@@ -69,10 +69,6 @@ figure.image img {
   object-fit: contain;
 }
 
-figure.image img[style*='height']:not([style*='width']) {
-  width: auto;
-}
-
 figure.image figcaption {
   margin-top: 0.4rem;
   color: var(--color-muted);

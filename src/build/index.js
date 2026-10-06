@@ -103,9 +103,6 @@ async function writeOutput(site, pages, images, outDir) {
 export async function build(root, { out }) {
   const site = await loadSite(root);
   const messages = [...site.messages];
-  if (site.config.theme !== undefined && !Object.hasOwn(site.themes, site.config.theme)) {
-    messages.push({ path: 'bake.config.js', line: 1, column: 1, text: `Unknown theme ${site.config.theme}` });
-  }
   const pages = [];
   for (const entry of site.pages.filter((page) => page.frontmatter.draft !== true)) {
     const rendered = await cachedRender(site, entry.path, await readFile(join(root, entry.path), 'utf8'));

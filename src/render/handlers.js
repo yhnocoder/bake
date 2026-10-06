@@ -57,6 +57,7 @@ export function createHandlers({ source, registry, components }) {
     const style = [];
     if (attributes.width) style.push(`width: ${cssSize(attributes.width)}`);
     if (attributes.height) style.push(`height: ${cssSize(attributes.height)}`);
+    if (attributes.height && !attributes.width) style.push('width: auto');
     const properties = { src: node.url, alt: node.alt ?? '' };
     if (style.length > 0) properties.style = style.join('; ');
     const className = ['image'];

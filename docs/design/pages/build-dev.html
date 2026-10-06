@@ -28,13 +28,13 @@
   <tbody>
     <tr><td><code>bake new &lt;path&gt;</code></td><td>新建 <code>content/&lt;path&gt;.md</code>，frontmatter 只有 <code>title</code> 和 <code>slug</code> 两项：<code>title</code> 是 <code>&lt;path&gt;</code> 的最后一段，<code>slug</code> 等于 <code>&lt;path&gt;</code>。<code>&lt;path&gt;</code> 不符合 <code>slug</code> 的格式时报错。成功时输出 <code>Created content/&lt;path&gt;.md</code>；文件已存在时输出 <code>content/&lt;path&gt;.md already exists</code></td><td>0 成功，1 失败</td></tr>
     <tr><td><code>bake dev [--port 4321]</code></td><td>启动开发服务器，默认端口 <code>4321</code>，被占用时依次尝试下一个端口</td><td>运行中不退出</td></tr>
-    <tr><td><code>bake build [--out dist]</code></td><td>生成静态网站到 <code>dist/</code>，<code>--out</code> 改变输出目录。成功时最后一行输出 <code>Built N pages to dist/</code></td><td>0 成功，1 有错误</td></tr>
+    <tr><td><code>bake build [--out dist]</code></td><td>生成静态网站到 <code>dist/</code>，<code>--out</code> 改变输出目录。成功时最后一行输出 <code>Built N pages to dist/</code>（N 为 1 时是 <code>Built 1 page to dist/</code>）</td><td>0 成功，1 有错误</td></tr>
     <tr><td><code>bake format [path...]</code></td><td>把 <code>.md</code> 文件统一成编辑器的输出格式，不改变内容。没有路径时处理 <code>content/</code> 下全部 <code>.md</code>，跳过 <code>notes/</code>、<code>components/</code>、<code>assets/</code>。每改写一个文件输出一行路径，最后一行输出 <code>Rewrote N files</code>（N 为 1 时是 <code>Rewrote 1 file</code>）或 <code>No files to rewrite</code>。只检查 Markdown 语法和 frontmatter 的 YAML 语法，有错误的文件不写回，按错误格式输出</td><td>0 成功，1 有解析错误</td></tr>
   </tbody>
 </table>
 <p>所有命令在博客仓库根目录运行，从当前目录读取 <code>bake.config.js</code>。命令行的全部输出使用英文，包括错误说明。错误信息的格式是 <code>文件路径:行:列 错误说明</code>，便于编辑器跳转。</p>
 <div class="term"><span class="prompt">$</span> bake build
-<span class="warn">content/word2vec/index.md:42:18 Link points to a missing heading /matrix-calculus/deep-learning#chain-rul</span> <span class="ref">1</span>
+<span class="warn">content/word2vec/index.md:42:18 Link points to a missing id /matrix-calculus/deep-learning/#chain-rul</span> <span class="ref">1</span>
 <span class="warn">content/bpe/index.md:7:1 Unknown directive :::callot</span>
 <span class="dim">2 errors, dist/ was not written</span> <span class="ref">2</span></div>
 <ol class="callouts">
@@ -59,7 +59,7 @@
   <tbody>
     <tr><td><code>title</code></td><td>必填</td><td>站点名，用于 <code>&lt;title&gt;</code> 后缀和版式页头</td></tr>
     <tr><td><code>base</code></td><td><code>/</code></td><td>站点部署的路径前缀。站内链接在 Markdown 中写不带前缀的绝对路径，构建时加上前缀</td></tr>
-    <tr><td><code>theme</code></td><td>无，必填</td><td>文章未写 <code>theme</code> 时使用的主题</td></tr>
+    <tr><td><code>theme</code></td><td>无，必填</td><td>文章未写 <code>theme</code> 时使用的主题，必须是 <code>themes/</code> 中的文件名，否则报错</td></tr>
     <tr><td><code>math.macros</code></td><td><code>{}</code></td><td>MathJax 宏，构建和编辑器共用</td></tr>
     <tr><td><code>site</code></td><td><code>{}</code></td><td>bake 不解释的数据，原样提供给组件，见 <a href="extending.html">扩展接口</a></td></tr>
   </tbody>
@@ -93,11 +93,13 @@
 │   └── sections.json         这一页的标题小节和带 id 段落的 HTML，供悬停预览
 ├── assets/
 │   ├── matrix-calculus/deep-learning/neuron.6b1f.webp
-│   ├── components/gradient-figure.a3c9.js
-│   └── bake.d07e.css
+│   ├── themes/blue.D2fT0aQe.css
+│   ├── client/page.Cw7nR1xA.js
+│   ├── components/gradient-figure.Bq3x9LkT.js
+│   └── bake.C8kya0lP.css
 └── site.json                 全站页面列表：地址、标题和 frontmatter</code></pre>
 <ul>
-  <li>每个页面只加载正文中用到的组件脚本。组件、版式 CSS 和主题 CSS 由 Vite 打包，文件名带内容哈希。</li>
+  <li>每个页面只加载正文中用到的组件脚本。组件、版式 CSS 和主题 CSS 由 Vite 打包，文件名带 8 位内容哈希（Vite 的哈希最短 6 位）。几个组件共用的代码由 Vite 拆到 <code>assets/chunks/</code>。</li>
   <li>图片由 sharp 处理：PNG 和 JPEG 转成 WebP；PNG、JPEG、WebP、AVIF 宽度超过 <code>1600px</code> 的缩到 <code>1600px</code>；GIF 和 SVG 原样复制。理由：GIF 可能是动图，转换会丢失动画。</li>
   <li>图片输出到 <code>assets/&lt;slug&gt;/&lt;文件名&gt;.&lt;哈希&gt;.&lt;扩展名&gt;</code>，哈希是源文件内容 SHA-256 的前 4 位十六进制。按 <code>slug</code> 分目录，所以移动文章文件不改变图片地址。</li>
   <li>每张图片输出 <code>width</code> 和 <code>height</code> 属性防止加载时页面跳动，并加 <code>loading="lazy"</code>。文章里写了 <code>width</code> 或 <code>height</code> 时，这两个值写进 <code>style</code>。</li>

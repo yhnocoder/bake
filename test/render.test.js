@@ -156,6 +156,11 @@ describe('每种内容的 HTML', () => {
       '<figure class="image float-left"><img src="./assets/neuron.svg" alt="说明" style="width: 160px; height: 2em"><figcaption>说明</figcaption></figure>',
     ],
     [
+      '只写高度的图片',
+      '![说明](./assets/neuron.svg){height=100}\n',
+      '<figure class="image"><img src="./assets/neuron.svg" alt="说明" style="height: 100px; width: auto"><figcaption>说明</figcaption></figure>',
+    ],
+    [
       'float 为 none 的图片',
       '![说明](./assets/neuron.svg){float=none}\n',
       '<figure class="image"><img src="./assets/neuron.svg" alt="说明"><figcaption>说明</figcaption></figure>',

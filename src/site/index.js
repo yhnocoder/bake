@@ -76,6 +76,9 @@ export async function loadSite(root) {
   messages.push(...pageMessages);
   const components = await loadComponents(root, messages);
   const themes = await loadThemes(root);
+  if (config.theme !== undefined && !Object.hasOwn(themes, config.theme)) {
+    messages.push({ path: configPath, line: 1, column: 1, text: `Unknown theme ${config.theme}` });
+  }
   return { root, config, pages, components, themes, layouts, messages };
 }
 
