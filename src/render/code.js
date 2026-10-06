@@ -28,13 +28,20 @@ let highlighterPromise;
 const languageLoads = new Map();
 
 export function highlighter() {
-  highlighterPromise ??= createHighlighter({ themes: [theme], langs: [] });
+  highlighterPromise ??= createHighlighter({ themes: [theme], langs: [] }).catch((error) => {
+    highlighterPromise = undefined;
+    throw error;
+  });
   return highlighterPromise;
 }
 
-async function loadLanguage(lang) {
-  if (!languageLoads.has(lang)) languageLoads.set(lang, highlighter().then((shiki) => shiki.loadLanguage(lang)));
-  await languageLoads.get(lang);
+function loadLanguage(lang) {
+  if (!languageLoads.has(lang)) {
+    const load = highlighter().then((shiki) => shiki.loadLanguage(lang));
+    languageLoads.set(lang, load);
+    load.catch(() => languageLoads.delete(lang));
+  }
+  return languageLoads.get(lang);
 }
 
 export async function highlightCode(tree, report) {
@@ -48,9 +55,16 @@ export async function highlightCode(tree, report) {
     blocks.push(node);
   });
   if (blocks.length === 0) return;
-  await Promise.all([...new Set(blocks.map((node) => node.lang))].map(loadLanguage));
+  const failures = new Map();
+  const languages = [...new Set(blocks.map((node) => node.lang))];
+  await Promise.all(languages.map((lang) => loadLanguage(lang).catch((error) => failures.set(lang, error))));
   const shiki = await highlighter();
   for (const node of blocks) {
+    const failure = failures.get(node.lang);
+    if (failure) {
+      report(node, `Cannot load code language ${node.lang}: ${failure.message}`);
+      continue;
+    }
     const [pre] = shiki.codeToHast(node.value, { lang: node.lang, theme: 'bake' }).children;
     node.data = { ...node.data, hChildren: pre.children[0].children };
   }

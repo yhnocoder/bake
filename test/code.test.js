@@ -48,6 +48,21 @@ describe('代码高亮', () => {
     loadLanguage.mock.restore();
   });
 
+  test('语言加载失败时报错并按纯文本输出，之后的渲染重新加载这种语言', async () => {
+    const shiki = await highlighter();
+    const failing = mock.method(shiki, 'loadLanguage', async () => {
+      throw new Error('broken grammar');
+    }, { times: 1 });
+    const { html, messages } = await renderBody('```go\nx := 1 < 2\n```');
+    assert.deepEqual(
+      messages.map(({ line, column, text }) => ({ line: line - headerLines, column, text })),
+      [{ line: 1, column: 1, text: 'Cannot load code language go: broken grammar' }],
+    );
+    assert.equal(html, '<pre><code class="language-go">x := 1 &#x3C; 2\n</code></pre>');
+    assert.match(await htmlOf('```go\nx := 1\n```'), /^<pre><code class="language-go"><span class="line">/);
+    failing.mock.restore();
+  });
+
   test('没有语言名和语言名为 text、txt、plain 的代码块不高亮', async () => {
     assert.equal(await htmlOf('```\na < b\n```'), '<pre><code>a &#x3C; b\n</code></pre>');
     for (const lang of ['text', 'txt', 'plain']) {
