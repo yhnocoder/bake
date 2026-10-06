@@ -64,8 +64,13 @@ figure.image {
 figure.image img {
   display: block;
   max-width: 100%;
+  height: auto;
   margin: 0 auto;
   object-fit: contain;
+}
+
+figure.image img[style*='height']:not([style*='width']) {
+  width: auto;
 }
 
 figure.image figcaption {
