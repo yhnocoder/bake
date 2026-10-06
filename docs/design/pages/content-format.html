@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>内容格式</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaiscreen.css">
+<link rel="stylesheet" href="../style.css">
+<script defer src="../math.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-core.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/diff-highlight/prism-diff-highlight.min.js"></script>
+<script defer src="../code.js"></script>
+</head>
+<body>
+<main>
+<p class="nav"><a href="../index.html">返回索引</a></p>
+<h1>内容格式</h1>
+<p class="lead">本文档定义 bake 接受的 Markdown 写法：基础语法、内置块类型、公式、旁注、站内引用和 frontmatter。<mark>渲染模块和编辑器都从内容格式模块取定义</mark>，这里写下的每一种写法，在编辑器里都能编辑，在页面上都能显示。</p>
+
+<blockquote>
+  <p>写法只有一套来源：<code>src/format/</code> 的 remark 插件组合和块类型登记表。新增一种写法时，先在这里登记，渲染和编辑器同时获得它。</p>
+</blockquote>
+
+<h2>基础语法是什么</h2>
+<p>正文是 CommonMark 加 GFM（表格、删除线、任务列表、脚注），再加公式（remark-math）、指令块（remark-directive）和文字标记 <code>==文字==</code>。不认识的指令名在构建和编辑器载入时报错，报错信息包含文件路径和行号。</p>
+<table>
+  <thead>
+    <tr><th>remark 插件</th><th>提供的写法</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>remark-gfm</code></td><td>表格、删除线、任务列表、脚注（用作旁注）</td></tr>
+    <tr><td><code>remark-math</code></td><td>行内公式 <code>$...$</code>、独立公式 <code>$$...$$</code></td></tr>
+    <tr><td><code>remark-directive</code></td><td><code>:name[]{}</code>、<code>::name[]{}</code>、<code>:::name</code> 三种指令</td></tr>
+    <tr><td>高亮插件</td><td><code>==文字==</code>。候选是 <code>remark-highlight-mark</code> 和 <code>remark-flexible-markers</code>，实现时按与 Milkdown 的兼容性选定；都不兼容时写一个 micromark 扩展</td></tr>
+  </tbody>
+</table>
+
+<h2>段落里能不能写 HTML</h2>
+<p>不能。段落、标题、列表里出现 HTML 标签时构建报错。只用一次的特殊内容写成独立的 HTML 块：前后各空一行，块内是完整的 HTML。编辑器里显示它的渲染结果，点开后编辑源码。</p>
+<p>同一种写法用到第二次时，把它做成块类型或文字标记：所有博客都可能用到的加进 bake 的 <code>src/blocks/</code>，只有一个博客使用的加在该博客的 <code>blocks/</code>。理由：HTML 在编辑器里只能按源码编辑，块类型才能在编辑器里直接输入。</p>
+
+<h2>内置块类型有哪些</h2>
+<table>
+  <thead>
+    <tr><th>内容</th><th>写法</th><th>生成的 HTML</th><th>编辑器里怎么改</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>标题 id 和目录短标题</td><td><code>## 标题 {#chain-rule toc="链式法则"}</code></td><td><code>&lt;h2 id="chain-rule"&gt;</code>，目录使用 <code>toc</code> 的文字</td><td>标题旁显示 id，在属性面板里改</td></tr>
+    <tr><td>文字标记</td><td><code>==文字==</code></td><td><code>&lt;mark&gt;</code></td><td>选中文字按快捷键</td></tr>
+    <tr><td>导语</td><td>正文开头的 <code>:::lede</code></td><td><code>&lt;div class="lede"&gt;</code></td><td>直接输入</td></tr>
+    <tr><td>章节副标题</td><td><code>::subtitle[文字]</code></td><td><code>&lt;p class="subtitle"&gt;</code></td><td>直接输入</td></tr>
+    <tr><td>图片</td><td><code>![说明](./assets/x.png)</code></td><td><code>&lt;figure&gt;</code>，说明文字同时作为 alt 和图注</td><td>粘贴或拖入，文件存进文章所在目录的 <code>assets/</code></td></tr>
+    <tr><td>组件</td><td>带图题 <code>:::name{属性}</code>，不带图题 <code>::name{属性}</code></td><td>同名 custom element，图题放在元素内的 <code>&lt;figcaption&gt;</code></td><td>组件照常运行，属性面板改参数，图题直接输入</td></tr>
+    <tr><td>折叠</td><td><code>:::fold[标题]</code></td><td><code>&lt;details&gt;</code></td><td>标题和内容直接输入，编辑时保持展开</td></tr>
+    <tr><td>提示框</td><td><code>:::callout{kind=note}</code>，<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code></td><td><code>&lt;aside class="callout note"&gt;</code></td><td>内容直接输入，类型在属性面板里选</td></tr>
+    <tr><td>加宽</td><td><code>:::wide</code></td><td><code>&lt;div class="wide"&gt;</code>，宽度扩展到正文和旁注栏</td><td>直接输入</td></tr>
+    <tr><td>边注</td><td><code>:::margin</code></td><td><code>&lt;aside class="sidenote unnumbered"&gt;</code>，放在右侧栏，不带编号</td><td>直接输入</td></tr>
+    <tr><td>卡片网格</td><td><code>:::bento</code> 内放 <code>::::card{span="2x1" title="标题"}</code></td><td>CSS grid，<code>span</code> 是列数乘行数</td><td>卡片内容直接输入，尺寸和标题在属性面板里改</td></tr>
+    <tr><td>参考文献</td><td><code>:::references</code> 内放普通列表</td><td><code>&lt;ol class="references"&gt;</code></td><td>直接编辑列表</td></tr>
+    <tr><td>表格</td><td>GFM 表格</td><td>外面包一层可以横向滚动的容器</td><td>表格编辑</td></tr>
+    <tr><td>独立的 HTML 块</td><td>前后空行的 HTML</td><td>原样输出</td><td>显示渲染结果，点开编辑源码</td></tr>
+  </tbody>
+</table>
+<p>指令的三种形式对应块类型定义里的 <code>form</code>：<code>:name</code> 是行内标记（<code>text</code>），<code>::name</code> 是单行块（<code>leaf</code>），<code>:::name</code> 是可以包含段落的块（<code>container</code>）。容器嵌套时外层多写一个冒号。块类型的定义方式见 <a href="extending.html">扩展接口</a>。</p>
+
+<h2>公式怎么写</h2>
+<p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
+<p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
+
+<h2>旁注怎么写</h2>
+<p>旁注是带编号的注释：正文里显示上标数字，注释放在右侧栏，与引用处对齐。写法是 GFM 脚注，注释里可以写任意 Markdown，包括公式、链接、列表和多个段落。</p>
+<pre><code class="language-markdown">导数描述的是函数在一点附近的变化率[^d]。
+
+[^d]: 这里的“附近”指 $\Delta x \to 0$ 的极限，见[前文](#derivative)。
+
+    注释的第二段缩进四个空格。</code></pre>
+<ul>
+  <li>编号按引用在正文中出现的顺序从 1 开始生成。<code>[^d]</code> 里的名字只用于对应，不显示。</li>
+  <li>鼠标移到注释上时，正文里被注释的内容高亮；鼠标移到正文的编号上时，对应注释高亮。默认高亮编号所在的整个段落。</li>
+  <li>需要精确范围时写 <code>:span[被注释的文字][^d]</code>，只高亮方括号里的文字。</li>
+  <li>定义了但没有被引用的注释，以及引用了但没有定义的注释，构建报错。</li>
+  <li>编辑器保存时，注释定义写在引用它的段落之后。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
+</ul>
+<p>生成的页面里，每条注释输出为 <code>&lt;aside class="sidenote"&gt;</code>，放在引用它的段落之后。对齐和高亮的行为见 <a href="#sidenote-layout">旁注怎么排版</a>。</p>
+
+<h3 id="sidenote-layout">旁注怎么排版</h3>
+<p>CSS 把 <code>.sidenote</code> 放进右侧栏，没有脚本时注释也在段落旁边显示。对齐脚本只做两件事：</p>
+<ol>
+  <li>一次读取全部编号的纵向位置，再一次写入全部注释的位置。一条注释的顶部低于上一条注释的底部加 <code>12px</code> 间距时，按编号位置放置；否则往下推到上一条注释底部加 <code>12px</code>。</li>
+  <li>字体加载完成（<code>document.fonts.ready</code>）、正文容器尺寸变化（ResizeObserver）、折叠块展开或收起时，重新执行第 1 步。</li>
+</ol>
+<p>读和写分成两批。理由：交替读写会让浏览器对每条注释都重新计算一次布局。</p>
+<p>高亮使用 CSS Custom Highlight API：把被注释的文字范围登记为一个 <code>Highlight</code>，由 <code>::highlight(sidenote)</code> 设定背景色。这个方式不修改 DOM，高亮不会引起重新排版。浏览器不支持这个 API 时不显示高亮，其他功能不受影响。</p>
+<p>窗口宽度小于 <code>1100px</code> 时没有右侧栏，注释显示在所在段落之后，缩进并用小字号。窄屏上点编号展开注释的交互属于手机适配，不在第一版。</p>
+
+<h2>站内引用怎么写</h2>
+<p>站内链接就是普通 Markdown 链接，不加新语法。链接到站内页面时，鼠标停留在链接上会弹出预览卡片，显示目标内容。</p>
+<pre><code class="language-markdown">这里用到的是[链式法则](/matrix-calculus/deep-learning#chain-rule)。
+
+链式法则把复合函数的导数写成各层导数的乘积。 ^chain-rule-def</code></pre>
+<table>
+  <thead>
+    <tr><th>链接目标</th><th>写法</th><th>预览显示</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>一篇文章</td><td><code>/topic/page</code></td><td>标题和导语</td></tr>
+    <tr><td>一个标题</td><td><code>/topic/page#heading-id</code></td><td>这个标题下的整节，到下一个同级或更高级标题为止</td></tr>
+    <tr><td>一个段落</td><td><code>/topic/page#block-id</code>，段落末尾写 <code>^block-id</code></td><td>这个段落</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><code>^block-id</code> 是 Obsidian 的块引用写法，写在段落最后，前面有一个空格，页面上不显示。它在页面上成为段落的 <code>id</code>。</li>
+  <li>站内链接指向的文章、标题或段落不存在时，构建报错，报错列出每一处引用的位置。</li>
+  <li>同一页内的链接写 <code>#id</code>，同样有预览。</li>
+  <li>图片语法 <code>![](/page#id)</code> 不用于引用。理由：它和真正的图片无法区分。</li>
+</ul>
+
+<h2>frontmatter 有哪些字段</h2>
+<pre><code class="language-yaml">---
+title: 大模型里的激活函数
+eyebrow: LLM Architecture Notes · 2026-09
+layout: essay
+theme: blue
+width: normal
+toc: true
+category: arch
+summary: 从 ReLU 到 SwiGLU，比较各函数的输出、导数和极限行为
+tags: [GELU, SiLU, GLU]
+---</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>类型</th><th>默认值</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>title</code></td><td>字符串</td><td>必填</td><td>页面标题和 <code>&lt;title&gt;</code></td></tr>
+    <tr><td><code>eyebrow</code></td><td>字符串</td><td>无</td><td>标题上方的一行小字</td></tr>
+    <tr><td><code>layout</code></td><td><code>essay</code> | <code>paper</code> | <code>bento</code> | 博客自定义的版式名</td><td><code>essay</code></td><td>选择版式，见 <a href="extending.html">扩展接口</a></td></tr>
+    <tr><td><code>theme</code></td><td><code>themes/</code> 下的文件名</td><td><code>bake.config.js</code> 的 <code>theme</code></td><td>选择主题</td></tr>
+    <tr><td><code>width</code></td><td><code>normal</code> | <code>wide</code></td><td><code>normal</code></td><td>正文宽度。<code>normal</code> 是 <code>--measure</code>，<code>wide</code> 是 <code>--measure-wide</code>，两个值由主题设定</td></tr>
+    <tr><td><code>toc</code></td><td>布尔</td><td><code>true</code></td><td>是否显示目录</td></tr>
+    <tr><td><code>numbered</code></td><td>布尔</td><td><code>false</code></td><td>标题是否自动编号，<code>paper</code> 版式默认 <code>true</code></td></tr>
+    <tr><td><code>authors</code></td><td>字符串列表</td><td>无</td><td><code>paper</code> 版式的作者行</td></tr>
+    <tr><td><code>abstract</code></td><td>字符串</td><td>无</td><td><code>paper</code> 版式的摘要</td></tr>
+    <tr><td><code>draft</code></td><td>布尔</td><td><code>false</code></td><td>为 <code>true</code> 时 <code>bake build</code> 不生成这一页，<code>bake dev</code> 照常显示</td></tr>
+  </tbody>
+</table>
+<p>以上字段由 bake 校验，类型不符时构建报错。其他字段（例如 <code>category</code>、<code>summary</code>、<code>tags</code>）bake 不解释，原样放进站点数据，供首页这类组件使用，见 <a href="extending.html">扩展接口</a>。</p>
+
+<h2>Markdown 的输出格式是什么</h2>
+<p>编辑器保存时用 remark-stringify 输出 Markdown，往返测试要求载入后不修改直接导出的结果与原文件逐字节相同。为此输出格式固定如下，示例博客的文件也按这个格式书写：</p>
+<table>
+  <thead>
+    <tr><th>项目</th><th>输出</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>无序列表符号</td><td><code>-</code></td></tr>
+    <tr><td>强调和加粗</td><td><code>*斜体*</code>、<code>**加粗**</code></td></tr>
+    <tr><td>代码块</td><td>三个反引号加语言名</td></tr>
+    <tr><td>标题</td><td>ATX 形式（<code>##</code>）</td></tr>
+    <tr><td>块之间</td><td>一个空行</td></tr>
+    <tr><td>文件末尾</td><td>一个换行符</td></tr>
+  </tbody>
+</table>
+<p>已有文件不符合这个格式时，第一次保存会改变这些写法。迁移博客时先用 <code>bake format</code> 统一一次，之后的 diff 只包含实际修改。</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>构建与开发服务器</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaiscreen.css">
+<link rel="stylesheet" href="../style.css">
+<script defer src="../math.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-core.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/diff-highlight/prism-diff-highlight.min.js"></script>
+<script defer src="../code.js"></script>
+</head>
+<body>
+<main>
+<p class="nav"><a href="../index.html">返回索引</a></p>
+<h1>构建与开发服务器</h1>
+<p class="lead">本文档写 bake 的命令、配置文件、页面地址规则、<code>bake build</code> 的输出，以及 <code>bake dev</code> 提供的接口和<mark>不刷新整页的更新方式</mark>。</p>
+
+<h2>有哪些命令</h2>
+<table>
+  <thead>
+    <tr><th>命令</th><th>作用</th><th>退出码</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>bake new &lt;路径&gt;</code></td><td>新建 <code>content/&lt;路径&gt;.md</code>，只含 <code>title</code> 一项 frontmatter；文件已存在时报错</td><td>0 成功，1 失败</td></tr>
+    <tr><td><code>bake dev [--port 4321]</code></td><td>启动开发服务器，默认端口 <code>4321</code>，被占用时依次尝试下一个端口</td><td>运行中不退出</td></tr>
+    <tr><td><code>bake build [--out dist]</code></td><td>生成静态网站到 <code>dist/</code></td><td>0 成功，1 有错误</td></tr>
+    <tr><td><code>bake format [路径...]</code></td><td>把 <code>.md</code> 文件统一成编辑器的输出格式，不改变内容，默认处理全部文章</td><td>0 成功，1 有解析错误</td></tr>
+  </tbody>
+</table>
+<p>所有命令在博客仓库根目录运行，从当前目录读取 <code>bake.config.js</code>。错误信息的格式是 <code>文件路径:行:列 错误说明</code>，便于编辑器跳转。</p>
+<div class="term"><span class="prompt">$</span> bake build
+<span class="warn">content/word2vec/index.md:42:18 站内链接指向不存在的标题 /matrix-calculus/deep-learning#chain-rul</span> <span class="ref">1</span>
+<span class="warn">content/bpe/index.md:7:1 未知的指令 :::callot</span>
+<span class="dim">2 个错误，未生成 dist/</span> <span class="ref">2</span></div>
+<ol class="callouts">
+  <li>每个错误一行，构建继续检查其余文件，最后汇总报告。</li>
+  <li>有任何错误时不写入输出目录，已有的 <code>dist/</code> 保持不变。</li>
+</ol>
+
+<h2>配置文件有哪些字段</h2>
+<pre><code class="language-js">export default {
+  title: 'Learn by Visualization',
+  base: process.env.BASE_PATH ?? '/',
+  theme: 'blue',
+  math: { macros: { R: '\\mathbb{R}' } },
+  site: {
+    categories: [{ id: 'math', name: '数学', color: '#985b57' }],
+  },
+};</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>默认值</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>title</code></td><td>必填</td><td>站点名，用于 <code>&lt;title&gt;</code> 后缀和版式页头</td></tr>
+    <tr><td><code>base</code></td><td><code>/</code></td><td>站点部署的路径前缀。站内链接在 Markdown 中写不带前缀的绝对路径，构建时加上前缀</td></tr>
+    <tr><td><code>theme</code></td><td>无，必填</td><td>文章未写 <code>theme</code> 时使用的主题</td></tr>
+    <tr><td><code>math.macros</code></td><td><code>{}</code></td><td>MathJax 宏，构建和编辑器共用</td></tr>
+    <tr><td><code>site</code></td><td><code>{}</code></td><td>bake 不解释的数据，原样提供给组件，见 <a href="extending.html">扩展接口</a></td></tr>
+  </tbody>
+</table>
+
+<h2>页面地址怎么确定</h2>
+<table>
+  <thead>
+    <tr><th>文件</th><th>地址</th><th>输出文件</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>content/index.md</code></td><td><code>/</code></td><td><code>dist/index.html</code></td></tr>
+    <tr><td><code>content/word2vec/index.md</code></td><td><code>/word2vec/</code></td><td><code>dist/word2vec/index.html</code></td></tr>
+    <tr><td><code>content/matrix-calculus/deep-learning.md</code></td><td><code>/matrix-calculus/deep-learning/</code></td><td><code>dist/matrix-calculus/deep-learning/index.html</code></td></tr>
+  </tbody>
+</table>
+<p><code>notes/</code>、<code>components/</code>、<code>assets/</code> 目录和以 <code>_</code> 开头的文件不生成页面。站内链接可以写成带或不带末尾 <code>/</code> 的地址，构建时统一成带 <code>/</code> 的形式。</p>
+
+<h2><code>bake build</code> 输出什么</h2>
+<pre><code class="language-text">dist/
+├── index.html
+├── matrix-calculus/deep-learning/
+│   ├── index.html            整页 HTML，公式已是 SVG
+│   └── sections.json         这一页的标题小节和带 id 段落的 HTML，供悬停预览
+├── assets/
+│   ├── matrix-calculus/neuron.6b1f.webp
+│   ├── components/gradient-figure.a3c9.js
+│   └── bake.d07e.css
+└── site.json                 全站页面列表：地址、标题和 frontmatter</code></pre>
+<ul>
+  <li>每个页面只加载正文中用到的组件脚本。组件、版式 CSS 和主题 CSS 由 Vite 打包，文件名带内容哈希。</li>
+  <li>图片由 sharp 处理：位图转成 WebP，宽度超过 <code>1600px</code> 的缩到 <code>1600px</code>，输出 <code>width</code> 和 <code>height</code> 属性防止加载时页面跳动，加 <code>loading="lazy"</code>。SVG 原样复制。</li>
+  <li>构建按文件内容缓存渲染结果，缓存放在 <code>node_modules/.cache/bake/</code>。只修改一篇文章时，其他文章不重新渲染公式。</li>
+</ul>
+
+<h2>悬停预览的数据怎么生成</h2>
+<p>构建时为每个页面写一个 <code>sections.json</code>：</p>
+<pre><code class="language-json">{
+  "title": "深度学习中的矩阵微积分",
+  "lede": "&lt;p&gt;...&lt;/p&gt;",
+  "sections": {
+    "chain-rule": { "kind": "heading", "html": "&lt;h2&gt;...&lt;/h2&gt;&lt;p&gt;...&lt;/p&gt;", "components": ["gradient-figure"] },
+    "chain-rule-def": { "kind": "block", "html": "&lt;p&gt;...&lt;/p&gt;", "components": [] }
+  }
+}</code></pre>
+<p>页面上的预览脚本在鼠标停留在站内链接上 <code>300ms</code> 后请求目标页的 <code>sections.json</code>，结果按页面缓存。预览卡片中用到的组件按 <code>components</code> 列表加载。预览卡片里的链接不再弹出下一层预览。鼠标离开链接和卡片 <code>200ms</code> 后卡片关闭。</p>
+
+<h2>站内链接怎么检查</h2>
+<p>构建先渲染全部页面，收集每页的标题 id 和 <code>^block-id</code>，再检查全部站内链接。链接指向不存在的页面、标题或段落时报错。同一页内出现重复的 id 时报错。<code>bake dev</code> 在页面上用状态栏提示断开的链接，不阻止页面显示。</p>
+
+<h2><code>bake dev</code> 提供什么</h2>
+<p>开发服务器是一组 Vite 插件。请求页面时即时渲染对应的 <code>.md</code>，渲染结果按文件内容缓存。</p>
+<table>
+  <thead>
+    <tr><th>接口</th><th>请求</th><th>返回</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>GET /__bake/source?page=/word2vec/</code></td><td>页面地址</td><td>文件路径、Markdown 原文、内容哈希</td></tr>
+    <tr><td><code>POST /__bake/save</code></td><td>页面地址、新的 Markdown、载入时的哈希</td><td>新的哈希；磁盘内容已变化时返回 409 和磁盘上的版本</td></tr>
+    <tr><td><code>POST /__bake/asset</code></td><td>页面地址、文件数据、扩展名</td><td>写入后的相对路径，例如 <code>./assets/3f9a1c2e.png</code></td></tr>
+    <tr><td><code>GET /__bake/sections</code></td><td>无</td><td>全站文章、标题、带 id 段落的列表，供链接选择器使用</td></tr>
+    <tr><td><code>GET /__bake/preview?href=/a/b/#id</code></td><td>站内链接</td><td>目标内容的 HTML，供编辑器里的悬停预览</td></tr>
+  </tbody>
+</table>
+<p>写入类接口只接受 <code>content/</code> 目录内的路径，路径解析后不在 <code>content/</code> 内时返回 403。开发服务器只监听 <code>localhost</code>。</p>
+
+<h3>文件变化怎么通知页面</h3>
+<ul>
+  <li><code>.md</code> 文件变化时，开发服务器重新渲染这一页，通过 Vite 的 WebSocket 发送 <code>bake:page</code> 事件，内容是新的正文 HTML、目录和旁注。页面就地替换，不刷新整页。</li>
+  <li>变化来自 <code>/__bake/save</code> 时，开发服务器记录写入内容的哈希，监视到哈希相同的变化时不发送事件。</li>
+  <li>组件 <code>.js</code> 变化时由 Vite 的模块热更新处理；主题 CSS 变化时由 Vite 替换样式表。</li>
+  <li>版式、<code>blocks/</code> 或 <code>bake.config.js</code> 变化时，重新渲染所有打开的页面并发送 <code>bake:page</code> 事件。</li>
+</ul>
+</main>
+</body>
+</html>
