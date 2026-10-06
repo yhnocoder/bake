@@ -18,8 +18,8 @@ const { default: DemoPlot } = await import(join(minimal, 'components/demo-plot.j
 const components = { 'demo-plot': DemoPlot.properties };
 const layouts = { essay: essay.fields, paper: paper.fields, bento: bento.fields };
 const options = { path: 'post.md', config, components, layouts, themes: ['default'] };
-const header = '---\ntitle: 测试\n---\n\n';
-const headerLines = 4;
+const header = '---\ntitle: 测试\nslug: test\n---\n\n';
+const headerLines = 5;
 
 function renderBody(body, extra = {}) {
   return render(`${header}${body}`, { ...options, ...extra });
@@ -382,10 +382,10 @@ describe('站内链接和组件', () => {
   test('收集站内链接并统一为带末尾 / 的形式', async () => {
     const { links, html } = await renderBody('[a](/topic/page) [b](/topic/page#x) [c](#y) [d](/topic/) [e](https://example.com/a)\n');
     assert.deepEqual(links, [
-      { href: '/topic/page/', line: 5, column: 1 },
-      { href: '/topic/page/#x', line: 5, column: 18 },
-      { href: '#y', line: 5, column: 37 },
-      { href: '/topic/', line: 5, column: 45 },
+      { href: '/topic/page/', line: headerLines + 1, column: 1 },
+      { href: '/topic/page/#x', line: headerLines + 1, column: 18 },
+      { href: '#y', line: headerLines + 1, column: 37 },
+      { href: '/topic/', line: headerLines + 1, column: 45 },
     ]);
     assert.ok(html.includes('<a href="/topic/page/#x">b</a>'));
     assert.ok(html.includes('<a href="https://example.com/a">e</a>'));

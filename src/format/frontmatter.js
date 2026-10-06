@@ -1,8 +1,17 @@
 import { isMap, parseDocument } from 'yaml';
 import { location } from 'vfile-location';
 
+const slugPattern = /^(?:\/|[a-z0-9-]+(?:\/[a-z0-9-]+)*)$/;
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isSlug(value) {
+  return typeof value === 'string' && slugPattern.test(value);
+}
+
 const commonFields = {
   title: { type: 'string' },
+  slug: { type: 'slug' },
+  date: { type: 'date' },
   layout: { type: 'string', default: 'essay' },
   theme: { type: 'string' },
   width: { type: 'enum', options: ['normal', 'wide'], default: 'normal' },
@@ -50,6 +59,12 @@ function typeError(name, value, field) {
       return Array.isArray(value) && value.every((item) => typeof item === 'string')
         ? null
         : `Frontmatter field ${name} must be a list of strings`;
+    case 'slug':
+      return isSlug(value)
+        ? null
+        : `Frontmatter field slug must be / or segments of lowercase letters, digits and - separated by /, got ${value}`;
+    case 'date':
+      return typeof value === 'string' && datePattern.test(value) ? null : `Frontmatter field date must be YYYY-MM-DD, got ${value}`;
     default:
       return null;
   }
@@ -78,6 +93,7 @@ export function checkFrontmatter(file, yaml, { layouts, themes }) {
   }
   const placeOf = (name) => keyPlaces.get(name) ?? start;
   if (values.title === undefined) file.message('Frontmatter is missing title', start);
+  if (values.slug === undefined) file.message('Frontmatter is missing slug', start);
   const layout = values.layout ?? commonFields.layout.default;
   let layoutFields = {};
   if (layouts) {

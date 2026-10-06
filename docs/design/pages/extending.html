@@ -122,6 +122,17 @@
 };</code></pre>
 <p>字段定义的格式与组件的 <code>static properties</code> 相同，另外支持 <code>list</code>（字符串列表）类型。bake 用它校验文章的 frontmatter，把默认值填进 <code>page</code>，并在编辑器的页面属性面板里生成控件。版式字段不能与通用字段同名，同名时构建报错。</p>
 <p><code>&lt;head&gt;</code>、主题 CSS、组件脚本、旁注对齐脚本、预览脚本和复制脚本由 bake 加入，版式不处理。编辑器挂载在版式输出的 <code>&lt;article&gt;</code> 上，所以每个版式必须输出且只输出一个 <code>&lt;article&gt;</code>。</p>
+<p>版式和 bake 的 CSS 通过以下 class 对应：</p>
+<table>
+  <thead>
+    <tr><th>class</th><th>由谁加</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>&lt;main class="layout-essay"&gt;</code></td><td>内置版式，<code>layout-paper</code>、<code>layout-bento</code> 同理</td><td>选择这个版式的栅格</td></tr>
+    <tr><td><code>&lt;article class="numbered"&gt;</code></td><td>版式，frontmatter 的 <code>numbered</code> 为 <code>true</code> 时</td><td><code>h2</code> 和 <code>h3</code> 用 CSS 计数器编号，essay 和 paper 共用同一段规则</td></tr>
+    <tr><td><code>&lt;body class="wide"&gt;</code></td><td>bake 生成整页时，frontmatter 的 <code>width</code> 为 <code>wide</code> 时</td><td>正文宽度改用 <code>--measure-wide</code></td></tr>
+  </tbody>
+</table>
 
 <h2>主题怎么写</h2>
 <p><code>themes/</code> 下每个 CSS 文件是一个主题，文件名是主题名。主题设定 bake 规定的 CSS 变量，也可以写博客自己的块类型和组件的样式。bake 的版式和内置块只使用这些变量，不写具体颜色。</p>
@@ -141,7 +152,7 @@
   --measure-wide: 60rem;
   --sidenote-width: 16rem;
 }</code></pre>
-<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。</p>
+<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。变量名列表在 <code>src/styles/variables.js</code>，检查主题时使用它。</p>
 
 <h2 id="site-data">组件怎么取得站点数据</h2>
 <p>首页是 <code>content/index.md</code>，首页的卡片网格是博客的全局组件 <code>topic-grid</code>。组件从 <code>bake/runtime</code> 导入 <code>site</code> 取得站点数据：</p>

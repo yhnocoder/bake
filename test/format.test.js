@@ -28,7 +28,7 @@ function markdownFiles(directory) {
 }
 
 function messagesOf(body, extra = {}) {
-  return parse(`---\ntitle: 测试\n---\n\n${body}`, { ...options, ...extra }).messages;
+  return parse(`---\ntitle: 测试\nslug: test\n---\n\n${body}`, { ...options, ...extra }).messages;
 }
 
 function only(body, extra) {
@@ -208,11 +208,11 @@ describe('块引用 id', () => {
 
 describe('校验：指令', () => {
   test('不认识的指令名', () => {
-    assert.deepEqual(only(':::callot\n内容\n:::\n'), { line: 5, column: 1, text: 'Unknown directive :::callot' });
+    assert.deepEqual(only(':::callot\n内容\n:::\n'), { line: 6, column: 1, text: 'Unknown directive :::callot' });
   });
 
   test('组件名不在 components 中', () => {
-    assert.deepEqual(only('::demo-plt\n'), { line: 5, column: 1, text: 'Unknown component ::demo-plt' });
+    assert.deepEqual(only('::demo-plt\n'), { line: 6, column: 1, text: 'Unknown component ::demo-plt' });
   });
 
   test('没有传入 components 时不检查组件', () => {
@@ -221,19 +221,19 @@ describe('校验：指令', () => {
 
   test('组件不能写成行内形式', () => {
     assert.deepEqual(only('文字 :demo-plot 文字\n'), {
-      line: 5,
+      line: 6,
       column: 4,
       text: 'Component :demo-plot must be written as ::demo-plot or :::demo-plot',
     });
   });
 
   test('指令形式与定义不符', () => {
-    assert.deepEqual(only('::callout\n'), { line: 5, column: 1, text: '::callout must be written as :::callout' });
+    assert.deepEqual(only('::callout\n'), { line: 6, column: 1, text: '::callout must be written as :::callout' });
   });
 
   test('属性不在定义中', () => {
     assert.deepEqual(only(':::callout{color=red}\n内容\n:::\n'), {
-      line: 5,
+      line: 6,
       column: 1,
       text: 'Unknown attribute color on :::callout',
     });
@@ -241,93 +241,93 @@ describe('校验：指令', () => {
 
   test('enum 取值不在 options 中', () => {
     assert.deepEqual(only(':::callout{kind=info}\n内容\n:::\n'), {
-      line: 5,
+      line: 6,
       column: 1,
       text: 'Attribute kind must be one of note, tip, warning, got info',
     });
   });
 
   test('数字类型不符', () => {
-    assert.deepEqual(only('::demo-plot{x0=abc}\n'), { line: 5, column: 1, text: 'Attribute x0 must be a number, got abc' });
+    assert.deepEqual(only('::demo-plot{x0=abc}\n'), { line: 6, column: 1, text: 'Attribute x0 must be a number, got abc' });
   });
 
   test('布尔类型不符', () => {
     assert.deepEqual(only('::demo-plot{showPath=yes}\n'), {
-      line: 5,
+      line: 6,
       column: 1,
       text: 'Attribute showPath must be true or false, got yes',
     });
   });
 
   test('组件属性不在定义中', () => {
-    assert.deepEqual(only('::demo-plot{size=3}\n'), { line: 5, column: 1, text: 'Unknown attribute size on ::demo-plot' });
+    assert.deepEqual(only('::demo-plot{size=3}\n'), { line: 6, column: 1, text: 'Unknown attribute size on ::demo-plot' });
   });
 });
 
 describe('校验：结构规则', () => {
   test('导语只能是正文第一个块', () => {
-    assert.deepEqual(only('第一段。\n\n:::lede\n导语\n:::\n'), { line: 7, column: 1, text: ':::lede must be the first block' });
+    assert.deepEqual(only('第一段。\n\n:::lede\n导语\n:::\n'), { line: 8, column: 1, text: ':::lede must be the first block' });
     assert.deepEqual(messagesOf(':::lede\n导语\n:::\n'), []);
   });
 
   test('::subtitle must directly follow a heading', () => {
-    assert.deepEqual(only('段落。\n\n::subtitle[说明]\n'), { line: 7, column: 1, text: '::subtitle must directly follow a heading' });
+    assert.deepEqual(only('段落。\n\n::subtitle[说明]\n'), { line: 8, column: 1, text: '::subtitle must directly follow a heading' });
     assert.deepEqual(messagesOf('## 标题\n\n::subtitle[说明]\n'), []);
   });
 
   test('::source must be the last child of a blockquote', () => {
     assert.deepEqual(only('> ::source[出处]\n>\n> 引文\n'), {
-      line: 5,
+      line: 6,
       column: 3,
       text: '::source must be the last child of a blockquote',
     });
-    assert.deepEqual(only('::source[出处]\n'), { line: 5, column: 1, text: '::source must be the last child of a blockquote' });
+    assert.deepEqual(only('::source[出处]\n'), { line: 6, column: 1, text: '::source must be the last child of a blockquote' });
   });
 
   test('折叠块必须写标题', () => {
-    assert.deepEqual(only(':::fold\n内容\n:::\n'), { line: 5, column: 1, text: ':::fold requires a title in brackets' });
+    assert.deepEqual(only(':::fold\n内容\n:::\n'), { line: 6, column: 1, text: ':::fold requires a title in brackets' });
   });
 
   test(':::bento can only contain :::card', () => {
-    assert.deepEqual(only('::::bento\n段落\n::::\n'), { line: 5, column: 1, text: ':::bento can only contain :::card' });
+    assert.deepEqual(only('::::bento\n段落\n::::\n'), { line: 6, column: 1, text: ':::bento can only contain :::card' });
   });
 
   test(':::card must be inside :::bento', () => {
-    assert.deepEqual(only(':::card\n内容\n:::\n'), { line: 5, column: 1, text: ':::card must be inside :::bento' });
+    assert.deepEqual(only(':::card\n内容\n:::\n'), { line: 6, column: 1, text: ':::card must be inside :::bento' });
   });
 
   test('卡片的 span 格式', () => {
     assert.deepEqual(only('::::bento\n:::card{span=5x1}\n内容\n:::\n::::\n'), {
-      line: 6,
+      line: 7,
       column: 1,
       text: ':::card span must be COLUMNSxROWS with 1 to 4 columns, got 5x1',
     });
   });
 
   test(':::references must contain exactly one list', () => {
-    assert.deepEqual(only(':::references\n段落\n:::\n'), { line: 5, column: 1, text: ':::references must contain exactly one list' });
+    assert.deepEqual(only(':::references\n段落\n:::\n'), { line: 6, column: 1, text: ':::references must contain exactly one list' });
   });
 
   test('注释范围后面必须紧跟脚注引用', () => {
-    assert.deepEqual(only('文字 :span[范围] 后面\n'), { line: 5, column: 4, text: ':span must be directly followed by a footnote reference' });
+    assert.deepEqual(only('文字 :span[范围] 后面\n'), { line: 6, column: 4, text: ':span must be directly followed by a footnote reference' });
   });
 });
 
 describe('校验：HTML', () => {
   test('段落里的 HTML 标签', () => {
-    assert.deepEqual(only('文字 <b>加粗</b>\n'), { line: 5, column: 4, text: 'HTML tag <b> is not allowed in a paragraph' });
+    assert.deepEqual(only('文字 <b>加粗</b>\n'), { line: 6, column: 4, text: 'HTML tag <b> is not allowed in a paragraph' });
   });
 
   test('标题里的 HTML 标签', () => {
-    assert.deepEqual(only('## 标题 <em>x</em>\n'), { line: 5, column: 7, text: 'HTML tag <em> is not allowed in a heading' });
+    assert.deepEqual(only('## 标题 <em>x</em>\n'), { line: 6, column: 7, text: 'HTML tag <em> is not allowed in a heading' });
   });
 
   test('列表里的 HTML 标签', () => {
-    assert.deepEqual(only('- <div>块</div>\n'), { line: 5, column: 3, text: 'HTML tag <div>块</div> is not allowed in a list' });
+    assert.deepEqual(only('- <div>块</div>\n'), { line: 6, column: 3, text: 'HTML tag <div>块</div> is not allowed in a list' });
   });
 
   test('表格单元格里的 HTML 标签', () => {
-    assert.deepEqual(only('| a |\n| - |\n| <br> |\n'), { line: 7, column: 3, text: 'HTML tag <br> is not allowed in a table cell' });
+    assert.deepEqual(only('| a |\n| - |\n| <br> |\n'), { line: 8, column: 3, text: 'HTML tag <br> is not allowed in a table cell' });
   });
 
   test('独立的 HTML 块不报错', () => {
@@ -337,35 +337,35 @@ describe('校验：HTML', () => {
 
 describe('校验：属性语法', () => {
   test('未知属性', () => {
-    assert.deepEqual(only('## 标题 {#a color=red}\n'), { line: 5, column: 7, text: 'Unknown heading attribute color' });
+    assert.deepEqual(only('## 标题 {#a color=red}\n'), { line: 6, column: 7, text: 'Unknown heading attribute color' });
   });
 
   test('取值不合法', () => {
     assert.deepEqual(only('## 标题 {#1a}\n'), {
-      line: 5,
+      line: 6,
       column: 7,
       text: 'Heading attribute id must start with a letter and contain only letters, digits, - and _, got 1a',
     });
     assert.deepEqual(only('![图](./a.png){float=center}\n'), {
-      line: 5,
+      line: 6,
       column: 14,
       text: 'Image attribute float must be one of none, left, right, got center',
     });
     assert.deepEqual(only('![图](./a.png){width=wide}\n'), {
-      line: 5,
+      line: 6,
       column: 14,
       text: 'Image attribute width must be a number with optional px, %, or em, got wide',
     });
   });
 
   test('.class', () => {
-    assert.deepEqual(only('## 标题 {.note}\n'), { line: 5, column: 7, text: 'Unsupported class attribute .note' });
+    assert.deepEqual(only('## 标题 {.note}\n'), { line: 6, column: 7, text: 'Unsupported class attribute .note' });
   });
 });
 
 describe('校验：图片', () => {
   test('扩展名不支持', () => {
-    assert.deepEqual(only('![图](./a.bmp)\n'), { line: 5, column: 1, text: 'Unsupported image format ./a.bmp' });
+    assert.deepEqual(only('![图](./a.bmp)\n'), { line: 6, column: 1, text: 'Unsupported image format ./a.bmp' });
   });
 
   test('每种支持的扩展名', () => {
@@ -375,22 +375,22 @@ describe('校验：图片', () => {
   });
 
   test('Image must be the only content of its paragraph', () => {
-    assert.deepEqual(only('文字 ![图](./a.png)\n'), { line: 5, column: 4, text: 'Image must be the only content of its paragraph' });
+    assert.deepEqual(only('文字 ![图](./a.png)\n'), { line: 6, column: 4, text: 'Image must be the only content of its paragraph' });
   });
 });
 
 describe('校验：旁注', () => {
   test('定义了没有被引用', () => {
-    assert.deepEqual(only('正文。\n\n[^a]: 注释\n'), { line: 7, column: 1, text: 'Footnote [^a] is defined but never referenced' });
+    assert.deepEqual(only('正文。\n\n[^a]: 注释\n'), { line: 8, column: 1, text: 'Footnote [^a] is defined but never referenced' });
   });
 
   test('引用了没有定义', () => {
-    assert.deepEqual(only('正文[^b]。\n'), { line: 5, column: 3, text: 'Footnote [^b] is not defined' });
+    assert.deepEqual(only('正文[^b]。\n'), { line: 6, column: 3, text: 'Footnote [^b] is not defined' });
   });
 
   test('同一条注释被引用超过一次', () => {
     assert.deepEqual(only('甲[^a]，乙[^a]。\n\n[^a]: 注释\n'), {
-      line: 5,
+      line: 6,
       column: 8,
       text: 'Footnote [^a] is referenced more than once',
     });
@@ -399,11 +399,12 @@ describe('校验：旁注', () => {
 
 describe('frontmatter', () => {
   test('填入默认值并保留其他字段', () => {
-    const { frontmatter, messages } = parse('---\ntitle: 标题\ncategory: arch\n---\n\n正文\n', options);
+    const { frontmatter, messages } = parse('---\ntitle: 标题\ncategory: arch\nslug: a\n---\n\n正文\n', options);
     assert.deepEqual(messages, []);
     assert.deepEqual(frontmatter, {
       title: '标题',
       category: 'arch',
+      slug: 'a',
       layout: 'essay',
       width: 'normal',
       draft: false,
@@ -413,11 +414,12 @@ describe('frontmatter', () => {
   });
 
   test('当前版式的默认值', () => {
-    const { frontmatter } = parse('---\ntitle: 论文\nlayout: paper\nauthors: [甲, 乙]\n---\n', options);
+    const { frontmatter } = parse('---\ntitle: 论文\nlayout: paper\nauthors: [甲, 乙]\nslug: a\n---\n', options);
     assert.deepEqual(frontmatter, {
       title: '论文',
       layout: 'paper',
       authors: ['甲', '乙'],
+      slug: 'a',
       width: 'normal',
       draft: false,
       toc: false,
@@ -432,13 +434,13 @@ describe('frontmatter', () => {
     assert.match(messages[0].text, /^Invalid YAML in frontmatter: /);
   });
 
-  test('title 缺失', () => {
-    assert.deepEqual(parse('---\nlayout: essay\n---\n', options).messages, [
+  test('title 和 slug 缺失', () => {
+    const missing = [
       { path: 'post.md', line: 1, column: 1, text: 'Frontmatter is missing title' },
-    ]);
-    assert.deepEqual(parse('正文\n', options).messages, [
-      { path: 'post.md', line: 1, column: 1, text: 'Frontmatter is missing title' },
-    ]);
+      { path: 'post.md', line: 1, column: 1, text: 'Frontmatter is missing slug' },
+    ];
+    assert.deepEqual(parse('---\nlayout: essay\n---\n', options).messages, missing);
+    assert.deepEqual(parse('正文\n', options).messages, missing);
   });
 
   const fieldCases = [
@@ -448,23 +450,34 @@ describe('frontmatter', () => {
     ['版式字段类型不符', 'toc: 1', 'Frontmatter field toc must be true or false'],
     ['layout 不在 layouts 中', 'layout: slides', 'Unknown layout slides'],
     ['theme 不在 themes 中', 'theme: red', 'Unknown theme red'],
+    ['slug 含大写字母', 'slug: Matrix/calculus', 'Frontmatter field slug must be / or segments of lowercase letters, digits and - separated by /, got Matrix/calculus'],
+    ['slug 以 / 结尾', 'slug: matrix/', 'Frontmatter field slug must be / or segments of lowercase letters, digits and - separated by /, got matrix/'],
+    ['slug 有空段', 'slug: matrix//calculus', 'Frontmatter field slug must be / or segments of lowercase letters, digits and - separated by /, got matrix//calculus'],
+    ['date 格式不符', 'date: 2026-1-6', 'Frontmatter field date must be YYYY-MM-DD, got 2026-1-6'],
     ['使用了其他版式的字段', 'authors: [甲]', 'Frontmatter field authors belongs to layout paper, current layout is essay'],
   ];
 
+  test('合法的 slug 和 date', () => {
+    for (const slug of ['/', 'features', 'matrix-calculus/deep-learning', '2026/a-1']) {
+      assert.deepEqual(parse(`---\ntitle: 标题\nslug: ${slug}\ndate: 2026-10-06\n---\n`, options).messages, []);
+    }
+  });
+
   for (const [name, line, text] of fieldCases) {
     test(name, () => {
-      const { messages } = parse(`---\ntitle: 标题\n${line}\n---\n`, options);
+      const slug = line.startsWith('slug:') ? '' : 'slug: a\n';
+      const { messages } = parse(`---\ntitle: 标题\n${line}\n${slug}---\n`, options);
       assert.deepEqual(messages, [{ path: 'post.md', line: 3, column: 1, text }]);
     });
   }
 
   test('列表字段类型不符', () => {
-    const { messages } = parse('---\ntitle: 标题\nlayout: paper\nauthors: 甲\n---\n', options);
+    const { messages } = parse('---\ntitle: 标题\nlayout: paper\nauthors: 甲\nslug: a\n---\n', options);
     assert.deepEqual(messages, [{ path: 'post.md', line: 4, column: 1, text: 'Frontmatter field authors must be a list of strings' }]);
   });
 
   test('版式字段与通用字段同名', () => {
-    const { messages } = parse('---\ntitle: 标题\nlayout: custom\n---\n', {
+    const { messages } = parse('---\ntitle: 标题\nlayout: custom\nslug: a\n---\n', {
       ...options,
       layouts: { ...layouts, custom: { width: { type: 'string' } } },
     });
@@ -472,7 +485,7 @@ describe('frontmatter', () => {
   });
 
   test('没有传入 layouts 和 themes 时跳过对应检查', () => {
-    const { messages } = parse('---\ntitle: 标题\nlayout: slides\ntheme: red\nauthors: [甲]\n---\n', { path: 'post.md' });
+    const { messages } = parse('---\ntitle: 标题\nlayout: slides\ntheme: red\nauthors: [甲]\nslug: a\n---\n', { path: 'post.md' });
     assert.deepEqual(messages, []);
   });
 });

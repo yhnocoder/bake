@@ -1,5 +1,6 @@
 ---
 title: bake 的全部写法
+slug: features
 layout: essay
 width: normal
 eyebrow: bake 示例 · 2026-10

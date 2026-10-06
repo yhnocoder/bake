@@ -1,31 +1,14 @@
 #!/usr/bin/env node
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { relative } from 'node:path';
 import { formatMessage, parseSyntax, stringify } from './format/index.js';
+import { markdownFiles } from './site/pages.js';
 
 const usage = `Usage:
   bake new <path>
   bake dev [--port 4321]
   bake build [--out dist]
   bake format [path...]`;
-
-const skippedDirectories = new Set(['notes', 'components', 'assets']);
-
-async function markdownFiles(path) {
-  const info = await stat(path);
-  if (!info.isDirectory()) return [path];
-  const entries = await readdir(path, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const child = join(path, entry.name);
-    if (entry.isDirectory()) {
-      if (!skippedDirectories.has(entry.name)) files.push(...(await markdownFiles(child)));
-    } else if (entry.name.endsWith('.md')) {
-      files.push(child);
-    }
-  }
-  return files;
-}
 
 async function formatCommand(paths) {
   const targets = paths.length > 0 ? paths : ['content'];

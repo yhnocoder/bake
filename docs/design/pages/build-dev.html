@@ -66,17 +66,24 @@
 </table>
 
 <h2>页面地址怎么确定</h2>
+<p>页面地址由 frontmatter 的 <code>slug</code> 决定，与文件在 <code>content/</code> 中的位置无关，文件可以任意移动。<code>slug</code> 必填，由一段或多段组成，段之间用 <code>/</code> 分隔，每段只含小写字母、数字和 <code>-</code>。地址是 <code>/&lt;slug&gt;/</code>，首页写 <code>slug: /</code>，地址是 <code>/</code>。</p>
 <table>
   <thead>
-    <tr><th>文件</th><th>地址</th><th>输出文件</th></tr>
+    <tr><th>文件</th><th><code>slug</code></th><th>地址</th><th>输出文件</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>content/index.md</code></td><td><code>/</code></td><td><code>dist/index.html</code></td></tr>
-    <tr><td><code>content/word2vec/index.md</code></td><td><code>/word2vec/</code></td><td><code>dist/word2vec/index.html</code></td></tr>
-    <tr><td><code>content/matrix-calculus/deep-learning.md</code></td><td><code>/matrix-calculus/deep-learning/</code></td><td><code>dist/matrix-calculus/deep-learning/index.html</code></td></tr>
+    <tr><td><code>content/index.md</code></td><td><code>/</code></td><td><code>/</code></td><td><code>dist/index.html</code></td></tr>
+    <tr><td><code>content/word2vec/index.md</code></td><td><code>word2vec</code></td><td><code>/word2vec/</code></td><td><code>dist/word2vec/index.html</code></td></tr>
+    <tr><td><code>content/matrix-calculus/deep-learning.md</code></td><td><code>matrix-calculus/deep-learning</code></td><td><code>/matrix-calculus/deep-learning/</code></td><td><code>dist/matrix-calculus/deep-learning/index.html</code></td></tr>
   </tbody>
 </table>
-<p><code>notes/</code>、<code>components/</code>、<code>assets/</code> 目录和以 <code>_</code> 开头的文件不生成页面。站内链接可以写成带或不带末尾 <code>/</code> 的地址，构建时统一成带 <code>/</code> 的形式。</p>
+<ul>
+  <li>两篇文章的 <code>slug</code> 相同时报错，错误列出两个文件。</li>
+  <li><code>slug</code> 缺失或不合法时报错，这篇文章没有地址。</li>
+  <li>站内链接写地址，例如 <code>/matrix-calculus/deep-learning#chain-rule</code>，所以移动文件不影响链接。站内链接可以写成带或不带末尾 <code>/</code> 的地址，构建时统一成带 <code>/</code> 的形式。</li>
+  <li><code>notes/</code>、<code>components/</code>、<code>assets/</code> 目录和以 <code>_</code> 开头的文件不生成页面。</li>
+  <li>地址的计算集中在 <code>src/site/pages.js</code>，构建和开发服务器都使用它。</li>
+</ul>
 
 <h2><code>bake build</code> 输出什么</h2>
 <pre><code class="language-text">dist/
