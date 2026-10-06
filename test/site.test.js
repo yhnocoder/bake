@@ -131,12 +131,13 @@ describe('组件和主题', () => {
 });
 
 describe('siteData', () => {
-  test('跳过草稿，保留其他字段，按路径排序', async () => {
+  test('跳过草稿和 slug 不合法的页面，保留其他字段，按路径排序', async () => {
     const root = blog({
       'bake.config.js': "export default { title: 't', theme: 'plain', site: { categories: ['math'] } };\n",
       'content/b.md': article('b', 'category: math\ntags: [x]\n'),
       'content/a.md': article('a', 'date: 2026-10-06\n'),
       'content/c.md': article('c', 'draft: true\n'),
+      'content/d.md': '---\ntitle: 文章 d\nslug: Not_Valid\n---\n\n正文。\n',
     });
     assert.deepEqual(siteData(await loadSite(root)), {
       pages: [

@@ -7,7 +7,7 @@ exports[`examples/minimal 的整页 HTML > bento.md 1`] = `
 <title>激活函数一览 · bake minimal</title>
 <link rel="stylesheet" href="/src/styles/base.css">
 <link rel="stylesheet" href="/examples/minimal/themes/default.css">
-<script type="module" src="/src/client/sidenotes.js"></script>
+<script type="module" src="/src/client/page.js"></script>
 </head>
 <body>
 <svg style="display:none"/><main class="layout-bento">
@@ -73,7 +73,7 @@ exports[`examples/minimal 的整页 HTML > features.md 1`] = `
 <title>bake 的全部写法 · bake minimal</title>
 <link rel="stylesheet" href="/src/styles/base.css">
 <link rel="stylesheet" href="/examples/minimal/themes/default.css">
-<script type="module" src="/src/client/sidenotes.js"></script>
+<script type="module" src="/src/client/page.js"></script>
 </head>
 <body>
 <svg style="display:none"/><main class="layout-essay">
@@ -196,7 +196,7 @@ exports[`examples/minimal 的整页 HTML > features.md 1`] = `
 </tr>
 </tbody>
 </table></div>
-<svg viewBox="0 0 120 40">
+<svg viewBox="0 0 120 40" width="240" fill="none" stroke="currentColor">
   <rect x="4" y="8" width="40" height="24" rx="4"/>
   <rect x="76" y="8" width="40" height="24" rx="4"/>
   <path d="M44 20 H76"/>
@@ -256,12 +256,12 @@ exports[`examples/minimal 的整页 HTML > paper.md 1`] = `
 <title>用梯度下降求函数的最小值 · bake minimal</title>
 <link rel="stylesheet" href="/src/styles/base.css">
 <link rel="stylesheet" href="/examples/minimal/themes/default.css">
-<script type="module" src="/src/client/sidenotes.js"></script>
+<script type="module" src="/src/client/page.js"></script>
 </head>
 <body>
 <svg style="display:none"/><main class="layout-paper">
 <header class="mast"><h1>用梯度下降求函数的最小值</h1><p class="authors"><span>张三</span><span>李四</span></p><p class="abstract">本文从一元函数出发说明梯度下降的更新规则，给出步长过大时发散的条件，并讨论把它推广到多元函数时需要的记号。</p></header>
-<nav class="toc"><ol><li class="toc-h2"><a href="#problem">问题</a></li><li class="toc-h2"><a href="#update">更新规则</a></li><li class="toc-h3"><a href="#step-size">步长的选择</a></li><li class="toc-h3"><a href="#multivariate">多元函数</a></li><li class="toc-h2"><a href="#conclusion">结论</a></li></ol></nav>
+<nav class="toc"><ol><li class="toc-h2"><a href="#problem">问题</a></li><li class="toc-h2"><a href="#update">更新规则</a></li><li class="toc-h3"><a href="#step-size">步长的选择</a></li><li class="toc-h3"><a href="#multivariate">推广到 <span class="math" data-tex="\\mathbb{R}^n"><svg/></span></a></li><li class="toc-h2"><a href="#conclusion">结论</a></li></ol></nav>
 <article class="numbered"><h2 id="problem"><a class="anchor" href="#problem" aria-hidden="true">#</a>问题</h2>
 <p>给定可微函数 <span class="math" data-tex="f: \\R \\to \\R"><svg/></span>，求使 <span class="math" data-tex="f(x)"><svg/></span> 最小的 <span class="math" data-tex="x"><svg/></span>。梯度下降从初始值 <span class="math" data-tex="x_0"><svg/></span> 出发，每一步沿负梯度方向移动<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>。</p>
 <aside class="sidenote" id="sn-1" data-md="[^name]: 一元函数的梯度就是导数 $f&#x27;(x)$，这里沿用多元情形的名称。"><span class="sidenote-number">1</span><p>一元函数的梯度就是导数 <span class="math" data-tex="f&#x27;(x)"><svg/></span>，这里沿用多元情形的名称。</p></aside>
@@ -274,7 +274,7 @@ x_{k+1} = x_k - \\eta f&#x27;(x_k)" id="eq-update"><svg/></div>
 <p>对 <span class="math" data-tex="f(x) = x^2"><svg/></span>，式 <a class="eqref" href="#eq-update">(1)</a> 给出 <span class="math" data-tex="x_{k+1} = (1 - 2\\eta) x_k"><svg/></span>。<span class="sidenote-span" data-md=":span[当 $\\eta > 1$ 时 $|1 - 2\\eta| > 1$，迭代发散]" data-sidenote="2">当 <span class="math" data-tex="\\eta > 1"><svg style="vertical-align: -0.489ex;" xmlns="http://www.w3.org/2000/svg" width="5.273ex" height="1.995ex" role="img" focusable="false" viewBox="0 -666 2330.6 882"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D702" href="#MJX-NCM-I-1D702"></use></g><g data-mml-node="mo" transform="translate(774.8,0)"><use data-c="3E" href="#MJX-NCM-N-3E"></use></g><g data-mml-node="mn" transform="translate(1830.6,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g></g></g></svg></span> 时 <span class="math" data-tex="|1 - 2\\eta| > 1"><svg style="vertical-align: -0.566ex;" xmlns="http://www.w3.org/2000/svg" width="11.559ex" height="2.262ex" role="img" focusable="false" viewBox="0 -750 5109 1000"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mo"><use data-c="7C" href="#MJX-NCM-N-7C"></use></g><g data-mml-node="mn" transform="translate(278,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g><g data-mml-node="mo" transform="translate(1000.2,0)"><use data-c="2212" href="#MJX-NCM-N-2212"></use></g><g data-mml-node="mn" transform="translate(2000.4,0)"><use data-c="32" href="#MJX-NCM-N-32"></use></g><g data-mml-node="mi" transform="translate(2500.4,0)"><use data-c="1D702" href="#MJX-NCM-I-1D702"></use></g><g data-mml-node="mo" transform="translate(2997.4,0)"><use data-c="7C" href="#MJX-NCM-N-7C"></use></g><g data-mml-node="mo" transform="translate(3553.2,0)"><use data-c="3E" href="#MJX-NCM-N-3E"></use></g><g data-mml-node="mn" transform="translate(4609,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g></g></g></svg></span>，迭代发散</span><sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>。</p>
 <aside class="sidenote" id="sn-2" data-md="[^diverge]: $\\eta = 1$ 时迭代在 $x_0$ 和 $-x_0$ 之间来回，既不收敛也不发散。"><span class="sidenote-number">2</span><p><span class="math" data-tex="\\eta = 1"><svg/></span> 时迭代在 <span class="math" data-tex="x_0"><svg/></span> 和 <span class="math" data-tex="-x_0"><svg/></span> 之间来回，既不收敛也不发散。</p></aside>
 <p>步长太小时收敛很慢，实际中常用随迭代次数减小的步长。</p>
-<h3 id="multivariate"><a class="anchor" href="#multivariate" aria-hidden="true">#</a>多元函数</h3>
+<h3 id="multivariate"><a class="anchor" href="#multivariate" aria-hidden="true">#</a>推广到 <span class="math" data-tex="\\mathbb{R}^n"><svg/></span></h3>
 <p>多元函数把导数换成梯度 <span class="math" data-tex="\\nabla f(x) \\in \\R^n"><svg/></span>，更新规则的形式不变。</p>
 <h2 id="conclusion"><a class="anchor" href="#conclusion" aria-hidden="true">#</a>结论</h2>
 <p>梯度下降只需要计算梯度，适合参数很多的模型。</p></article>
