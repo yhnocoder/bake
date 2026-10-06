@@ -222,16 +222,17 @@ describe('文件变化', () => {
     await page.close();
   });
 
-  test('修改标题文字时就地更新目录，不替换 <article> 以外的结构', async () => {
+  test('修改标题文字时目录随 <article> 以外的结构一起替换，<article> 是同一个元素', async () => {
     const { page } = await open('/features/');
     await page.evaluate(() => {
-      window.mast = document.querySelector('header.mast');
+      window.article = document.querySelector('article');
       window.addEventListener('bake:page-update', (event) => (window.chrome = event.detail.chrome));
     });
     edit('content/features.md', (source) => source.replace('## 图片 {#images}', '## 图片与图注 {#images}'));
     await page.waitForFunction(() => document.querySelector('nav.toc').textContent.includes('图片与图注'));
-    assert.equal(await page.evaluate(() => window.chrome), false);
-    assert.equal(await page.evaluate(() => document.querySelector('header.mast') === window.mast), true);
+    assert.equal(await page.evaluate(() => window.chrome), true);
+    assert.equal(await page.evaluate(() => document.querySelector('article') === window.article), true);
+    assert.equal(await page.evaluate(() => window.marker), 'kept');
     await page.close();
   });
 

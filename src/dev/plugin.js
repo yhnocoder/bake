@@ -133,8 +133,7 @@ export function bakeDev({ root }) {
   }
 
   function chromeOf(entry, article) {
-    const toc = article.toc.length > 0 ? [{ id: '', html: '', depth: 2 }] : [];
-    return renderDocumentFor(site, entry.path, { ...article, html: '', mathDefs: '', toc }, { assets: pageAssets(article) });
+    return renderDocumentFor(site, entry.path, { ...article, html: '', mathDefs: '' }, { assets: pageAssets(article) });
   }
 
   function chromeChanged(entry, result) {

@@ -1,5 +1,4 @@
 import { addGlyphs, glyphsOf } from '../client/math-defs.js';
-import { tocList } from '../layouts/html.js';
 import { showStatus } from './status.js';
 
 function stylesheets(target) {
@@ -50,8 +49,6 @@ async function update(detail) {
   if (detail.chrome) replaceChrome(await fetchDocument());
   if (accepted) {
     document.querySelector('article').innerHTML = detail.html;
-    const toc = document.querySelector('nav.toc ol');
-    if (toc) toc.outerHTML = tocList(detail.toc);
     addGlyphs(glyphsOf(detail.mathDefs));
   }
   window.scrollTo(window.scrollX, scroll);
