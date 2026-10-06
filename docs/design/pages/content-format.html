@@ -137,6 +137,7 @@
     <tr><td>块引用 id 扩展 <code>src/format/block-id.js</code></td><td>段落末尾的 <code>^block-id</code>，见 <a href="#site-links">站内引用怎么写</a>。bake 自己实现</td></tr>
   </tbody>
 </table>
+<p>基础语法按 CommonMark 的规定输出 HTML。代码块输出 <code>&lt;pre&gt;&lt;code class="language-python"&gt;</code>，语言名写在 <code>class</code> 里。</p>
 <p>属性、高亮和块引用 id 三个扩展各自包含解析和输出两部分。理由：现有的 remark 插件要么没有输出规则，写回时报错或丢失属性，要么把正文里的 <code>=</code> 转义成 <code>\=</code>，往返测试无法通过。</p>
 
 <h2>段落里能不能写 HTML</h2>
@@ -145,9 +146,11 @@
 
 <h2>内置块类型长什么样</h2>
 <p>下面每一节给出一种内置块类型的写法和渲染结果。渲染结果是 bake 内置样式的默认效果：颜色、字体和宽度取自主题变量，主题只改变量值，版面结构不变。指令有三种形式，对应块类型定义里的 <code>form</code>：<code>:name</code> 是行内标记（<code>text</code>），<code>::name</code> 是单行块（<code>leaf</code>），<code>:::name</code> 是可以包含段落的块（<code>container</code>）。容器嵌套时外层多写一个冒号。块类型的定义方式见 <a href="extending.html">扩展接口</a>。</p>
+<p>每个指令块输出的最外层元素、每个组件元素和每条旁注的 <code>&lt;aside&gt;</code> 带 <code>data-md</code> 属性，值是这个节点在源文件中的原文，按语法树记录的位置从源文件截取。发布的页面在复制时直接使用它，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。</p>
 
 <h3>标题 id 和目录短标题</h3>
-<p>标题后的 <code>{#id}</code> 设定锚点，<code>toc</code> 设定目录里显示的短标题。没有写 <code>{#id}</code> 时，id 由标题文字生成。id 以字母开头，只含字母、数字、<code>-</code> 和 <code>_</code>。标题只接受 <code>id</code> 和 <code>toc</code> 两个属性，其他属性和 <code>.class</code> 报错。鼠标移到标题上时，左侧显示 <code>#</code> 链接。编辑器里标题左侧显示 id，在属性面板里修改。</p>
+<p>标题后的 <code>{#id}</code> 设定锚点，<code>toc</code> 设定目录里显示的短标题。<code>{#id}</code> 里的 id 以字母开头，只含字母、数字、<code>-</code> 和 <code>_</code>。标题只接受 <code>id</code> 和 <code>toc</code> 两个属性，其他属性和 <code>.class</code> 报错。鼠标移到标题上时，左侧显示 <code>#</code> 链接。编辑器里标题左侧显示 id，在属性面板里修改。</p>
+<p>标题输出为 <code>&lt;h2 id="chain-rule"&gt;&lt;a class="anchor" href="#chain-rule" aria-hidden="true"&gt;#&lt;/a&gt;反向传播中的链式法则&lt;/h2&gt;</code>。没有写 <code>{#id}</code> 时，id 由 github-slugger 从标题文字生成：保留中文，字母转为小写，空格换成 <code>-</code>，去掉标点；同一页里重复时依次加 <code>-1</code>、<code>-2</code>。生成的 id 与页面里显式写的 id（标题的 <code>{#id}</code>、<code>^block-id</code>、公式编号）相同时，生成的 id 也加后缀。标题文字只有标点、生成的 id 为空时报错，需要写 <code>{#id}</code>。目录包含 <code>h2</code> 和 <code>h3</code>，目录项的文字优先使用 <code>toc</code> 属性。</p>
 <div class="spec">
 <pre><code class="language-markdown">## 反向传播中的链式法则 {#chain-rule toc=链式法则}</code></pre>
 <div class="sp">
@@ -193,7 +196,7 @@
 </div>
 
 <h3>图片</h3>
-<p>图片用 Markdown 的图片语法，说明文字同时用作 <code>alt</code> 和图注，输出 <code>&lt;figure&gt;</code>。图片必须独占一段，段落里还有其他文字时报错。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
+<p>图片用 Markdown 的图片语法，说明文字同时用作 <code>alt</code> 和图注。图片必须独占一段，段落里还有其他文字时报错。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
 <p>支持的格式：SVG、PNG、JPEG（<code>.jpg</code>、<code>.jpeg</code>）、GIF、WebP、AVIF。其他扩展名构建报错。构建时怎样处理每种格式见 <a href="build-dev.html">构建与开发服务器</a>。</p>
 <p>图片后面紧跟一组 <code>{}</code> 属性时，可以设定尺寸和排法。表外的属性报错：</p>
 <table>
@@ -206,6 +209,7 @@
     <tr><td><code>float</code></td><td><code>none</code> | <code>left</code> | <code>right</code></td><td><code>none</code></td><td><code>none</code> 时图片独占一行并居中；<code>left</code> 或 <code>right</code> 时图片靠左或靠右，后面的文字环绕在另一侧</td></tr>
   </tbody>
 </table>
+<p>图片输出为 <code>&lt;figure class="image float-left"&gt;</code>，里面依次是 <code>&lt;img src="./assets/neuron.svg" alt="神经元" style="width: 160px"&gt;</code> 和 <code>&lt;figcaption&gt;神经元&lt;/figcaption&gt;</code>。<code>float</code> 为 <code>none</code> 时没有 <code>float-*</code> 类。<code>width</code> 和 <code>height</code> 写进 <code>style</code>，只写数字时加 <code>px</code>。说明文字为空时没有 <code>&lt;figcaption&gt;</code>。</p>
 <p>浮动图片的宽度最多是正文宽度的 <code>50%</code>，与环绕文字之间留 <code>1.5em</code> 间距。窗口宽度小于 <code>600px</code> 时浮动取消，图片独占一行。理由：窄屏上剩下的宽度放不下几个字，环绕的文字会变成一列一两个字。</p>
 <div class="spec">
 <pre><code class="language-markdown">![一个神经元的输入、权重与输出](./assets/neuron.svg){width=60%}</code></pre>
@@ -238,7 +242,7 @@
 </div>
 
 <h3>组件</h3>
-<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错。输出同名 custom element，图题放在元素内的 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供外框和图题的样式。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
+<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错。输出同名 custom element，例如 <code>&lt;gradient-figure x0="1.5" data-md="…"&gt;&lt;figcaption&gt;图题&lt;/figcaption&gt;&lt;/gradient-figure&gt;</code>。属性值等于 <code>static properties</code> 中 <code>default</code> 的属性不写进元素；没有图题时元素内没有 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供外框和图题的样式。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::gradient-figure{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
@@ -256,7 +260,7 @@
 </div>
 
 <h3>折叠</h3>
-<p><code>:::fold[标题]</code> 输出 <code>&lt;details&gt;</code>，方括号里的标题必填。默认收起，点击标题展开。适合放推导细节和补充证明。编辑器里折叠块始终展开，标题和内容直接输入。</p>
+<p><code>:::fold[标题]</code> 输出 <code>&lt;details class="fold"&gt;</code>，方括号里的标题必填，输出为 <code>&lt;summary&gt;</code>。默认收起，点击标题展开。适合放推导细节和补充证明。编辑器里折叠块始终展开，标题和内容直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::fold[推导细节]
 把 $z = Wx + b$ 代入后逐项求导……
@@ -268,7 +272,7 @@
 </div>
 
 <h3>提示框</h3>
-<p><code>:::callout{kind=note}</code> 输出 <code>&lt;aside class="callout note"&gt;</code>。<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code>，默认 <code>note</code>，三种类型的标签分别是「说明」「提示」「注意」。编辑器里内容直接输入，类型在属性面板里选。</p>
+<p><code>:::callout{kind=note}</code> 输出 <code>&lt;aside class="callout note"&gt;</code>。<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code>，默认 <code>note</code>，三种类型的标签分别是「说明」「提示」「注意」。标签输出为 <code>&lt;aside&gt;</code> 内的第一个元素 <code>&lt;p class="callout-label"&gt;说明&lt;/p&gt;</code>，后面是内容。编辑器里内容直接输入，类型在属性面板里选。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::callout{kind=note}
 本文的向量都是列向量。
@@ -350,9 +354,16 @@
   <li>需要精确范围时写 <code>:span[被注释的文字][^d]</code>，只高亮方括号里的文字。<code>:span</code> 后面必须紧跟一个脚注引用。</li>
   <li>定义了但没有被引用的注释，以及引用了但没有定义的注释，构建报错。</li>
   <li>同一条注释只能引用一次，引用第二次时报错。理由：每条注释在右侧栏只显示一次，只能和一处位置对齐。</li>
+  <li>注释里不能再写脚注引用，写了时报错。理由：注释本身已经在右侧栏，嵌套的注释没有位置可以放。</li>
   <li>编辑器保存时，注释定义写在第一次引用它的块之后，规则见 <a href="#output-format">输出格式</a>。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
-  <li>生成的页面里，每条注释输出为 <code>&lt;aside class="sidenote"&gt;</code>，放在引用它的段落之后。</li>
 </ul>
+<p>生成的页面里，正文中的引用输出为 <code>&lt;sup class="sidenote-ref" id="sn-ref-1"&gt;&lt;a href="#sn-1"&gt;1&lt;/a&gt;&lt;/sup&gt;</code>，注释输出为 <code>&lt;aside class="sidenote" id="sn-1" data-md="…"&gt;&lt;span class="sidenote-number"&gt;1&lt;/span&gt;注释内容&lt;/aside&gt;</code>。注释的位置：</p>
+<ul>
+  <li>引用在段落里时，注释放在这个段落之后。段落在提示框、列表项等块里时，注释也在同一个块里。</li>
+  <li>引用在标题里时，注释放在标题之后。</li>
+  <li>引用在表格里时，注释放在整个表格之后。</li>
+</ul>
+<p><code>:span[文字][^d]</code> 输出 <code>&lt;span class="sidenote-span" data-sidenote="1"&gt;文字&lt;/span&gt;</code>，后面接上述引用。悬停时的高亮范围由页面上的脚本根据这两个属性确定。</p>
 <p id="sidenote-layout">旁注和边注的排版：CSS 把 <code>.sidenote</code> 放进右侧栏，没有脚本时注释也在段落旁边显示。对齐脚本只做两件事：</p>
 <ol>
   <li>一次读取全部编号的纵向位置，再一次写入全部注释的位置。一条注释的顶部低于上一条注释的底部加 <code>12px</code> 间距时，按编号位置放置；否则往下推到上一条注释底部加 <code>12px</code>。边注按它前面段落的顶部位置放置。</li>
@@ -363,7 +374,7 @@
 <p>窗口宽度小于 <code>1100px</code> 时没有右侧栏，注释显示在所在段落之后，缩进并用小字号。窄屏上点编号展开注释的交互属于手机适配，不在 Bake v0.1 的范围内。</p>
 
 <h3>卡片网格</h3>
-<p>外层写 <code>::::bento</code>，里面只能放 <code>:::card</code>，<code>:::card</code> 也只能放在 <code>::::bento</code> 里。网格是 4 列，<code>span=列数x行数</code> 设定卡片大小，列数是 1 到 4，默认 <code>1x1</code>，<code>title</code> 是卡片标题。编辑器里卡片内容直接输入，尺寸和标题在属性面板里修改。</p>
+<p>外层写 <code>::::bento</code>，里面只能放 <code>:::card</code>，<code>:::card</code> 也只能放在 <code>::::bento</code> 里。网格是 4 列，<code>span=列数x行数</code> 设定卡片大小，列数是 1 到 4，默认 <code>1x1</code>，<code>title</code> 是卡片标题。外层输出 <code>&lt;div class="bento"&gt;</code>，每张卡片输出 <code>&lt;section class="card" style="grid-column: span 2; grid-row: span 1"&gt;</code>，有标题时第一个元素是 <code>&lt;p class="card-title"&gt;ReLU&lt;/p&gt;</code>。编辑器里卡片内容直接输入，尺寸和标题在属性面板里修改。</p>
 <div class="spec">
 <pre><code class="language-markdown">::::bento
 :::card{span=2x1 title=ReLU}
@@ -408,7 +419,7 @@
 </div>
 
 <h3>表格</h3>
-<p>GFM 表格。生成页面时外面包一层可以横向滚动的容器，窄屏上表格在容器内滚动，页面不出现横向滚动。数字列使用等宽数字。编辑器里单元格直接输入。</p>
+<p>GFM 表格。生成页面时外面包一层可以横向滚动的容器 <code>&lt;div class="table-scroll"&gt;</code>，窄屏上表格在容器内滚动，页面不出现横向滚动。数字列使用等宽数字。编辑器里单元格直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">| 函数 | 零点处导数 |
 | - | -: |
@@ -441,6 +452,20 @@
 <h2>公式怎么写</h2>
 <p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
 <p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
+<p>渲染使用 MathJax 4（<code>@mathjax/src</code>）和 New Computer Modern 字体（<code>@mathjax/mathjax-newcm-font</code>）。TeX 输入加载 <code>base</code>、<code>ams</code>、<code>newcommand</code>、<code>configmacros</code> 四个包，宏取自 <code>math.macros</code>。公式的 HTML：</p>
+<table>
+  <thead>
+    <tr><th>写法</th><th>输出</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>行内公式 <code>$...$</code></td><td><code>&lt;span class="math" data-tex="TeX 源码"&gt;&lt;svg&gt;…&lt;/svg&gt;&lt;/span&gt;</code></td></tr>
+    <tr><td>独立公式 <code>$$...$$</code></td><td><code>&lt;div class="math display" data-tex="TeX 源码"&gt;&lt;svg&gt;…&lt;/svg&gt;&lt;/div&gt;</code>，带 <code>\label{eq:name}</code> 时加 <code>id="eq-name"</code>（<code>:</code> 换成 <code>-</code>）</td></tr>
+    <tr><td><code>$\eqref{eq:name}$</code></td><td><code>&lt;a class="eqref" href="#eq-name"&gt;(1)&lt;/a&gt;</code></td></tr>
+  </tbody>
+</table>
+<p>编号由 bake 处理，MathJax 不保存公式之间的状态。含 <code>\label{eq:name}</code> 的独立公式按在页面中出现的顺序从 1 开始编号，渲染前把 <code>\label{eq:name}</code> 换成 <code>\tag{n}</code>。<code>\eqref{eq:name}</code> 不交给 MathJax，直接输出上表中的链接，它必须是所在公式的全部内容。理由：每个公式的渲染结果只取决于它自己的源码，可以按源码缓存。</p>
+<p>渲染结果按「行内或独立」加 TeX 源码缓存，同一个公式只调用 MathJax 一次。SVG 输出使用 <code>fontCache: 'global'</code>：每个公式的 SVG 用 <code>&lt;use href="#MJX-…"&gt;</code> 引用字形，一页用到的全部字形放在一个 <code>&lt;svg style="display:none"&gt;&lt;defs&gt;…&lt;/defs&gt;&lt;/svg&gt;</code> 里，由版式放在 <code>&lt;body&gt;</code> 开头。理由：同一个字形在一页里只出现一次，页面体积小。</p>
+<p>TeX 语法错误、未定义的宏和 <code>\eqref</code> 指向不存在的 <code>\label</code> 时构建报错，位置是公式在源文件中的行列。</p>
 
 <h2 id="site-links">站内引用怎么写</h2>
 <p>站内链接就是普通 Markdown 链接，不加新语法。链接到站内页面时，鼠标停留在链接上会弹出预览卡片，显示目标内容。</p>
@@ -461,6 +486,7 @@
   <li><code>^block-id</code> 是 Obsidian 的块引用写法，写在段落最后，前面有一个空格，页面上不显示。它在页面上成为段落的 <code>id</code>。</li>
   <li>站内链接指向的文章、标题或段落不存在时，构建报错，报错列出每一处引用的位置。</li>
   <li>同一页内的链接写 <code>#id</code>，同样有预览。</li>
+  <li>页面内的 id 包括标题 id、<code>^block-id</code> 和公式编号的 id，同一页里重复时报错。</li>
   <li>图片语法 <code>![](/page#id)</code> 不用于引用。理由：它和真正的图片无法区分。</li>
 </ul>
 
@@ -566,6 +592,26 @@ parseSyntax(source, { path })
   </tbody>
 </table>
 <p><code>components</code>、<code>layouts</code>、<code>themes</code> 没有传入时，跳过对应的检查。</p>
+<p><code>src/render/index.js</code> 导出 <code>render</code>，把一篇文章渲染成正文 HTML 片段和目录。版式、构建和开发服务器从它取数据：</p>
+<pre><code class="language-js">await render(source, { path, config, blocks, components, layouts, themes })
+  // → { page, html, toc, mathDefs, ids, links, components, messages }</code></pre>
+<p><code>render</code> 是异步函数，因为 MathJax 按字符范围加载字体数据。<code>config</code> 是 <code>bake.config.js</code> 的内容，用到其中的 <code>math.macros</code>；其他参数与 <code>parse</code> 相同。</p>
+<table>
+  <thead>
+    <tr><th>返回值</th><th>内容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>page</code></td><td><code>parse</code> 返回的 <code>frontmatter</code>，版式字段已填入默认值</td></tr>
+    <tr><td><code>html</code></td><td>正文 HTML 片段，旁注已放在对应段落之后</td></tr>
+    <tr><td><code>toc</code></td><td><code>[{ id, text, depth }]</code>，包含 <code>h2</code> 和 <code>h3</code>，<code>text</code> 优先使用标题的 <code>toc</code> 属性</td></tr>
+    <tr><td><code>mathDefs</code></td><td>这一页的公式用到的全部字形，形式为 <code>&lt;svg style="display:none"&gt;&lt;defs&gt;…&lt;/defs&gt;&lt;/svg&gt;</code>，由版式放在 <code>&lt;body&gt;</code> 开头；没有公式时为空字符串</td></tr>
+    <tr><td><code>ids</code></td><td>页面内的全部 id：标题、<code>^block-id</code>、公式编号</td></tr>
+    <tr><td><code>links</code></td><td>站内链接 <code>[{ href, line, column }]</code>。以 <code>/</code> 或 <code>#</code> 开头的链接是站内链接，<code>href</code> 的路径部分统一为带末尾 <code>/</code> 的形式，<code>#</code> 之后不变。<code>config.base</code> 由构建加上，这里不加</td></tr>
+    <tr><td><code>components</code></td><td>正文用到的组件名</td></tr>
+    <tr><td><code>messages</code></td><td><code>parse</code> 的错误加上渲染的错误，格式与 <code>parse</code> 相同，例如 <code>content/a.md:12:5 \eqref target eq:grad is not defined</code></td></tr>
+  </tbody>
+</table>
+<p>跨页面的站内链接检查由构建完成，<code>render</code> 只返回检查需要的 <code>ids</code> 和 <code>links</code>。</p>
 </main>
 </body>
 </html>

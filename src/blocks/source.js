@@ -3,4 +3,5 @@ export default {
   form: 'leaf',
   label: '出处',
   attributes: {},
+  render: ({ children }) => ['figcaption', {}, children],
 };
