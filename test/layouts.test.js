@@ -13,8 +13,8 @@ const root = join(import.meta.dirname, '..');
 const site = await loadSite(join(root, 'examples/minimal'));
 const assets = { styles: ['/src/styles/base.css', '/examples/minimal/themes/default.css'], scripts: ['/src/client/sidenotes.js'] };
 const toc = [
-  { id: 'a', text: '第一节', depth: 2 },
-  { id: 'b', text: '小节 <b>', depth: 3 },
+  { id: 'a', html: '第一节', depth: 2 },
+  { id: 'b', html: '小节 &lt;b&gt;', depth: 3 },
 ];
 const layouts = { essay, paper, bento };
 

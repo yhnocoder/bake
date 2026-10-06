@@ -5,7 +5,7 @@ export function escapeHtml(text) {
 }
 
 export function tocList(toc) {
-  const items = toc.map(({ id, text, depth }) => `<li class="toc-h${depth}"><a href="#${escapeHtml(id)}">${escapeHtml(text)}</a></li>`);
+  const items = toc.map(({ id, html, depth }) => `<li class="toc-h${depth}"><a href="#${escapeHtml(id)}">${html}</a></li>`);
   return `<ol>${items.join('')}</ol>`;
 }
 

@@ -41,8 +41,8 @@ async function convert(tex, display, macros) {
   const { document, output } = documentFor(macros);
   const container = await document.convertPromise(tex, { display });
   const svg = adaptor.outerHTML(adaptor.firstChild(container)).replace(latexAttribute, '');
-  for (const [id, path] of output.fontCache.cache) glyphs.set(id, path);
   const glyphIds = [...new Set([...svg.matchAll(glyphReference)].map((match) => match[1]))];
+  for (const id of glyphIds) glyphs.set(id, output.fontCache.cache.get(id));
   return { svg, glyphIds };
 }
 
