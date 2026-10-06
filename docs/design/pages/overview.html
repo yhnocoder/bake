@@ -30,7 +30,7 @@
     <tr><th>命令</th><th>作用</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>bake new &lt;路径&gt;</code></td><td>在 <code>content/</code> 下新建一篇只有 frontmatter 的文章，例如 <code>bake new matrix-calculus/jacobian</code> 生成 <code>content/matrix-calculus/jacobian.md</code></td></tr>
+    <tr><td><code>bake new &lt;path&gt;</code></td><td>在 <code>content/</code> 下新建一篇只有 frontmatter 的文章，例如 <code>bake new matrix-calculus/jacobian</code> 生成 <code>content/matrix-calculus/jacobian.md</code></td></tr>
     <tr><td><code>bake dev</code></td><td>启动开发服务器。页面右下角有「编辑」按钮，打开后在页面上直接编辑，见 <a href="editor.html">编辑器</a></td></tr>
     <tr><td><code>bake build</code></td><td>生成静态网站到 <code>dist/</code>，见 <a href="build-dev.html">构建与开发服务器</a></td></tr>
     <tr><td><code>bake format</code></td><td>把已有的 <code>.md</code> 文件统一成编辑器保存时的输出格式，见 <a href="content-format.html">内容格式</a></td></tr>
@@ -163,8 +163,8 @@
 </table>
 <p>不使用 Eleventy、Hugo 这类自带 Markdown 解析器的生成器。理由：它们的解析器与编辑器使用的 remark 不同，同一份 Markdown 在编辑器和页面上可能显示不一样。</p>
 
-<h2>第一版不包含的功能</h2>
-<p>dark mode、手机适配、AI、导出成 HTML / PDF / Typst / Markdown、设置界面。这些在第一版完成后另行设计。</p>
+<h2>Bake v0.1 不包含的功能</h2>
+<p>dark mode、手机适配、AI、导出成 HTML / PDF / Typst / Markdown、设置界面。这些在 Bake v0.1 完成后另行设计。</p>
 </main>
 </body>
 </html>

@@ -26,17 +26,17 @@
     <tr><th>命令</th><th>作用</th><th>退出码</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>bake new &lt;路径&gt;</code></td><td>新建 <code>content/&lt;路径&gt;.md</code>，只含 <code>title</code> 一项 frontmatter；文件已存在时报错</td><td>0 成功，1 失败</td></tr>
+    <tr><td><code>bake new &lt;path&gt;</code></td><td>新建 <code>content/&lt;path&gt;.md</code>，只含 <code>title</code> 一项 frontmatter；文件已存在时报错</td><td>0 成功，1 失败</td></tr>
     <tr><td><code>bake dev [--port 4321]</code></td><td>启动开发服务器，默认端口 <code>4321</code>，被占用时依次尝试下一个端口</td><td>运行中不退出</td></tr>
     <tr><td><code>bake build [--out dist]</code></td><td>生成静态网站到 <code>dist/</code></td><td>0 成功，1 有错误</td></tr>
-    <tr><td><code>bake format [路径...]</code></td><td>把 <code>.md</code> 文件统一成编辑器的输出格式，不改变内容，默认处理全部文章</td><td>0 成功，1 有解析错误</td></tr>
+    <tr><td><code>bake format [path...]</code></td><td>把 <code>.md</code> 文件统一成编辑器的输出格式，不改变内容。没有路径时处理 <code>content/</code> 下全部 <code>.md</code>，跳过 <code>notes/</code>、<code>components/</code>、<code>assets/</code>。每改写一个文件输出一行路径，最后一行输出 <code>Rewrote N files</code>（N 为 1 时是 <code>Rewrote 1 file</code>）或 <code>No files to rewrite</code>。只检查 Markdown 语法和 frontmatter 的 YAML 语法，有错误的文件不写回，按错误格式输出</td><td>0 成功，1 有解析错误</td></tr>
   </tbody>
 </table>
-<p>所有命令在博客仓库根目录运行，从当前目录读取 <code>bake.config.js</code>。错误信息的格式是 <code>文件路径:行:列 错误说明</code>，便于编辑器跳转。</p>
+<p>所有命令在博客仓库根目录运行，从当前目录读取 <code>bake.config.js</code>。命令行的全部输出使用英文，包括错误说明。错误信息的格式是 <code>文件路径:行:列 错误说明</code>，便于编辑器跳转。</p>
 <div class="term"><span class="prompt">$</span> bake build
-<span class="warn">content/word2vec/index.md:42:18 站内链接指向不存在的标题 /matrix-calculus/deep-learning#chain-rul</span> <span class="ref">1</span>
-<span class="warn">content/bpe/index.md:7:1 未知的指令 :::callot</span>
-<span class="dim">2 个错误，未生成 dist/</span> <span class="ref">2</span></div>
+<span class="warn">content/word2vec/index.md:42:18 Link points to a missing heading /matrix-calculus/deep-learning#chain-rul</span> <span class="ref">1</span>
+<span class="warn">content/bpe/index.md:7:1 Unknown directive :::callot</span>
+<span class="dim">2 errors, dist/ not written</span> <span class="ref">2</span></div>
 <ol class="callouts">
   <li>每个错误一行，构建继续检查其余文件，最后汇总报告。</li>
   <li>有任何错误时不写入输出目录，已有的 <code>dist/</code> 保持不变。</li>

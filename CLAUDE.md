@@ -6,7 +6,7 @@ bake 是一个面向技术博客的静态网站生成器，自带所见即所得
 
 bake 只包含工具本身。博客的文章、交互图和主题放在博客自己的仓库里，`examples/` 下的两个博客用于测试 bake。
 
-文档从 `docs/design/index.html` 开始读，计划与进度见 GitHub issue #<IssueId>。
+文档从 `docs/design/index.html` 开始读，计划与进度见 GitHub issue #2。
 
 ## 协作方式
 
@@ -29,10 +29,10 @@ Design 使用 HTML 文档，主要由用户描述需求和预期，放在 `docs/
 
 ### 计划
 
-当前计划与进度写在 #<IssueId>（label 为 `dashboard`）的正文里：
+当前计划与进度写在 #2（label 为 `dashboard`）的正文里：
 
 - 顺序：计划分几段，每段做什么，前一段为什么是后一段的前提。
-- Task 列表：每个 Task 的 issue 编号、一句话内容、验收者、依赖与状态。完成的 Task 写明合并它的 PR。
+- Task 列表：每个 Task 的 issue 编号、一句话内容、依赖与状态。完成的 Task 写明合并它的 PR。
 - 哪些 Task 可以并行，每条依赖的理由。
 - 不写进 Design Doc 的约定，例如测试使用的外部服务、CI 从哪个 Task 开始。
 

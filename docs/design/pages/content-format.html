@@ -131,22 +131,25 @@
     <tr><td><code>remark-gfm</code></td><td>表格、删除线、任务列表、脚注（用作旁注）</td></tr>
     <tr><td><code>remark-math</code></td><td>行内公式 <code>$...$</code>、独立公式 <code>$$...$$</code></td></tr>
     <tr><td><code>remark-directive</code></td><td><code>:name[]{}</code>、<code>::name[]{}</code>、<code>:::name</code> 三种指令</td></tr>
-    <tr><td>属性插件</td><td>标题和图片后面的 <code>{#id key=value}</code>，写法与 Pandoc 的属性语法相同。实现时选用现有的 remark 插件，没有与 Milkdown 兼容的插件时写一个 micromark 扩展</td></tr>
-    <tr><td>高亮插件</td><td><code>==文字==</code>。候选是 <code>remark-highlight-mark</code> 和 <code>remark-flexible-markers</code>，实现时按与 Milkdown 的兼容性选定；都不兼容时写一个 micromark 扩展</td></tr>
+    <tr><td><code>remark-cjk-friendly</code>、<code>remark-cjk-friendly-gfm-strikethrough</code></td><td>中文标点旁边的 <code>**</code>、<code>*</code>、<code>~~</code> 正确识别，例如 <code>中文**加粗：**后面</code></td></tr>
+    <tr><td>属性扩展 <code>src/format/attributes.js</code></td><td>标题和图片后面的 <code>{#id key=value}</code>，写法与 Pandoc 的属性语法相同，不支持 Pandoc 的 <code>.class</code>。bake 自己实现</td></tr>
+    <tr><td>高亮扩展 <code>src/format/highlight.js</code></td><td><code>==文字==</code>，标记是恰好两个 <code>=</code>，两侧的判定规则与 <code>remark-cjk-friendly</code> 对 <code>*</code> 的规则相同，所以 <code>中文==重点：==后面</code> 能识别。bake 自己实现</td></tr>
+    <tr><td>块引用 id 扩展 <code>src/format/block-id.js</code></td><td>段落末尾的 <code>^block-id</code>，见 <a href="#site-links">站内引用怎么写</a>。bake 自己实现</td></tr>
   </tbody>
 </table>
+<p>属性、高亮和块引用 id 三个扩展各自包含解析和输出两部分。理由：现有的 remark 插件要么没有输出规则，写回时报错或丢失属性，要么把正文里的 <code>=</code> 转义成 <code>\=</code>，往返测试无法通过。</p>
 
 <h2>段落里能不能写 HTML</h2>
-<p>不能。段落、标题、列表里出现 HTML 标签时构建报错。只用一次的特殊内容写成独立的 HTML 块：前后各空一行，块内是完整的 HTML。编辑器里显示它的渲染结果，点开后编辑源码。</p>
+<p>不能。段落、标题、列表和表格单元格里出现 HTML 标签时构建报错。只用一次的特殊内容写成独立的 HTML 块：前后各空一行，块内是完整的 HTML。编辑器里显示它的渲染结果，点开后编辑源码。</p>
 <p>同一种写法用到第二次时，把它做成块类型或文字标记：所有博客都可能用到的加进 bake 的 <code>src/blocks/</code>，只有一个博客使用的加在该博客的 <code>blocks/</code>。理由：HTML 在编辑器里只能按源码编辑，块类型才能在编辑器里直接输入。</p>
 
 <h2>内置块类型长什么样</h2>
 <p>下面每一节给出一种内置块类型的写法和渲染结果。渲染结果是 bake 内置样式的默认效果：颜色、字体和宽度取自主题变量，主题只改变量值，版面结构不变。指令有三种形式，对应块类型定义里的 <code>form</code>：<code>:name</code> 是行内标记（<code>text</code>），<code>::name</code> 是单行块（<code>leaf</code>），<code>:::name</code> 是可以包含段落的块（<code>container</code>）。容器嵌套时外层多写一个冒号。块类型的定义方式见 <a href="extending.html">扩展接口</a>。</p>
 
 <h3>标题 id 和目录短标题</h3>
-<p>标题后的 <code>{#id}</code> 设定锚点，<code>toc</code> 设定目录里显示的短标题。没有写 <code>{#id}</code> 时，id 由标题文字生成。鼠标移到标题上时，左侧显示 <code>#</code> 链接。编辑器里标题左侧显示 id，在属性面板里修改。</p>
+<p>标题后的 <code>{#id}</code> 设定锚点，<code>toc</code> 设定目录里显示的短标题。没有写 <code>{#id}</code> 时，id 由标题文字生成。id 以字母开头，只含字母、数字、<code>-</code> 和 <code>_</code>。标题只接受 <code>id</code> 和 <code>toc</code> 两个属性，其他属性和 <code>.class</code> 报错。鼠标移到标题上时，左侧显示 <code>#</code> 链接。编辑器里标题左侧显示 id，在属性面板里修改。</p>
 <div class="spec">
-<pre><code class="language-markdown">## 反向传播中的链式法则 {#chain-rule toc="链式法则"}</code></pre>
+<pre><code class="language-markdown">## 反向传播中的链式法则 {#chain-rule toc=链式法则}</code></pre>
 <div class="sp">
   <div class="sp-toc"><span>目录</span><b>链式法则</b></div>
   <div class="sp-h2"><span class="sp-anchor">#</span>反向传播中的链式法则</div>
@@ -161,7 +164,7 @@
 </div>
 
 <h3>导语</h3>
-<p><code>:::lede</code> 写在正文开头，输出 <code>&lt;div class="lede"&gt;</code>。字号是正文的 1.15 倍，下方有一条分隔线。站内引用预览一篇文章时显示的就是导语。</p>
+<p><code>:::lede</code> 只能是正文的第一个块，写在其他位置时报错。它输出 <code>&lt;div class="lede"&gt;</code>。字号是正文的 1.15 倍，下方有一条分隔线。站内引用预览一篇文章时显示的就是导语。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::lede
 这篇文章从一个神经元出发，推导反向传播中每一步的矩阵求导。
@@ -170,7 +173,7 @@
 </div>
 
 <h3>章节副标题</h3>
-<p><code>::subtitle[文字]</code> 紧跟在标题之后，输出 <code>&lt;p class="subtitle"&gt;</code>。它不进入目录，不生成锚点，用于给一节补充一句说明。</p>
+<p><code>::subtitle[文字]</code> 必须紧跟在标题之后，否则报错。它输出 <code>&lt;p class="subtitle"&gt;</code>。它不进入目录，不生成锚点，用于给一节补充一句说明。</p>
 <div class="spec">
 <pre><code class="language-markdown">## 链式法则 {#chain-rule}
 
@@ -179,7 +182,7 @@
 </div>
 
 <h3>引用</h3>
-<p>Markdown 的 <code>&gt;</code> 引用块。引用块的最后一行写 <code>::source[出处]</code> 时，出处显示在引文下方，输出为 <code>&lt;figure class="quote"&gt;</code>，里面是 <code>&lt;blockquote&gt;</code> 和 <code>&lt;figcaption&gt;</code>。引文使用 <code>--font-serif</code>，字号是正文的 1.25 倍。没有出处时只输出 <code>&lt;blockquote&gt;</code>，样式相同。</p>
+<p>Markdown 的 <code>&gt;</code> 引用块。引用块的最后一行写 <code>::source[出处]</code> 时，出处显示在引文下方，输出为 <code>&lt;figure class="quote"&gt;</code>，里面是 <code>&lt;blockquote&gt;</code> 和 <code>&lt;figcaption&gt;</code>。引文使用 <code>--font-serif</code>，字号是正文的 1.25 倍。没有出处时只输出 <code>&lt;blockquote&gt;</code>，样式相同。<code>::source</code> 只能是引用块的最后一个子节点，写在其他位置时报错。</p>
 <div class="spec">
 <pre><code class="language-markdown">&gt; You shall know a word by the company it keeps.
 &gt;
@@ -190,9 +193,9 @@
 </div>
 
 <h3>图片</h3>
-<p>图片用 Markdown 的图片语法，说明文字同时用作 <code>alt</code> 和图注，输出 <code>&lt;figure&gt;</code>。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
+<p>图片用 Markdown 的图片语法，说明文字同时用作 <code>alt</code> 和图注，输出 <code>&lt;figure&gt;</code>。图片必须独占一段，段落里还有其他文字时报错。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
 <p>支持的格式：SVG、PNG、JPEG（<code>.jpg</code>、<code>.jpeg</code>）、GIF、WebP、AVIF。其他扩展名构建报错。构建时怎样处理每种格式见 <a href="build-dev.html">构建与开发服务器</a>。</p>
-<p>图片后面紧跟一组 <code>{}</code> 属性时，可以设定尺寸和排法：</p>
+<p>图片后面紧跟一组 <code>{}</code> 属性时，可以设定尺寸和排法。表外的属性报错：</p>
 <table>
   <thead>
     <tr><th>属性</th><th>取值</th><th>默认值</th><th>作用</th></tr>
@@ -235,9 +238,9 @@
 </div>
 
 <h3>组件</h3>
-<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。输出同名 custom element，图题放在元素内的 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供外框和图题的样式。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
+<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错。输出同名 custom element，图题放在元素内的 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供外框和图题的样式。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
 <div class="spec">
-<pre><code class="language-markdown">:::gradient-figure{x0="1.2"}
+<pre><code class="language-markdown">:::gradient-figure{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
 :::</code></pre>
 <div class="sp">
@@ -253,7 +256,7 @@
 </div>
 
 <h3>折叠</h3>
-<p><code>:::fold[标题]</code> 输出 <code>&lt;details&gt;</code>，默认收起，点击标题展开。适合放推导细节和补充证明。编辑器里折叠块始终展开，标题和内容直接输入。</p>
+<p><code>:::fold[标题]</code> 输出 <code>&lt;details&gt;</code>，方括号里的标题必填。默认收起，点击标题展开。适合放推导细节和补充证明。编辑器里折叠块始终展开，标题和内容直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::fold[推导细节]
 把 $z = Wx + b$ 代入后逐项求导……
@@ -292,7 +295,7 @@
 
 :::wide
 | 函数 | 定义 | 导数 | 输出范围 | … |
-|---|---|---|---|---|
+| - | - | - | - | - |
 :::</code></pre>
 <div class="sp">
   <div class="sp-page">
@@ -344,9 +347,10 @@
 <ul>
   <li>编号按引用在正文中出现的顺序从 1 开始生成。<code>[^d]</code> 里的名字只用于对应，不显示。</li>
   <li>鼠标移到注释上时，正文里被注释的内容高亮；鼠标移到正文的编号上时，对应注释高亮。默认高亮编号所在的整个段落。</li>
-  <li>需要精确范围时写 <code>:span[被注释的文字][^d]</code>，只高亮方括号里的文字。</li>
+  <li>需要精确范围时写 <code>:span[被注释的文字][^d]</code>，只高亮方括号里的文字。<code>:span</code> 后面必须紧跟一个脚注引用。</li>
   <li>定义了但没有被引用的注释，以及引用了但没有定义的注释，构建报错。</li>
-  <li>编辑器保存时，注释定义写在引用它的段落之后。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
+  <li>同一条注释只能引用一次，引用第二次时报错。理由：每条注释在右侧栏只显示一次，只能和一处位置对齐。</li>
+  <li>编辑器保存时，注释定义写在第一次引用它的块之后，规则见 <a href="#output-format">输出格式</a>。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
   <li>生成的页面里，每条注释输出为 <code>&lt;aside class="sidenote"&gt;</code>，放在引用它的段落之后。</li>
 </ul>
 <p id="sidenote-layout">旁注和边注的排版：CSS 把 <code>.sidenote</code> 放进右侧栏，没有脚本时注释也在段落旁边显示。对齐脚本只做两件事：</p>
@@ -356,22 +360,25 @@
 </ol>
 <p>读和写分成两批。理由：交替读写会让浏览器对每条注释都重新计算一次布局。</p>
 <p>高亮使用 CSS Custom Highlight API：把被注释的文字范围登记为一个 <code>Highlight</code>，由 <code>::highlight(sidenote)</code> 设定背景色。这个方式不修改 DOM，高亮不会引起重新排版。浏览器不支持这个 API 时不显示高亮，其他功能不受影响。</p>
-<p>窗口宽度小于 <code>1100px</code> 时没有右侧栏，注释显示在所在段落之后，缩进并用小字号。窄屏上点编号展开注释的交互属于手机适配，不在第一版。</p>
+<p>窗口宽度小于 <code>1100px</code> 时没有右侧栏，注释显示在所在段落之后，缩进并用小字号。窄屏上点编号展开注释的交互属于手机适配，不在 Bake v0.1 的范围内。</p>
 
 <h3>卡片网格</h3>
-<p>外层写 <code>::::bento</code>，里面放若干 <code>:::card</code>。网格是 4 列，<code>span="列数x行数"</code> 设定卡片大小，默认 <code>1x1</code>，<code>title</code> 是卡片标题。编辑器里卡片内容直接输入，尺寸和标题在属性面板里修改。</p>
+<p>外层写 <code>::::bento</code>，里面只能放 <code>:::card</code>，<code>:::card</code> 也只能放在 <code>::::bento</code> 里。网格是 4 列，<code>span=列数x行数</code> 设定卡片大小，列数是 1 到 4，默认 <code>1x1</code>，<code>title</code> 是卡片标题。编辑器里卡片内容直接输入，尺寸和标题在属性面板里修改。</p>
 <div class="spec">
 <pre><code class="language-markdown">::::bento
-:::card{span="2x1" title="ReLU"}
+:::card{span=2x1 title=ReLU}
 最简单的激活函数。
 :::
-:::card{title="GELU"}
+
+:::card{title=GELU}
 平滑。
 :::
-:::card{title="SiLU"}
+
+:::card{title=SiLU}
 自门控。
 :::
-:::card{span="4x1" title="比较"}
+
+:::card{span=4x1 title=比较}
 三者在零点附近的导数不同。
 :::
 ::::</code></pre>
@@ -386,7 +393,7 @@
 </div>
 
 <h3>参考文献</h3>
-<p><code>:::references</code> 里放普通列表，输出 <code>&lt;ol class="references"&gt;</code>，编号写成 <code>[1]</code> 的形式，字号小于正文。</p>
+<p><code>:::references</code> 里只能放一个普通列表，输出 <code>&lt;ol class="references"&gt;</code>，编号写成 <code>[1]</code> 的形式，字号小于正文。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::references
 - Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.
@@ -404,7 +411,7 @@
 <p>GFM 表格。生成页面时外面包一层可以横向滚动的容器，窄屏上表格在容器内滚动，页面不出现横向滚动。数字列使用等宽数字。编辑器里单元格直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">| 函数 | 零点处导数 |
-|---|---:|
+| - | -: |
 | ReLU | 不存在 |
 | GELU | 0.5 |
 | SiLU | 0.5 |</code></pre>
@@ -435,7 +442,7 @@
 <p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
 <p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
 
-<h2>站内引用怎么写</h2>
+<h2 id="site-links">站内引用怎么写</h2>
 <p>站内链接就是普通 Markdown 链接，不加新语法。链接到站内页面时，鼠标停留在链接上会弹出预览卡片，显示目标内容。</p>
 <pre><code class="language-markdown">这里用到的是[链式法则](/matrix-calculus/deep-learning#chain-rule)。
 
@@ -512,7 +519,7 @@ tags: [GELU, SiLU, GLU]
   <li>编辑器的页面属性面板列出通用字段和当前版式的字段，控件按字段类型生成。</li>
 </ul>
 
-<h2>Markdown 的输出格式是什么</h2>
+<h2 id="output-format">Markdown 的输出格式是什么</h2>
 <p>编辑器保存时用 remark-stringify 输出 Markdown，往返测试要求载入后不修改直接导出的结果与原文件逐字节相同。为此输出格式固定如下，示例博客的文件也按这个格式书写：</p>
 <table>
   <thead>
@@ -525,9 +532,40 @@ tags: [GELU, SiLU, GLU]
     <tr><td>标题</td><td>ATX 形式（<code>##</code>）</td></tr>
     <tr><td>块之间</td><td>一个空行</td></tr>
     <tr><td>文件末尾</td><td>一个换行符</td></tr>
+    <tr><td>指令和属性的值</td><td>值里没有空白、引号、<code>&lt;</code>、<code>=</code>、<code>&gt;</code>、反引号、<code>}</code> 时不加引号，例如 <code>{kind=note}</code>、<code>{x0=1.2}</code>、<code>{span=2x1 title=ReLU}</code>、<code>{toc=链式法则}</code>；否则加双引号。标题和图片的属性 <code>#id</code> 在前，其余按属性表的顺序</td></tr>
+    <tr><td>表格</td><td>单元格两侧各一个空格，分隔行写成 <code>| - | -: |</code>，列不按宽度对齐</td></tr>
+    <tr><td>有序列表</td><td>起始编号保留原值，后续编号依次递增，例如 <code>1. 1. 1.</code> 输出为 <code>1. 2. 3.</code></td></tr>
+    <tr><td>硬换行</td><td>行尾反斜杠</td></tr>
+    <tr><td>旁注定义的位置</td><td>写在第一次引用它的块之后。这个块是正文的顶层块，例如引用在提示框里的段落中时，定义写在整个提示框之后。同一个块引用了多条注释时，按引用顺序排列</td></tr>
+    <tr><td>frontmatter</td><td>原文不变</td></tr>
   </tbody>
 </table>
 <p>已有文件不符合这个格式时，第一次保存会改变这些写法。迁移博客时先用 <code>bake format</code> 统一一次，之后的 diff 只包含实际修改。</p>
+
+<h2>模块接口</h2>
+<p><code>src/format/index.js</code> 导出四个函数，渲染模块和编辑器通过它们读写 Markdown：</p>
+<pre><code class="language-js">parse(source, { path, blocks, components, layouts, themes })
+  // → { tree, frontmatter, messages }
+stringify(tree)   // → string
+format(source)    // → string，等于 stringify(parse(source).tree)
+parseSyntax(source, { path })
+  // → { tree, messages }</code></pre>
+<p><code>parseSyntax</code> 只报告解析阶段的错误，即属性语法和 frontmatter 的 YAML 语法，不检查指令名、组件和版式。<code>bake format</code> 不读取博客的扩展目录，所以使用它。</p>
+<table>
+  <thead>
+    <tr><th>参数或返回值</th><th>内容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>blocks</code></td><td>博客 <code>blocks/</code> 里的块类型定义列表，与内置块类型合并，重名时报错</td></tr>
+    <tr><td><code>components</code></td><td><code>{ 组件名: static properties }</code></td></tr>
+    <tr><td><code>layouts</code></td><td><code>{ 版式名: fields }</code></td></tr>
+    <tr><td><code>themes</code></td><td>主题名列表</td></tr>
+    <tr><td><code>tree</code></td><td>mdast 语法树。高亮是 <code>mark</code> 节点；标题和图片的属性在节点的 <code>data.attributes</code>；段落的块引用 id 在 <code>data.blockId</code></td></tr>
+    <tr><td><code>frontmatter</code></td><td>填入通用字段和当前版式字段默认值后的对象，其他字段原样保留</td></tr>
+    <tr><td><code>messages</code></td><td>每项是 <code>{ path, line, column, text }</code>，<code>text</code> 是英文的错误说明，打印为 <code>文件路径:行:列 错误说明</code>，与 <a href="build-dev.html">构建与开发服务器</a> 的错误格式相同</td></tr>
+  </tbody>
+</table>
+<p><code>components</code>、<code>layouts</code>、<code>themes</code> 没有传入时，跳过对应的检查。</p>
 </main>
 </body>
 </html>
