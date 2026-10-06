@@ -1,4 +1,5 @@
 import { addGlyphs, glyphsOf } from '../client/math-defs.js';
+import { tocList } from '../layouts/html.js';
 import { showStatus } from './status.js';
 
 function stylesheets(target) {
@@ -34,25 +35,36 @@ async function fetchDocument() {
   return new DOMParser().parseFromString(await response.text(), 'text/html');
 }
 
+let status = JSON.parse(document.getElementById('bake-status').textContent);
+showStatus(status);
+
+function updateStatus(next) {
+  status = { ...status, ...next };
+  showStatus(status);
+}
+
 async function update(detail) {
-  showStatus(detail);
+  updateStatus({ errors: detail.errors });
   const scroll = window.scrollY;
   const accepted = window.dispatchEvent(new CustomEvent('bake:page-update', { detail, cancelable: true }));
   if (detail.chrome) replaceChrome(await fetchDocument());
   if (accepted) {
     document.querySelector('article').innerHTML = detail.html;
+    const toc = document.querySelector('nav.toc ol');
+    if (toc) toc.outerHTML = tocList(detail.toc);
     addGlyphs(glyphsOf(detail.mathDefs));
   }
   window.scrollTo(window.scrollX, scroll);
   window.dispatchEvent(new CustomEvent('bake:page-updated', { detail }));
 }
 
-showStatus(JSON.parse(document.getElementById('bake-status').textContent));
-
 if (import.meta.hot) {
   import.meta.hot.send('bake:open', { url: location.pathname });
   let updating = Promise.resolve();
   import.meta.hot.on('bake:page', (detail) => {
     if (detail.url === location.pathname) updating = updating.then(() => update(detail));
+  });
+  import.meta.hot.on('bake:status', ({ url, errors, links }) => {
+    if (url === location.pathname) updateStatus({ errors, links });
   });
 }

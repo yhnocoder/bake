@@ -42,7 +42,7 @@
     <tr><td>浏览器端需要渲染公式时声明 <code>static runtimeMath = true</code></td><td>bake 只在用到这个组件的页面加载 MathJax</td></tr>
   </tbody>
 </table>
-<p>开发服务器中，组件文件修改后页面不刷新，组件实例换成新的实现。bake 为每个组件注册一个包装类：包装类构造元素时使用当前的实现类，把生命周期回调和属性变化转发给元素自己的实现，<code>observedAttributes</code> 来自 <code>static properties</code>。组件模块热更新时，包装类换用新的实现类，并把页面上这个名字的每个元素替换成新元素，属性和子节点移到新元素中，所以属性不变，图题保留。理由：一个 custom element 名字只能注册一次，直接重新注册会失败。注册时的 <code>observedAttributes</code> 不随热更新改变，新增的属性在刷新页面后才响应变化。</p>
+<p>开发服务器中，组件文件修改后页面不刷新，组件实例换成新的实现。bake 为每个组件注册一个包装类：包装类构造元素时使用当前的实现类，把生命周期回调和属性变化转发给元素自己的实现，<code>observedAttributes</code> 来自 <code>static properties</code>。组件模块热更新时，包装类换用新的实现类，并把页面上这个名字的每个元素替换成新元素：新元素使用当前的属性和元素第一次连接时原有子节点的副本，所以属性不变，图题保留，旧实现生成的内容不会带到新元素中。理由：一个 custom element 名字只能注册一次，直接重新注册会失败。注册时的 <code>observedAttributes</code> 不随热更新改变，新增的属性在刷新页面后才响应变化。</p>
 <p>组件可以用纯 JavaScript 编写，也可以用 SolidJS 通过 <code>solid-element</code> 编写。组件可以从 <code>bake/runtime</code> 导入以下工具：</p>
 <table>
   <thead>

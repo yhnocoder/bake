@@ -12,6 +12,15 @@ let root;
 let server;
 let origin;
 let browser;
+const appendNote = `export default class AppendNote extends HTMLElement {
+  connectedCallback() {
+    const note = document.createElement('span');
+    note.className = 'generated';
+    note.textContent = 'v1';
+    this.append(note);
+  }
+}
+`;
 
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex');
@@ -24,6 +33,14 @@ function listing(directory) {
 async function post(path, body) {
   const response = await fetch(origin + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   return { status: response.status, body: await response.json() };
+}
+
+async function until(condition, timeout = 10000) {
+  const deadline = Date.now() + timeout;
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error('Condition not met in time');
+    await new Promise((done) => setTimeout(done, 50));
+  }
 }
 
 function edit(path, replace) {
@@ -49,6 +66,8 @@ async function open(url) {
 before(async () => {
   root = mkdtempSync(join(tmpdir(), 'bake-dev-'));
   cpSync(example, root, { recursive: true });
+  writeFileSync(join(root, 'components/append-note.js'), appendNote);
+  writeFileSync(join(root, 'content/append.md'), '---\ntitle: 追加\nslug: append\n---\n\n:::append-note\n图题\n:::\n');
   server = await createDevServer({ root, port: 0 });
   origin = `http://localhost:${server.httpServer.address().port}`;
   browser = await chromium.launch();
@@ -203,6 +222,40 @@ describe('文件变化', () => {
     await page.close();
   });
 
+  test('修改标题文字时就地更新目录，不替换 <article> 以外的结构', async () => {
+    const { page } = await open('/features/');
+    await page.evaluate(() => {
+      window.mast = document.querySelector('header.mast');
+      window.addEventListener('bake:page-update', (event) => (window.chrome = event.detail.chrome));
+    });
+    edit('content/features.md', (source) => source.replace('## 图片 {#images}', '## 图片与图注 {#images}'));
+    await page.waitForFunction(() => document.querySelector('nav.toc').textContent.includes('图片与图注'));
+    assert.equal(await page.evaluate(() => window.chrome), false);
+    assert.equal(await page.evaluate(() => document.querySelector('header.mast') === window.mast), true);
+    await page.close();
+  });
+
+  test('新增文章后可以访问，修改 slug 后旧地址返回 404', async () => {
+    writeFileSync(join(root, 'content/new.md'), '---\ntitle: 新文章\nslug: fresh\n---\n\n正文。\n');
+    const reachable = async (url) => (await fetch(origin + url)).status;
+    await until(async () => (await reachable('/fresh/')) === 200);
+    edit('content/new.md', (source) => source.replace('slug: fresh', 'slug: renamed'));
+    await until(async () => (await reachable('/renamed/')) === 200);
+    assert.equal(await reachable('/fresh/'), 404);
+  });
+
+  test('跨页链接指向不存在的 id 时显示在状态栏', async () => {
+    writeFileSync(join(root, 'content/links.md'), '---\ntitle: 链接\nslug: links\n---\n\n[有](/paper/#update)和[无](/paper/#missing)。\n');
+    await until(async () => (await fetch(`${origin}/links/`)).status === 200);
+    const { page } = await open('/links/');
+    await page.waitForFunction(() => document.querySelector('.bake-status-problems').textContent === '1 个断开的站内链接');
+    await page.click('.bake-status-problems');
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.bake-status-list li')].map((item) => item.textContent)), [
+      'content/links.md:6:21 Link points to a missing id /paper/#missing',
+    ]);
+    await page.close();
+  });
+
   test('渲染错误和断开的站内链接显示在状态栏', async () => {
     const { page } = await open('/features/');
     edit('content/features.md', (source) => `${source}\n[断开](/missing/)\n\n:::callot\n内容\n:::\n`);
@@ -229,6 +282,28 @@ describe('文件变化', () => {
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('demo-plot')].some((element) => window.plots.includes(element))), false);
     assert.equal(await page.evaluate(() => document.querySelectorAll('demo-plot > svg').length), before.length);
     assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  test('组件在 connectedCallback 中追加的内容在热更新后只有一份', async () => {
+    const { page } = await open('/append/');
+    await page.waitForFunction(() => document.querySelector('append-note .generated'));
+    edit('components/append-note.js', (source) => source.replace("'v1'", "'v2'"));
+    await page.waitForFunction(() => document.querySelector('append-note .generated')?.textContent === 'v2');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('append-note .generated').length), 1);
+    assert.equal(await page.evaluate(() => document.querySelector('append-note figcaption')?.textContent), '图题');
+    await page.close();
+  });
+
+  test('页面只有一个字形容器，更新后原有字形仍在', async () => {
+    const { page } = await open('/paper/');
+    const before = await page.evaluate(() => [...document.querySelectorAll('#math-defs path')].map((path) => path.id));
+    edit('content/paper.md', (source) => source.replace('第 $k$ 步的更新是', '第 $k$ 步的更新是 $\\Omega$'));
+    await page.waitForFunction((count) => document.querySelectorAll('#math-defs path').length > count, before.length);
+    const after = await page.evaluate(() => [...document.querySelectorAll('#math-defs path')].map((path) => path.id));
+    assert.equal(await page.evaluate(() => document.querySelectorAll('svg[style="display:none"]').length), 1);
+    assert.ok(before.every((id) => after.includes(id)));
+    assert.equal(new Set(after).size, after.length);
     await page.close();
   });
 });

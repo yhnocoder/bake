@@ -20,7 +20,7 @@ const layouts = { essay, paper, bento };
 
 function withoutSvg(html) {
   return html
-    .replace(/<svg style="display:none"><defs>[\s\S]*?<\/defs><\/svg>/, '<svg style="display:none"/>')
+    .replace(/<svg id="math-defs" style="display:none"><defs>[\s\S]*?<\/defs><\/svg>/, '<svg style="display:none"/>')
     .replace(/(class="math[^>]*>)<svg[\s\S]*?<\/svg><\/(span|div)>/g, '$1<svg/></$2>');
 }
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
 import { imageExtensions } from '../format/validate.js';
 import { loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
-import { findPages } from '../site/pages.js';
+import { isPagePath, removePage, updatePage } from '../site/pages.js';
 
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
 const componentPrefix = '\0bake:component/';
@@ -70,10 +70,6 @@ function splitHref(href) {
   return { path, fragment };
 }
 
-function chromeOf(result) {
-  return result.html.replace(result.rendered.mathDefs, '').replace(result.rendered.html, '');
-}
-
 export function bakeDev({ root }) {
   const content = join(root, 'content');
   const configFile = join(root, 'bake.config.js');
@@ -100,12 +96,6 @@ export function bakeDev({ root }) {
     site = await loadSite(root);
     rendered.clear();
     report(site.messages);
-  }
-
-  async function reloadPages() {
-    const { pages, messages } = await findPages(root);
-    site = { ...site, pages };
-    report(messages);
   }
 
   function pageAt(url) {
@@ -149,30 +139,46 @@ export function bakeDev({ root }) {
     return messages;
   }
 
-  async function pageState(entry) {
+  function chromeOf(entry, article) {
+    const toc = article.toc.length > 0 ? [{ id: '', html: '', depth: 2 }] : [];
+    return renderDocumentFor(site, entry.path, { ...article, html: '', mathDefs: '', toc }, { assets: pageAssets(article) });
+  }
+
+  function chromeChanged(entry, result) {
+    const chrome = chromeOf(entry, result.rendered);
+    const changed = chromes.get(entry.url) !== chrome;
+    chromes.set(entry.url, chrome);
+    return changed;
+  }
+
+  async function sendStatus(entry, client) {
     const result = await renderEntry(entry);
-    if (result.html === null) return { result, chromeChanged: false };
     const status = { errors: result.messages, links: await brokenLinks(entry, result) };
     statuses.set(entry.url, status);
-    const chrome = chromeOf(result);
-    const chromeChanged = chromes.get(entry.url) !== chrome;
-    chromes.set(entry.url, chrome);
-    return { result, status, chromeChanged };
+    client.send('bake:status', { url: entry.url, ...status });
+  }
+
+  function checkLinks(entry, client = server.ws) {
+    sendStatus(entry, client).catch((error) => server.config.logger.error(error.stack));
   }
 
   async function sendPage(entry, { chrome = false } = {}) {
-    const { result, status, chromeChanged } = await pageState(entry);
+    const result = await renderEntry(entry);
     if (result.html === null) return;
+    const changed = chromeChanged(entry, result);
     const { html, toc, mathDefs } = result.rendered;
-    server.ws.send('bake:page', { url: entry.url, html, toc, mathDefs, chrome: chrome || chromeChanged, ...status });
+    server.ws.send('bake:page', { url: entry.url, html, toc, mathDefs, chrome: chrome || changed, errors: result.messages });
+    checkLinks(entry);
   }
 
   async function servePage(entry, request, response) {
-    const { result } = await pageState(entry);
+    const result = await renderEntry(entry);
+    statuses.set(entry.url, { errors: result.messages, links: statuses.get(entry.url)?.links ?? [] });
     if (result.html === null) {
       sendText(response, 500, result.messages.map(formatMessage).join('\n') + '\n');
       return;
     }
+    chromeChanged(entry, result);
     sendText(response, 200, await server.transformIndexHtml(entry.url, result.html, request.originalUrl), 'text/html');
   }
 
@@ -264,10 +270,12 @@ export function bakeDev({ root }) {
   }
 
   async function handleMarkdown(event, file) {
-    await reloadPages();
-    if (event === 'unlink') return;
     const path = relative(root, file);
-    const entry = site.pages.find((page) => page.path === path);
+    const previous = site.pages.find((page) => page.path === path);
+    const { pages, messages } = event === 'unlink' ? removePage(site.pages, path) : await updatePage(root, site.pages, path);
+    site = { ...site, pages };
+    const entry = pages.find((page) => page.path === path);
+    if (previous?.url !== entry?.url) report(messages);
     if (!entry?.url) return;
     if (savedHashes.get(path) === sha256(await readFile(file))) return;
     await sendPage(entry);
@@ -283,7 +291,7 @@ export function bakeDev({ root }) {
 
   function handleFile(event, file) {
     if (file === configFile) return serialize(handleConfig);
-    if (isInside(content, file) && file.endsWith('.md')) return serialize(() => handleMarkdown(event, file));
+    if (isPagePath(relative(root, file))) return serialize(() => handleMarkdown(event, file));
     if (Object.values(site.components).some(({ path }) => join(root, path) === file)) return serialize(reloadSite);
     return undefined;
   }
@@ -297,7 +305,11 @@ export function bakeDev({ root }) {
       server.watcher.on('all', (event, file) => {
         handleFile(event, file)?.catch((error) => server.config.logger.error(error.stack));
       });
-      server.ws.on('bake:open', ({ url }) => openUrls.add(url));
+      server.ws.on('bake:open', ({ url }, client) => {
+        openUrls.add(url);
+        const entry = pageAt(url);
+        if (entry) checkLinks(entry, client);
+      });
       server.middlewares.use((request, response, next) => handleRequest(request, response, next).catch(next));
     },
     resolveId(id) {

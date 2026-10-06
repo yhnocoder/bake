@@ -254,7 +254,7 @@ describe('公式', () => {
   test('mathDefs 只包含这一页用到的字形', async () => {
     await htmlOf('$\\Omega \\cdot \\Psi$\n');
     const { html, mathDefs } = await renderBody('$x$\n');
-    assert.ok(mathDefs.startsWith('<svg style="display:none"><defs>'));
+    assert.ok(mathDefs.startsWith('<svg id="math-defs" style="display:none"><defs>'));
     assert.ok(mathDefs.endsWith('</defs></svg>'));
     assert.deepEqual(definedGlyphIds(mathDefs), glyphIds(html));
     assert.equal(glyphIds(html).size, 1);
