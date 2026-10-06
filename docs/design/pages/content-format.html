@@ -16,7 +16,8 @@
 <style>
 :root {
   --sp-paper: #fffefa;
-  --sp-mark: #fbe8a0;
+  --sp-mark: #f5e6c8;
+  --sp-mark-text: #a0574a;
   --sp-hl: #e2ecfa;
   --sp-note: #3b6fa8;
   --sp-note-bg: #e8f0fa;
@@ -28,7 +29,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --sp-paper: #23221e;
-    --sp-mark: #5c4c1d;
+    --sp-mark: #4d3b22;
+    --sp-mark-text: #e39c8c;
     --sp-hl: #26354b;
     --sp-note: #79a9e0;
     --sp-note-bg: #1f2c3c;
@@ -52,7 +54,7 @@
 .sp-anchor { position: absolute; left: -0.9rem; color: var(--accent); font-weight: 400; }
 .sp-toc { font-size: 0.8rem; color: var(--muted); display: flex; gap: 0.6rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--line); }
 .sp-toc b { color: var(--fg); font-weight: 500; border-left: 2px solid var(--accent); padding-left: 0.4rem; }
-.sp-mark { background: var(--sp-mark); border-radius: 2px; padding: 0 0.1em; }
+.sp-mark { color: var(--sp-mark-text); font-weight: 600; background: linear-gradient(transparent 62%, var(--sp-mark) 62%); }
 .sp-lede { font-size: 1.15em; line-height: 1.75; padding-bottom: 0.8rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--line); }
 .sp-subtitle { color: var(--muted); font-size: 0.95rem; margin-top: 0.1rem; }
 .sp-figure { margin: 0; }
@@ -145,7 +147,7 @@
 </div>
 
 <h3>文字标记</h3>
-<p><code>==文字==</code> 输出 <code>&lt;mark&gt;</code>，背景色是 <code>--color-mark</code>。编辑器里选中文字按 <code>Mod-Shift-H</code>。</p>
+<p><code>==文字==</code> 输出 <code>&lt;mark&gt;</code>。文字加粗并使用 <code>--color-mark-text</code>，文字下部约 40% 的高度铺 <code>--color-mark</code> 底色。编辑器里选中文字按 <code>Mod-Shift-H</code>。</p>
 <div class="spec">
 <pre><code class="language-markdown">梯度指向函数值==增长最快==的方向。</code></pre>
 <div class="sp"><p>梯度指向函数值<span class="sp-mark">增长最快</span>的方向。</p></div>

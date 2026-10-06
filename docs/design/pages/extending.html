@@ -124,14 +124,15 @@
   --color-muted: #656d76;
   --color-bg: #fbfaf7;
   --color-accent: #2f6fb3;
-  --color-mark: #fff3b0;
+  --color-mark: #f5e6c8;
+  --color-mark-text: #a0574a;
   --color-highlight: #e6f0ff;
   --color-border: #e3e0d8;
   --measure: 42rem;
   --measure-wide: 60rem;
   --sidenote-width: 16rem;
 }</code></pre>
-<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark</code> 是 <code>==文字==</code> 的背景色。主题缺少某个变量时，构建报错并列出缺少的变量。</p>
+<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。</p>
 
 <h2 id="site-data">组件怎么取得站点数据</h2>
 <p>首页是 <code>content/index.md</code>，首页的卡片网格是博客的全局组件 <code>topic-grid</code>。组件从 <code>bake/runtime</code> 导入 <code>site</code> 取得站点数据：</p>
