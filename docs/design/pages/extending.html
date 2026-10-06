@@ -134,7 +134,7 @@
   </tbody>
 </table>
 
-<h2>主题怎么写</h2>
+<h2 id="theme">主题怎么写</h2>
 <p><code>themes/</code> 下每个 CSS 文件是一个主题，文件名是主题名。主题设定 bake 规定的 CSS 变量，也可以写博客自己的块类型和组件的样式。bake 的版式和内置块只使用这些变量，不写具体颜色。</p>
 <pre><code class="language-css">:root {
   --font-body: 'LXGW WenKai Screen', serif;
@@ -152,7 +152,21 @@
   --measure-wide: 60rem;
   --sidenote-width: 16rem;
 }</code></pre>
-<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。变量名列表在 <code>src/styles/variables.js</code>，检查主题时使用它。</p>
+<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。变量名列表是 <code>src/styles/variables.js</code> 的 <code>themeVariables</code>，检查主题时使用它。</p>
+<p>代码高亮的颜色使用 13 个可选的代码变量，列在同一文件的 <code>optionalVariables</code>，检查主题时不要求它们。主题不写某个代码变量时，它回退到下表的主题变量。理由：只设定必需变量的主题也有代码颜色，深色模式只需要换变量的值。</p>
+<table>
+  <thead>
+    <tr><th>代码变量</th><th>回退</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>--code-foreground</code></td><td><code>--color-text</code></td></tr>
+    <tr><td><code>--code-token-keyword</code></td><td><code>--color-accent</code></td></tr>
+    <tr><td><code>--code-token-comment</code></td><td><code>--color-muted</code></td></tr>
+    <tr><td><code>--code-token-string</code>、<code>--code-token-string-expression</code></td><td><code>--color-mark-text</code></td></tr>
+    <tr><td><code>--code-token-constant</code>、<code>--code-token-parameter</code>、<code>--code-token-function</code>、<code>--code-token-punctuation</code>、<code>--code-token-link</code>、<code>--code-token-inserted</code>、<code>--code-token-deleted</code>、<code>--code-token-changed</code></td><td><code>--color-text</code></td></tr>
+  </tbody>
+</table>
+<p><code>examples/minimal/themes/default.css</code> 写出了全部 13 个代码变量，供主题作者参考。</p>
 
 <h2 id="site-data">组件怎么取得站点数据</h2>
 <p>首页是 <code>content/index.md</code>，首页的卡片网格是博客的全局组件 <code>topic-grid</code>。组件从 <code>bake/runtime</code> 导入 <code>site</code> 取得站点数据：</p>

@@ -171,7 +171,7 @@ describe('每种内容的 HTML', () => {
       '<demo-plot curve="quartic" class="component" data-md="::demo-plot{x0=1.20 curve=quartic}"></demo-plot>',
     ],
     ['独立的 HTML 块', '<svg viewBox="0 0 1 1">\n  <rect/>\n</svg>\n', '<svg viewBox="0 0 1 1">\n  <rect/>\n</svg>'],
-    ['代码块', '```python\nprint(1 < 2)\n```\n', '<pre><code class="language-python">print(1 &#x3C; 2)\n</code></pre>'],
+    ['代码块', '```\nprint(1 < 2)\n```\n', '<pre><code>print(1 &#x3C; 2)\n</code></pre>'],
   ];
 
   for (const [name, body, expected] of cases) {

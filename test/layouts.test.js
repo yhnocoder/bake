@@ -7,7 +7,7 @@ import essay from '../src/layouts/essay.js';
 import { renderDocument } from '../src/layouts/head.js';
 import paper from '../src/layouts/paper.js';
 import { loadSite, renderPage } from '../src/site/index.js';
-import { themeVariables } from '../src/styles/variables.js';
+import { optionalVariables, themeVariables } from '../src/styles/variables.js';
 
 const root = join(import.meta.dirname, '..');
 const site = await loadSite(join(root, 'examples/minimal'));
@@ -95,9 +95,9 @@ describe('样式', () => {
     }
   });
 
-  test('示例主题设定了全部主题变量', () => {
+  test('示例主题设定了全部主题变量和可选的代码变量', () => {
     const theme = readFileSync(join(root, 'examples/minimal/themes/default.css'), 'utf8');
     const defined = [...theme.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]);
-    assert.deepEqual(defined, themeVariables);
+    assert.deepEqual(defined, [...themeVariables, ...optionalVariables]);
   });
 });
