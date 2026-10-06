@@ -1,8 +1,10 @@
-# <Project>
+# bake
 
 ## 目标
 
-<Description>
+bake 是一个面向技术博客的静态网站生成器，自带所见即所得的编辑器。它不仅支持 Markdown 基础语法与自定义扩展语法，还能在文章中嵌入交互组件，并在编辑器里直接调整组件的参数。`bake build` 把文章生成静态网站；`bake dev` 在排好版的页面上编辑文章，修改保存回 Markdown 文件。
+
+bake 只包含工具本身。博客的文章、交互图和主题放在博客自己的仓库里，`examples/` 下的两个博客用于测试 bake。
 
 文档从 `docs/design/index.html` 开始读，计划与进度见 GitHub issue #<IssueId>。
 
@@ -95,9 +97,8 @@ dashboard issue 同一时间只由一个 agent 修改，其他 agent 完成 Task
 文件组织：
 
 - `docs/design/index.html` 是索引页，列出所有文档。
-- `docs/design/style.css` 是所有页面共用的样式。组件的写法和效果见 `pages/_template.html`，完整文档的写法参考 `examples/`。新文档复制 `pages/_template.html` 开始，保留 `<head>`（字体、MathJax、Prism 的引入），按需使用组件，删掉不用的内容。
+- `docs/design/style.css` 是所有页面共用的样式。组件的写法和效果见 `pages/_template.html`，完整文档的写法参考 `pages/` 里已有的文档。新文档复制 `pages/_template.html` 开始，保留 `<head>`（字体、MathJax、Prism 的引入），按需使用组件，删掉不用的内容。
 - 项目的设计文档放在 `docs/design/pages/`。
-- `docs/design/examples/` 是示例，新项目开始时整个目录删除，并删除 index 里对应的卡片。
 - 改动 `docs/design/` 后运行 `uv run scripts/check_design.py`，它对每个页面截取桌面、375px、深色三种截图，并报告控制台错误、资源加载失败、公式渲染错误、窄屏横向溢出和断开的相对链接。脚本只能发现机械性错误，布局是否符合设计仍然需要看截图。
 
 

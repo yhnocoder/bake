@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>扩展接口</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaiscreen.css">
+<link rel="stylesheet" href="../style.css">
+<script defer src="../math.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-core.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/diff-highlight/prism-diff-highlight.min.js"></script>
+<script defer src="../code.js"></script>
+</head>
+<body>
+<main>
+<p class="nav"><a href="../index.html">返回索引</a></p>
+<h1>扩展接口</h1>
+<p class="lead">博客通过四种方式扩展 bake：组件、块类型、版式和主题。四种方式都是<mark>把文件放进约定的目录</mark>，bake 按目录发现它们，配置文件不需要登记。</p>
+
+<h2>组件怎么写</h2>
+<p>组件是用代码画的交互图。<code>components/</code>（全局）和 <code>content/&lt;主题&gt;/components/</code>（只在这个主题的文章里可用）下的每个 <code>.js</code> 文件定义一个 custom element，元素名就是文件名。文件名必须包含 <code>-</code>，这是 custom element 的命名规则。</p>
+<pre><code class="language-js">export default class GradientFigure extends HTMLElement {
+  static properties = {
+    x0: { label: 'x₀ 初始值', type: 'number', min: -2, max: 2, step: 0.01, default: 1.2 },
+    showPath: { label: '显示路径', type: 'boolean', default: true },
+  };
+  static runtimeMath = true;
+}</code></pre>
+<p>bake 对组件的要求：</p>
+<table>
+  <thead>
+    <tr><th>要求</th><th>理由</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>默认导出一个继承 <code>HTMLElement</code> 的类，bake 用文件名调用 <code>customElements.define</code></td><td>组件不需要自己注册，改名只改文件名</td></tr>
+    <tr><td><code>static properties</code> 列出可调属性，字段为 <code>label</code>、<code>type</code>（<code>number</code> | <code>string</code> | <code>boolean</code> | <code>enum</code>）、<code>default</code>，以及 <code>min</code>、<code>max</code>、<code>step</code>、<code>options</code></td><td>编辑器据此生成属性面板；bake 据此生成 <code>observedAttributes</code></td></tr>
+    <tr><td>属性变化时重画（<code>attributeChangedCallback</code>）</td><td>属性面板修改属性时组件实时更新</td></tr>
+    <tr><td>保留元素内原有的 <code>&lt;figcaption&gt;</code></td><td>图题是 Markdown 内容，由编辑器管理</td></tr>
+    <tr><td>浏览器端需要渲染公式时声明 <code>static runtimeMath = true</code></td><td>bake 只在用到这个组件的页面加载 MathJax</td></tr>
+  </tbody>
+</table>
+<p>组件可以用纯 JavaScript 编写，也可以用 SolidJS 通过 <code>solid-element</code> 编写。组件可以从 <code>bake/runtime</code> 导入以下工具：</p>
+<table>
+  <thead>
+    <tr><th>导入</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>animate</code></td><td>Motion 的 <code>animate</code>，系统开启减少动态效果时动画时长为 0</td></tr>
+    <tr><td><code>layoutText</code></td><td>Pretext 的封装：给定文字、字体和宽度，返回断行结果和高度，用于 SVG 和 canvas 里的文字</td></tr>
+    <tr><td><code>renderMath</code></td><td>在浏览器里渲染 TeX，使用站点的 MathJax 配置；只在声明 <code>runtimeMath</code> 的组件里可用</td></tr>
+    <tr><td><code>site</code></td><td>站点数据，见 <a href="#site-data">组件怎么取得站点数据</a></td></tr>
+  </tbody>
+</table>
+<p>组件名在全站唯一，主题组件与全局组件重名时构建报错。一个主题的组件被另一个主题的文章使用时构建报错，提示把它移到全局 <code>components/</code>。<code>components/lib/</code> 下的文件是组件共用的模块，不定义组件。</p>
+
+<h2>块类型怎么定义</h2>
+<p>块类型是扩展的 Markdown 写法。bake 的内置块类型在 <code>src/blocks/</code>，博客自己的块类型在 <code>blocks/</code>，每个文件定义一种，格式相同。</p>
+<pre><code class="language-js">export default {
+  name: 'shape',
+  form: 'text',
+  attributes: {
+    kind: { type: 'enum', options: ['scalar', 'row', 'column', 'matrix'], default: 'scalar' },
+  },
+  render: ({ attributes, children }) =&gt; ['span', { class: `math-shape ${attributes.kind}` }, children],
+};</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>name</code></td><td>指令名，全站唯一。博客的块类型与内置块类型重名时构建报错</td></tr>
+    <tr><td><code>form</code></td><td><code>text</code>：行内标记，写作 <code>:name[文字]{属性}</code>；<code>leaf</code>：单行块，写作 <code>::name[文字]{属性}</code>；<code>container</code>：可以包含段落的块，写作 <code>:::name{属性}</code> 到 <code>:::</code></td></tr>
+    <tr><td><code>label</code></td><td>插入菜单里显示的名字，默认是 <code>name</code></td></tr>
+    <tr><td><code>attributes</code></td><td>属性定义，字段与组件的 <code>static properties</code> 相同，编辑器据此生成属性面板</td></tr>
+    <tr><td><code>render</code></td><td>可选。返回 hast 风格的数组 <code>[标签, 属性, 子节点]</code>。不写时输出 <code>&lt;div class="name"&gt;</code>（<code>text</code> 形式为 <code>&lt;span&gt;</code>），属性写成 <code>data-*</code></td></tr>
+  </tbody>
+</table>
+<p>块类型的样式写在博客的主题 CSS 里。编辑器中块内的内容可以直接输入，渲染结果与页面相同。理由：<code>render</code> 的输出同时用作编辑器节点的 DOM，编辑器和页面不需要两套定义。</p>
+
+<h2>版式怎么写</h2>
+<p>版式决定正文周围的页面结构。内置三种：</p>
+<table>
+  <thead>
+    <tr><th>版式</th><th>结构</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>essay</code></td><td>左侧目录、中间正文、右侧旁注栏</td></tr>
+    <tr><td><code>paper</code></td><td>标题、作者行、摘要，正文单栏，标题自动编号，旁注栏在右侧</td></tr>
+    <tr><td><code>bento</code></td><td>标题和导语，下方是整页宽度的卡片网格，没有目录和旁注栏</td></tr>
+  </tbody>
+</table>
+<p>博客可以在 <code>layouts/</code> 中新增版式，或用同名文件覆盖内置版式。版式是一个函数，返回 <code>&lt;body&gt;</code> 内的 HTML：</p>
+<pre><code class="language-js">export default function essay({ page, html, toc, site }) {
+  return `
+    &lt;header class="mast"&gt;
+      ${page.eyebrow ? `&lt;p class="eyebrow"&gt;${page.eyebrow}&lt;/p&gt;` : ''}
+      &lt;h1&gt;${page.title}&lt;/h1&gt;
+    &lt;/header&gt;
+    &lt;nav class="toc"&gt;${toc.map(t =&gt; `&lt;a href="#${t.id}"&gt;${t.text}&lt;/a&gt;`).join('')}&lt;/nav&gt;
+    &lt;article&gt;${html}&lt;/article&gt;`;
+}</code></pre>
+<table>
+  <thead>
+    <tr><th>参数</th><th>内容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>page</code></td><td>frontmatter 全部字段，版式字段已经填入默认值，加上 <code>url</code> 和 <code>path</code>（源文件相对路径）</td></tr>
+    <tr><td><code>html</code></td><td>渲染好的正文 HTML，旁注已经放在对应段落之后</td></tr>
+    <tr><td><code>toc</code></td><td>目录项列表 <code>{ id, text, depth }</code>，<code>text</code> 优先使用标题的 <code>toc</code> 属性</td></tr>
+    <tr><td><code>site</code></td><td>站点数据，与组件取得的相同</td></tr>
+  </tbody>
+</table>
+<p>版式需要的 frontmatter 字段由版式文件导出 <code>fields</code> 声明：</p>
+<pre><code class="language-js">export const fields = {
+  authors: { label: '作者', type: 'list' },
+  abstract: { label: '摘要', type: 'string' },
+  toc: { label: '目录', type: 'boolean', default: false },
+  numbered: { label: '标题编号', type: 'boolean', default: true },
+};</code></pre>
+<p>字段定义的格式与组件的 <code>static properties</code> 相同，另外支持 <code>list</code>（字符串列表）类型。bake 用它校验文章的 frontmatter，把默认值填进 <code>page</code>，并在编辑器的页面属性面板里生成控件。版式字段不能与通用字段同名，同名时构建报错。</p>
+<p><code>&lt;head&gt;</code>、主题 CSS、组件脚本、旁注对齐脚本、预览脚本和复制脚本由 bake 加入，版式不处理。编辑器挂载在版式输出的 <code>&lt;article&gt;</code> 上，所以每个版式必须输出且只输出一个 <code>&lt;article&gt;</code>。</p>
+
+<h2>主题怎么写</h2>
+<p><code>themes/</code> 下每个 CSS 文件是一个主题，文件名是主题名。主题设定 bake 规定的 CSS 变量，也可以写博客自己的块类型和组件的样式。bake 的版式和内置块只使用这些变量，不写具体颜色。</p>
+<pre><code class="language-css">:root {
+  --font-body: 'LXGW WenKai Screen', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif: 'Source Serif 4', 'Noto Serif SC', serif;
+  --color-text: #1f2328;
+  --color-muted: #656d76;
+  --color-bg: #fbfaf7;
+  --color-accent: #2f6fb3;
+  --color-mark: #f5e6c8;
+  --color-mark-text: #a0574a;
+  --color-highlight: #e6f0ff;
+  --color-border: #e3e0d8;
+  --measure: 42rem;
+  --measure-wide: 60rem;
+  --sidenote-width: 16rem;
+}</code></pre>
+<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。</p>
+
+<h2 id="site-data">组件怎么取得站点数据</h2>
+<p>首页是 <code>content/index.md</code>，首页的卡片网格是博客的全局组件 <code>topic-grid</code>。组件从 <code>bake/runtime</code> 导入 <code>site</code> 取得站点数据：</p>
+<pre><code class="language-js">import { site } from 'bake/runtime';
+
+site.pages;
+site.config;</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>内容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>site.pages</code></td><td>全部非草稿页面的列表，每项是 <code>{ url, title, ...frontmatter }</code>，按路径排序</td></tr>
+    <tr><td><code>site.config</code></td><td><code>bake.config.js</code> 中的 <code>site</code> 字段，例如首页分类</td></tr>
+  </tbody>
+</table>
+<p>构建时 <code>site</code> 从 <code>dist/site.json</code> 读取，只有导入了 <code>site</code> 的组件所在页面才请求这个文件。开发服务器中，页面增删或 frontmatter 修改后 <code>site</code> 自动更新，并派发 <code>bake:site</code> 事件。</p>
+</main>
+</body>
+</html>

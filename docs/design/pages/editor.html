@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>编辑器</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaiscreen.css">
+<link rel="stylesheet" href="../style.css">
+<script defer src="../math.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-core.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/diff-highlight/prism-diff-highlight.min.js"></script>
+<script defer src="../code.js"></script>
+</head>
+<body>
+<main>
+<p class="nav"><a href="../index.html">返回索引</a></p>
+<h1>编辑器</h1>
+<p class="lead">编辑器运行在 <code>bake dev</code> 打开的页面上：点「编辑」后，<mark>排好版的页面本身变成可编辑的</mark>，修改自动写回 <code>.md</code> 文件。本文档写编辑器的界面、每种内容的编辑方式、保存与冲突、复制与粘贴，以及公式的渲染策略。</p>
+
+<h2>编辑器是什么样子</h2>
+<div class="wire-scroll">
+<div class="wire">
+  <div class="top"><b>A. 页面顶部</b>版式原有的标题区，标题直接输入。</div>
+  <div class="side"><b>B. 目录</b>版式原有的目录，随标题实时更新。</div>
+  <div class="body"><b>C. 正文</b>Milkdown 编辑区，样式与发布的页面相同。空行输入 <code>/</code> 打开插入菜单。
+    <div class="bar" style="width: 85%"></div>
+    <div class="bar" style="width: 60%"></div>
+  </div>
+  <div class="foot"><b>D. 状态栏</b>右下角：「编辑」开关、保存状态（已保存、保存中、冲突）。</div>
+</div>
+</div>
+<p>右侧栏在编辑时显示旁注，旁注可以直接输入。选中组件或带属性的块时，属性面板出现在右侧栏顶部；关闭面板后旁注恢复显示。</p>
+<p>编辑器只存在于 <code>bake dev</code>。<code>bake build</code> 的输出不包含编辑器代码，也不包含「编辑」按钮。</p>
+
+<h2>每种内容怎么编辑</h2>
+<table>
+  <thead>
+    <tr><th>内容</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>文字、标题、列表、引用</td><td>直接输入；Markdown 快捷输入（行首 <code>## </code>、<code>- </code>、<code>&gt; </code>）转换成对应格式</td></tr>
+    <tr><td>加粗、斜体、行内代码、高亮</td><td><code>Mod-B</code>、<code>Mod-I</code>、<code>Mod-E</code>、<code>Mod-Shift-H</code>；输入 <code>==文字==</code> 时自动转换</td></tr>
+    <tr><td>链接</td><td><code>Mod-K</code> 打开链接选择器，见 <a href="#links">站内链接</a></td></tr>
+    <tr><td>行内公式</td><td>输入 <code>$...$</code> 后转换；点击公式打开 LaTeX 输入框，输入时实时预览，<code>Enter</code> 或点击外部确认，<code>Esc</code> 取消</td></tr>
+    <tr><td>独立公式</td><td>空行输入 <code>$$</code> 后回车；编辑方式同行内公式，输入框为多行</td></tr>
+    <tr><td>容器块（折叠、提示框、加宽、边注、卡片网格、参考文献）</td><td>插入菜单插入；块内内容直接输入；属性在属性面板里改</td></tr>
+    <tr><td>组件</td><td>插入菜单插入；组件照常运行；属性面板按组件的 <code>static properties</code> 生成控件；图题直接输入</td></tr>
+    <tr><td>图片</td><td>粘贴或拖入；说明文字直接输入</td></tr>
+    <tr><td>表格</td><td>单元格直接输入；<code>Tab</code> 移到下一格；右键菜单增删行列</td></tr>
+    <tr><td>代码块</td><td>输入三个反引号加语言名后回车；语言名在代码块右上角修改</td></tr>
+    <tr><td>独立的 HTML 块</td><td>显示渲染结果；点击后显示源码输入框</td></tr>
+    <tr><td>标题 id 和目录短标题</td><td>标题左侧显示 id；在属性面板里改 <code>id</code> 和 <code>toc</code></td></tr>
+  </tbody>
+</table>
+<p><code>Mod</code> 在 macOS 上是 Command，其他系统上是 Ctrl。</p>
+
+<h3>插入菜单</h3>
+<p>在空行输入 <code>/</code> 打开插入菜单，继续输入文字筛选，<code>Enter</code> 插入。菜单列出全部内置块类型、博客 <code>blocks/</code> 里的块类型，以及当前文章能使用的组件（全局组件和本主题的组件）。菜单项由块类型登记表和组件登记表生成，新增块类型或组件后不需要修改编辑器。</p>
+
+<h3>属性面板</h3>
+<p>属性面板的控件由定义生成：</p>
+<table>
+  <thead>
+    <tr><th><code>type</code></th><th>控件</th><th>写回的属性值</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>number</code></td><td>滑块加数字输入框，使用 <code>min</code>、<code>max</code>、<code>step</code></td><td>数字</td></tr>
+    <tr><td><code>string</code></td><td>单行输入框</td><td>字符串</td></tr>
+    <tr><td><code>boolean</code></td><td>开关</td><td>为 <code>true</code> 时写属性名，为 <code>false</code> 时不写</td></tr>
+    <tr><td><code>enum</code></td><td>下拉框，选项来自 <code>options</code></td><td>选中的字符串</td></tr>
+  </tbody>
+</table>
+<p>没有选中任何块时，属性面板显示页面属性：通用 frontmatter 字段和当前版式声明的字段，见 <a href="content-format.html">内容格式</a> 的 frontmatter 一节。修改后写回文件开头的 frontmatter。</p>
+<p>拖动滑块时组件实时重画，文件在停止拖动后写回。属性值等于 <code>default</code> 时不写进 Markdown。理由：文件里只保留与默认值不同的属性，默认值修改后所有没有显式设置的地方一起生效。</p>
+
+<h2>怎样移动块</h2>
+<p>鼠标移到一个块上时，块的左侧显示拖动手柄 <code>⋮⋮</code>。按住手柄拖动，目标位置显示一条横线，松开后块移到横线处。点击手柄打开块菜单，菜单里有「删除」「复制一份」「上移」「下移」。</p>
+<ul>
+  <li>可以拖动的块：段落、标题、列表项、引用、代码块、公式块、图片、组件、表格、独立的 HTML 块和所有容器块。容器块连同里面的内容一起移动。</li>
+  <li>块可以拖进或拖出容器块，例如把一个段落拖进提示框，或者把卡片网格里的一张卡片拖到另一个位置。拖进容器后不符合容器结构的位置不显示横线，例如卡片网格里只能放卡片。</li>
+  <li>移动带旁注编号的段落时，旁注跟着段落移动，编号按新的顺序重新计算。</li>
+  <li>键盘操作：<code>Mod-Shift-↑</code> 和 <code>Mod-Shift-↓</code> 把光标所在的块上移或下移一个位置。</li>
+  <li>移动可以用 <code>Mod-Z</code> 撤销，一次移动对应一步撤销。</li>
+  <li>块移动时使用 Motion 动画，其他块让出位置的过程也有过渡；系统开启减少动态效果时直接移动。</li>
+</ul>
+<p>拖动使用 Milkdown 的 block 插件（<code>@milkdown/kit/plugin/block</code>）提供的手柄定位和 ProseMirror 原生的节点拖放。</p>
+
+<h2>旁注怎么编辑</h2>
+<ul>
+  <li>在正文中按 <code>Mod-Alt-F</code> 或输入 <code>[^</code>，在光标处插入一个新编号，右侧栏出现一条空注释，光标移到注释里。</li>
+  <li>注释是编辑器文档中的一个块，可以输入段落、公式、链接和列表。</li>
+  <li>删除正文里的编号时，对应注释一起删除；撤销时一起恢复。</li>
+  <li>编号随增删实时更新。</li>
+  <li>编辑器和发布的页面使用同一份对齐代码，见 <a href="content-format.html#sidenote-layout">内容格式中旁注的排版</a>。</li>
+  <li>保存时注释定义写在引用它的段落之后。已有的脚注名保持不变；新插入的注释命名为 <code>[^n1]</code>、<code>[^n2]</code>，跳过文件中已经使用的名字。</li>
+</ul>
+
+<h2 id="links">站内链接怎么插入</h2>
+<p>按 <code>Mod-K</code> 或在插入菜单选择「链接」，打开链接选择器。输入文章标题、标题文字或段落 id，候选列表显示全站的文章、标题和带 <code>^block-id</code> 的段落，按匹配程度排序。选中后填入路径和 <code>#id</code>，链接文字默认是目标的标题文字。输入以 <code>http</code> 开头的地址时作为外部链接插入。</p>
+<p>编辑器里鼠标停留在站内链接上同样显示预览，内容由开发服务器即时渲染。候选列表的数据来自开发服务器的 <code>/__bake/sections</code> 接口，见 <a href="build-dev.html">构建与开发服务器</a>。</p>
+
+<h2>修改怎么保存</h2>
+<ol>
+  <li>每次修改后等待 <code>800ms</code>，期间没有新的修改时保存。</li>
+  <li>编辑器用 Markdown 输出器把整篇文档转成文本，连同载入时文件内容的哈希值发给 <code>POST /__bake/save</code>。</li>
+  <li>开发服务器比较磁盘上文件的哈希值。相同时写入文件，返回新的哈希值；不同时不写入，返回冲突。</li>
+  <li>保存成功后状态栏显示「已保存」。开发服务器识别出这次文件变化来自编辑器，不重新渲染页面，也不通知页面更新。</li>
+</ol>
+<p>保存失败或冲突时，状态栏显示原因，编辑器保留当前内容，不丢弃修改。</p>
+
+<h2>在编辑器之外修改文件时会怎样</h2>
+<table>
+  <thead>
+    <tr><th>情况</th><th>结果</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>编辑器未打开，<code>.md</code> 被修改</td><td>页面就地替换正文、目录和旁注，滚动位置保持不变，不刷新整页</td></tr>
+    <tr><td>编辑器已打开，没有未保存的修改，<code>.md</code> 被修改</td><td>编辑器重新载入文件内容，光标尽量保持在原段落</td></tr>
+    <tr><td>编辑器已打开，有未保存的修改，<code>.md</code> 被修改</td><td>状态栏显示冲突，提供「使用磁盘上的版本」和「保留我的修改并覆盖」两个按钮</td></tr>
+    <tr><td>组件的 <code>.js</code> 被修改</td><td>Vite 热更新这个组件，页面上该组件的实例重新创建，属性保持不变</td></tr>
+    <tr><td>主题或版式被修改</td><td>主题 CSS 热更新；版式修改后就地替换整个 <code>&lt;body&gt;</code> 内容，不刷新整页</td></tr>
+  </tbody>
+</table>
+
+<h2>复制与粘贴怎么处理</h2>
+<p>粘贴进编辑器的内容自动转换成对应的格式。从编辑器或发布的页面复制出去时，剪贴板的纯文本是 Markdown，同时附带 HTML，粘贴到支持格式的应用时保留格式。</p>
+
+<h3>粘贴进编辑器</h3>
+<table>
+  <thead>
+    <tr><th>来源</th><th>剪贴板内容</th><th>转换结果</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>bake 生成的页面</td><td>HTML，元素上带 <code>data-tex</code> 和 <code>data-md</code></td><td>与原文相同的公式、组件、旁注和块</td></tr>
+    <tr><td>其他网页</td><td>HTML</td><td>标题、列表、链接、表格、代码块、加粗、斜体对应到编辑器格式；不认识的标签只保留文字</td></tr>
+    <tr><td>网页里的公式</td><td>MathJax 或 KaTeX 输出中的 TeX 源码，或 MathML</td><td>公式</td></tr>
+    <tr><td>VS Code 等代码编辑器</td><td>纯文本和 <code>vscode-editor-data</code> 中的语言名</td><td>带语言名的代码块</td></tr>
+    <tr><td>Markdown 文本</td><td>纯文本</td><td>按 Markdown 解析后插入，公式和表格保留</td></tr>
+    <tr><td>Excel、Numbers、Google Sheets</td><td>HTML 表格</td><td>GFM 表格</td></tr>
+    <tr><td>截图、图片文件、SVG 文件</td><td>图片数据</td><td>文件存进文章所在目录的 <code>assets/</code>，插入图片</td></tr>
+    <tr><td>SVG 源码</td><td>以 <code>&lt;svg</code> 开头的文本</td><td>存成 <code>assets/</code> 里的 <code>.svg</code> 文件，插入图片</td></tr>
+  </tbody>
+</table>
+<p>纯文本按 Markdown 解析的条件：文本中出现 Markdown 的块级写法（标题、列表、表格、代码块、公式块）。不满足时按普通文本插入。按 <code>Mod-Shift-V</code> 始终按普通文本插入。</p>
+<p>粘贴的图片文件名是内容哈希的前 <code>8</code> 位加原扩展名，例如 <code>assets/3f9a1c2e.png</code>。理由：同一张图片粘贴两次只保存一个文件。图片通过 <code>POST /__bake/asset</code> 写入。</p>
+
+<h3>复制出去</h3>
+<ul>
+  <li>编辑器里：选区用保存时使用的同一个 Markdown 输出器转成文本，复制出去的内容和 <code>.md</code> 文件里的写法相同。</li>
+  <li>发布的页面：页面空闲时加载复制脚本，拦截 <code>copy</code> 事件，把选区的 HTML 转回 Markdown。构建时给公式加 <code>data-tex</code>，给组件、旁注和指令块加 <code>data-md</code>（该元素对应的 Markdown 源码），转换时直接使用这些属性。选区只包含公式或组件的一部分时，按整个元素处理。</li>
+</ul>
+
+<h2>公式在编辑器里怎么渲染</h2>
+<p>打开编辑器时，编辑器直接使用页面上已经渲染好的公式 SVG，不在浏览器里重新渲染。只有被修改的公式才在浏览器里用 MathJax 渲染，结果按 TeX 源码缓存，同一个公式只渲染一次。MathJax 只在第一次修改公式时加载。</p>
+<p>编辑器和构建读取同一份 MathJax 配置（宏和字体），两边输出的 SVG 相同。保存写回文件时开发服务器不重新渲染页面，所以修改一个公式只引起这一个公式的渲染。</p>
+</main>
+</body>
+</html>
