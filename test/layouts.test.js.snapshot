@@ -234,13 +234,13 @@ exports[`examples/minimal 的整页 HTML > features.md 1`] = `
 <p>第一行末尾是硬换行<br>
 第二行。</p>
 <hr>
-<ol class="references" data-md=":::references
+<div class="references" data-md=":::references
 - Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.
 - Hendrycks, Gimpel. Gaussian Error Linear Units. 2016.
-:::">
+:::"><ul>
 <li>Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.</li>
 <li>Hendrycks, Gimpel. Gaussian Error Linear Units. 2016.</li>
-</ol></article>
+</ul></div></article>
 </main>
 </body>
 </html>

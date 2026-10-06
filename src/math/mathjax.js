@@ -9,7 +9,6 @@ import '@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js';
 import { mathjax } from '@mathjax/src/js/mathjax.js';
 import { SVG } from '@mathjax/src/js/output/svg.js';
 
-mathjax.asyncLoad = (name) => import(name);
 const adaptor = liteAdaptor();
 RegisterHTMLHandler(adaptor);
 
@@ -61,8 +60,12 @@ export function renderFormula(tex, display, macros = {}) {
   return result;
 }
 
+export function glyphPaths(glyphIds) {
+  return Object.fromEntries(glyphIds.map((id) => [id, glyphs.get(id)]));
+}
+
 export function glyphDefinitions(glyphIds) {
   if (glyphIds.length === 0) return '';
-  const paths = glyphIds.map((id) => `<path id="${id}" d="${glyphs.get(id)}"></path>`).join('');
+  const paths = Object.entries(glyphPaths(glyphIds)).map(([id, d]) => `<path id="${id}" d="${d}"></path>`).join('');
   return `<svg id="math-defs" style="display:none"><defs>${paths}</defs></svg>`;
 }

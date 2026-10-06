@@ -1,4 +1,3 @@
-import GithubSlugger from 'github-slugger';
 import { toHtml } from 'hast-util-to-html';
 import { toHast } from 'mdast-util-to-hast';
 import { visit } from 'unist-util-visit';
@@ -7,6 +6,7 @@ import { parse } from '../format/index.js';
 import { createRegistry } from '../format/registry.js';
 import { renderEquations } from './equations.js';
 import { createHandlers } from './handlers.js';
+import { createHeadingIds } from './heading-ids.js';
 import { placeSidenotes } from './sidenotes.js';
 
 const tocDepths = [2, 3];
@@ -34,16 +34,14 @@ function assignIds(tree, report) {
     if (explicit.has(id)) report(node, `Duplicate id ${id}`);
     explicit.add(id);
   });
-  const slugger = new GithubSlugger();
+  const headingId = createHeadingIds(explicit);
   const ids = [];
   const toc = [];
   visit(tree, (node) => {
     let id = explicitId(node);
     if (node.type === 'heading') {
       if (id === undefined) {
-        const text = headingText(node).replace(/\s+/g, ' ').trim();
-        do id = slugger.slug(text);
-        while (explicit.has(id));
+        id = headingId(headingText(node));
         if (id === '') report(node, 'Cannot generate an id from this heading, add {#id}');
       }
       node.data = { ...node.data, id };

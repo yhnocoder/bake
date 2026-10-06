@@ -2,6 +2,8 @@ import { toHtml } from 'hast-util-to-html';
 import { h } from 'hastscript';
 import { defaultHandlers } from 'mdast-util-to-hast';
 import { contentChildren } from '../format/validate.js';
+import { blockRender, isDefault, withDefaults } from './block-render.js';
+import { imageAppearance } from './image.js';
 
 function element(tagName, properties, children = []) {
   return { type: 'element', tagName, properties, children };
@@ -9,24 +11,6 @@ function element(tagName, properties, children = []) {
 
 function fromArray([tagName, properties, children = []]) {
   return h(tagName, properties, children.map((child) => (Array.isArray(child) && typeof child[0] === 'string' ? fromArray(child) : child)));
-}
-
-function cssSize(value) {
-  return /^\d+(?:\.\d+)?$/.test(value) ? `${value}px` : value;
-}
-
-function isDefault(value, property) {
-  if (property?.default === undefined) return false;
-  if (property.type === 'number') return Number(value) === property.default;
-  return value === String(property.default);
-}
-
-function withDefaults(attributes, definitions) {
-  const result = {};
-  for (const [key, property] of Object.entries(definitions ?? {})) {
-    if (property.default !== undefined) result[key] = String(property.default);
-  }
-  return { ...result, ...attributes };
 }
 
 export function createHandlers({ source, registry, components }) {
@@ -53,14 +37,9 @@ export function createHandlers({ source, registry, components }) {
   }
 
   function image(_, node) {
-    const attributes = node.data?.attributes ?? {};
-    const style = [];
-    if (attributes.width) style.push(`width: ${cssSize(attributes.width)}`);
-    if (attributes.height) style.push(`height: ${cssSize(attributes.height)}`);
+    const { className, style } = imageAppearance(node.data?.attributes);
     const properties = { src: node.url, alt: node.alt ?? '' };
-    if (style.length > 0) properties.style = style.join('; ');
-    const className = ['image'];
-    if (attributes.float && attributes.float !== 'none') className.push(`float-${attributes.float}`);
+    if (style) properties.style = style;
     const children = [element('img', properties)];
     if (node.alt) children.push(element('figcaption', {}, [{ type: 'text', value: node.alt }]));
     return element('figure', { className }, children);
@@ -123,13 +102,8 @@ export function createHandlers({ source, registry, components }) {
     const block = registry.get(node.name);
     const attributes = withDefaults(node.attributes, block?.attributes);
     const children = state.all(node);
-    const result = block?.render
-      ? fromArray(block.render({ attributes, children }))
-      : h(
-          node.type === 'textDirective' ? 'span' : 'div',
-          { class: node.name, ...Object.fromEntries(Object.entries(attributes).map(([key, value]) => [`data-${key}`, value])) },
-          children,
-        );
+    const form = { textDirective: 'text', leafDirective: 'leaf', containerDirective: 'container' }[node.type];
+    const result = fromArray(blockRender(block, node.name, form)({ attributes, children }));
     result.properties.dataMd = sourceOf(node);
     return state.applyData(node, result);
   }
