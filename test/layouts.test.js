@@ -83,12 +83,14 @@ describe('版式', () => {
 describe('样式', () => {
   const styles = ['base', 'blocks', 'layouts'].map((name) => readFileSync(join(root, `src/styles/${name}.css`), 'utf8'));
 
-  test('只使用主题变量，不写具体颜色', () => {
+  const cardVariables = ['--card-columns', '--card-rows'];
+
+  test('只使用主题变量和卡片的尺寸变量，不写具体颜色', () => {
     for (const css of styles) {
       assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b|\b(?:rgb|hsl|oklch)a?\(/i);
       const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]));
       for (const [, name] of css.matchAll(/var\((--[\w-]+)/g)) {
-        assert.ok(themeVariables.includes(name) || defined.has(name), `${name} is not a theme variable`);
+        assert.ok(themeVariables.includes(name) || cardVariables.includes(name) || defined.has(name), `${name} is not a theme variable`);
       }
     }
   });

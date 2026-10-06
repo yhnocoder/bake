@@ -43,19 +43,19 @@ $\\log(1 + e^x)$，是 ReLU 的平滑版本。
 :::card{span=4x1 title=比较}
 ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。
 :::
-::::"><section class="card" style="grid-column: span 2; grid-row: span 1" data-md=":::card{span=2x1 title=ReLU}
+::::"><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=ReLU}
 $\\max(0, x)$，计算量最小，是深度网络里最常用的激活函数。
-:::"><p class="card-title">ReLU</p><p><span class="math" data-tex="\\max(0, x)"><svg/></span>，计算量最小，是深度网络里最常用的激活函数。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=GELU}
+:::"><p class="card-title">ReLU</p><p><span class="math" data-tex="\\max(0, x)"><svg/></span>，计算量最小，是深度网络里最常用的激活函数。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=GELU}
 $x \\Phi(x)$，在零点附近平滑。
-:::"><p class="card-title">GELU</p><p><span class="math" data-tex="x \\Phi(x)"><svg/></span>，在零点附近平滑。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=SiLU}
+:::"><p class="card-title">GELU</p><p><span class="math" data-tex="x \\Phi(x)"><svg/></span>，在零点附近平滑。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=SiLU}
 $x \\sigma(x)$，也叫 Swish。
-:::"><p class="card-title">SiLU</p><p><span class="math" data-tex="x \\sigma(x)"><svg/></span>，也叫 Swish。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=Tanh}
+:::"><p class="card-title">SiLU</p><p><span class="math" data-tex="x \\sigma(x)"><svg/></span>，也叫 Swish。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=Tanh}
 输出范围是 $(-1, 1)$。
-:::"><p class="card-title">Tanh</p><p>输出范围是 <span class="math" data-tex="(-1, 1)"><svg/></span>。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=Sigmoid}
+:::"><p class="card-title">Tanh</p><p>输出范围是 <span class="math" data-tex="(-1, 1)"><svg/></span>。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=Sigmoid}
 输出范围是 $(0, 1)$。
-:::"><p class="card-title">Sigmoid</p><p>输出范围是 <span class="math" data-tex="(0, 1)"><svg/></span>。</p></section><section class="card" style="grid-column: span 2; grid-row: span 1" data-md=":::card{span=2x1 title=Softplus}
+:::"><p class="card-title">Sigmoid</p><p>输出范围是 <span class="math" data-tex="(0, 1)"><svg/></span>。</p></section><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=Softplus}
 $\\log(1 + e^x)$，是 ReLU 的平滑版本。
-:::"><p class="card-title">Softplus</p><p><span class="math" data-tex="\\log(1 + e^x)"><svg/></span>，是 ReLU 的平滑版本。</p></section><section class="card" style="grid-column: span 4; grid-row: span 1" data-md=":::card{span=4x1 title=比较}
+:::"><p class="card-title">Softplus</p><p><span class="math" data-tex="\\log(1 + e^x)"><svg/></span>，是 ReLU 的平滑版本。</p></section><section class="card" style="--card-columns: 4; --card-rows: 1" data-md=":::card{span=4x1 title=比较}
 ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。
 :::"><p class="card-title">比较</p><p>ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。</p></section></div></article>
 </main>
@@ -96,10 +96,10 @@ exports[`examples/minimal 的整页 HTML > features.md 1`] = `
 <figure class="image float-right"><img src="./assets/relu.png" alt="ReLU 函数的图像" style="width: 240px"><figcaption>ReLU 函数的图像</figcaption></figure>
 <p>ReLU 在负半轴输出 0，在正半轴输出输入本身。它的导数在负半轴是 0，在正半轴是 1，计算量很小，所以是深度网络里最常用的激活函数。</p>
 <h2 id="components"><a class="anchor" href="#components" aria-hidden="true">#</a>组件</h2>
-<demo-plot data-md=":::demo-plot{x0=1.2}
+<demo-plot class="component" data-md=":::demo-plot{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
 :::"><figcaption>从 <span class="math" data-tex="x_0"><svg/></span> 出发沿负梯度方向下降。</figcaption></demo-plot>
-<demo-plot x0="0.5" showPath="false" data-md="::demo-plot{x0=0.5 showPath=false}"></demo-plot>
+<demo-plot x0="0.5" showPath="false" class="component" data-md="::demo-plot{x0=0.5 showPath=false}"></demo-plot>
 <h2 id="blocks"><a class="anchor" href="#blocks" aria-hidden="true">#</a>块</h2>
 <details class="fold" data-md=":::fold[推导细节]
 把 $z = Wx + b$ 代入后逐项求导。
@@ -164,13 +164,13 @@ exports[`examples/minimal 的整页 HTML > features.md 1`] = `
 :::card{span=4x1 title=比较}
 三者在零点附近的导数不同。
 :::
-::::"><section class="card" style="grid-column: span 2; grid-row: span 1" data-md=":::card{span=2x1 title=ReLU}
+::::"><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=ReLU}
 最简单的激活函数。
-:::"><p class="card-title">ReLU</p><p>最简单的激活函数。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=GELU}
+:::"><p class="card-title">ReLU</p><p>最简单的激活函数。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=GELU}
 平滑。
-:::"><p class="card-title">GELU</p><p>平滑。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=SiLU}
+:::"><p class="card-title">GELU</p><p>平滑。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=SiLU}
 自门控。
-:::"><p class="card-title">SiLU</p><p>自门控。</p></section><section class="card" style="grid-column: span 4; grid-row: span 1" data-md=":::card{span=4x1 title=比较}
+:::"><p class="card-title">SiLU</p><p>自门控。</p></section><section class="card" style="--card-columns: 4; --card-rows: 1" data-md=":::card{span=4x1 title=比较}
 三者在零点附近的导数不同。
 :::"><p class="card-title">比较</p><p>三者在零点附近的导数不同。</p></section></div>
 <h2 id="table"><a class="anchor" href="#table" aria-hidden="true">#</a>表格与 HTML</h2>

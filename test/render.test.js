@@ -132,8 +132,8 @@ describe('每种内容的 HTML', () => {
       '卡片网格',
       '::::bento\n:::card{span=2x1 title=ReLU}\n内容。\n:::\n\n:::card\n无标题。\n:::\n::::\n',
       '<div class="bento" data-md="::::bento\n:::card{span=2x1 title=ReLU}\n内容。\n:::\n\n:::card\n无标题。\n:::\n::::">' +
-        '<section class="card" style="grid-column: span 2; grid-row: span 1" data-md=":::card{span=2x1 title=ReLU}\n内容。\n:::"><p class="card-title">ReLU</p><p>内容。</p></section>' +
-        '<section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card\n无标题。\n:::"><p>无标题。</p></section></div>',
+        '<section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=ReLU}\n内容。\n:::"><p class="card-title">ReLU</p><p>内容。</p></section>' +
+        '<section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card\n无标题。\n:::"><p>无标题。</p></section></div>',
     ],
     [
       '参考文献',
@@ -163,12 +163,12 @@ describe('每种内容的 HTML', () => {
     [
       '有图题的组件',
       ':::demo-plot{x0=1.5 showPath=true}\n图题。\n:::\n',
-      '<demo-plot x0="1.5" data-md=":::demo-plot{x0=1.5 showPath=true}\n图题。\n:::"><figcaption>图题。</figcaption></demo-plot>',
+      '<demo-plot x0="1.5" class="component" data-md=":::demo-plot{x0=1.5 showPath=true}\n图题。\n:::"><figcaption>图题。</figcaption></demo-plot>',
     ],
     [
       '没有图题的组件',
       '::demo-plot{x0=1.20 curve=quartic}\n',
-      '<demo-plot curve="quartic" data-md="::demo-plot{x0=1.20 curve=quartic}"></demo-plot>',
+      '<demo-plot curve="quartic" class="component" data-md="::demo-plot{x0=1.20 curve=quartic}"></demo-plot>',
     ],
     ['独立的 HTML 块', '<svg viewBox="0 0 1 1">\n  <rect/>\n</svg>\n', '<svg viewBox="0 0 1 1">\n  <rect/>\n</svg>'],
     ['代码块', '```python\nprint(1 < 2)\n```\n', '<pre><code class="language-python">print(1 &#x3C; 2)\n</code></pre>'],

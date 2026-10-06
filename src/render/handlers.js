@@ -106,7 +106,7 @@ export function createHandlers({ source, registry, components }) {
       const caption = content.length === 1 && content[0].type === 'paragraph' ? state.all(content[0]) : state.all({ ...node, children: content });
       if (caption.length > 0) children.push(element('figcaption', {}, caption));
     }
-    return element(node.name, { ...attributes, dataMd: sourceOf(node) }, children);
+    return element(node.name, { ...attributes, className: ['component'], dataMd: sourceOf(node) }, children);
   }
 
   function directive(state, node) {

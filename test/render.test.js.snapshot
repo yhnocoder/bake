@@ -103,10 +103,10 @@ exports[`features.md > 快照 2`] = `
 <figure class="image float-right"><img src="./assets/relu.png" alt="ReLU 函数的图像" style="width: 240px"><figcaption>ReLU 函数的图像</figcaption></figure>
 <p>ReLU 在负半轴输出 0，在正半轴输出输入本身。它的导数在负半轴是 0，在正半轴是 1，计算量很小，所以是深度网络里最常用的激活函数。</p>
 <h2 id="components"><a class="anchor" href="#components" aria-hidden="true">#</a>组件</h2>
-<demo-plot data-md=":::demo-plot{x0=1.2}
+<demo-plot class="component" data-md=":::demo-plot{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
 :::"><figcaption>从 <span class="math" data-tex="x_0"><svg style="vertical-align: -0.375ex;" xmlns="http://www.w3.org/2000/svg" width="2.282ex" height="1.375ex" role="img" focusable="false" viewBox="0 -442 1008.6 607.6"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="msub"><g data-mml-node="mi"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g><g data-mml-node="mn" transform="translate(605,-150) scale(0.707)"><use data-c="30" href="#MJX-NCM-N-30"></use></g></g></g></g></svg></span> 出发沿负梯度方向下降。</figcaption></demo-plot>
-<demo-plot x0="0.5" showPath="false" data-md="::demo-plot{x0=0.5 showPath=false}"></demo-plot>
+<demo-plot x0="0.5" showPath="false" class="component" data-md="::demo-plot{x0=0.5 showPath=false}"></demo-plot>
 <h2 id="blocks"><a class="anchor" href="#blocks" aria-hidden="true">#</a>块</h2>
 <details class="fold" data-md=":::fold[推导细节]
 把 $z = Wx + b$ 代入后逐项求导。
@@ -171,13 +171,13 @@ exports[`features.md > 快照 2`] = `
 :::card{span=4x1 title=比较}
 三者在零点附近的导数不同。
 :::
-::::"><section class="card" style="grid-column: span 2; grid-row: span 1" data-md=":::card{span=2x1 title=ReLU}
+::::"><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=ReLU}
 最简单的激活函数。
-:::"><p class="card-title">ReLU</p><p>最简单的激活函数。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=GELU}
+:::"><p class="card-title">ReLU</p><p>最简单的激活函数。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=GELU}
 平滑。
-:::"><p class="card-title">GELU</p><p>平滑。</p></section><section class="card" style="grid-column: span 1; grid-row: span 1" data-md=":::card{title=SiLU}
+:::"><p class="card-title">GELU</p><p>平滑。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=SiLU}
 自门控。
-:::"><p class="card-title">SiLU</p><p>自门控。</p></section><section class="card" style="grid-column: span 4; grid-row: span 1" data-md=":::card{span=4x1 title=比较}
+:::"><p class="card-title">SiLU</p><p>自门控。</p></section><section class="card" style="--card-columns: 4; --card-rows: 1" data-md=":::card{span=4x1 title=比较}
 三者在零点附近的导数不同。
 :::"><p class="card-title">比较</p><p>三者在零点附近的导数不同。</p></section></div>
 <h2 id="table"><a class="anchor" href="#table" aria-hidden="true">#</a>表格与 HTML</h2>

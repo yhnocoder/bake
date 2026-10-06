@@ -9,6 +9,6 @@ export default {
   render: ({ attributes, children }) => {
     const [columns, rows] = attributes.span.split('x');
     const title = attributes.title === undefined ? [] : [['p', { class: 'card-title' }, [attributes.title]]];
-    return ['section', { class: 'card', style: `grid-column: span ${columns}; grid-row: span ${rows}` }, [...title, ...children]];
+    return ['section', { class: 'card', style: `--card-columns: ${columns}; --card-rows: ${rows}` }, [...title, ...children]];
   },
 };
