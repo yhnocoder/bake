@@ -1,5 +1,5 @@
 const gap = 12;
-const wideWindow = matchMedia('(width >= 1100px)');
+const wideWindow = '(width >= 1100px)';
 const paragraphSelector = 'p, li, h1, h2, h3, h4, h5, h6, table, figcaption';
 
 function anchorOf(article, note) {
@@ -10,7 +10,7 @@ function anchorOf(article, note) {
 }
 
 export function alignSidenotes(article) {
-  if (!wideWindow.matches) return;
+  if (!matchMedia(wideWindow).matches) return;
   const placements = [];
   for (const note of article.querySelectorAll('.sidenote')) {
     const anchor = anchorOf(article, note);
@@ -46,7 +46,13 @@ function annotatedRange(article, number) {
   return range;
 }
 
-function watchHover(article) {
+export function watchSidenotes(article) {
+  const align = () => alignSidenotes(article);
+  new ResizeObserver(align).observe(article);
+  document.fonts.ready.then(align);
+  document.addEventListener('toggle', align, true);
+  window.addEventListener('bake:page-updated', align);
+
   let highlighted = null;
   let active = null;
   const show = (target) => {
@@ -68,12 +74,3 @@ function watchHover(article) {
   article.addEventListener('mouseleave', () => show(null));
 }
 
-const article = document.querySelector('article');
-if (article) {
-  const align = () => alignSidenotes(article);
-  new ResizeObserver(align).observe(article);
-  document.fonts.ready.then(align);
-  document.addEventListener('toggle', align, true);
-  window.addEventListener('bake:page-updated', align);
-  watchHover(article);
-}

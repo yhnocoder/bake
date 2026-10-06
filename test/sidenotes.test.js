@@ -84,6 +84,23 @@ describe('旁注脚本', () => {
     await page.close();
   });
 
+  test('导入 sidenotes.js 不对页面产生作用', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.route('**/src/client/page.js', (route) => route.fulfill({ contentType: 'text/javascript', body: '' }));
+    await page.goto(server.origin + server.pages.features);
+    const exported = await page.evaluate(async () => Object.keys(await import('/src/client/sidenotes.js')).sort());
+    assert.deepEqual(exported, ['alignSidenotes', 'watchSidenotes']);
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await page.dispatchEvent('#sn-1', 'mouseover');
+    await page.click('details.fold > summary');
+    const touched = await page.evaluate(() => ({
+      positioned: [...document.querySelectorAll('.sidenote')].filter((note) => note.style.top !== '').length,
+      highlighted: CSS.highlights.has('sidenote'),
+    }));
+    assert.deepEqual(touched, { positioned: 0, highlighted: false });
+    await page.close();
+  });
+
   test('1100px 以下注释显示在所在段落之后', async () => {
     const page = await open(1000);
     const layout = await page.evaluate(() =>

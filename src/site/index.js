@@ -81,8 +81,8 @@ export async function loadSite(root) {
 
 export function siteData(site) {
   const pages = site.pages
-    .filter((page) => page.frontmatter.draft !== true)
-    .map(({ url, frontmatter }) => ({ url, title: frontmatter.title, ...frontmatter }));
+    .filter((page) => page.url !== null && page.frontmatter.draft !== true)
+    .map(({ url, frontmatter }) => ({ url, ...frontmatter }));
   return { pages, config: site.config.site };
 }
 

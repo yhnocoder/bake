@@ -25,7 +25,7 @@ async function renderExample() {
     const theme = site.themes[frontmatter.theme ?? site.config.theme];
     const assets = {
       styles: ['base', 'blocks', 'layouts'].map((name) => `/src/styles/${name}.css`).concat(`/${example}/${theme}`),
-      scripts: ['/src/client/sidenotes.js', '/components.js'],
+      scripts: ['/src/client/page.js', '/components.js'],
     };
     const result = await renderPage(site, path, { assets });
     messages.push(...result.messages);
