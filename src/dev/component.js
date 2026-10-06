@@ -1,3 +1,5 @@
+import { observedAttributes } from '../client/component.js';
+
 const callbacks = ['disconnectedCallback', 'adoptedCallback', 'attributeChangedCallback'];
 const originalChildren = new WeakMap();
 
@@ -13,7 +15,7 @@ function replaceElements(name) {
 export function defineComponent(name, implementation) {
   let current = implementation;
   class Host extends HTMLElement {
-    static observedAttributes = Object.keys(implementation.properties ?? {}).map((key) => key.toLowerCase());
+    static observedAttributes = observedAttributes(implementation.properties);
 
     constructor() {
       const element = Reflect.construct(current, [], Host);

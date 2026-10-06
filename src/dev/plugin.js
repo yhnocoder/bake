@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
 import { imageExtensions } from '../format/validate.js';
 import { loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
+import { brokenLinks, splitHref } from '../site/links.js';
 import { isPagePath, removePage, updatePage } from '../site/pages.js';
 
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -63,13 +64,6 @@ function requireStrings(body, fields) {
   }
 }
 
-function splitHref(href) {
-  const hash = href.indexOf('#');
-  const path = (hash === -1 ? href : href.slice(0, hash)).split('?')[0];
-  const fragment = hash === -1 ? '' : decodeURIComponent(href.slice(hash + 1));
-  return { path, fragment };
-}
-
 export function bakeDev({ root }) {
   const content = join(root, 'content');
   const configFile = join(root, 'bake.config.js');
@@ -123,20 +117,19 @@ export function bakeDev({ root }) {
     return result;
   }
 
-  async function brokenLinks(entry, result) {
-    const messages = [];
-    for (const { href, line, column } of result.rendered.links) {
+  async function linkTargets(entry, article) {
+    const linked = new Map();
+    for (const { href } of article.links) {
       const { path, fragment } = splitHref(href);
       const target = path === '' ? entry : pageAt(path);
-      if (!target) {
-        messages.push({ path: entry.path, line, column, text: `Link points to a missing page ${href}` });
-        continue;
-      }
-      if (fragment === '') continue;
-      const ids = target === entry ? result.rendered.ids : (await renderEntry(target)).rendered.ids;
-      if (!ids.includes(fragment)) messages.push({ path: entry.path, line, column, text: `Link points to a missing id ${href}` });
+      if (target) linked.set(target, linked.get(target) || fragment !== '');
     }
-    return messages;
+    const targets = new Map();
+    for (const [target, needsIds] of linked) {
+      targets.set(target.url, needsIds && target !== entry ? (await renderEntry(target)).rendered.ids : []);
+    }
+    targets.set(entry.url, article.ids);
+    return targets;
   }
 
   function chromeOf(entry, article) {
@@ -153,7 +146,8 @@ export function bakeDev({ root }) {
 
   async function sendStatus(entry, client) {
     const result = await renderEntry(entry);
-    const status = { errors: result.messages, links: await brokenLinks(entry, result) };
+    const links = brokenLinks(entry, result.rendered.links, await linkTargets(entry, result.rendered));
+    const status = { errors: result.messages, links };
     statuses.set(entry.url, status);
     client.send('bake:status', { url: entry.url, ...status });
   }
