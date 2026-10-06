@@ -1,11 +1,11 @@
 import { remarkStringifyOptionsCtx } from '@milkdown/core';
-import { commonmark, remarkHtmlTransformer, remarkPreserveEmptyLinePlugin, syncHeadingIdPlugin } from '@milkdown/preset-commonmark';
+import { commonmark, remarkHtmlTransformer, remarkInlineLinkPlugin, remarkPreserveEmptyLinePlugin, syncHeadingIdPlugin } from '@milkdown/preset-commonmark';
 import { gfm, remarkGFMPlugin } from '@milkdown/preset-gfm';
 import { $remark } from '@milkdown/utils';
 import { remarkPlugins } from '../format/processor.js';
 import { markdownOptions } from '../format/to-markdown.js';
 
-const replacedPlugins = new Set([remarkPreserveEmptyLinePlugin, remarkHtmlTransformer, syncHeadingIdPlugin, remarkGFMPlugin].flat());
+const replacedPlugins = new Set([remarkPreserveEmptyLinePlugin, remarkHtmlTransformer, remarkInlineLinkPlugin, syncHeadingIdPlugin, remarkGFMPlugin].flat());
 
 export const presets = [...commonmark, ...gfm].filter((plugin) => !replacedPlugins.has(plugin));
 

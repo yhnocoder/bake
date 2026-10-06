@@ -2,15 +2,15 @@ import { parserCtx } from '@milkdown/core';
 import { TextSelection } from '@milkdown/prose/state';
 import registry from 'virtual:bake/registry';
 import { addGlyphs, glyphsOf } from '../client/math-defs.js';
+import { frontmatterLength } from '../format/frontmatter.js';
 import { createEditor } from './editor.js';
 import { docToMarkdown } from './markdown.js';
 import { reloadTransaction, renderedFormulas } from './math.js';
 
 const saveDelay = 800;
-const frontmatterBlock = /^---\r?\n(?:[\s\S]*?\r?\n)?---(?:\r?\n|$)/;
 
 function splitFrontmatter(markdown) {
-  const head = frontmatterBlock.exec(markdown)?.[0] ?? '';
+  const head = markdown.slice(0, frontmatterLength(markdown));
   return { head, body: markdown.slice(head.length) };
 }
 

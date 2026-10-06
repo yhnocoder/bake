@@ -102,15 +102,18 @@ function* fenceLineEnds(source) {
   }
 }
 
-export function readFrontmatter(source) {
+export function frontmatterLength(source) {
   for (const end of fenceLineEnds(source)) {
-    const file = new VFile(source.slice(0, end));
-    const yaml = readYaml(frontmatterParser.parse(file), file);
-    if (!yaml) continue;
-    if (yaml.document.errors.length > 0 || !isMap(yaml.document.contents)) break;
-    return { values: yaml.document.toJS(), keyPlaces: keyPlacesOf(file, yaml) };
+    if (findYamlNode(frontmatterParser.parse(source.slice(0, end)))) return end;
   }
-  return { values: {}, keyPlaces: new Map() };
+  return 0;
+}
+
+export function readFrontmatter(source) {
+  const file = new VFile(source.slice(0, frontmatterLength(source)));
+  const yaml = readYaml(frontmatterParser.parse(file), file);
+  if (!yaml || yaml.document.errors.length > 0 || !isMap(yaml.document.contents)) return { values: {}, keyPlaces: new Map() };
+  return { values: yaml.document.toJS(), keyPlaces: keyPlacesOf(file, yaml) };
 }
 
 export function checkFrontmatter(file, yaml, { layouts, themes }) {

@@ -9,6 +9,7 @@ import { headingIds } from './heading-ids.js';
 import { html } from './html.js';
 import { math } from './math.js';
 import { nodes } from './nodes.js';
+import { references } from './references.js';
 import { bakeRemark, configureStringify, presets } from './remark.js';
 import { tableMenu } from './table-menu.js';
 import { taskList } from './task-list.js';
@@ -51,6 +52,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(presets)
     .use(history)
     .use(nodes)
+    .use(references)
     .use(html)
     .use(codeBlockView)
     .use(math(formulas))

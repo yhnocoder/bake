@@ -78,7 +78,7 @@ article .milkdown .editor > :first-child {
   position: absolute;
   right: 100%;
   margin-right: 0.6rem;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.6em;
   font-weight: 400;
   color: var(--color-muted, #8a8580);
@@ -138,7 +138,7 @@ article .milkdown .editor > :first-child {
 }
 
 .milkdown .math-error {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.85em;
   color: var(--color-mark-text, #a0574a);
 }
@@ -151,7 +151,7 @@ article .milkdown .editor > :first-child {
   border: 1px solid var(--color-accent, #2f6fb3);
   border-radius: 4px;
   background: var(--color-bg, #fff);
-  font: 14px/1.5 var(--font-mono, monospace);
+  font: 14px/1.5 var(--font-mono);
   color: var(--color-text, #1f2328);
 }
 
@@ -172,7 +172,7 @@ textarea.bake-math-input {
   padding: 6px 8px;
   border: 1px solid var(--color-accent, #2f6fb3);
   border-radius: 4px;
-  font: 13px/1.5 var(--font-mono, monospace);
+  font: 13px/1.5 var(--font-mono);
   resize: vertical;
 }
 
@@ -189,7 +189,7 @@ textarea.bake-math-input {
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
-  font: 12px/1.6 var(--font-mono, monospace);
+  font: 12px/1.6 var(--font-mono);
   color: var(--color-muted, #8a8580);
   text-align: right;
 }
@@ -208,7 +208,7 @@ textarea.bake-math-input {
 }
 
 .milkdown .footnote-label {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   user-select: none;
 }
 
@@ -250,4 +250,11 @@ textarea.bake-math-input {
 
 .milkdown .selectedCell {
   background: var(--color-code-bg, #f4f2ee);
+}
+
+.bake-link-definition {
+  margin: 0.2rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-muted);
 }
