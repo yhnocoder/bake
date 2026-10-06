@@ -91,11 +91,26 @@ function keyPlacesOf(file, yaml) {
 
 const frontmatterParser = createProcessor();
 
+function* fenceLineEnds(source) {
+  let start = source.indexOf('\n') + 1;
+  if (source.slice(0, start).trim() !== '---') return;
+  while (start > 0 && start < source.length) {
+    const newline = source.indexOf('\n', start);
+    const end = newline === -1 ? source.length : newline + 1;
+    if (source.slice(start, end).trim() === '---') yield end;
+    start = end;
+  }
+}
+
 export function readFrontmatter(source) {
-  const file = new VFile(source);
-  const yaml = readYaml(frontmatterParser.parse(file), file);
-  if (!yaml || yaml.document.errors.length > 0 || !isMap(yaml.document.contents)) return { values: {}, keyPlaces: new Map() };
-  return { values: yaml.document.toJS(), keyPlaces: keyPlacesOf(file, yaml) };
+  for (const end of fenceLineEnds(source)) {
+    const file = new VFile(source.slice(0, end));
+    const yaml = readYaml(frontmatterParser.parse(file), file);
+    if (!yaml) continue;
+    if (yaml.document.errors.length > 0 || !isMap(yaml.document.contents)) break;
+    return { values: yaml.document.toJS(), keyPlaces: keyPlacesOf(file, yaml) };
+  }
+  return { values: {}, keyPlaces: new Map() };
 }
 
 export function checkFrontmatter(file, yaml, { layouts, themes }) {
