@@ -2,7 +2,9 @@
 
 ## 目标
 
-bake 是一个写技术博客的工具。输入是一个装着 Markdown 文章的目录，输出是静态网站；在 `bake dev` 打开的页面上直接编辑，修改自动写回 Markdown 文件。bake 不包含任何博客的内容，`examples/` 里的博客用于测试。
+bake 是一个面向技术博客的静态网站生成器，自带所见即所得的编辑器。文章用 Markdown 书写，公式、交互图、旁注和站内引用都有对应的写法。`bake build` 把文章生成静态网站；`bake dev` 在排好版的页面上编辑文章，修改保存回 Markdown 文件。
+
+bake 只包含工具本身。博客的文章、交互图和主题放在博客自己的仓库里，`examples/` 下的两个博客用于测试 bake。
 
 文档从 `docs/design/index.html` 开始读，计划与进度见 GitHub issue #<IssueId>。
 

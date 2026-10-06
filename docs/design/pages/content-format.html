@@ -13,6 +13,95 @@
 <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/plugins/diff-highlight/prism-diff-highlight.min.js"></script>
 <script defer src="../code.js"></script>
+<style>
+:root {
+  --sp-paper: #fffefa;
+  --sp-mark: #fbe8a0;
+  --sp-hl: #e2ecfa;
+  --sp-note: #3b6fa8;
+  --sp-note-bg: #e8f0fa;
+  --sp-tip: #2e7d4f;
+  --sp-tip-bg: #e3f2e7;
+  --sp-warn: #a8661a;
+  --sp-warn-bg: #fbeedb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sp-paper: #23221e;
+    --sp-mark: #5c4c1d;
+    --sp-hl: #26354b;
+    --sp-note: #79a9e0;
+    --sp-note-bg: #1f2c3c;
+    --sp-tip: #82cf95;
+    --sp-tip-bg: #1d3325;
+    --sp-warn: #e3ac5e;
+    --sp-warn-bg: #3a2c19;
+  }
+}
+.spec { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 0.75rem 0 2rem; align-items: start; }
+.spec.one { grid-template-columns: minmax(0, 1fr); }
+.spec > pre { margin: 0; }
+@media (max-width: 760px) { .spec { grid-template-columns: minmax(0, 1fr); } }
+.sp { background: var(--sp-paper); border: 1px solid var(--line); border-radius: 12px; padding: 2rem 1.1rem 1rem; font-family: var(--kai); font-size: 15px; line-height: 1.8; position: relative; min-width: 0; }
+.sp::before { content: "渲染结果"; position: absolute; top: 0.5rem; left: 1.1rem; font: 0.7rem var(--mono); color: var(--muted); letter-spacing: 0.06em; }
+.sp p { margin: 0 0 0.6rem; }
+.sp p:last-child { margin-bottom: 0; }
+.sp-dim { color: var(--muted); }
+.sp-note { font-size: 0.8rem; color: var(--muted); font-family: var(--font); margin-top: 0.6rem !important; }
+.sp-h2 { font-size: 1.35rem; font-weight: 700; line-height: 1.4; position: relative; }
+.sp-anchor { position: absolute; left: -0.9rem; color: var(--accent); font-weight: 400; }
+.sp-toc { font-size: 0.8rem; color: var(--muted); display: flex; gap: 0.6rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--line); }
+.sp-toc b { color: var(--fg); font-weight: 500; border-left: 2px solid var(--accent); padding-left: 0.4rem; }
+.sp-mark { background: var(--sp-mark); border-radius: 2px; padding: 0 0.1em; }
+.sp-lede { font-size: 1.15em; line-height: 1.75; padding-bottom: 0.8rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--line); }
+.sp-subtitle { color: var(--muted); font-size: 0.95rem; margin-top: 0.1rem; }
+.sp-figure { margin: 0; }
+.sp-figure svg { width: 100%; max-width: 260px; display: block; margin: 0 auto; }
+.sp-figure figcaption { text-align: center; font-size: 0.85rem; margin-top: 0.4rem; }
+.sp-node { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+.sp-node.strong { fill: var(--accent-soft); stroke: var(--accent); }
+.sp-edge, .sp-curve { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.sp-curve { stroke: var(--fg); stroke-width: 1.6; }
+.sp-component { border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem; }
+.sp-slider { display: flex; align-items: center; gap: 0.5rem; font: 0.75rem var(--mono); color: var(--muted); max-width: 260px; margin: 0.4rem auto 0; }
+.sp-slider i { flex: 1; height: 4px; background: var(--line); border-radius: 2px; }
+.sp-slider b { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.sp-fold { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0.4rem 0; margin-bottom: 0.6rem; }
+.sp-fold summary { cursor: pointer; font-weight: 600; list-style: none; }
+.sp-fold summary::-webkit-details-marker { display: none; }
+.sp-fold summary::before { content: "▸"; display: inline-block; width: 1.1rem; color: var(--muted); transition: transform 0.2s; }
+.sp-fold[open] summary::before { transform: rotate(90deg); }
+.sp-fold p { margin: 0.3rem 0 0 1.1rem; color: var(--fg); }
+.sp-callout { border-left: 3px solid var(--sp-note); background: var(--sp-note-bg); border-radius: 0 8px 8px 0; padding: 0.5rem 0.8rem; margin-bottom: 0.6rem; }
+.sp-callout b { display: block; font-size: 0.8rem; color: var(--sp-note); letter-spacing: 0.08em; }
+.sp-callout.tip { border-color: var(--sp-tip); background: var(--sp-tip-bg); }
+.sp-callout.tip b { color: var(--sp-tip); }
+.sp-callout.warning { border-color: var(--sp-warn); background: var(--sp-warn-bg); }
+.sp-callout.warning b { color: var(--sp-warn); }
+.sp-page { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; column-gap: 1rem; row-gap: 0.4rem; }
+.sp-page > * { grid-column: 1; align-self: start; }
+.sp-page > .sp-side, .sp-page > .sp-col { grid-column: 2; grid-row: 1; }
+.sp-col { background: var(--surface); border-radius: 4px; min-height: 2.5rem; }
+.sp-page > .sp-wide { grid-column: 1 / -1; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 0.6rem; text-align: center; font-size: 0.9rem; }
+.sp-side { font-size: 0.8rem; line-height: 1.6; color: var(--muted); border-left: 1px solid var(--line); padding-left: 0.6rem; }
+.sp-side.active { color: var(--fg); }
+.sp-side sup, .sp-ref { color: var(--accent); font-family: var(--mono); font-size: 0.7em; }
+.sp-hl { background: var(--sp-hl); border-radius: 3px; }
+.sp-bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.sp-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.6rem; font-size: 0.85rem; line-height: 1.5; }
+.sp-card b { display: block; font-size: 0.9rem; margin-bottom: 0.2rem; }
+.sp-refs { margin: 0; padding-left: 2.2rem; font-size: 0.85rem; line-height: 1.6; list-style: none; counter-reset: ref; }
+.sp-refs li { counter-increment: ref; position: relative; margin-bottom: 0.3rem; }
+.sp-refs li::before { content: "[" counter(ref) "]"; position: absolute; left: -2.2rem; color: var(--muted); font-family: var(--mono); font-size: 0.8rem; }
+.sp-table { overflow-x: auto; font-size: 0.9rem; }
+.sp-tr { display: grid; grid-template-columns: 1fr 8rem; border-bottom: 1px solid var(--line); padding: 0.3rem 0; }
+.sp-tr span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.sp-tr.head { font-weight: 700; border-bottom: 1.5px solid var(--fg); }
+.sp-tr:last-child { border-bottom: none; }
+.sp-raw { width: 100%; max-width: 220px; display: block; margin: 0 auto; }
+.sp-raw rect { fill: none; stroke: var(--fg); stroke-width: 1.5; }
+.sp-raw path { stroke: var(--fg); stroke-width: 1.5; }
+</style>
 </head>
 <body>
 <main>
@@ -42,29 +131,217 @@
 <p>不能。段落、标题、列表里出现 HTML 标签时构建报错。只用一次的特殊内容写成独立的 HTML 块：前后各空一行，块内是完整的 HTML。编辑器里显示它的渲染结果，点开后编辑源码。</p>
 <p>同一种写法用到第二次时，把它做成块类型或文字标记：所有博客都可能用到的加进 bake 的 <code>src/blocks/</code>，只有一个博客使用的加在该博客的 <code>blocks/</code>。理由：HTML 在编辑器里只能按源码编辑，块类型才能在编辑器里直接输入。</p>
 
-<h2>内置块类型有哪些</h2>
-<table>
-  <thead>
-    <tr><th>内容</th><th>写法</th><th>生成的 HTML</th><th>编辑器里怎么改</th></tr>
-  </thead>
-  <tbody>
-    <tr><td>标题 id 和目录短标题</td><td><code>## 标题 {#chain-rule toc="链式法则"}</code></td><td><code>&lt;h2 id="chain-rule"&gt;</code>，目录使用 <code>toc</code> 的文字</td><td>标题旁显示 id，在属性面板里改</td></tr>
-    <tr><td>文字标记</td><td><code>==文字==</code></td><td><code>&lt;mark&gt;</code></td><td>选中文字按快捷键</td></tr>
-    <tr><td>导语</td><td>正文开头的 <code>:::lede</code></td><td><code>&lt;div class="lede"&gt;</code></td><td>直接输入</td></tr>
-    <tr><td>章节副标题</td><td><code>::subtitle[文字]</code></td><td><code>&lt;p class="subtitle"&gt;</code></td><td>直接输入</td></tr>
-    <tr><td>图片</td><td><code>![说明](./assets/x.png)</code></td><td><code>&lt;figure&gt;</code>，说明文字同时作为 alt 和图注</td><td>粘贴或拖入，文件存进文章所在目录的 <code>assets/</code></td></tr>
-    <tr><td>组件</td><td>带图题 <code>:::name{属性}</code>，不带图题 <code>::name{属性}</code></td><td>同名 custom element，图题放在元素内的 <code>&lt;figcaption&gt;</code></td><td>组件照常运行，属性面板改参数，图题直接输入</td></tr>
-    <tr><td>折叠</td><td><code>:::fold[标题]</code></td><td><code>&lt;details&gt;</code></td><td>标题和内容直接输入，编辑时保持展开</td></tr>
-    <tr><td>提示框</td><td><code>:::callout{kind=note}</code>，<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code></td><td><code>&lt;aside class="callout note"&gt;</code></td><td>内容直接输入，类型在属性面板里选</td></tr>
-    <tr><td>加宽</td><td><code>:::wide</code></td><td><code>&lt;div class="wide"&gt;</code>，宽度扩展到正文和旁注栏</td><td>直接输入</td></tr>
-    <tr><td>边注</td><td><code>:::margin</code></td><td><code>&lt;aside class="sidenote unnumbered"&gt;</code>，放在右侧栏，不带编号</td><td>直接输入</td></tr>
-    <tr><td>卡片网格</td><td><code>:::bento</code> 内放 <code>::::card{span="2x1" title="标题"}</code></td><td>CSS grid，<code>span</code> 是列数乘行数</td><td>卡片内容直接输入，尺寸和标题在属性面板里改</td></tr>
-    <tr><td>参考文献</td><td><code>:::references</code> 内放普通列表</td><td><code>&lt;ol class="references"&gt;</code></td><td>直接编辑列表</td></tr>
-    <tr><td>表格</td><td>GFM 表格</td><td>外面包一层可以横向滚动的容器</td><td>表格编辑</td></tr>
-    <tr><td>独立的 HTML 块</td><td>前后空行的 HTML</td><td>原样输出</td><td>显示渲染结果，点开编辑源码</td></tr>
-  </tbody>
-</table>
-<p>指令的三种形式对应块类型定义里的 <code>form</code>：<code>:name</code> 是行内标记（<code>text</code>），<code>::name</code> 是单行块（<code>leaf</code>），<code>:::name</code> 是可以包含段落的块（<code>container</code>）。容器嵌套时外层多写一个冒号。块类型的定义方式见 <a href="extending.html">扩展接口</a>。</p>
+<h2>内置块类型长什么样</h2>
+<p>下面每一节给出一种内置块类型的写法和渲染结果。渲染结果是 bake 内置样式的默认效果：颜色、字体和宽度取自主题变量，主题只改变量值，版面结构不变。指令有三种形式，对应块类型定义里的 <code>form</code>：<code>:name</code> 是行内标记（<code>text</code>），<code>::name</code> 是单行块（<code>leaf</code>），<code>:::name</code> 是可以包含段落的块（<code>container</code>）。容器嵌套时外层多写一个冒号。块类型的定义方式见 <a href="extending.html">扩展接口</a>。</p>
+
+<h3>标题 id 和目录短标题</h3>
+<p>标题后的 <code>{#id}</code> 设定锚点，<code>toc</code> 设定目录里显示的短标题。没有写 <code>{#id}</code> 时，id 由标题文字生成。鼠标移到标题上时，左侧显示 <code>#</code> 链接。编辑器里标题左侧显示 id，在属性面板里修改。</p>
+<div class="spec">
+<pre><code class="language-markdown">## 反向传播中的链式法则 {#chain-rule toc="链式法则"}</code></pre>
+<div class="sp">
+  <div class="sp-toc"><span>目录</span><b>链式法则</b></div>
+  <div class="sp-h2"><span class="sp-anchor">#</span>反向传播中的链式法则</div>
+</div>
+</div>
+
+<h3>文字标记</h3>
+<p><code>==文字==</code> 输出 <code>&lt;mark&gt;</code>，背景色是 <code>--color-mark</code>。编辑器里选中文字按 <code>Mod-Shift-H</code>。</p>
+<div class="spec">
+<pre><code class="language-markdown">梯度指向函数值==增长最快==的方向。</code></pre>
+<div class="sp"><p>梯度指向函数值<span class="sp-mark">增长最快</span>的方向。</p></div>
+</div>
+
+<h3>导语</h3>
+<p><code>:::lede</code> 写在正文开头，输出 <code>&lt;div class="lede"&gt;</code>。字号是正文的 1.15 倍，下方有一条分隔线。站内引用预览一篇文章时显示的就是导语。</p>
+<div class="spec">
+<pre><code class="language-markdown">:::lede
+这篇文章从一个神经元出发，推导反向传播中每一步的矩阵求导。
+:::</code></pre>
+<div class="sp"><div class="sp-lede">这篇文章从一个神经元出发，推导反向传播中每一步的矩阵求导。</div><p class="sp-dim">正文第一段……</p></div>
+</div>
+
+<h3>章节副标题</h3>
+<p><code>::subtitle[文字]</code> 紧跟在标题之后，输出 <code>&lt;p class="subtitle"&gt;</code>。它不进入目录，不生成锚点，用于给一节补充一句说明。</p>
+<div class="spec">
+<pre><code class="language-markdown">## 链式法则 {#chain-rule}
+
+::subtitle[从标量推广到矩阵]</code></pre>
+<div class="sp"><div class="sp-h2">链式法则</div><div class="sp-subtitle">从标量推广到矩阵</div></div>
+</div>
+
+<h3>图片</h3>
+<p>图片输出 <code>&lt;figure&gt;</code>，说明文字同时用作 <code>alt</code> 和图注。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
+<div class="spec">
+<pre><code class="language-markdown">![一个神经元的输入、权重与输出](./assets/neuron.svg)</code></pre>
+<div class="sp">
+  <figure class="sp-figure">
+    <svg viewBox="0 0 220 90" role="img" aria-label="神经元示意">
+      <circle class="sp-node" cx="30" cy="20" r="9"></circle><circle class="sp-node" cx="30" cy="45" r="9"></circle><circle class="sp-node" cx="30" cy="70" r="9"></circle>
+      <line class="sp-edge" x1="39" y1="20" x2="141" y2="45"></line><line class="sp-edge" x1="39" y1="45" x2="141" y2="45"></line><line class="sp-edge" x1="39" y1="70" x2="141" y2="45"></line>
+      <circle class="sp-node strong" cx="155" cy="45" r="14"></circle><line class="sp-edge" x1="169" y1="45" x2="205" y2="45"></line>
+    </svg>
+    <figcaption>一个神经元的输入、权重与输出</figcaption>
+  </figure>
+</div>
+</div>
+
+<h3>组件</h3>
+<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。输出同名 custom element，图题放在元素内的 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供外框和图题的样式。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
+<div class="spec">
+<pre><code class="language-markdown">:::gradient-figure{x0="1.2"}
+从 $x_0$ 出发沿负梯度方向下降。
+:::</code></pre>
+<div class="sp">
+  <figure class="sp-figure sp-component">
+    <svg viewBox="0 0 220 90" role="img" aria-label="梯度下降示意">
+      <path class="sp-curve" d="M10 15 Q110 150 210 15"></path>
+      <circle class="sp-node strong" cx="168" cy="44" r="5"></circle><circle class="sp-node" cx="140" cy="66" r="4"></circle><circle class="sp-node" cx="122" cy="76" r="3"></circle>
+    </svg>
+    <div class="sp-slider"><span>x₀</span><i><b style="width: 80%"></b></i><span>1.2</span></div>
+    <figcaption>从 x₀ 出发沿负梯度方向下降。</figcaption>
+  </figure>
+</div>
+</div>
+
+<h3>折叠</h3>
+<p><code>:::fold[标题]</code> 输出 <code>&lt;details&gt;</code>，默认收起，点击标题展开。适合放推导细节和补充证明。编辑器里折叠块始终展开，标题和内容直接输入。</p>
+<div class="spec">
+<pre><code class="language-markdown">:::fold[推导细节]
+把 $z = Wx + b$ 代入后逐项求导……
+:::</code></pre>
+<div class="sp">
+  <details class="sp-fold" open><summary>推导细节</summary><p>把 z = Wx + b 代入后逐项求导……</p></details>
+  <details class="sp-fold"><summary>收起时的样子</summary><p>内容</p></details>
+</div>
+</div>
+
+<h3>提示框</h3>
+<p><code>:::callout{kind=note}</code> 输出 <code>&lt;aside class="callout note"&gt;</code>。<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code>，默认 <code>note</code>，三种类型的标签分别是「说明」「提示」「注意」。编辑器里内容直接输入，类型在属性面板里选。</p>
+<div class="spec">
+<pre><code class="language-markdown">:::callout{kind=note}
+本文的向量都是列向量。
+:::
+
+:::callout{kind=tip}
+先看图再看公式。
+:::
+
+:::callout{kind=warning}
+这里的求和不能交换次序。
+:::</code></pre>
+<div class="sp">
+  <aside class="sp-callout note"><b>说明</b>本文的向量都是列向量。</aside>
+  <aside class="sp-callout tip"><b>提示</b>先看图再看公式。</aside>
+  <aside class="sp-callout warning"><b>注意</b>这里的求和不能交换次序。</aside>
+</div>
+</div>
+
+<h3>加宽</h3>
+<p><code>:::wide</code> 输出 <code>&lt;div class="wide"&gt;</code>，宽度扩展到正文加右侧栏，用于放宽表格和大图。下图中灰色竖条是右侧栏的位置。</p>
+<div class="spec">
+<pre><code class="language-markdown">正文段落。
+
+:::wide
+| 函数 | 定义 | 导数 | 输出范围 | … |
+|---|---|---|---|---|
+:::</code></pre>
+<div class="sp">
+  <div class="sp-page">
+    <p>正文段落。</p><div class="sp-col" aria-hidden="true"></div>
+    <div class="sp-wide">加宽的内容横跨正文和右侧栏</div>
+    <p class="sp-dim">后面的正文回到原来的宽度。</p>
+  </div>
+</div>
+</div>
+
+<h3>边注</h3>
+<p><code>:::margin</code> 输出 <code>&lt;aside class="sidenote unnumbered"&gt;</code>，放在右侧栏，与它前面的段落顶部对齐，不带编号。和旁注使用同一套对齐代码。</p>
+<div class="spec">
+<pre><code class="language-markdown">softmax 把任意实数向量变成概率分布。
+
+:::margin
+名字来自 argmax 的平滑版本。
+:::</code></pre>
+<div class="sp">
+  <div class="sp-page">
+    <p>softmax 把任意实数向量变成概率分布。</p>
+    <aside class="sp-side">名字来自 argmax 的平滑版本。</aside>
+  </div>
+</div>
+</div>
+
+<h3>卡片网格</h3>
+<p>外层写 <code>::::bento</code>，里面放若干 <code>:::card</code>。网格是 4 列，<code>span="列数x行数"</code> 设定卡片大小，默认 <code>1x1</code>，<code>title</code> 是卡片标题。编辑器里卡片内容直接输入，尺寸和标题在属性面板里修改。</p>
+<div class="spec">
+<pre><code class="language-markdown">::::bento
+:::card{span="2x1" title="ReLU"}
+最简单的激活函数。
+:::
+:::card{title="GELU"}
+平滑。
+:::
+:::card{title="SiLU"}
+自门控。
+:::
+:::card{span="4x1" title="比较"}
+三者在零点附近的导数不同。
+:::
+::::</code></pre>
+<div class="sp">
+  <div class="sp-bento">
+    <div class="sp-card" style="grid-column: span 2"><b>ReLU</b>最简单的激活函数。</div>
+    <div class="sp-card"><b>GELU</b>平滑。</div>
+    <div class="sp-card"><b>SiLU</b>自门控。</div>
+    <div class="sp-card" style="grid-column: span 4"><b>比较</b>三者在零点附近的导数不同。</div>
+  </div>
+</div>
+</div>
+
+<h3>参考文献</h3>
+<p><code>:::references</code> 里放普通列表，输出 <code>&lt;ol class="references"&gt;</code>，编号写成 <code>[1]</code> 的形式，字号小于正文。</p>
+<div class="spec">
+<pre><code class="language-markdown">:::references
+- Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.
+- Hendrycks, Gimpel. Gaussian Error Linear Units. 2016.
+:::</code></pre>
+<div class="sp">
+  <ol class="sp-refs">
+    <li>Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.</li>
+    <li>Hendrycks, Gimpel. Gaussian Error Linear Units. 2016.</li>
+  </ol>
+</div>
+</div>
+
+<h3>表格</h3>
+<p>GFM 表格。生成页面时外面包一层可以横向滚动的容器，窄屏上表格在容器内滚动，页面不出现横向滚动。数字列使用等宽数字。编辑器里单元格直接输入。</p>
+<div class="spec">
+<pre><code class="language-markdown">| 函数 | 零点处导数 |
+|---|---:|
+| ReLU | 不存在 |
+| GELU | 0.5 |
+| SiLU | 0.5 |</code></pre>
+<div class="sp">
+  <div class="sp-table">
+    <div class="sp-tr head"><span>函数</span><span>零点处导数</span></div>
+    <div class="sp-tr"><span>ReLU</span><span>不存在</span></div>
+    <div class="sp-tr"><span>GELU</span><span>0.5</span></div>
+    <div class="sp-tr"><span>SiLU</span><span>0.5</span></div>
+  </div>
+</div>
+</div>
+
+<h3>独立的 HTML 块</h3>
+<p>前后各空一行的 HTML 原样输出，bake 不加样式。编辑器里显示渲染结果，点击后编辑源码。同样的 HTML 用到第二次时，改成块类型或组件。</p>
+<div class="spec">
+<pre><code class="language-html">&lt;svg viewBox="0 0 120 40"&gt;
+  &lt;rect x="4" y="8" width="40" height="24" rx="4"/&gt;
+  &lt;rect x="76" y="8" width="40" height="24" rx="4"/&gt;
+  &lt;path d="M44 20 H76"/&gt;
+&lt;/svg&gt;</code></pre>
+<div class="sp">
+  <svg class="sp-raw" viewBox="0 0 120 40" role="img" aria-label="两个方框"><rect x="4" y="8" width="40" height="24" rx="4"></rect><rect x="76" y="8" width="40" height="24" rx="4"></rect><path d="M44 20 H76"></path></svg>
+</div>
+</div>
 
 <h2>公式怎么写</h2>
 <p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
@@ -77,6 +354,15 @@
 [^d]: 这里的“附近”指 $\Delta x \to 0$ 的极限，见[前文](#derivative)。
 
     注释的第二段缩进四个空格。</code></pre>
+<div class="spec one">
+<div class="sp">
+  <div class="sp-page">
+    <p class="sp-hl">导数描述的是函数在一点附近的变化率<sup class="sp-ref">1</sup>。</p>
+    <aside class="sp-side active"><sup>1</sup> 这里的“附近”指 Δx → 0 的极限，见前文。<br>注释的第二段缩进四个空格。</aside>
+  </div>
+  <p class="sp-note">鼠标停在注释上时，被注释的段落显示 <code>--color-highlight</code> 背景。</p>
+</div>
+</div>
 <ul>
   <li>编号按引用在正文中出现的顺序从 1 开始生成。<code>[^d]</code> 里的名字只用于对应，不显示。</li>
   <li>鼠标移到注释上时，正文里被注释的内容高亮；鼠标移到正文的编号上时，对应注释高亮。默认高亮编号所在的整个段落。</li>
