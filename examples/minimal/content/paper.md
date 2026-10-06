@@ -33,7 +33,7 @@ $$
 
 步长太小时收敛很慢，实际中常用随迭代次数减小的步长。
 
-### 多元函数 {#multivariate}
+### 推广到 $\mathbb{R}^n$ {#multivariate}
 
 多元函数把导数换成梯度 $\nabla f(x) \in \R^n$，更新规则的形式不变。
 

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, test } from 'node:test';
-import { loadSite, renderPage, siteData } from '../src/site/index.js';
+import { loadSite, renderArticle, renderDocumentFor, renderPage, siteData } from '../src/site/index.js';
 
 const blogs = [];
 const config = "export default { title: '测试站点', theme: 'plain' };\n";
@@ -131,12 +131,13 @@ describe('组件和主题', () => {
 });
 
 describe('siteData', () => {
-  test('跳过草稿，保留其他字段，按路径排序', async () => {
+  test('跳过草稿和 slug 不合法的页面，保留其他字段，按路径排序', async () => {
     const root = blog({
       'bake.config.js': "export default { title: 't', theme: 'plain', site: { categories: ['math'] } };\n",
       'content/b.md': article('b', 'category: math\ntags: [x]\n'),
       'content/a.md': article('a', 'date: 2026-10-06\n'),
       'content/c.md': article('c', 'draft: true\n'),
+      'content/d.md': '---\ntitle: 文章 d\nslug: Not_Valid\n---\n\n正文。\n',
     });
     assert.deepEqual(siteData(await loadSite(root)), {
       pages: [
@@ -177,5 +178,18 @@ describe('renderPage', () => {
     const { html, messages } = await renderPage(site, 'content/post.md', { assets });
     assert.equal(html, null);
     assert.deepEqual(messages, [{ path: 'content/post.md', line: 4, column: 1, text: 'Unknown layout slides' }]);
+  });
+
+  test('分两步渲染时使用传入的源文件，资源由渲染结果决定', async () => {
+    const root = blog({ 'themes/plain.css': '', 'components/demo-plot.js': plot, 'content/post.md': article('post') });
+    const site = await loadSite(root);
+    const source = '---\ntitle: 新标题\nslug: moved\n---\n\n::demo-plot\n';
+    const rendered = await renderArticle(site, 'content/post.md', source);
+    assert.deepEqual(rendered.components, ['demo-plot']);
+    const html = renderDocumentFor(site, 'content/post.md', rendered, {
+      assets: { styles: [], scripts: rendered.components.map((name) => `/${name}.js`) },
+    });
+    assert.match(html, /<title>新标题 · 测试站点<\/title>/);
+    assert.match(html, /<script type="module" src="\/demo-plot.js"><\/script>/);
   });
 });

@@ -11,10 +11,10 @@ import { themeVariables } from '../src/styles/variables.js';
 
 const root = join(import.meta.dirname, '..');
 const site = await loadSite(join(root, 'examples/minimal'));
-const assets = { styles: ['/src/styles/base.css', '/examples/minimal/themes/default.css'], scripts: ['/src/client/sidenotes.js'] };
+const assets = { styles: ['/src/styles/base.css', '/examples/minimal/themes/default.css'], scripts: ['/src/client/page.js'] };
 const toc = [
-  { id: 'a', text: '第一节', depth: 2 },
-  { id: 'b', text: '小节 <b>', depth: 3 },
+  { id: 'a', html: '第一节', depth: 2 },
+  { id: 'b', html: '小节 &lt;b&gt;', depth: 3 },
 ];
 const layouts = { essay, paper, bento };
 
@@ -37,6 +37,12 @@ describe('examples/minimal 的整页 HTML', () => {
       t.assert.snapshot(withoutSvg(html), { serializers: [(value) => value] });
     });
   }
+});
+
+test('标题含公式时目录项放入公式的 HTML', async () => {
+  const { html } = await renderPage(site, 'content/paper.md', { assets });
+  const entry = html.match(/<li class="toc-h3"><a href="#multivariate">(.*?)<\/a><\/li>/)[1];
+  assert.match(entry, /^推广到 <span class="math" data-tex="\\mathbb\{R\}\^n"><svg[\s\S]*<\/svg><\/span>$/);
 });
 
 describe('版式', () => {

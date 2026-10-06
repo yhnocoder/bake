@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 import { build } from 'vite';
 
-const clientScript = { name: 'client/sidenotes', path: fileURLToPath(new URL('../client/sidenotes.js', import.meta.url)) };
+const clientScript = { name: 'client/page', path: fileURLToPath(new URL('../client/page.js', import.meta.url)) };
 const styles = ['base', 'blocks', 'layouts'].map((name) => fileURLToPath(new URL(`../styles/${name}.css`, import.meta.url)));
 const virtualPrefix = '\0bake:';
 

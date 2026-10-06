@@ -1,10 +1,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
-import { isMap, LineCounter, parseDocument } from 'yaml';
-import { isSlug } from '../format/frontmatter.js';
+import { isSlug, readFrontmatter } from '../format/frontmatter.js';
 
 const skippedDirectories = new Set(['notes', 'components', 'assets']);
-const frontmatterBlock = /^---\r?\n([\s\S]*?\r?\n)?---(?:\r?\n|$)/;
 
 export async function markdownFiles(path) {
   const info = await stat(path);
@@ -27,16 +25,6 @@ export function pageUrl(slug) {
   return slug === '/' ? '/' : `/${slug}/`;
 }
 
-function readFrontmatter(source) {
-  const block = frontmatterBlock.exec(source);
-  const lineCounter = new LineCounter();
-  const document = parseDocument(block?.[1] ?? '', { lineCounter });
-  if (document.errors.length > 0 || !isMap(document.contents)) return { frontmatter: {} };
-  const slugKey = document.contents.items.find((pair) => pair.key?.value === 'slug')?.key;
-  const { line, col } = lineCounter.linePos(slugKey?.range[0] ?? 0);
-  return { frontmatter: document.toJS(), slugPoint: { line: line + 1, column: col } };
-}
-
 export async function findPages(root) {
   const content = join(root, 'content');
   const files = await markdownFiles(content).catch((error) => {
@@ -48,12 +36,16 @@ export async function findPages(root) {
   const owners = new Map();
   const paths = files.map((file) => relative(root, file)).filter((path) => !basename(path).startsWith('_'));
   for (const path of paths.sort((a, b) => (a < b ? -1 : 1))) {
-    const { frontmatter, slugPoint } = readFrontmatter(await readFile(join(root, path), 'utf8'));
+    const { values: frontmatter, keyPlaces } = readFrontmatter(await readFile(join(root, path), 'utf8'));
     const url = pageUrl(frontmatter.slug);
     if (url !== null) {
       const owner = owners.get(url);
-      if (owner) messages.push({ path, ...slugPoint, text: `Slug ${frontmatter.slug} is already used by ${owner}` });
-      else owners.set(url, path);
+      if (owner) {
+        const { line, column } = keyPlaces.get('slug');
+        messages.push({ path, line, column, text: `Slug ${frontmatter.slug} is already used by ${owner}` });
+      } else {
+        owners.set(url, path);
+      }
     }
     pages.push({ path, url, frontmatter });
   }

@@ -72,7 +72,7 @@ describe('输出目录', () => {
       assert.ok(list.includes(`${page}/sections.json`));
     }
     matching(list, /^assets\/components\/demo-plot\.[\w-]+\.js$/);
-    matching(list, /^assets\/client\/sidenotes\.[\w-]+\.js$/);
+    matching(list, /^assets\/client\/page\.[\w-]+\.js$/);
     matching(list, /^assets\/bake\.[\w-]+\.css$/);
     matching(list, /^assets\/themes\/default\.[\w-]+\.css$/);
     matching(list, /^assets\/features\/relu\.[0-9a-f]{4}\.webp$/);
@@ -122,7 +122,7 @@ describe('组件与脚本', () => {
     const dist = await buildBlog(blog());
     const list = files(dist);
     const plot = matching(list, /^assets\/components\/demo-plot\.[\w-]+\.js$/);
-    const client = matching(list, /^assets\/client\/sidenotes\.[\w-]+\.js$/);
+    const client = matching(list, /^assets\/client\/page\.[\w-]+\.js$/);
     const features = read(dist, 'features/index.html');
     const paper = read(dist, 'paper/index.html');
     assert.ok(features.includes(`<script type="module" src="/${client}"></script>`));

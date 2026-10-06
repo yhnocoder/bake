@@ -6,7 +6,7 @@ import renderEssay, { fields as essayFields } from '../layouts/essay.js';
 import { renderDocument } from '../layouts/head.js';
 import renderPaper, { fields as paperFields } from '../layouts/paper.js';
 import { render } from '../render/index.js';
-import { findPages } from './pages.js';
+import { findPages, pageUrl } from './pages.js';
 
 const configPath = 'bake.config.js';
 const layouts = {
@@ -81,8 +81,8 @@ export async function loadSite(root) {
 
 export function siteData(site) {
   const pages = site.pages
-    .filter((page) => page.frontmatter.draft !== true)
-    .map(({ url, frontmatter }) => ({ url, title: frontmatter.title, ...frontmatter }));
+    .filter((page) => page.url !== null && page.frontmatter.draft !== true)
+    .map(({ url, frontmatter }) => ({ url, ...frontmatter }));
   return { pages, config: site.config.site };
 }
 
@@ -103,16 +103,13 @@ export function renderArticle(site, pagePath, source) {
 export function renderDocumentFor(site, pagePath, rendered, { assets }) {
   const layout = site.layouts[rendered.page.layout];
   if (!layout) return null;
-  const entry = site.pages.find((page) => page.path === pagePath);
-  const page = { ...rendered.page, url: entry.url, path: pagePath };
+  const page = { ...rendered.page, url: pageUrl(rendered.page.slug), path: pagePath };
   const body = layout.render({ page, html: rendered.html, toc: rendered.toc, site: siteData(site) });
   return renderDocument({ page, config: site.config, body, mathDefs: rendered.mathDefs, assets });
 }
 
 export async function renderPage(site, pagePath, { assets }) {
   if (!site.pages.some((page) => page.path === pagePath)) throw new Error(`${pagePath} is not a page of this site`);
-  const source = await readFile(join(site.root, pagePath), 'utf8');
-  const rendered = await renderArticle(site, pagePath, source);
-  const html = renderDocumentFor(site, pagePath, rendered, { assets });
-  return { html, rendered, messages: rendered.messages };
+  const rendered = await renderArticle(site, pagePath, await readFile(join(site.root, pagePath), 'utf8'));
+  return { html: renderDocumentFor(site, pagePath, rendered, { assets }), rendered, messages: rendered.messages };
 }
