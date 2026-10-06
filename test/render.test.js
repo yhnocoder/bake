@@ -391,6 +391,14 @@ describe('站内链接和组件', () => {
     assert.ok(html.includes('<a href="https://example.com/a">e</a>'));
   });
 
+  test('按文档顺序收集图片地址和位置', async () => {
+    const { images } = await renderBody('![a](./a.png)\n\n文字 ![b](https://example.com/b.png){width=10}\n');
+    assert.deepEqual(images, [
+      { src: './a.png', line: headerLines + 1, column: 1 },
+      { src: 'https://example.com/b.png', line: headerLines + 3, column: 4 },
+    ]);
+  });
+
   test('正文用到的组件名', async () => {
     const { components: used } = await renderBody('::demo-plot\n\n:::demo-plot\n图题\n:::\n');
     assert.deepEqual(used, ['demo-plot']);

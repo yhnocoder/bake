@@ -64,6 +64,14 @@ function collectLinks(tree) {
   return links;
 }
 
+function collectImages(tree) {
+  const images = [];
+  visit(tree, 'image', (node) => {
+    images.push({ src: node.url, line: node.position.start.line, column: node.position.start.column });
+  });
+  return images;
+}
+
 function collectComponents(tree) {
   const names = new Set();
   visit(tree, ['leafDirective', 'containerDirective'], (node) => {
@@ -93,6 +101,7 @@ export async function render(source, { path, config = {}, blocks = [], component
     mathDefs,
     ids,
     links,
+    images: collectImages(tree),
     components: collectComponents(tree),
     messages,
   };
