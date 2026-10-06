@@ -107,12 +107,20 @@
     <tr><th>参数</th><th>内容</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>page</code></td><td>frontmatter 全部字段，加上 <code>url</code> 和 <code>path</code>（源文件相对路径）</td></tr>
+    <tr><td><code>page</code></td><td>frontmatter 全部字段，版式字段已经填入默认值，加上 <code>url</code> 和 <code>path</code>（源文件相对路径）</td></tr>
     <tr><td><code>html</code></td><td>渲染好的正文 HTML，旁注已经放在对应段落之后</td></tr>
     <tr><td><code>toc</code></td><td>目录项列表 <code>{ id, text, depth }</code>，<code>text</code> 优先使用标题的 <code>toc</code> 属性</td></tr>
     <tr><td><code>site</code></td><td>站点数据，与组件取得的相同</td></tr>
   </tbody>
 </table>
+<p>版式需要的 frontmatter 字段由版式文件导出 <code>fields</code> 声明：</p>
+<pre><code class="language-js">export const fields = {
+  authors: { label: '作者', type: 'list' },
+  abstract: { label: '摘要', type: 'string' },
+  toc: { label: '目录', type: 'boolean', default: false },
+  numbered: { label: '标题编号', type: 'boolean', default: true },
+};</code></pre>
+<p>字段定义的格式与组件的 <code>static properties</code> 相同，另外支持 <code>list</code>（字符串列表）类型。bake 用它校验文章的 frontmatter，把默认值填进 <code>page</code>，并在编辑器的页面属性面板里生成控件。版式字段不能与通用字段同名，同名时构建报错。</p>
 <p><code>&lt;head&gt;</code>、主题 CSS、组件脚本、旁注对齐脚本、预览脚本和复制脚本由 bake 加入，版式不处理。编辑器挂载在版式输出的 <code>&lt;article&gt;</code> 上，所以每个版式必须输出且只输出一个 <code>&lt;article&gt;</code>。</p>
 
 <h2>主题怎么写</h2>

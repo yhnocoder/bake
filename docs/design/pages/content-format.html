@@ -200,7 +200,7 @@
   <tbody>
     <tr><td><code>width</code></td><td>数字加 <code>px</code>、<code>%</code> 或 <code>em</code>，只写数字时按 <code>px</code></td><td>图片原始宽度，最宽为正文宽度</td><td>显示宽度。<code>%</code> 相对于正文宽度</td></tr>
     <tr><td><code>height</code></td><td>同 <code>width</code></td><td>按宽度和原始比例计算</td><td>显示高度。只写一个时另一个按原始比例计算；两个都写时图片按比例缩放到框内，不变形</td></tr>
-    <tr><td><code>float</code></td><td><code>left</code> | <code>right</code></td><td>不浮动</td><td>不写时图片独占一行并居中；写 <code>left</code> 或 <code>right</code> 时图片靠左或靠右，后面的文字环绕在另一侧</td></tr>
+    <tr><td><code>float</code></td><td><code>none</code> | <code>left</code> | <code>right</code></td><td><code>none</code></td><td><code>none</code> 时图片独占一行并居中；<code>left</code> 或 <code>right</code> 时图片靠左或靠右，后面的文字环绕在另一侧</td></tr>
   </tbody>
 </table>
 <p>浮动图片的宽度最多是正文宽度的 <code>50%</code>，与环绕文字之间留 <code>1.5em</code> 间距。窗口宽度小于 <code>600px</code> 时浮动取消，图片独占一行。理由：窄屏上剩下的宽度放不下几个字，环绕的文字会变成一列一两个字。</p>
@@ -458,35 +458,59 @@
 </ul>
 
 <h2>frontmatter 有哪些字段</h2>
+<p>frontmatter 的字段分三类：所有文章都适用的通用字段，由版式声明的版式字段，以及 bake 不解释、原样交给组件的其他字段。</p>
 <pre><code class="language-yaml">---
 title: 大模型里的激活函数
-eyebrow: LLM Architecture Notes · 2026-09
 layout: essay
 theme: blue
 width: normal
+eyebrow: LLM Architecture Notes · 2026-09
 toc: true
 category: arch
 summary: 从 ReLU 到 SwiGLU，比较各函数的输出、导数和极限行为
 tags: [GELU, SiLU, GLU]
 ---</code></pre>
+<p>这个例子里，<code>title</code> 到 <code>width</code> 是通用字段，<code>eyebrow</code> 和 <code>toc</code> 是 essay 版式的字段，<code>category</code>、<code>summary</code>、<code>tags</code> 是交给首页组件的字段。</p>
+
+<h3>通用字段</h3>
 <table>
   <thead>
     <tr><th>字段</th><th>类型</th><th>默认值</th><th>作用</th></tr>
   </thead>
   <tbody>
     <tr><td><code>title</code></td><td>字符串</td><td>必填</td><td>页面标题和 <code>&lt;title&gt;</code></td></tr>
-    <tr><td><code>eyebrow</code></td><td>字符串</td><td>无</td><td>标题上方的一行小字</td></tr>
-    <tr><td><code>layout</code></td><td><code>essay</code> | <code>paper</code> | <code>bento</code> | 博客自定义的版式名</td><td><code>essay</code></td><td>选择版式，见 <a href="extending.html">扩展接口</a></td></tr>
+    <tr><td><code>layout</code></td><td><code>essay</code> | <code>paper</code> | <code>bento</code> | 博客自定义的版式名</td><td><code>essay</code></td><td>选择版式</td></tr>
     <tr><td><code>theme</code></td><td><code>themes/</code> 下的文件名</td><td><code>bake.config.js</code> 的 <code>theme</code></td><td>选择主题</td></tr>
     <tr><td><code>width</code></td><td><code>normal</code> | <code>wide</code></td><td><code>normal</code></td><td>正文宽度。<code>normal</code> 是 <code>--measure</code>，<code>wide</code> 是 <code>--measure-wide</code>，两个值由主题设定</td></tr>
-    <tr><td><code>toc</code></td><td>布尔</td><td><code>true</code></td><td>是否显示目录</td></tr>
-    <tr><td><code>numbered</code></td><td>布尔</td><td><code>false</code></td><td>标题是否自动编号，<code>paper</code> 版式默认 <code>true</code></td></tr>
-    <tr><td><code>authors</code></td><td>字符串列表</td><td>无</td><td><code>paper</code> 版式的作者行</td></tr>
-    <tr><td><code>abstract</code></td><td>字符串</td><td>无</td><td><code>paper</code> 版式的摘要</td></tr>
     <tr><td><code>draft</code></td><td>布尔</td><td><code>false</code></td><td>为 <code>true</code> 时 <code>bake build</code> 不生成这一页，<code>bake dev</code> 照常显示</td></tr>
   </tbody>
 </table>
-<p>以上字段由 bake 校验，类型不符时构建报错。其他字段（例如 <code>category</code>、<code>summary</code>、<code>tags</code>）bake 不解释，原样放进站点数据，供首页这类组件使用，见 <a href="extending.html">扩展接口</a>。</p>
+
+<h3>版式字段</h3>
+<p>每个版式声明自己需要的字段，声明方式见 <a href="extending.html">扩展接口</a> 的版式一节。文章选了哪个版式，就可以使用这个版式的字段。内置版式的字段如下：</p>
+<table>
+  <thead>
+    <tr><th>版式</th><th>字段</th><th>类型</th><th>默认值</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td rowspan="3"><code>essay</code></td><td><code>eyebrow</code></td><td>字符串</td><td>无</td><td>标题上方的一行小字</td></tr>
+    <tr><td><code>toc</code></td><td>布尔</td><td><code>true</code></td><td>是否显示左侧目录</td></tr>
+    <tr><td><code>numbered</code></td><td>布尔</td><td><code>false</code></td><td>标题是否自动编号</td></tr>
+    <tr><td rowspan="4"><code>paper</code></td><td><code>authors</code></td><td>字符串列表</td><td>无</td><td>标题下方的作者行</td></tr>
+    <tr><td><code>abstract</code></td><td>字符串</td><td>无</td><td>作者行下方的摘要</td></tr>
+    <tr><td><code>toc</code></td><td>布尔</td><td><code>false</code></td><td>是否在摘要后显示目录</td></tr>
+    <tr><td><code>numbered</code></td><td>布尔</td><td><code>true</code></td><td>标题是否自动编号</td></tr>
+    <tr><td><code>bento</code></td><td colspan="4">没有版式字段</td></tr>
+  </tbody>
+</table>
+
+<h3>校验规则</h3>
+<ul>
+  <li>通用字段和当前版式声明的字段由 bake 校验，类型不符或取值不在范围内时构建报错。</li>
+  <li>文章使用了另一个版式的字段时构建报错。例如 essay 文章写了 <code>authors</code>。理由：这种情况通常是切换版式后忘了删字段，字段在页面上不会显示。</li>
+  <li>其他字段 bake 不解释，原样放进站点数据，供首页这类组件使用，见 <a href="extending.html">扩展接口</a>。</li>
+  <li>编辑器的页面属性面板列出通用字段和当前版式的字段，控件按字段类型生成。</li>
+</ul>
 
 <h2>Markdown 的输出格式是什么</h2>
 <p>编辑器保存时用 remark-stringify 输出 Markdown，往返测试要求载入后不修改直接导出的结果与原文件逐字节相同。为此输出格式固定如下，示例博客的文件也按这个格式书写：</p>
