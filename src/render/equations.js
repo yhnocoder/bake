@@ -9,26 +9,29 @@ function equationId(name) {
   return name.replaceAll(':', '-');
 }
 
-function numberEquations(tree) {
+function numberEquations(tree, report) {
   const labels = new Map();
   let count = 0;
   visit(tree, 'math', (node) => {
     const names = [...node.value.matchAll(label)].map((match) => match[1]);
     if (names.length === 0) return;
+    const id = equationId(names[0]);
+    const firstIsDuplicate = labels.has(names[0]);
     const numbers = [];
     for (const name of names) {
       const number = ++count;
       numbers.push(number);
-      if (!labels.has(name)) labels.set(name, { id: equationId(name), number });
+      if (labels.has(name)) report(node, `Duplicate equation label ${name}`);
+      else labels.set(name, { id, number });
     }
     let index = 0;
-    node.data = { ...node.data, equationId: equationId(names[0]), tex: node.value.replace(label, () => `\\tag{${numbers[index++]}}`) };
+    node.data = { ...node.data, equationId: firstIsDuplicate ? undefined : id, tex: node.value.replace(label, () => `\\tag{${numbers[index++]}}`) };
   });
   return labels;
 }
 
 export async function renderEquations(tree, { macros, report }) {
-  const labels = numberEquations(tree);
+  const labels = numberEquations(tree, report);
   const formulas = [];
   visit(tree, ['math', 'inlineMath'], (node) => {
     formulas.push(node);

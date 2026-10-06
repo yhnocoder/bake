@@ -3,57 +3,57 @@ exports[`features.md > 快照 1`] = `
   "toc": [
     {
       "id": "chain-rule",
-      "text": "链式法则",
+      "html": "链式法则",
       "depth": 2
     },
     {
       "id": "images",
-      "text": "图片",
+      "html": "图片",
       "depth": 2
     },
     {
       "id": "components",
-      "text": "组件",
+      "html": "组件",
       "depth": 2
     },
     {
       "id": "blocks",
-      "text": "块",
+      "html": "块",
       "depth": 2
     },
     {
       "id": "sidenotes",
-      "text": "旁注",
+      "html": "旁注",
       "depth": 2
     },
     {
       "id": "bento",
-      "text": "卡片网格",
+      "html": "卡片网格",
       "depth": 2
     },
     {
       "id": "table",
-      "text": "表格与 HTML",
+      "html": "表格与 HTML",
       "depth": 2
     },
     {
       "id": "math",
-      "text": "公式",
+      "html": "公式",
       "depth": 2
     },
     {
       "id": "配置文件中的宏",
-      "text": "配置文件中的宏",
+      "html": "配置文件中的宏",
       "depth": 3
     },
     {
       "id": "links",
-      "text": "站内引用",
+      "html": "站内引用",
       "depth": 2
     },
     {
       "id": "lists",
-      "text": "列表与代码",
+      "html": "列表与代码",
       "depth": 2
     }
   ],
