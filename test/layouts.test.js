@@ -11,7 +11,7 @@ import { themeVariables } from '../src/styles/variables.js';
 
 const root = join(import.meta.dirname, '..');
 const site = await loadSite(join(root, 'examples/minimal'));
-const assets = { styles: ['/src/styles/base.css', '/examples/minimal/themes/default.css'], scripts: ['/src/client/sidenotes.js'] };
+const assets = { styles: ['/src/styles/base.css', '/examples/minimal/themes/default.css'], scripts: ['/src/client/page.js'] };
 const toc = [
   { id: 'a', html: '第一节', depth: 2 },
   { id: 'b', html: '小节 &lt;b&gt;', depth: 3 },
@@ -31,12 +31,18 @@ function articleCount(html) {
 describe('examples/minimal 的整页 HTML', () => {
   for (const name of ['features', 'paper', 'bento']) {
     test(`${name}.md`, async (t) => {
-      const { html, messages } = await renderPage(site, `content/${name}.md`, { assets: () => assets });
+      const { html, messages } = await renderPage(site, `content/${name}.md`, { assets });
       assert.deepEqual(messages, []);
       assert.equal(articleCount(html), 1);
       t.assert.snapshot(withoutSvg(html), { serializers: [(value) => value] });
     });
   }
+});
+
+test('标题含公式时目录项放入公式的 HTML', async () => {
+  const { html } = await renderPage(site, 'content/paper.md', { assets });
+  const entry = html.match(/<li class="toc-h3"><a href="#multivariate">(.*?)<\/a><\/li>/)[1];
+  assert.match(entry, /^推广到 <span class="math" data-tex="\\mathbb\{R\}\^n"><svg[\s\S]*<\/svg><\/span>$/);
 });
 
 describe('版式', () => {

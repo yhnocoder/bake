@@ -21,11 +21,12 @@ async function renderExample() {
   const files = { '/components.js': definitions.join('') };
   const pages = {};
   const messages = [...site.messages];
-  const assets = ({ page }) => ({
-    styles: ['base', 'blocks', 'layouts'].map((name) => `/src/styles/${name}.css`).concat(`/${example}/${site.themes[page.theme ?? site.config.theme]}`),
-    scripts: ['/src/client/sidenotes.js', '/components.js'],
-  });
-  for (const { path } of site.pages) {
+  for (const { path, frontmatter } of site.pages) {
+    const theme = site.themes[frontmatter.theme ?? site.config.theme];
+    const assets = {
+      styles: ['base', 'blocks', 'layouts'].map((name) => `/src/styles/${name}.css`).concat(`/${example}/${theme}`),
+      scripts: ['/src/client/page.js', '/components.js'],
+    };
     const result = await renderPage(site, path, { assets });
     messages.push(...result.messages);
     const url = `/${example}/${dirname(path)}/${basename(path, '.md')}.html`;

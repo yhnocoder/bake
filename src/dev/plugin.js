@@ -4,13 +4,13 @@ import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
 import { imageExtensions } from '../format/validate.js';
-import { loadSite, renderPage } from '../site/index.js';
+import { loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
 import { findPages } from '../site/pages.js';
 
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
 const componentPrefix = '\0bake:component/';
 const bakeStyles = ['base', 'blocks', 'layouts'].map((name) => `src/styles/${name}.css`);
-const bakeScripts = ['src/client/sidenotes.js', 'src/dev/client.js'];
+const bakeScripts = ['src/client/page.js', 'src/dev/client.js'];
 
 class RequestError extends Error {
   constructor(status, message) {
@@ -121,10 +121,13 @@ export function bakeDev({ root }) {
   }
 
   async function renderEntry(entry) {
-    const hash = sha256(await readFile(join(root, entry.path)));
+    const bytes = await readFile(join(root, entry.path));
+    const hash = sha256(bytes);
     const cached = rendered.get(entry.path);
     if (cached?.hash === hash) return cached.result;
-    const result = await renderPage(site, entry.path, { assets: pageAssets });
+    const article = await renderArticle(site, entry.path, bytes.toString('utf8'));
+    const html = renderDocumentFor(site, entry.path, article, { assets: pageAssets(article) });
+    const result = { html, rendered: article, messages: article.messages };
     rendered.set(entry.path, { hash, result });
     report(result.messages);
     return result;

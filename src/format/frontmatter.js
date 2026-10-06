@@ -1,5 +1,7 @@
-import { isMap, parseDocument } from 'yaml';
+import { VFile } from 'vfile';
 import { location } from 'vfile-location';
+import { isMap, parseDocument } from 'yaml';
+import { createProcessor } from './processor.js';
 
 const slugPattern = /^(?:\/|[a-z0-9-]+(?:\/[a-z0-9-]+)*)$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -78,8 +80,40 @@ function withDefaults(values, fields) {
   return result;
 }
 
-export function checkFrontmatter(file, yaml, { layouts, themes }) {
+function keyPlacesOf(file, yaml) {
   const points = location(file);
+  const places = new Map();
+  for (const pair of yaml?.document.contents?.items ?? []) {
+    places.set(String(pair.key?.value), points.toPoint(yaml.contentOffset + (pair.key?.range?.[0] ?? 0)));
+  }
+  return places;
+}
+
+const frontmatterParser = createProcessor();
+
+function* fenceLineEnds(source) {
+  let start = source.indexOf('\n') + 1;
+  if (source.slice(0, start).trim() !== '---') return;
+  while (start > 0 && start < source.length) {
+    const newline = source.indexOf('\n', start);
+    const end = newline === -1 ? source.length : newline + 1;
+    if (source.slice(start, end).trim() === '---') yield end;
+    start = end;
+  }
+}
+
+export function readFrontmatter(source) {
+  for (const end of fenceLineEnds(source)) {
+    const file = new VFile(source.slice(0, end));
+    const yaml = readYaml(frontmatterParser.parse(file), file);
+    if (!yaml) continue;
+    if (yaml.document.errors.length > 0 || !isMap(yaml.document.contents)) break;
+    return { values: yaml.document.toJS(), keyPlaces: keyPlacesOf(file, yaml) };
+  }
+  return { values: {}, keyPlaces: new Map() };
+}
+
+export function checkFrontmatter(file, yaml, { layouts, themes }) {
   const start = yaml ? yaml.node.position.start : { line: 1, column: 1 };
   if (yaml && yaml.document.errors.length > 0) return withDefaults({}, commonFields);
   if (yaml && yaml.document.contents !== null && !isMap(yaml.document.contents)) {
@@ -87,10 +121,7 @@ export function checkFrontmatter(file, yaml, { layouts, themes }) {
     return withDefaults({}, commonFields);
   }
   const values = yaml?.document.toJS() ?? {};
-  const keyPlaces = new Map();
-  for (const pair of yaml?.document.contents?.items ?? []) {
-    keyPlaces.set(String(pair.key?.value), points.toPoint(yaml.contentOffset + (pair.key?.range?.[0] ?? 0)));
-  }
+  const keyPlaces = keyPlacesOf(file, yaml);
   const placeOf = (name) => keyPlaces.get(name) ?? start;
   if (values.title === undefined) file.message('Frontmatter is missing title', start);
   if (values.slug === undefined) file.message('Frontmatter is missing slug', start);

@@ -121,7 +121,7 @@ softmax 把任意实数向量变成概率分布。
 | GELU | 0.5 |
 | SiLU | 0.5 |
 
-<svg viewBox="0 0 120 40">
+<svg viewBox="0 0 120 40" width="240" fill="none" stroke="currentColor">
   <rect x="4" y="8" width="40" height="24" rx="4"/>
   <rect x="76" y="8" width="40" height="24" rx="4"/>
   <path d="M44 20 H76"/>
