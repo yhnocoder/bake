@@ -68,7 +68,7 @@ export function bakeDev({ root }) {
   const content = join(root, 'content');
   const configFile = join(root, 'bake.config.js');
   const rendered = new Map();
-  const savedHashes = new Map();
+  const shownHashes = new Map();
   const statuses = new Map();
   const chromes = new Map();
   const openUrls = new Set();
@@ -158,6 +158,7 @@ export function bakeDev({ root }) {
   async function sendPage(entry, { chrome = false } = {}) {
     const result = await renderEntry(entry);
     if (result.html === null) return;
+    shownHashes.set(entry.path, rendered.get(entry.path).hash);
     const changed = chromeChanged(entry, result);
     const { html, toc, mathDefs } = result.rendered;
     server.ws.send('bake:page', { url: entry.url, html, toc, mathDefs, chrome: chrome || changed, errors: result.messages });
@@ -200,7 +201,7 @@ export function bakeDev({ root }) {
     if (currentHash !== body.hash) throw Object.assign(new RequestError(409, 'File changed on disk'), { body: { markdown: current.toString('utf8'), hash: currentHash } });
     const bytes = Buffer.from(body.markdown, 'utf8');
     const hash = sha256(bytes);
-    savedHashes.set(entry.path, hash);
+    shownHashes.set(entry.path, hash);
     await writeFile(file, bytes);
     return { hash };
   }
@@ -270,7 +271,7 @@ export function bakeDev({ root }) {
     const entry = pages.find((page) => page.path === path);
     if (previous?.url !== entry?.url) report(messages);
     if (!entry?.url) return;
-    if (savedHashes.get(path) === sha256(await readFile(file))) return;
+    if (shownHashes.get(path) === sha256(await readFile(file))) return;
     await sendPage(entry);
   }
 
