@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
+import { parseArgs } from 'node:util';
+import { createDevServer } from './dev/index.js';
 import { formatMessage, parseSyntax, stringify } from './format/index.js';
 import { markdownFiles } from './site/pages.js';
 
@@ -43,9 +45,23 @@ async function formatCommand(paths) {
   return failed ? 1 : 0;
 }
 
+async function devCommand(options) {
+  const { values } = parseArgs({ args: options, options: { port: { type: 'string', default: '4321' } } });
+  const port = Number(values.port);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    console.error(`Invalid port ${values.port}`);
+    return 1;
+  }
+  const server = await createDevServer({ root: process.cwd(), port });
+  console.log(`Local: http://localhost:${server.httpServer.address().port}/`);
+  return undefined;
+}
+
 const [command, ...rest] = process.argv.slice(2);
 if (command === 'format') {
   process.exitCode = await formatCommand(rest);
+} else if (command === 'dev') {
+  process.exitCode = await devCommand(rest);
 } else {
   console.error(usage);
   process.exitCode = 1;

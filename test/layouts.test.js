@@ -31,7 +31,7 @@ function articleCount(html) {
 describe('examples/minimal 的整页 HTML', () => {
   for (const name of ['features', 'paper', 'bento']) {
     test(`${name}.md`, async (t) => {
-      const { html, messages } = await renderPage(site, `content/${name}.md`, { assets });
+      const { html, messages } = await renderPage(site, `content/${name}.md`, { assets: () => assets });
       assert.deepEqual(messages, []);
       assert.equal(articleCount(html), 1);
       t.assert.snapshot(withoutSvg(html), { serializers: [(value) => value] });

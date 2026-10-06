@@ -154,27 +154,27 @@ describe('renderPage', () => {
   test('生成整页 HTML', async () => {
     const root = blog({ 'themes/plain.css': '', 'content/post.md': article('post'), 'content/index.md': article('/') });
     const site = await loadSite(root);
-    const { html, rendered, messages } = await renderPage(site, 'content/post.md', { assets });
+    const { html, rendered, messages } = await renderPage(site, 'content/post.md', { assets: () => assets });
     assert.deepEqual(messages, []);
     assert.equal(rendered.page.title, '文章 post');
     assert.match(html, /^<!doctype html>\n<html lang="zh-CN">/);
     assert.match(html, /<title>文章 post · 测试站点<\/title>/);
     assert.match(html, /<link rel="stylesheet" href="\/bake.css">\n<link rel="stylesheet" href="\/theme.css">\n<script type="module" src="\/sidenotes.js"><\/script>/);
-    const home = await renderPage(site, 'content/index.md', { assets });
+    const home = await renderPage(site, 'content/index.md', { assets: () => assets });
     assert.match(home.html, /<title>测试站点<\/title>/);
   });
 
   test('返回渲染错误', async () => {
     const root = blog({ 'themes/plain.css': '', 'content/post.md': article('post', 'theme: red\n') });
     const site = await loadSite(root);
-    const { messages } = await renderPage(site, 'content/post.md', { assets });
+    const { messages } = await renderPage(site, 'content/post.md', { assets: () => assets });
     assert.deepEqual(messages, [{ path: 'content/post.md', line: 4, column: 1, text: 'Unknown theme red' }]);
   });
 
   test('不认识的版式时不生成 HTML', async () => {
     const root = blog({ 'content/post.md': article('post', 'layout: slides\n') });
     const site = await loadSite(root);
-    const { html, messages } = await renderPage(site, 'content/post.md', { assets });
+    const { html, messages } = await renderPage(site, 'content/post.md', { assets: () => assets });
     assert.equal(html, null);
     assert.deepEqual(messages, [{ path: 'content/post.md', line: 4, column: 1, text: 'Unknown layout slides' }]);
   });

@@ -1,6 +1,6 @@
 import { location } from 'vfile-location';
 
-const imageExtensions = ['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif'];
+export const imageExtensions = ['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif'];
 const footnoteCall = /\[\^([^\]\s]+)\]/g;
 const cardSpan = /^([1-4])x([1-9]\d*)$/;
 const markers = { textDirective: ':', leafDirective: '::', containerDirective: ':::' };

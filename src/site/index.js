@@ -101,6 +101,6 @@ export async function renderPage(site, pagePath, { assets }) {
   if (!layout) return { html: null, rendered, messages: rendered.messages };
   const page = { ...rendered.page, url: entry.url, path: pagePath };
   const body = layout.render({ page, html: rendered.html, toc: rendered.toc, site: siteData(site) });
-  const html = renderDocument({ page, config: site.config, body, mathDefs: rendered.mathDefs, assets });
+  const html = renderDocument({ page, config: site.config, body, mathDefs: rendered.mathDefs, assets: assets({ page, components: rendered.components }) });
   return { html, rendered, messages: rendered.messages };
 }
