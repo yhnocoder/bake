@@ -74,11 +74,11 @@
 .sp-fold summary::before { content: "▸"; display: inline-block; width: 1.1rem; color: var(--muted); transition: transform 0.2s; }
 .sp-fold[open] summary::before { transform: rotate(90deg); }
 .sp-fold p { margin: 0.3rem 0 0 1.1rem; color: var(--fg); }
-.sp-callout { border-left: 3px solid var(--sp-note); background: var(--sp-note-bg); border-radius: 0 8px 8px 0; padding: 0.5rem 0.8rem; margin-bottom: 0.6rem; }
-.sp-callout b { display: block; font-size: 0.8rem; color: var(--sp-note); letter-spacing: 0.08em; }
-.sp-callout.tip { border-color: var(--sp-tip); background: var(--sp-tip-bg); }
+.sp-callout { background: var(--sp-note-bg); border-radius: 12px; padding: 0.8rem 1.1rem; margin-bottom: 0.6rem; }
+.sp-callout b { display: block; font-family: var(--font); font-size: 0.78rem; font-weight: 600; color: var(--sp-note); letter-spacing: 0.06em; margin-bottom: 0.15rem; }
+.sp-callout.tip { background: var(--sp-tip-bg); }
 .sp-callout.tip b { color: var(--sp-tip); }
-.sp-callout.warning { border-color: var(--sp-warn); background: var(--sp-warn-bg); }
+.sp-callout.warning { background: var(--sp-warn-bg); }
 .sp-callout.warning b { color: var(--sp-warn); }
 .sp-page { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; column-gap: 1rem; row-gap: 0.4rem; }
 .sp-page > * { grid-column: 1; align-self: start; }
@@ -100,6 +100,12 @@
 .sp-tr span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .sp-tr.head { font-weight: 700; border-bottom: 1.5px solid var(--fg); }
 .sp-tr:last-child { border-bottom: none; }
+.sp-quote { margin: 0; background: var(--surface); border-radius: 14px; padding: 1.1rem 1.4rem; }
+.sp-quote blockquote { margin: 0; padding: 0; border: 0; background: none; border-radius: 0; font-family: "Source Serif 4", "Noto Serif SC", Georgia, "Songti SC", serif; font-size: 1.25em; line-height: 1.5; color: var(--fg); }
+.sp-quote figcaption { margin-top: 0.6rem; font-family: var(--font); font-size: 0.85rem; color: var(--muted); }
+.sp-float { float: left; width: 160px; max-width: 50%; margin: 0.3rem 1.5em 0.5rem 0; }
+.sp-float figcaption { text-align: center; }
+.sp { display: flow-root; }
 .sp-raw { width: 100%; max-width: 220px; display: block; margin: 0 auto; }
 .sp-raw rect { fill: none; stroke: var(--fg); stroke-width: 1.5; }
 .sp-raw path { stroke: var(--fg); stroke-width: 1.5; }
@@ -125,6 +131,7 @@
     <tr><td><code>remark-gfm</code></td><td>表格、删除线、任务列表、脚注（用作旁注）</td></tr>
     <tr><td><code>remark-math</code></td><td>行内公式 <code>$...$</code>、独立公式 <code>$$...$$</code></td></tr>
     <tr><td><code>remark-directive</code></td><td><code>:name[]{}</code>、<code>::name[]{}</code>、<code>:::name</code> 三种指令</td></tr>
+    <tr><td>属性插件</td><td>标题和图片后面的 <code>{#id key=value}</code>，写法与 Pandoc 的属性语法相同。实现时选用现有的 remark 插件，没有与 Milkdown 兼容的插件时写一个 micromark 扩展</td></tr>
     <tr><td>高亮插件</td><td><code>==文字==</code>。候选是 <code>remark-highlight-mark</code> 和 <code>remark-flexible-markers</code>，实现时按与 Milkdown 的兼容性选定；都不兼容时写一个 micromark 扩展</td></tr>
   </tbody>
 </table>
@@ -171,12 +178,36 @@
 <div class="sp"><div class="sp-h2">链式法则</div><div class="sp-subtitle">从标量推广到矩阵</div></div>
 </div>
 
-<h3>图片</h3>
-<p>图片输出 <code>&lt;figure&gt;</code>，说明文字同时用作 <code>alt</code> 和图注。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
+<h3>引用</h3>
+<p>Markdown 的 <code>&gt;</code> 引用块。引用块的最后一行写 <code>::source[出处]</code> 时，出处显示在引文下方，输出为 <code>&lt;figure class="quote"&gt;</code>，里面是 <code>&lt;blockquote&gt;</code> 和 <code>&lt;figcaption&gt;</code>。引文使用 <code>--font-serif</code>，字号是正文的 1.25 倍。没有出处时只输出 <code>&lt;blockquote&gt;</code>，样式相同。</p>
 <div class="spec">
-<pre><code class="language-markdown">![一个神经元的输入、权重与输出](./assets/neuron.svg)</code></pre>
+<pre><code class="language-markdown">&gt; You shall know a word by the company it keeps.
+&gt;
+&gt; ::source[J. R. Firth, 1957]</code></pre>
 <div class="sp">
-  <figure class="sp-figure">
+  <figure class="sp-quote"><blockquote>You shall know a word by the company it keeps.</blockquote><figcaption>J. R. Firth, 1957</figcaption></figure>
+</div>
+</div>
+
+<h3>图片</h3>
+<p>图片用 Markdown 的图片语法，说明文字同时用作 <code>alt</code> 和图注，输出 <code>&lt;figure&gt;</code>。图片文件放在文章所在目录的 <code>assets/</code>。编辑器里粘贴或拖入图片时，文件自动存进 <code>assets/</code>。</p>
+<p>支持的格式：SVG、PNG、JPEG（<code>.jpg</code>、<code>.jpeg</code>）、GIF、WebP、AVIF。其他扩展名构建报错。构建时怎样处理每种格式见 <a href="build-dev.html">构建与开发服务器</a>。</p>
+<p>图片后面紧跟一组 <code>{}</code> 属性时，可以设定尺寸和排法：</p>
+<table>
+  <thead>
+    <tr><th>属性</th><th>取值</th><th>默认值</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>width</code></td><td>数字加 <code>px</code>、<code>%</code> 或 <code>em</code>，只写数字时按 <code>px</code></td><td>图片原始宽度，最宽为正文宽度</td><td>显示宽度。<code>%</code> 相对于正文宽度</td></tr>
+    <tr><td><code>height</code></td><td>同 <code>width</code></td><td>按宽度和原始比例计算</td><td>显示高度。只写一个时另一个按原始比例计算；两个都写时图片按比例缩放到框内，不变形</td></tr>
+    <tr><td><code>float</code></td><td><code>left</code> | <code>right</code></td><td>不浮动</td><td>不写时图片独占一行并居中；写 <code>left</code> 或 <code>right</code> 时图片靠左或靠右，后面的文字环绕在另一侧</td></tr>
+  </tbody>
+</table>
+<p>浮动图片的宽度最多是正文宽度的 <code>50%</code>，与环绕文字之间留 <code>1.5em</code> 间距。窗口宽度小于 <code>600px</code> 时浮动取消，图片独占一行。理由：窄屏上剩下的宽度放不下几个字，环绕的文字会变成一列一两个字。</p>
+<div class="spec">
+<pre><code class="language-markdown">![一个神经元的输入、权重与输出](./assets/neuron.svg){width=60%}</code></pre>
+<div class="sp">
+  <figure class="sp-figure" style="width: 60%; margin: 0 auto">
     <svg viewBox="0 0 220 90" role="img" aria-label="神经元示意">
       <circle class="sp-node" cx="30" cy="20" r="9"></circle><circle class="sp-node" cx="30" cy="45" r="9"></circle><circle class="sp-node" cx="30" cy="70" r="9"></circle>
       <line class="sp-edge" x1="39" y1="20" x2="141" y2="45"></line><line class="sp-edge" x1="39" y1="45" x2="141" y2="45"></line><line class="sp-edge" x1="39" y1="70" x2="141" y2="45"></line>
@@ -184,6 +215,22 @@
     </svg>
     <figcaption>一个神经元的输入、权重与输出</figcaption>
   </figure>
+</div>
+</div>
+<div class="spec">
+<pre><code class="language-markdown">![神经元](./assets/neuron.svg){width=160px float=left}
+
+一个神经元把每个输入乘以对应的权重，求和后加上偏置，再经过激活函数得到输出。多个神经元并排组成一层，多层依次连接组成网络。</code></pre>
+<div class="sp">
+  <figure class="sp-figure sp-float">
+    <svg viewBox="0 0 220 90" role="img" aria-label="神经元示意">
+      <circle class="sp-node" cx="30" cy="20" r="9"></circle><circle class="sp-node" cx="30" cy="45" r="9"></circle><circle class="sp-node" cx="30" cy="70" r="9"></circle>
+      <line class="sp-edge" x1="39" y1="20" x2="141" y2="45"></line><line class="sp-edge" x1="39" y1="45" x2="141" y2="45"></line><line class="sp-edge" x1="39" y1="70" x2="141" y2="45"></line>
+      <circle class="sp-node strong" cx="155" cy="45" r="14"></circle><line class="sp-edge" x1="169" y1="45" x2="205" y2="45"></line>
+    </svg>
+    <figcaption>神经元</figcaption>
+  </figure>
+  <p>一个神经元把每个输入乘以对应的权重，求和后加上偏置，再经过激活函数得到输出。多个神经元并排组成一层，多层依次连接组成网络。</p>
 </div>
 </div>
 
@@ -272,6 +319,45 @@
 </div>
 </div>
 
+<h3>旁注</h3>
+<p>旁注是带编号的注释：正文里显示上标数字，注释放在右侧栏，与编号所在的行对齐。写法是 GFM 脚注，注释里可以写任意 Markdown，包括公式、链接、列表和多个段落。和边注的区别是旁注指向正文里的一处位置，悬停时高亮被注释的内容。</p>
+<div class="spec one">
+<pre><code class="language-markdown">反向传播从损失函数开始，沿计算图逆向逐层计算梯度。
+
+每一层的梯度都由上一层传回的梯度乘以本层的局部导数得到[^d]。局部导数只依赖本层的输入和输出，所以每一层可以独立计算，再按顺序连乘起来。
+
+[^d]: 局部导数是本层输出对本层输入的导数 $\partial y / \partial x$。
+
+    注释可以有多段，后面的段落缩进四个空格。
+
+最后得到的是损失对每个参数的梯度。优化器用这些梯度更新参数，进入下一轮前向传播。</code></pre>
+<div class="sp">
+  <div class="sp-page">
+    <p>反向传播从损失函数开始，沿计算图逆向逐层计算梯度。</p>
+    <p class="sp-hl">每一层的梯度都由上一层传回的梯度乘以本层的局部导数得到<sup class="sp-ref">1</sup>。局部导数只依赖本层的输入和输出，所以每一层可以独立计算，再按顺序连乘起来。</p>
+    <aside class="sp-side active" style="grid-row: 2 / span 2"><sup>1</sup> 局部导数是本层输出对本层输入的导数 ∂y/∂x。<br>注释可以有多段。</aside>
+    <p>最后得到的是损失对每个参数的梯度。优化器用这些梯度更新参数，进入下一轮前向传播。</p>
+  </div>
+  <p class="sp-note">图中是鼠标停在注释上时的样子：被注释的段落显示 <code>--color-highlight</code> 背景，上下两段不变。</p>
+</div>
+</div>
+<ul>
+  <li>编号按引用在正文中出现的顺序从 1 开始生成。<code>[^d]</code> 里的名字只用于对应，不显示。</li>
+  <li>鼠标移到注释上时，正文里被注释的内容高亮；鼠标移到正文的编号上时，对应注释高亮。默认高亮编号所在的整个段落。</li>
+  <li>需要精确范围时写 <code>:span[被注释的文字][^d]</code>，只高亮方括号里的文字。</li>
+  <li>定义了但没有被引用的注释，以及引用了但没有定义的注释，构建报错。</li>
+  <li>编辑器保存时，注释定义写在引用它的段落之后。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
+  <li>生成的页面里，每条注释输出为 <code>&lt;aside class="sidenote"&gt;</code>，放在引用它的段落之后。</li>
+</ul>
+<p id="sidenote-layout">旁注和边注的排版：CSS 把 <code>.sidenote</code> 放进右侧栏，没有脚本时注释也在段落旁边显示。对齐脚本只做两件事：</p>
+<ol>
+  <li>一次读取全部编号的纵向位置，再一次写入全部注释的位置。一条注释的顶部低于上一条注释的底部加 <code>12px</code> 间距时，按编号位置放置；否则往下推到上一条注释底部加 <code>12px</code>。边注按它前面段落的顶部位置放置。</li>
+  <li>字体加载完成（<code>document.fonts.ready</code>）、正文容器尺寸变化（ResizeObserver）、折叠块展开或收起时，重新执行第 1 步。</li>
+</ol>
+<p>读和写分成两批。理由：交替读写会让浏览器对每条注释都重新计算一次布局。</p>
+<p>高亮使用 CSS Custom Highlight API：把被注释的文字范围登记为一个 <code>Highlight</code>，由 <code>::highlight(sidenote)</code> 设定背景色。这个方式不修改 DOM，高亮不会引起重新排版。浏览器不支持这个 API 时不显示高亮，其他功能不受影响。</p>
+<p>窗口宽度小于 <code>1100px</code> 时没有右侧栏，注释显示在所在段落之后，缩进并用小字号。窄屏上点编号展开注释的交互属于手机适配，不在第一版。</p>
+
 <h3>卡片网格</h3>
 <p>外层写 <code>::::bento</code>，里面放若干 <code>:::card</code>。网格是 4 列，<code>span="列数x行数"</code> 设定卡片大小，默认 <code>1x1</code>，<code>title</code> 是卡片标题。编辑器里卡片内容直接输入，尺寸和标题在属性面板里修改。</p>
 <div class="spec">
@@ -348,41 +434,6 @@
 <h2>公式怎么写</h2>
 <p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
 <p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
-
-<h2>旁注怎么写</h2>
-<p>旁注是带编号的注释：正文里显示上标数字，注释放在右侧栏，与引用处对齐。写法是 GFM 脚注，注释里可以写任意 Markdown，包括公式、链接、列表和多个段落。</p>
-<pre><code class="language-markdown">导数描述的是函数在一点附近的变化率[^d]。
-
-[^d]: 这里的“附近”指 $\Delta x \to 0$ 的极限，见[前文](#derivative)。
-
-    注释的第二段缩进四个空格。</code></pre>
-<div class="spec one">
-<div class="sp">
-  <div class="sp-page">
-    <p class="sp-hl">导数描述的是函数在一点附近的变化率<sup class="sp-ref">1</sup>。</p>
-    <aside class="sp-side active"><sup>1</sup> 这里的“附近”指 Δx → 0 的极限，见前文。<br>注释的第二段缩进四个空格。</aside>
-  </div>
-  <p class="sp-note">鼠标停在注释上时，被注释的段落显示 <code>--color-highlight</code> 背景。</p>
-</div>
-</div>
-<ul>
-  <li>编号按引用在正文中出现的顺序从 1 开始生成。<code>[^d]</code> 里的名字只用于对应，不显示。</li>
-  <li>鼠标移到注释上时，正文里被注释的内容高亮；鼠标移到正文的编号上时，对应注释高亮。默认高亮编号所在的整个段落。</li>
-  <li>需要精确范围时写 <code>:span[被注释的文字][^d]</code>，只高亮方括号里的文字。</li>
-  <li>定义了但没有被引用的注释，以及引用了但没有定义的注释，构建报错。</li>
-  <li>编辑器保存时，注释定义写在引用它的段落之后。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
-</ul>
-<p>生成的页面里，每条注释输出为 <code>&lt;aside class="sidenote"&gt;</code>，放在引用它的段落之后。对齐和高亮的行为见 <a href="#sidenote-layout">旁注怎么排版</a>。</p>
-
-<h3 id="sidenote-layout">旁注怎么排版</h3>
-<p>CSS 把 <code>.sidenote</code> 放进右侧栏，没有脚本时注释也在段落旁边显示。对齐脚本只做两件事：</p>
-<ol>
-  <li>一次读取全部编号的纵向位置，再一次写入全部注释的位置。一条注释的顶部低于上一条注释的底部加 <code>12px</code> 间距时，按编号位置放置；否则往下推到上一条注释底部加 <code>12px</code>。</li>
-  <li>字体加载完成（<code>document.fonts.ready</code>）、正文容器尺寸变化（ResizeObserver）、折叠块展开或收起时，重新执行第 1 步。</li>
-</ol>
-<p>读和写分成两批。理由：交替读写会让浏览器对每条注释都重新计算一次布局。</p>
-<p>高亮使用 CSS Custom Highlight API：把被注释的文字范围登记为一个 <code>Highlight</code>，由 <code>::highlight(sidenote)</code> 设定背景色。这个方式不修改 DOM，高亮不会引起重新排版。浏览器不支持这个 API 时不显示高亮，其他功能不受影响。</p>
-<p>窗口宽度小于 <code>1100px</code> 时没有右侧栏，注释显示在所在段落之后，缩进并用小字号。窄屏上点编号展开注释的交互属于手机适配，不在第一版。</p>
 
 <h2>站内引用怎么写</h2>
 <p>站内链接就是普通 Markdown 链接，不加新语法。链接到站内页面时，鼠标停留在链接上会弹出预览卡片，显示目标内容。</p>

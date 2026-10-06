@@ -91,7 +91,8 @@
 └── site.json                 全站页面列表：地址、标题和 frontmatter</code></pre>
 <ul>
   <li>每个页面只加载正文中用到的组件脚本。组件、版式 CSS 和主题 CSS 由 Vite 打包，文件名带内容哈希。</li>
-  <li>图片由 sharp 处理：位图转成 WebP，宽度超过 <code>1600px</code> 的缩到 <code>1600px</code>，输出 <code>width</code> 和 <code>height</code> 属性防止加载时页面跳动，加 <code>loading="lazy"</code>。SVG 原样复制。</li>
+  <li>图片由 sharp 处理：PNG 和 JPEG 转成 WebP；PNG、JPEG、WebP、AVIF 宽度超过 <code>1600px</code> 的缩到 <code>1600px</code>；GIF 和 SVG 原样复制。理由：GIF 可能是动图，转换会丢失动画。</li>
+  <li>每张图片输出 <code>width</code> 和 <code>height</code> 属性防止加载时页面跳动，并加 <code>loading="lazy"</code>。文章里写了 <code>width</code> 或 <code>height</code> 时，这两个值写进 <code>style</code>。</li>
   <li>构建按文件内容缓存渲染结果，缓存放在 <code>node_modules/.cache/bake/</code>。只修改一篇文章时，其他文章不重新渲染公式。</li>
 </ul>
 
