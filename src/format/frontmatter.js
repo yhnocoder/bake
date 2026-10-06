@@ -93,6 +93,7 @@ const frontmatterParser = createProcessor();
 
 function* fenceLineEnds(source) {
   let start = source.indexOf('\n') + 1;
+  if (source.slice(0, start).trim() !== '---') return;
   while (start > 0 && start < source.length) {
     const newline = source.indexOf('\n', start);
     const end = newline === -1 ? source.length : newline + 1;

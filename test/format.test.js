@@ -518,6 +518,8 @@ describe('readFrontmatter', () => {
       ['---\nslug: b\n----\n---\n\n正文\n', {}],
       ['---\nslug: b\n\n正文\n', {}],
       ['正文\n\n---\nslug: b\n---\n', {}],
+      ['\uFEFF---\nslug: b\n---\n', { slug: 'b' }],
+      [`正文\n${'\n---\n\n段落\n'.repeat(50)}`, {}],
     ];
     for (const [source, values] of cases) {
       const full = readYaml(createProcessor().parse(source), new VFile(source));
