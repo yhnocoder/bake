@@ -1,3 +1,4 @@
+import { toHtml } from 'hast-util-to-html';
 import { h } from 'hastscript';
 import { defaultHandlers } from 'mdast-util-to-hast';
 import { contentChildren } from '../format/validate.js';
@@ -33,13 +34,21 @@ export function createHandlers({ source, registry, components }) {
 
   function heading(state, node) {
     const { id } = node.data;
+    const content = state.all(node);
+    const tocText = node.data.attributes?.toc;
+    const tocContent = tocText === undefined ? content.filter((child) => !child.properties?.className?.includes('sidenote-ref')) : [{ type: 'text', value: tocText }];
+    node.data.tocHtml = toHtml(tocContent, { allowDangerousHtml: true });
     const anchor = element('a', { className: ['anchor'], href: `#${id}`, ariaHidden: 'true' }, [{ type: 'text', value: '#' }]);
-    return element(`h${node.depth}`, { id }, [anchor, ...state.all(node)]);
+    return element(`h${node.depth}`, { id }, [anchor, ...content]);
   }
 
   function paragraph(state, node) {
-    if (node.children.length === 1 && node.children[0].type === 'image') return state.one(node.children[0], node);
     const properties = node.data?.blockId ? { id: node.data.blockId } : {};
+    if (node.children.length === 1 && node.children[0].type === 'image') {
+      const figure = state.one(node.children[0], node);
+      Object.assign(figure.properties, properties);
+      return figure;
+    }
     return element('p', properties, state.all(node));
   }
 

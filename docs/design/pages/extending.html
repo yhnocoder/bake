@@ -99,7 +99,7 @@
       ${page.eyebrow ? `&lt;p class="eyebrow"&gt;${page.eyebrow}&lt;/p&gt;` : ''}
       &lt;h1&gt;${page.title}&lt;/h1&gt;
     &lt;/header&gt;
-    &lt;nav class="toc"&gt;${toc.map(t =&gt; `&lt;a href="#${t.id}"&gt;${t.text}&lt;/a&gt;`).join('')}&lt;/nav&gt;
+    &lt;nav class="toc"&gt;${toc.map(t =&gt; `&lt;a href="#${t.id}"&gt;${t.html}&lt;/a&gt;`).join('')}&lt;/nav&gt;
     &lt;article&gt;${html}&lt;/article&gt;`;
 }</code></pre>
 <table>
@@ -109,7 +109,7 @@
   <tbody>
     <tr><td><code>page</code></td><td>frontmatter 全部字段，版式字段已经填入默认值，加上 <code>url</code> 和 <code>path</code>（源文件相对路径）</td></tr>
     <tr><td><code>html</code></td><td>渲染好的正文 HTML，旁注已经放在对应段落之后</td></tr>
-    <tr><td><code>toc</code></td><td>目录项列表 <code>{ id, text, depth }</code>，<code>text</code> 优先使用标题的 <code>toc</code> 属性</td></tr>
+    <tr><td><code>toc</code></td><td>目录项列表 <code>{ id, html, depth }</code>，<code>html</code> 是目录项的 HTML，有 <code>toc</code> 属性时是它的文字，没有时是标题内容渲染后的 HTML</td></tr>
     <tr><td><code>site</code></td><td>站点数据，与组件取得的相同</td></tr>
   </tbody>
 </table>

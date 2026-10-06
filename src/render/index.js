@@ -1,7 +1,6 @@
 import GithubSlugger from 'github-slugger';
 import { toHtml } from 'hast-util-to-html';
 import { toHast } from 'mdast-util-to-hast';
-import { toString } from 'mdast-util-to-string';
 import { visit } from 'unist-util-visit';
 import builtinBlocks from '../blocks/index.js';
 import { parse } from '../format/index.js';
@@ -11,6 +10,14 @@ import { createHandlers } from './handlers.js';
 import { placeSidenotes } from './sidenotes.js';
 
 const tocDepths = [2, 3];
+const textlessTypes = new Set(['inlineMath', 'footnoteReference']);
+const fileExtension = /\.[a-z0-9]+$/i;
+
+function headingText(node) {
+  if (textlessTypes.has(node.type)) return '';
+  if ('value' in node) return node.value;
+  return (node.children ?? []).map(headingText).join('');
+}
 
 function explicitId(node) {
   if (node.type === 'heading') return node.data?.attributes?.id;
@@ -34,31 +41,30 @@ function assignIds(tree, report) {
     let id = explicitId(node);
     if (node.type === 'heading') {
       if (id === undefined) {
-        do id = slugger.slug(toString(node));
+        do id = slugger.slug(headingText(node));
         while (explicit.has(id));
         if (id === '') report(node, 'Cannot generate an id from this heading, add {#id}');
       }
       node.data = { ...node.data, id };
-      if (tocDepths.includes(node.depth)) toc.push({ id, text: node.data.attributes?.toc ?? toString(node), depth: node.depth });
+      if (tocDepths.includes(node.depth)) toc.push({ id, heading: node, depth: node.depth });
     }
     if (id !== undefined && !ids.includes(id)) ids.push(id);
   });
   return { ids, toc };
 }
 
-function normalizeHref(href) {
-  const hash = href.indexOf('#');
-  const path = hash === -1 ? href : href.slice(0, hash);
-  const fragment = hash === -1 ? '' : href.slice(hash);
-  if (path === '' || path.endsWith('/')) return href;
-  return `${path}/${fragment}`;
+function splitHref(href) {
+  const end = href.search(/[?#]/);
+  return end === -1 ? { path: href, rest: '' } : { path: href.slice(0, end), rest: href.slice(end) };
 }
 
 function collectLinks(tree) {
   const links = [];
   visit(tree, ['link', 'definition'], (node) => {
     if (!node.url.startsWith('/') && !node.url.startsWith('#')) return;
-    node.url = normalizeHref(node.url);
+    const { path, rest } = splitHref(node.url);
+    if (fileExtension.test(path)) return;
+    if (path !== '' && !path.endsWith('/')) node.url = `${path}/${rest}`;
     links.push({ href: node.url, line: node.position.start.line, column: node.position.start.column });
   });
   return links;
@@ -85,11 +91,12 @@ export async function render(source, { path, config = {}, blocks = [], component
   const links = collectLinks(tree);
   const handlers = createHandlers({ source, registry: createRegistry(builtinBlocks, blocks), components });
   const html = toHtml(toHast(tree, { handlers, allowDangerousHtml: true }), { allowDangerousHtml: true });
+  const tocEntries = toc.map(({ id, heading, depth }) => ({ id, html: heading.data.tocHtml, depth }));
   messages.sort((a, b) => a.line - b.line || a.column - b.column);
   return {
     page: parsed.frontmatter,
     html,
-    toc,
+    toc: tocEntries,
     mathDefs,
     ids,
     links,

@@ -207,6 +207,18 @@ describe('每种内容的 HTML', () => {
 });
 
 describe('公式', () => {
+  test('同一个公式的多个 label 都指向这个公式', async () => {
+    const html = await htmlOf('$$\n\\begin{align} a &= 1 \\label{eq:a} \\\\ b &= 2 \\label{eq:b} \\end{align}\n$$\n\n$\\eqref{eq:b}$\n');
+    assert.ok(html.includes('id="eq-a"'), html);
+    assert.ok(html.includes('<a class="eqref" href="#eq-a">(2)</a>'), html);
+  });
+
+  test('同名的 label 报错', async () => {
+    assert.deepEqual(await messagesOf('$$\nx \\label{eq:a}\n$$\n\n$$\n\\begin{align} y \\label{eq:b} \\\\ z \\label{eq:a} \\end{align}\n$$\n'), [
+      { line: 5, column: 1, text: 'Duplicate equation label eq:a' },
+    ]);
+  });
+
   test('行内公式和独立公式的外层元素', async () => {
     const html = withoutSvg(await htmlOf('行内 $a+b$。\n\n$$\nc\n$$\n'));
     assert.ok(html.includes('<span class="math" data-tex="a+b"><svg/></span>'), html);
@@ -372,13 +384,30 @@ describe('id 和目录', () => {
   test('目录包含 h2 和 h3，优先使用 toc 属性', async () => {
     const { toc } = await renderBody('# 一级\n\n## 链式法则 {#chain toc=链式}\n\n### 小节\n\n#### 四级\n');
     assert.deepEqual(toc, [
-      { id: 'chain', text: '链式', depth: 2 },
-      { id: '小节', text: '小节', depth: 3 },
+      { id: 'chain', html: '链式', depth: 2 },
+      { id: '小节', html: '小节', depth: 3 },
     ]);
+  });
+
+  test('标题里的公式在目录中显示为 SVG，不进入生成的 id', async () => {
+    const { toc, ids } = await renderBody('## 公式 $\\alpha$ 标题[^a]\n\n[^a]: 注释\n');
+    assert.deepEqual(ids, ['公式--标题']);
+    assert.match(toc[0].html, /^公式 <span class="math" data-tex="\\alpha"><svg[\s\S]*<\/svg><\/span> 标题$/);
+  });
+
+  test('只含图片的段落把 ^block-id 放在 figure 上', async () => {
+    const html = await htmlOf('![图](./assets/neuron.svg) ^fig\n');
+    assert.ok(html.startsWith('<figure class="image" id="fig">'), html);
   });
 });
 
 describe('站内链接和组件', () => {
+  test('指向文件的链接不改写也不收集，查询参数保留在末尾 / 之后', async () => {
+    const { html, links } = await renderBody('[pdf](/assets/a.pdf) [feed](/feed.xml) [q](/a?x=1) [h](/a?x=1#b)\n');
+    assert.ok(html.includes('href="/assets/a.pdf"') && html.includes('href="/feed.xml"'), html);
+    assert.deepEqual(links.map((link) => link.href), ['/a/?x=1', '/a/?x=1#b']);
+  });
+
   test('收集站内链接并统一为带末尾 / 的形式', async () => {
     const { links, html } = await renderBody('[a](/topic/page) [b](/topic/page#x) [c](#y) [d](/topic/) [e](https://example.com/a)\n');
     assert.deepEqual(links, [
