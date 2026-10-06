@@ -4,6 +4,8 @@ import { visit } from 'unist-util-visit';
 
 const headingLevel = (node) => (node.type === 'element' && /^h[1-6]$/.test(node.tagName) ? Number(node.tagName[1]) : 0);
 
+const isBlock = (node) => node.tagName === 'p' || (node.tagName === 'figure' && node.properties.className?.includes('image'));
+
 function componentNames(nodes) {
   const names = new Set();
   visit({ type: 'root', children: nodes }, 'element', (node) => {
@@ -28,7 +30,7 @@ export function pageSections({ title, html }) {
     sections[node.properties.id] = section('heading', top.slice(index, end === -1 ? undefined : end));
   });
   visit(tree, 'element', (node) => {
-    if (node.tagName === 'p' && node.properties.id !== undefined) sections[node.properties.id] = section('block', [node]);
+    if (isBlock(node) && node.properties.id !== undefined) sections[node.properties.id] = section('block', [node]);
   });
   return { title, lede: lede ? toHtml(lede, { closeEmptyElements: true }) : '', sections };
 }

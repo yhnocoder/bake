@@ -1,14 +1,31 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
+import { brokenLinks } from '../site/links.js';
 import { loadSite, renderArticle, renderDocumentFor, renderOptions, siteData } from '../site/index.js';
 import { bundle } from './bundle.js';
 import { rewriteHtml } from './html.js';
 import { isLocalImage, processImage } from './images.js';
 import { pageSections } from './sections.js';
 
-const { version } = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
+const bakeRoot = fileURLToPath(new URL('../../', import.meta.url));
+const renderSources = ['src/render', 'src/format', 'src/blocks'];
+const cacheDirectory = 'node_modules/.cache/bake';
+
+async function renderCodeHash() {
+  const hash = createHash('sha256');
+  for (const directory of renderSources) {
+    const entries = await readdir(join(bakeRoot, directory), { recursive: true, withFileTypes: true });
+    const files = entries.filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name));
+    for (const file of files.sort()) hash.update(relative(bakeRoot, file)).update(await readFile(file));
+  }
+  hash.update(await readFile(join(bakeRoot, 'package-lock.json')).catch(() => ''));
+  return hash.digest('hex');
+}
+
+const renderCode = await renderCodeHash();
 
 function decode(text) {
   try {
@@ -18,9 +35,10 @@ function decode(text) {
   }
 }
 
-async function cachedRender(site, path, source) {
-  const key = createHash('sha256').update(JSON.stringify([source, renderOptions(site, path), version])).digest('hex');
-  const file = join(site.root, 'node_modules/.cache/bake', `${key}.json`);
+async function cachedRender(site, path, source, used) {
+  const key = createHash('sha256').update(JSON.stringify([source, renderOptions(site, path), renderCode])).digest('hex');
+  const file = join(site.root, cacheDirectory, `${key}.json`);
+  used.add(`${key}.json`);
   try {
     return JSON.parse(await readFile(file, 'utf8'));
   } catch {}
@@ -32,19 +50,17 @@ async function cachedRender(site, path, source) {
   return rendered;
 }
 
-function checkLinks(pages, messages) {
-  const targets = new Map(pages.map(({ entry, rendered }) => [entry.url, new Set(rendered.ids)]));
-  for (const { entry, rendered } of pages) {
-    for (const { href, line, column } of rendered.links) {
-      const hash = href.indexOf('#');
-      const url = hash === -1 ? href : href.slice(0, hash) || entry.url;
-      const id = hash === -1 ? '' : decode(href.slice(hash + 1));
-      const ids = targets.get(url);
-      const at = { path: entry.path, line, column };
-      if (!ids) messages.push({ ...at, text: `Link points to a missing page ${decode(url)}` });
-      else if (id !== '' && !ids.has(id)) messages.push({ ...at, text: `Link points to a missing id ${decode(href)}` });
-    }
+async function pruneCache(root, used) {
+  const directory = join(root, cacheDirectory);
+  const names = await readdir(directory).catch(() => []);
+  for (const name of names) {
+    if (!used.has(name)) await rm(join(directory, name), { force: true }).catch(() => {});
   }
+}
+
+function checkLinks(pages, messages) {
+  const targets = new Map(pages.map(({ entry, rendered }) => [entry.url, rendered.ids]));
+  for (const { entry, rendered } of pages) messages.push(...brokenLinks(entry, rendered.links, targets));
 }
 
 async function findImages(root, pages, messages) {
@@ -104,8 +120,9 @@ export async function build(root, { out }) {
   const site = await loadSite(root);
   const messages = [...site.messages];
   const pages = [];
+  const usedCache = new Set();
   for (const entry of site.pages.filter((page) => page.frontmatter.draft !== true)) {
-    const rendered = await cachedRender(site, entry.path, await readFile(join(root, entry.path), 'utf8'));
+    const rendered = await cachedRender(site, entry.path, await readFile(join(root, entry.path), 'utf8'), usedCache);
     messages.push(...rendered.messages);
     pages.push({ entry, rendered });
   }
@@ -127,5 +144,6 @@ export async function build(root, { out }) {
     await rm(temporary, { recursive: true, force: true });
     throw error;
   }
+  await pruneCache(root, usedCache);
   return { errors: [], pageCount: pages.length };
 }

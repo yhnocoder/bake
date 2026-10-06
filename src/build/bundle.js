@@ -5,6 +5,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { build } from 'vite';
 
 const clientScript = { name: 'client/page', path: fileURLToPath(new URL('../client/page.js', import.meta.url)) };
+const componentHelpers = fileURLToPath(new URL('../client/component.js', import.meta.url));
 const styles = ['base', 'blocks', 'layouts'].map((name) => fileURLToPath(new URL(`../styles/${name}.css`, import.meta.url)));
 const virtualPrefix = '\0bake:';
 
@@ -21,7 +22,14 @@ export async function bundle(site, { outDir, components, themes }) {
   const input = { bake: 'bake.css', [clientScript.name]: clientScript.path };
   for (const name of components) {
     const path = join(site.root, site.components[name].path);
-    modules[`component-${name}.js`] = `import Component from ${JSON.stringify(path)};\ncustomElements.define(${JSON.stringify(name)}, Component);\n`;
+    modules[`component-${name}.js`] = [
+      `import { observedAttributes } from ${JSON.stringify(componentHelpers)};`,
+      `import Component from ${JSON.stringify(path)};`,
+      `customElements.define(${JSON.stringify(name)}, class extends Component {`,
+      '  static observedAttributes = observedAttributes(Component.properties);',
+      '});',
+      '',
+    ].join('\n');
     input[`components/${name}`] = `component-${name}.js`;
   }
   for (const theme of themes) input[`themes/${theme}`] = join(site.root, site.themes[theme]);

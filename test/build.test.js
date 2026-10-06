@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, test } from 'node:test';
+import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { build } from '../src/build/index.js';
 import { pageSections } from '../src/build/sections.js';
@@ -145,7 +146,7 @@ describe('组件与脚本', () => {
       }),
     );
     const list = files(dist);
-    const chunk = matching(list, /^assets\/chunks\/[\w-]+\.[\w-]+\.js$/);
+    const chunk = matching(list, /^assets\/chunks\/label\.[\w-]+\.js$/);
     const chunkName = chunk.split('/').at(-1);
     for (const name of ['first-box', 'second-box']) {
       assert.ok(read(dist, matching(list, new RegExp(`^assets/components/${name}\\.[\\w-]+\\.js$`))).includes(chunkName));
@@ -279,6 +280,13 @@ describe('sections.json', () => {
     });
   });
 
+  test('只含图片的块是 figure，也有块范围', () => {
+    const html = '<figure class="image" id="fig"><img src="a.webp" alt="图"><figcaption>图</figcaption></figure><figure id="other"></figure>';
+    assert.deepEqual(pageSections({ title: 't', html }).sections, {
+      fig: { kind: 'block', html: '<figure class="image" id="fig"><img src="a.webp" alt="图"><figcaption>图</figcaption></figure>', components: [] },
+    });
+  });
+
   test('没有导语时为空字符串', () => {
     assert.deepEqual(pageSections({ title: 't', html: '<p>正文。</p>' }), { title: 't', lede: '', sections: {} });
   });
@@ -356,6 +364,12 @@ describe('站内链接', () => {
     );
   });
 
+  test('带查询参数的站内链接按地址和 id 检查', async () => {
+    const directory = blog({ 'content/query.md': article('query', '[带参数](/features?x=1#chain-rule) [本页](?tab=2)') });
+    const dist = await buildBlog(directory);
+    assert.ok(read(dist, 'query/index.html').includes('href="/features/?x=1#chain-rule"'));
+  });
+
   test('渲染错误与链接错误一起输出', () => {
     const directory = blog({ 'content/bad.md': article('bad', ':::callot\n内容\n:::\n\n[x](/nope)') });
     const result = bake(directory, 'build');
@@ -387,7 +401,18 @@ describe('渲染缓存', () => {
     const dist = await buildBlog(directory);
     assert.ok(read(dist, 'paper/index.html').includes('缓存里的文字'));
     assert.ok(read(dist, 'features/index.html').includes('修改后的梯度指向函数值'));
-    assert.equal(cacheEntries(directory).length, 4);
+    assert.equal(cacheEntries(directory).length, 3);
+  });
+
+  test('构建成功后删除这次没有用到的缓存文件', async () => {
+    const directory = blog();
+    await buildBlog(directory);
+    const stale = join(directory, 'node_modules/.cache/bake/stale.json');
+    writeFileSync(stale, '{}');
+    rmSync(join(directory, 'content/bento.md'));
+    await buildBlog(directory);
+    assert.equal(existsSync(stale), false);
+    assert.equal(cacheEntries(directory).length, 2);
   });
 
   test('缓存文件损坏时重新渲染', async () => {
@@ -442,5 +467,39 @@ describe('bake new', () => {
     const result = bake(directory, 'build');
     assert.equal(result.status, 0, result.stderr);
     assert.ok(read(directory, 'dist/hello/world/index.html').includes('<title>world · bake minimal</title>'));
+  });
+});
+
+describe('构建后的组件', () => {
+  test('修改 properties 中的属性时调用 attributeChangedCallback', async () => {
+    const probe = [
+      'export default class ProbeBox extends HTMLElement {',
+      "  static properties = { stepSize: { label: '步长', type: 'number', default: 1 } };",
+      '  attributeChangedCallback(name, previous, value) {',
+      "    this.dataset.changed = `${name}=${value}`;",
+      '  }',
+      '}',
+      '',
+    ].join('\n');
+    const directory = blog({ 'components/probe-box.js': probe, 'content/probe.md': article('probe', '::probe-box{stepSize=2}') });
+    const dist = await buildBlog(directory);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.route('http://bake.test/**', (route) => {
+        const path = new URL(route.request().url()).pathname;
+        route.fulfill({ path: join(dist, path.endsWith('/') ? `${path}index.html` : path) });
+      });
+      await page.goto('http://bake.test/probe/');
+      const changed = await page.evaluate(async () => {
+        await customElements.whenDefined('probe-box');
+        const element = document.querySelector('probe-box');
+        element.setAttribute('stepsize', '3');
+        return element.dataset.changed;
+      });
+      assert.equal(changed, 'stepsize=3');
+    } finally {
+      await browser.close();
+    }
   });
 });

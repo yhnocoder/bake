@@ -103,7 +103,7 @@
   <li>图片由 sharp 处理：PNG 和 JPEG 转成 WebP；PNG、JPEG、WebP、AVIF 宽度超过 <code>1600px</code> 的缩到 <code>1600px</code>；GIF 和 SVG 原样复制。理由：GIF 可能是动图，转换会丢失动画。</li>
   <li>图片输出到 <code>assets/&lt;slug&gt;/&lt;文件名&gt;.&lt;哈希&gt;.&lt;扩展名&gt;</code>，哈希是源文件内容 SHA-256 的前 4 位十六进制。按 <code>slug</code> 分目录，所以移动文章文件不改变图片地址。</li>
   <li>每张图片输出 <code>width</code> 和 <code>height</code> 属性防止加载时页面跳动，并加 <code>loading="lazy"</code>。文章里写了 <code>width</code> 或 <code>height</code> 时，这两个值写进 <code>style</code>。</li>
-  <li>构建缓存渲染结果，缓存放在 <code>node_modules/.cache/bake/</code>。缓存键是文章内容、渲染参数（配置、组件属性、版式字段、主题名）和 bake 版本号三者的 SHA-256，渲染参数变化时缓存失效，例如新加一个组件后，之前报告“未知组件”的文章会重新渲染。只修改一篇文章时，其他文章不重新渲染公式。缓存读写失败时直接重新渲染，不报错。</li>
+  <li>构建缓存渲染结果，缓存放在 <code>node_modules/.cache/bake/</code>。缓存键是文章内容、渲染参数（配置、组件属性、版式字段、主题名）和渲染代码三者的 SHA-256。渲染代码的哈希由 bake 的 <code>src/render/</code>、<code>src/format/</code>、<code>src/blocks/</code> 的文件内容和 <code>package-lock.json</code> 计算，修改 bake 源码或升级依赖后缓存失效；渲染参数变化时缓存也失效，例如新加一个组件后，之前报告“未知组件”的文章会重新渲染。只修改一篇文章时，其他文章不重新渲染公式。缓存读写失败时直接重新渲染，不报错。构建成功后删除这次没有用到的缓存文件。</li>
 </ul>
 
 <h2>悬停预览的数据怎么生成</h2>
