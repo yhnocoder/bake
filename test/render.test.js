@@ -213,6 +213,12 @@ describe('公式', () => {
     assert.ok(html.includes('<a class="eqref" href="#eq-a">(2)</a>'), html);
   });
 
+  test('同名的 label 作为公式的第一个 label 时只报一条错误', async () => {
+    assert.deepEqual(await messagesOf('$$\nx \\label{eq:a}\n$$\n\n$$\ny \\label{eq:a}\n$$\n'), [
+      { line: 5, column: 1, text: 'Duplicate equation label eq:a' },
+    ]);
+  });
+
   test('同名的 label 报错', async () => {
     assert.deepEqual(await messagesOf('$$\nx \\label{eq:a}\n$$\n\n$$\n\\begin{align} y \\label{eq:b} \\\\ z \\label{eq:a} \\end{align}\n$$\n'), [
       { line: 5, column: 1, text: 'Duplicate equation label eq:a' },
@@ -357,6 +363,11 @@ describe('旁注', () => {
 });
 
 describe('id 和目录', () => {
+  test('去掉公式后合并空白再生成 id', async () => {
+    const { ids } = await renderBody('## $x$ 公式  $y$  标题 $z$\n');
+    assert.deepEqual(ids, ['公式-标题']);
+  });
+
   test('标题文字生成不出 id 时报错', async () => {
     assert.deepEqual(await messagesOf('## ？！\n'), [{ line: 1, column: 1, text: 'Cannot generate an id from this heading, add {#id}' }]);
   });
@@ -391,7 +402,7 @@ describe('id 和目录', () => {
 
   test('标题里的公式在目录中显示为 SVG，不进入生成的 id', async () => {
     const { toc, ids } = await renderBody('## 公式 $\\alpha$ 标题[^a]\n\n[^a]: 注释\n');
-    assert.deepEqual(ids, ['公式--标题']);
+    assert.deepEqual(ids, ['公式-标题']);
     assert.match(toc[0].html, /^公式 <span class="math" data-tex="\\alpha"><svg[\s\S]*<\/svg><\/span> 标题$/);
   });
 

@@ -41,7 +41,8 @@ function assignIds(tree, report) {
     let id = explicitId(node);
     if (node.type === 'heading') {
       if (id === undefined) {
-        do id = slugger.slug(headingText(node));
+        const text = headingText(node).replace(/\s+/g, ' ').trim();
+        do id = slugger.slug(text);
         while (explicit.has(id));
         if (id === '') report(node, 'Cannot generate an id from this heading, add {#id}');
       }

@@ -16,6 +16,7 @@ function numberEquations(tree, report) {
     const names = [...node.value.matchAll(label)].map((match) => match[1]);
     if (names.length === 0) return;
     const id = equationId(names[0]);
+    const firstIsDuplicate = labels.has(names[0]);
     const numbers = [];
     for (const name of names) {
       const number = ++count;
@@ -24,7 +25,7 @@ function numberEquations(tree, report) {
       else labels.set(name, { id, number });
     }
     let index = 0;
-    node.data = { ...node.data, equationId: id, tex: node.value.replace(label, () => `\\tag{${numbers[index++]}}`) };
+    node.data = { ...node.data, equationId: firstIsDuplicate ? undefined : id, tex: node.value.replace(label, () => `\\tag{${numbers[index++]}}`) };
   });
   return labels;
 }
