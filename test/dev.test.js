@@ -96,10 +96,14 @@ describe('页面', () => {
     assert.doesNotMatch(html, /bake:component/);
   });
 
-  test('不存在的页面返回 404 和一行说明', async () => {
+  test('不存在的页面返回 404，页面列出全部文章的链接', async () => {
     const response = await fetch(`${origin}/missing/`);
     assert.equal(response.status, 404);
-    assert.equal(await response.text(), 'No page at /missing/\n');
+    assert.match(response.headers.get('content-type'), /^text\/html/);
+    const html = await response.text();
+    assert.match(html, /<p>No page at \/missing\/<\/p>/);
+    assert.match(html, /<li><a href="\/paper\/">\/paper\/<\/a> 用梯度下降求函数的最小值 <code>content\/paper\.md<\/code><\/li>/);
+    for (const url of ['/bento/', '/features/']) assert.ok(html.includes(`<a href="${url}">`));
   });
 
   test('图片按文章所在目录的 assets/ 提供', async () => {
