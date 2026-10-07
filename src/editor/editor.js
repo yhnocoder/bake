@@ -3,6 +3,7 @@ import { history } from '@milkdown/plugin-history';
 import { Plugin } from '@milkdown/prose/state';
 import { $prose } from '@milkdown/utils';
 import { codeBlockView } from './code-block.js';
+import { codeHighlight } from './code-highlight.js';
 import { directives } from './directives.js';
 import { enterRules } from './enter-rules.js';
 import { headingIds } from './heading-ids.js';
@@ -56,6 +57,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(references)
     .use(html)
     .use(codeBlockView)
+    .use(codeHighlight)
     .use(math(formulas))
     .use(directives(registry))
     .use(strictParsing)

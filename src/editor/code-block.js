@@ -1,8 +1,15 @@
 import { codeBlockSchema } from '@milkdown/preset-commonmark';
 import { $view } from '@milkdown/utils';
 
+function markUnknownLanguage(element, decorations) {
+  const unknown = decorations.some((decoration) => decoration.spec.unknownLanguage);
+  element.classList.toggle('unknown-language', unknown);
+  if (unknown) element.title = '未知的语言名，构建时会报错';
+  else element.removeAttribute('title');
+}
+
 class CodeBlockView {
-  constructor(node, view, getPos) {
+  constructor(node, view, getPos, decorations) {
     this.node = node;
     this.view = view;
     this.getPos = getPos;
@@ -12,6 +19,7 @@ class CodeBlockView {
     this.language.placeholder = '语言';
     this.language.spellcheck = false;
     this.language.value = node.attrs.language;
+    markUnknownLanguage(this.language, decorations);
     this.language.addEventListener('change', () => this.setLanguage());
     this.language.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -29,9 +37,10 @@ class CodeBlockView {
     if (language !== this.node.attrs.language) this.view.dispatch(this.view.state.tr.setNodeAttribute(this.getPos(), 'language', language));
   }
 
-  update(node) {
+  update(node, decorations) {
     if (node.type !== this.node.type) return false;
     this.node = node;
+    markUnknownLanguage(this.language, decorations);
     if (document.activeElement !== this.language) this.language.value = node.attrs.language;
     return true;
   }
@@ -45,4 +54,4 @@ class CodeBlockView {
   }
 }
 
-export const codeBlockView = $view(codeBlockSchema.node, () => (node, view, getPos) => new CodeBlockView(node, view, getPos));
+export const codeBlockView = $view(codeBlockSchema.node, () => (node, view, getPos, decorations) => new CodeBlockView(node, view, getPos, decorations));
