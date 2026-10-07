@@ -62,6 +62,13 @@ describe('配置', () => {
     ]);
   });
 
+  test('配置文件不存在时报告所在目录', async () => {
+    const root = blog({});
+    rmSync(join(root, 'bake.config.js'));
+    const site = await load(root);
+    assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: `bake.config.js not found in ${root}` }]);
+  });
+
   test('配置文件载入失败时报错，使用默认值', async () => {
     const site = await load(blog({ 'bake.config.js': "throw new Error('broken config');\n" }));
     assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: 'Cannot load bake.config.js: broken config' }]);
@@ -242,7 +249,7 @@ describe('createModuleLoader', () => {
     });
   });
 
-  test('传入开发服务器时，修改 lib/ 文件后再次载入得到新值', async () => {
+  test('传入开发服务器时，修改 lib/ 文件并调用 invalidate 后再次载入得到新值', async () => {
     const root = blog({
       'components/demo-plot.js': component(1),
       'components/plot.css': 'p {}\n',
@@ -253,9 +260,9 @@ describe('createModuleLoader', () => {
     try {
       const before = await loadSite(root, { loader });
       assert.equal(before.components['demo-plot'].properties.scale.default, 2);
-      const changed = new Promise((resolve) => server.watcher.once('change', resolve));
-      writeFileSync(join(root, 'components/lib/scale.js'), 'export const scale = 3;\n');
-      await changed;
+      const scale = join(root, 'components/lib/scale.js');
+      writeFileSync(scale, 'export const scale = 3;\n');
+      loader.invalidate(scale);
       const after = await loadSite(root, { loader });
       assert.equal(after.components['demo-plot'].properties.scale.default, 3);
     } finally {

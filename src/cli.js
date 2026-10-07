@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative } from 'node:path';
+import { parseArgs } from 'node:util';
 import { stringify as stringifyYaml } from 'yaml';
 import { build } from './build/index.js';
+import { createDevServer } from './dev/index.js';
 import { format, formatMessage, parseSyntax, stringify } from './format/index.js';
 import { isSlug } from './format/frontmatter.js';
 import { markdownFiles } from './site/pages.js';
@@ -77,6 +79,26 @@ async function buildCommand(out) {
   return 0;
 }
 
+async function devCommand(options) {
+  const { values } = parseArgs({ args: options, options: { port: { type: 'string', default: '4321' } } });
+  const port = Number(values.port);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    console.error(`Invalid port ${values.port}`);
+    return 1;
+  }
+  let server;
+  try {
+    server = await createDevServer({ root: process.cwd(), port });
+  } catch (error) {
+    if (!error.messages) throw error;
+    for (const message of error.messages) console.error(formatMessage(message));
+    console.error(`${error.messages.length} ${error.messages.length === 1 ? 'error' : 'errors'}, the dev server was not started`);
+    return 1;
+  }
+  console.log(`Local: http://localhost:${server.httpServer.address().port}/`);
+  return undefined;
+}
+
 const [command, ...rest] = process.argv.slice(2);
 if (command === 'format') {
   process.exitCode = await formatCommand(rest);
@@ -84,6 +106,8 @@ if (command === 'format') {
   process.exitCode = await newCommand(rest[0]);
 } else if (command === 'build' && (rest.length === 0 || (rest.length === 2 && rest[0] === '--out'))) {
   process.exitCode = await buildCommand(rest[1] ?? 'dist');
+} else if (command === 'dev') {
+  process.exitCode = await devCommand(rest);
 } else {
   console.error(usage);
   process.exitCode = 1;
