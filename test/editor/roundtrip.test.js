@@ -47,7 +47,7 @@ slug: references-page
 `;
 
 test('引用式链接、引用式图片和链接定义原样保存，修改链接文字只改变对应的行', async () => {
-  site.write('content/references.md', referencePage);
+  await site.addPage('content/references.md', referencePage, '/references-page/');
   const { page, errors } = await openEditor(site, '/references-page/');
   assert.equal(await page.textContent('.bake-save-state'), '已保存');
   assert.equal(await exportMarkdown(page), referencePage);
