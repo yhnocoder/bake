@@ -8,12 +8,12 @@ const problems = [];
 const path = join(blog, 'content/features.md');
 const anchor = '局部导数只依赖本层的输入和输出';
 
-async function open(options = {}) {
+async function open(options = {}, url = '/features/') {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...options });
   const page = await context.newPage();
   page.on('console', (message) => ['error', 'warning'].includes(message.type()) && problems.push(`console ${message.type()}: ${message.text()}`));
   page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
-  await page.goto(`${origin}/features/`);
+  await page.goto(`${origin}${url}`);
   await page.evaluate(() => document.fonts.ready);
   return { context, page };
 }
@@ -118,8 +118,22 @@ async function reload() {
   });
 }
 
+async function structure() {
+  writeFileSync(join(blog, 'content/broken.md'), '---\ntitle: 结构错误\nslug: broken\n---\n\n::::callout{kind=note}\n\n:::card{title=嵌套}\n\n卡片在卡片网格之外。\n\n:::\n\n::::\n');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const { context, page } = await open({}, '/broken/');
+  await page.click('.bake-edit-toggle');
+  await page.waitForFunction(() => document.querySelector('.bake-save-state')?.textContent !== '');
+  const message = await page.textContent('.bake-save-state');
+  const opened = await page.locator('article .milkdown').count();
+  console.log(`status bar: ${message}; editor elements in article: ${opened}`);
+  if (message !== '文章有结构错误，修正后才能编辑' || opened !== 0) problems.push('the editor opened an article with a structure error');
+  await page.screenshot({ path: join(output, 'structure-error.png') });
+  await context.close();
+}
+
 mkdirSync(output, { recursive: true });
-await { layout, conflict, reload }[scenario]();
+await { layout, conflict, reload, structure }[scenario]();
 await browser.close();
 for (const problem of problems) console.log(problem);
 process.exitCode = problems.length > 0 ? 1 : 0;

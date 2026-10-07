@@ -55,4 +55,11 @@ else
   record 5 '没有未保存修改时在外部修改文件（重新载入）' 失败 "退出码 $LAST_STATUS，问题见 5.txt"
 fi
 
+run_step 6 node "$EDITOR" structure "$ORIGIN" "$BLOG" "$RESULTS_DIR/structure"
+if [ "$LAST_STATUS" -eq 0 ]; then
+  record 6 '打开有结构错误的文章' 通过 '编辑器没有打开，状态栏显示「文章有结构错误，修正后才能编辑」；截图在 accept-results/editor-core/structure/'
+else
+  record 6 '打开有结构错误的文章' 失败 "退出码 $LAST_STATUS，问题见 6.txt"
+fi
+
 write_summary

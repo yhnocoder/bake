@@ -34,9 +34,9 @@ function createFormulaRenderer(formulas) {
   return {
     rendered: (tex, display) => formulas.get(formulaKey(tex, display)),
     async render(tex, display, numbers) {
-      renderTex ??= (await import('../math/browser.js')).renderTex;
+      renderTex ??= (await import('../math/browser.js')).createMathRenderer({ fontCache: 'global' });
       const tagged = tex.replace(labelPattern, (_, name) => (numbers.has(name) ? `\\tag{${numbers.get(name)}}` : ''));
-      const { svg, glyphs } = await renderTex(tagged, display);
+      const { svg, glyphs } = await renderTex(tagged, { display });
       addGlyphs(glyphs);
       formulas.set(formulaKey(tex, display), svg);
       return svg;

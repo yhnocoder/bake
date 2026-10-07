@@ -159,7 +159,7 @@
     <tr><th>用途</th><th>选择</th><th>理由</th></tr>
   </thead>
   <tbody>
-    <tr><td>编辑器</td><td>Milkdown（ProseMirror 加 remark）。只使用 <code>@milkdown/core</code>、<code>ctx</code>、<code>transformer</code>、<code>utils</code>、<code>prose</code>、<code>preset-commonmark</code>、<code>preset-gfm</code>、<code>plugin-history</code>，以及后续功能需要的 <code>plugin-block</code>、<code>plugin-slash</code>；不使用 Crepe 和界面组件，版本写精确值</td><td>与渲染共用 remark 解析，编辑器和页面对同一份 Markdown 的理解一致</td></tr>
+    <tr><td>编辑器</td><td>Milkdown（ProseMirror 加 remark）。只使用 <code>@milkdown/core</code>、<code>ctx</code>、<code>transformer</code>、<code>utils</code>、<code>prose</code>、<code>preset-commonmark</code>、<code>preset-gfm</code>、<code>plugin-history</code>，以及插入菜单需要的 <code>plugin-slash</code>；不使用 <code>plugin-block</code>、<code>plugin-clipboard</code>、Crepe 和界面组件，版本写精确值</td><td>与渲染共用 remark 解析，编辑器和页面对同一份 Markdown 的理解一致</td></tr>
     <tr><td>开发服务器和打包</td><td>Vite</td><td>按模块热更新，保存时不刷新整页</td></tr>
     <tr><td>公式</td><td>MathJax，构建时输出 SVG</td><td>页面不需要加载 MathJax，打开时不跳动</td></tr>
     <tr><td>组件</td><td>custom element；可以用 SolidJS（solid-element）编写</td><td>不强制框架，简单的图用纯 JS 更短</td></tr>

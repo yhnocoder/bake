@@ -13,7 +13,7 @@ export async function createDevServer({ root, port }) {
     cacheDir: join(tmpdir(), 'bake-vite', createHash('sha256').update(root).digest('hex').slice(0, 16)),
     appType: 'custom',
     server: { host: 'localhost', port, strictPort: false, fs: { allow: [root, bakeRoot] } },
-    optimizeDeps: { entries: [join(bakeRoot, 'src/editor/session.js')] },
+    optimizeDeps: { entries: [join(bakeRoot, 'src/editor/index.js')] },
     plugins: [dev, bakeMath({ getConfig: () => dev.api.site().config })],
   });
   await server.listen();

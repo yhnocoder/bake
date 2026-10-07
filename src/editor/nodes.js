@@ -1,11 +1,41 @@
 import { commandsCtx } from '@milkdown/core';
 import { markRule } from '@milkdown/prose';
 import { toggleMark } from '@milkdown/prose/commands';
-import { codeBlockSchema, headingSchema, imageSchema, paragraphSchema } from '@milkdown/preset-commonmark';
+import { blockquoteSchema, codeBlockSchema, headingSchema, imageSchema, paragraphSchema } from '@milkdown/preset-commonmark';
 import { footnoteDefinitionSchema, footnoteReferenceSchema } from '@milkdown/preset-gfm';
-import { $command, $inputRule, $markSchema, $useKeymap } from '@milkdown/utils';
+import { $command, $inputRule, $markSchema, $node, $useKeymap } from '@milkdown/utils';
 import { imageAppearance } from '../render/image.js';
 import { footnoteKey } from './footnote-labels.js';
+import { blockquoteContent, docContent } from './structure.js';
+
+const doc = $node('doc', () => ({
+  content: docContent,
+  attrs: { frontmatter: { default: null } },
+  parseMarkdown: {
+    match: (node) => node.type === 'root',
+    runner: (state, node, type) => {
+      const yaml = node.children.find((child) => child.type === 'yaml');
+      state.openNode(type, { frontmatter: yaml ? yaml.value : null });
+      state.next(node.children.filter((child) => child !== yaml));
+    },
+  },
+  toMarkdown: {
+    match: (node) => node.type.name === 'doc',
+    runner: (state, node) => {
+      state.openNode('root');
+      if (node.attrs.frontmatter !== null) state.addNode('yaml', undefined, node.attrs.frontmatter);
+      const last = node.lastChild;
+      state.next(last?.type.name === 'paragraph' && last.content.size === 0 ? node.content.cut(0, node.content.size - last.nodeSize) : node.content);
+    },
+  },
+}));
+
+const blockquote = blockquoteSchema.extendSchema((previous) => (ctx) => ({ ...previous(ctx), content: blockquoteContent }));
+
+function isEmptyDefinition(node) {
+  return node.childCount === 1 && node.firstChild.type.name === 'paragraph' && node.firstChild.content.size === 0;
+}
+
 
 const heading = headingSchema.extendSchema((previous) => (ctx) => {
   const base = previous(ctx);
@@ -131,7 +161,12 @@ const footnoteDefinition = footnoteDefinitionSchema.extendSchema((previous) => (
     toMarkdown: {
       match: base.toMarkdown.match,
       runner: (state, node) => {
-        state.openNode('footnoteDefinition', undefined, { label: node.attrs.label, identifier: footnoteKey(node.attrs.label) });
+        const props = { label: node.attrs.label, identifier: footnoteKey(node.attrs.label) };
+        if (isEmptyDefinition(node)) {
+          state.addNode('footnoteDefinition', [], undefined, props);
+          return;
+        }
+        state.openNode('footnoteDefinition', undefined, props);
         state.next(node.content);
         state.closeNode();
       },
@@ -172,4 +207,4 @@ const highlightKeymap = $useKeymap('highlightKeymap', {
   },
 });
 
-export const nodes = [heading, paragraph, image, codeBlock, footnoteReference, footnoteDefinition, highlightSchema, toggleHighlight, highlightInputRule, highlightKeymap].flat();
+export const nodes = [doc, blockquote, heading, paragraph, image, codeBlock, footnoteReference, footnoteDefinition, highlightSchema, toggleHighlight, highlightInputRule, highlightKeymap].flat();

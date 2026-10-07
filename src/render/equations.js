@@ -1,6 +1,5 @@
 import { visit } from 'unist-util-visit';
-import '../math/node.js';
-import { glyphDefinitions, renderFormula } from '../math/mathjax.js';
+import { glyphDefinitions, renderFormula } from '../math/node.js';
 import { equationId, eqrefOnly, labelNames, labelPattern } from './equation-labels.js';
 
 const eqref = /\\eqref\{/;

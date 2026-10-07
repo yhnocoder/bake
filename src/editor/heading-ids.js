@@ -1,21 +1,8 @@
 import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { $prose } from '@milkdown/utils';
-import { equationId, labelNames } from '../render/equation-labels.js';
 import { createHeadingIds } from '../render/heading-ids.js';
-
-function explicitIds(doc) {
-  const ids = new Set();
-  doc.descendants((node) => {
-    if (node.type.name === 'heading' && node.attrs.attributes?.id) ids.add(node.attrs.attributes.id);
-    if (node.type.name === 'paragraph' && node.attrs.blockId) ids.add(node.attrs.blockId);
-    if (node.type.name === 'math_block') {
-      const [name] = labelNames(node.attrs.value);
-      if (name !== undefined) ids.add(equationId(name));
-    }
-  });
-  return ids;
-}
+import { renderedIds } from './ids.js';
 
 function idLabel(id) {
   const label = document.createElement('span');
@@ -26,8 +13,7 @@ function idLabel(id) {
 }
 
 function headingDecorations(doc) {
-  const explicit = explicitIds(doc);
-  const headingId = createHeadingIds(explicit);
+  const headingId = createHeadingIds(renderedIds(doc));
   const decorations = [];
   doc.descendants((node, pos) => {
     if (node.type.name !== 'heading') return;

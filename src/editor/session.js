@@ -2,22 +2,11 @@ import { parserCtx } from '@milkdown/core';
 import { TextSelection } from '@milkdown/prose/state';
 import registry from 'virtual:bake/registry';
 import { addGlyphs, glyphsOf } from '../client/math-defs.js';
-import { frontmatterLength } from '../format/frontmatter.js';
 import { createEditor } from './editor.js';
 import { docToMarkdown } from './markdown.js';
 import { reloadTransaction, renderedFormulas } from './math.js';
 
 const saveDelay = 800;
-
-function splitFrontmatter(markdown) {
-  const head = markdown.slice(0, frontmatterLength(markdown));
-  return { head, body: markdown.slice(head.length) };
-}
-
-function joinFrontmatter(head, body) {
-  if (head === '') return body;
-  return body === '' ? head : `${head}\n${body}`;
-}
 
 async function requestJson(url, options) {
   const response = await fetch(url, options);
@@ -35,7 +24,7 @@ function startOfBlock(doc, index) {
 }
 
 export async function openEditor(status) {
-  const page = location.pathname;
+  let page = location.pathname;
   const article = document.querySelector('article');
   const source = await requestJson(`/__bake/source?page=${encodeURIComponent(page)}`);
   if (source.status !== 200) {
@@ -43,8 +32,6 @@ export async function openEditor(status) {
     return null;
   }
   const formulas = renderedFormulas(article);
-  const loaded = splitFrontmatter(source.body.markdown);
-  let head = loaded.head;
   let hash = source.body.hash;
   let savedDoc = null;
   let view = null;
@@ -55,9 +42,9 @@ export async function openEditor(status) {
   const root = document.createElement('div');
   let created;
   try {
-    created = await createEditor({ root, markdown: loaded.body, registry, formulas, onChange: (state) => savedDoc !== null && state.doc !== savedDoc && scheduleSave() });
-  } catch (error) {
-    status.structureError(error.message);
+    created = await createEditor({ root, markdown: source.body.markdown, registry, formulas, onChange: (state) => savedDoc !== null && state.doc !== savedDoc && scheduleSave() });
+  } catch {
+    status.structureError();
     return null;
   }
   const { editor } = created;
@@ -66,22 +53,20 @@ export async function openEditor(status) {
   article.replaceChildren(...root.childNodes);
   status.saved();
 
-  const markdown = () => joinFrontmatter(head, editor.action((ctx) => docToMarkdown(ctx, view.state.doc)));
+  const markdown = () => editor.action((ctx) => docToMarkdown(ctx, view.state.doc));
   const hasUnsavedChanges = () => view.state.doc !== savedDoc;
 
   function load(markdownText, nextHash) {
-    const next = splitFrontmatter(markdownText);
     const index = blockIndex(view.state.doc, view.state.selection.from);
     let doc;
     try {
-      doc = editor.action((ctx) => ctx.get(parserCtx)(next.body));
-    } catch (error) {
-      status.structureError(error.message);
+      doc = editor.action((ctx) => ctx.get(parserCtx)(markdownText));
+    } catch {
+      status.structureError();
       return;
     }
-    head = next.head;
     hash = nextHash;
-    const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content);
+    const tr = view.state.tr.setDocAttribute('frontmatter', doc.attrs.frontmatter).replaceWith(0, view.state.doc.content.size, doc.content);
     tr.setSelection(TextSelection.near(tr.doc.resolve(startOfBlock(tr.doc, index) + 1)));
     savedDoc = tr.doc;
     view.dispatch(reloadTransaction(tr));
@@ -119,6 +104,11 @@ export async function openEditor(status) {
     if (response.status === 200) {
       hash = response.body.hash;
       savedDoc = doc;
+      if (response.body.url !== page) {
+        page = response.body.url;
+        history.replaceState(history.state, '', page);
+      }
+      window.dispatchEvent(new CustomEvent('bake:editor-saved', { detail: { url: page, hash, frontmatter: doc.attrs.frontmatter } }));
       if (hasUnsavedChanges()) scheduleSave();
       else status.saved();
     } else if (response.status === 409) showConflict(response.body);

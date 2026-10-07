@@ -34,7 +34,7 @@ const status = {
   saved: () => show('已保存', 'saved'),
   saving: () => show('保存中', 'saving'),
   failed: (message) => show(`保存失败：${message}`, 'failed'),
-  structureError: (message) => show(`文章有结构错误，修正后才能编辑：${message}`, 'failed'),
+  structureError: () => show('文章有结构错误，修正后才能编辑', 'failed'),
   conflict({ useDisk, keepMine }) {
     show('冲突', 'conflict');
     actions.append(button('使用磁盘上的版本', useDisk), button('保留我的修改并覆盖', keepMine));

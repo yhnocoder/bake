@@ -2,6 +2,7 @@ import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { $markSchema, $nodeSchema, $prose, $view } from '@milkdown/utils';
 import { blockRender, isDefault, withDefaults } from '../render/block-render.js';
+import { blockGroup, containerContent, labelRequired } from './structure.js';
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 
@@ -129,10 +130,10 @@ function staticWidgets(doc, shapes) {
 
 function containerSchema(block) {
   const id = `directive_${block.name}`;
-  const labelRequired = block.name === 'fold';
+  const keepEmptyLabel = labelRequired(id);
   return $nodeSchema(id, () => ({
-    group: 'block',
-    content: labelRequired ? 'directive_label block+' : 'directive_label? block+',
+    group: blockGroup(id),
+    content: containerContent(id),
     defining: true,
     attrs: { attributes: { default: {} } },
     parseDOM: [],
@@ -150,7 +151,7 @@ function containerSchema(block) {
       runner: (state, node) => {
         state.openNode('containerDirective', undefined, { name: block.name, attributes: node.attrs.attributes });
         node.forEach((child) => {
-          if (labelRequired || child.type.name !== 'directive_label' || child.content.size > 0) state.next(child);
+          if (keepEmptyLabel || child.type.name !== 'directive_label' || child.content.size > 0) state.next(child);
         });
         state.closeNode();
       },
@@ -161,7 +162,7 @@ function containerSchema(block) {
 function leafSchema(block) {
   const id = `directive_${block.name}`;
   return $nodeSchema(id, () => ({
-    group: 'block',
+    group: blockGroup(id),
     content: 'inline*',
     attrs: { attributes: { default: {} } },
     parseDOM: [],
