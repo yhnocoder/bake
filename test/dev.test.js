@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -380,5 +380,31 @@ describe('状态栏', () => {
     assert.equal(await shown(), null);
     assert.deepEqual(errors, []);
     await page.close();
+  });
+});
+
+describe('站点模块', () => {
+  const api = () => server.config.plugins.find((plugin) => plugin.name === 'bake-dev').api;
+
+  test('修改 bake.config.js 后已打开的页面不刷新整页就换成新的配置', async () => {
+    const { page, errors } = await open('/paper/');
+    edit('bake.config.js', (source) => source.replace("title: 'bake minimal'", "title: 'bake changed'"));
+    await page.waitForFunction(() => document.title.endsWith('bake changed'));
+    assert.equal(await page.evaluate(() => window.marker), 'kept');
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  test('新增组件和修改组件导入的文件后重新读取 static properties', async () => {
+    writeFileSync(join(root, 'content/sized.md'), '---\ntitle: 尺寸\nslug: sized\n---\n\n::sized-box{size=3}\n');
+    await until(async () => (await fetch(`${origin}/sized/`)).status === 200);
+    const texts = async () => (await api().renderedPage('/sized/')).messages.map(({ text }) => text);
+    assert.match((await texts()).join('\n'), /Unknown component/);
+    mkdirSync(join(root, 'components/lib'));
+    writeFileSync(join(root, 'components/lib/sized-properties.js'), 'export default {};\n');
+    writeFileSync(join(root, 'components/sized-box.js'), "import properties from './lib/sized-properties.js';\nexport default class SizedBox extends HTMLElement {\n  static properties = properties;\n}\n");
+    await until(async () => (await texts()).some((text) => text.startsWith('Unknown attribute size')));
+    edit('components/lib/sized-properties.js', () => "export default { size: { label: '尺寸', type: 'number', default: 1 } };\n");
+    await until(async () => (await texts()).length === 0);
   });
 });

@@ -12,9 +12,14 @@ export async function createModuleLoader(root, { server } = {}) {
         server: { middlewareMode: true, hmr: false, ws: false },
         optimizeDeps: { noDiscovery: true },
       });
-  const runner = createServerModuleRunner((server ?? ownServer).environments.ssr, { hmr: false });
+  const environment = (server ?? ownServer).environments.ssr;
+  const runner = createServerModuleRunner(environment, { hmr: false });
   return {
     import: (path) => runner.import(join(root, path)),
+    invalidate(file) {
+      environment.moduleGraph.onFileChange(file);
+      runner.clearCache();
+    },
     async close() {
       await runner.close();
       await ownServer?.close();
