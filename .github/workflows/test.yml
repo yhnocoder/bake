@@ -15,4 +15,5 @@ jobs:
           cache: npm
       - uses: astral-sh/setup-uv@v6
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: scripts/test.sh

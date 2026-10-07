@@ -1,6 +1,7 @@
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const width = 320;
 const height = 160;
+const margin = 8;
 const curves = {
   quadratic: { value: (x) => x * x, slope: (x) => 2 * x },
   quartic: { value: (x) => x ** 4 / 4, slope: (x) => x ** 3 },
@@ -39,7 +40,7 @@ export default class DemoPlot extends HTMLElement {
     const showPath = (this.getAttribute('showPath') ?? String(DemoPlot.properties.showPath.default)) === 'true';
     const curve = curves[this.getAttribute('curve') ?? DemoPlot.properties.curve.default];
     const svg = document.createElementNS(svgNamespace, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('viewBox', `${-margin} ${-margin} ${width + 2 * margin} ${height + 2 * margin}`);
     const samples = Array.from({ length: 81 }, (_, index) => -2 + index * 0.05);
     svg.append(polyline(samples.map((x) => toPoint(x, curve.value(x))), 'currentColor'));
     if (showPath) {

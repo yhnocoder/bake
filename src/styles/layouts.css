@@ -1,0 +1,141 @@
+main {
+  --body-width: var(--measure);
+  --gutter: 2.5rem;
+  display: grid;
+  grid-template-columns: [body] minmax(0, var(--body-width));
+  justify-content: center;
+  padding: 3rem 16px 5rem;
+}
+
+body.wide main {
+  --body-width: var(--measure-wide);
+}
+
+main > * {
+  grid-column: body;
+  min-width: 0;
+}
+
+.mast {
+  margin-bottom: 2rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+}
+
+.authors {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1.2em;
+  margin: 0.8rem 0 0;
+  color: var(--color-muted);
+}
+
+.abstract {
+  margin: 1.2rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.95em;
+}
+
+nav.toc {
+  margin-bottom: 2rem;
+  color: var(--color-muted);
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+nav.toc summary {
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+nav.toc ol {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+nav.toc li {
+  margin: 0.25rem 0;
+}
+
+nav.toc li.toc-h3 {
+  padding-left: 1em;
+}
+
+nav.toc a {
+  color: inherit;
+  text-decoration: none;
+}
+
+nav.toc a:hover {
+  color: var(--color-accent);
+}
+
+.layout-paper nav.toc {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+main.layout-bento {
+  --body-width: var(--measure-wide);
+}
+
+@media (width >= 1100px) {
+  :is(.layout-essay, .layout-paper) {
+    grid-template-columns: [body] minmax(0, var(--body-width)) [side] var(--sidenote-width);
+    column-gap: var(--gutter);
+  }
+
+  :is(.layout-essay, .layout-paper) > article {
+    position: relative;
+  }
+
+  :is(.layout-essay, .layout-paper) .sidenote {
+    position: absolute;
+    left: calc(100% + var(--gutter));
+    width: var(--sidenote-width);
+    margin: 0;
+  }
+
+  :is(.layout-essay, .layout-paper) .wide {
+    margin-right: calc(-1 * (var(--gutter) + var(--sidenote-width)));
+  }
+}
+
+@media (width >= 1280px) {
+  .layout-essay {
+    grid-template-columns: [toc] 12rem [body] minmax(0, var(--body-width)) [side] var(--sidenote-width);
+  }
+
+  .layout-essay > nav.toc {
+    grid-column: toc;
+    grid-row: 2;
+    position: sticky;
+    top: 2rem;
+    align-self: start;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  .layout-essay > article {
+    grid-row: 2;
+  }
+
+  @supports selector(::details-content) {
+    .layout-essay > nav.toc summary {
+      display: none;
+    }
+
+    .layout-essay > nav.toc details::details-content {
+      content-visibility: visible;
+    }
+  }
+}

@@ -47,10 +47,10 @@
 │   ├── topic-grid.js            首页的分类卡片网格
 │   └── lib/                     组件共用的脚本，本身不是组件
 ├── content/                 文章，按主题分目录
-│   ├── index.md                 → /，首页也是一篇文章
+│   ├── index.md                 首页，slug 为 /
 │   ├── matrix-calculus/
-│   │   ├── index.md             → /matrix-calculus/
-│   │   ├── deep-learning.md     → /matrix-calculus/deep-learning/
+│   │   ├── index.md             slug 为 matrix-calculus
+│   │   ├── deep-learning.md     slug 为 matrix-calculus/deep-learning
 │   │   ├── assets/neuron.png    文章里写 ![…](./assets/neuron.png)
 │   │   ├── components/          只在这个主题的文章里能用的组件
 │   │   │   └── gradient-figure.js
@@ -61,7 +61,7 @@
 ├── themes/                  主题 CSS
 └── tests/                   这个博客自己的页面测试</code></pre>
 <ul>
-  <li><code>content/</code> 下每个 <code>.md</code> 文件生成一个页面。<code>index.md</code> 的地址是所在目录，其他文件的地址是目录加文件名。<code>notes/</code>、<code>components/</code>、<code>assets/</code> 目录里的文件不生成页面。</li>
+  <li><code>content/</code> 下每个 <code>.md</code> 文件生成一个页面。页面地址由 frontmatter 的 <code>slug</code> 决定，与文件在 <code>content/</code> 中的位置无关，规则见 <a href="build-dev.html">构建与开发服务器</a>。<code>notes/</code>、<code>components/</code>、<code>assets/</code> 目录里的文件不生成页面。</li>
   <li>组件名在全站唯一。主题目录下的组件和全局组件重名时，构建报错。理由：浏览器里一个 custom element 名字只能对应一个定义。</li>
   <li>首页是 <code>content/index.md</code>，首页的卡片网格是一个组件，数据来自 bake 提供的全部文章 frontmatter，见 <a href="extending.html">扩展接口</a>。</li>
 </ul>
@@ -69,7 +69,7 @@
 <h2>bake 由哪些模块组成</h2>
 <p>核心是内容格式模块：它定义哪些 Markdown 写法合法、每种块类型有哪些属性。渲染模块和编辑器都从这里取定义，所以编辑器里看到的就是发布后的页面。</p>
 <figure>
-<svg class="diagram" viewBox="0 0 640 250" role="img" aria-label="bake 的模块和依赖">
+<svg class="diagram" viewBox="0 0 640 340" role="img" aria-label="bake 的模块和依赖">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z"></path>
@@ -79,21 +79,23 @@
   <text x="320" y="37" text-anchor="middle">format 内容格式</text>
   <rect x="60" y="100" width="160" height="44" rx="8"></rect>
   <text x="140" y="127" text-anchor="middle">render 渲染</text>
-  <rect x="420" y="100" width="160" height="44" rx="8"></rect>
-  <text x="500" y="127" text-anchor="middle">editor 编辑器</text>
-  <rect x="60" y="190" width="160" height="44" rx="8"></rect>
-  <text x="140" y="217" text-anchor="middle">build 构建</text>
-  <rect x="240" y="190" width="160" height="44" rx="8"></rect>
-  <text x="320" y="217" text-anchor="middle">dev 开发服务器</text>
   <rect x="240" y="100" width="160" height="44" rx="8"></rect>
   <text x="320" y="127" text-anchor="middle">layouts 版式</text>
+  <rect x="420" y="100" width="160" height="44" rx="8"></rect>
+  <text x="500" y="127" text-anchor="middle">editor 编辑器</text>
+  <rect x="150" y="190" width="160" height="44" rx="8"></rect>
+  <text x="230" y="217" text-anchor="middle">site 站点</text>
+  <rect x="60" y="280" width="160" height="44" rx="8"></rect>
+  <text x="140" y="307" text-anchor="middle">build 构建</text>
+  <rect x="240" y="280" width="160" height="44" rx="8"></rect>
+  <text x="320" y="307" text-anchor="middle">dev 开发服务器</text>
   <line x1="280" y1="54" x2="170" y2="100" marker-end="url(#arrow)"></line>
   <line x1="360" y1="54" x2="470" y2="100" marker-end="url(#arrow)"></line>
-  <line x1="140" y1="144" x2="140" y2="190" marker-end="url(#arrow)"></line>
-  <line x1="180" y1="144" x2="290" y2="190" marker-end="url(#arrow)"></line>
-  <line x1="300" y1="144" x2="170" y2="190" marker-end="url(#arrow)"></line>
-  <line x1="320" y1="144" x2="320" y2="190" marker-end="url(#arrow)"></line>
-  <line x1="460" y1="144" x2="370" y2="190" marker-end="url(#arrow)"></line>
+  <line x1="150" y1="144" x2="200" y2="190" marker-end="url(#arrow)"></line>
+  <line x1="310" y1="144" x2="260" y2="190" marker-end="url(#arrow)"></line>
+  <line x1="200" y1="234" x2="150" y2="280" marker-end="url(#arrow)"></line>
+  <line x1="260" y1="234" x2="310" y2="280" marker-end="url(#arrow)"></line>
+  <line x1="480" y1="144" x2="370" y2="280" marker-end="url(#arrow)"></line>
 </svg>
 <figcaption>箭头从被依赖的模块指向使用它的模块。</figcaption>
 </figure>
@@ -105,9 +107,10 @@
     <tr><td><code>format</code></td><td>remark 插件组合、块类型登记表、frontmatter 校验。不认识的指令报错</td></tr>
     <tr><td><code>render</code></td><td>把一篇 <code>.md</code> 渲染成 HTML 片段和目录：标题 id、章节、公式 SVG、图片、表格、旁注、站内链接</td></tr>
     <tr><td><code>layouts</code></td><td>把渲染结果套进整页 HTML。内置 essay、paper、bento</td></tr>
+    <tr><td><code>site</code></td><td>读取配置，按 <code>slug</code> 发现页面，发现组件和主题，把一篇文章经过渲染和版式生成整页 HTML。构建和开发服务器都通过它渲染整页，两者生成的页面相同</td></tr>
     <tr><td><code>editor</code></td><td>浏览器里的编辑器。节点定义、属性面板、插入菜单由块类型登记表和组件登记表生成</td></tr>
-    <tr><td><code>dev</code></td><td>Vite 插件：请求页面时即时渲染，提供读写 <code>.md</code> 的接口，监视文件变化并通知页面</td></tr>
-    <tr><td><code>build</code></td><td>遍历 <code>content/</code>，生成每页 HTML，打包每页用到的组件，处理图片，检查站内链接</td></tr>
+    <tr><td><code>dev</code></td><td>Vite 插件：请求页面时通过 <code>site</code> 即时渲染，提供读写 <code>.md</code> 的接口，监视文件变化并通知页面</td></tr>
+    <tr><td><code>build</code></td><td>通过 <code>site</code> 生成每页 HTML，打包每页用到的组件，处理图片，检查站内链接</td></tr>
   </tbody>
 </table>
 
@@ -118,7 +121,9 @@
 │   ├── blocks/      内置块类型，每种一个文件，渲染规则和编辑器节点放在一起
 │   ├── render/
 │   ├── layouts/     essay.js、paper.js、bento.js、head.js
-│   ├── styles/      版式和内置块的 CSS，只使用主题变量
+│   ├── styles/      版式和内置块的 CSS，只使用主题变量；variables.js 列出主题变量名
+│   ├── client/      浏览器脚本：page.js 是页面入口，sidenotes.js 导出旁注对齐与悬停高亮
+│   ├── site/        读取配置、页面、组件和主题，渲染整页；pages.js 计算页面地址
 │   ├── editor/
 │   ├── dev/
 │   ├── build/
@@ -129,7 +134,8 @@
 │   │   ├── content/features.md   一页展示全部功能
 │   │   ├── content/paper.md      paper 版式
 │   │   ├── content/bento.md      bento 版式
-│   │   └── components/demo-plot.js
+│   │   ├── components/demo-plot.js
+│   │   └── themes/default.css
 │   └── learn-by-visualization/   真实博客，验证 bake 能承载已有内容
 └── test/</code></pre>
 <p>bake 的测试只针对 <code>examples/</code>。<code>examples/minimal/content/features.md</code> 在一页里使用每一种块、公式、旁注、站内引用、组件、图片和表格；新增一种内置功能时，同时在这一页加上它的用法。</p>

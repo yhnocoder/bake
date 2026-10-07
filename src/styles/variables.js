@@ -1,0 +1,16 @@
+export const themeVariables = [
+  '--font-body',
+  '--font-mono',
+  '--font-serif',
+  '--color-text',
+  '--color-muted',
+  '--color-bg',
+  '--color-accent',
+  '--color-mark',
+  '--color-mark-text',
+  '--color-highlight',
+  '--color-border',
+  '--measure',
+  '--measure-wide',
+  '--sidenote-width',
+];

@@ -1,0 +1,285 @@
+exports[`examples/minimal 的整页 HTML > bento.md 1`] = `
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>激活函数一览 · bake minimal</title>
+<link rel="stylesheet" href="/src/styles/base.css">
+<link rel="stylesheet" href="/examples/minimal/themes/default.css">
+<script type="module" src="/src/client/page.js"></script>
+</head>
+<body>
+<svg style="display:none"/><main class="layout-bento">
+<header class="mast"><h1>激活函数一览</h1></header>
+<article><div class="lede" data-md=":::lede
+这一页用卡片网格比较常见的激活函数，每张卡片给出定义和一句说明。
+:::"><p>这一页用卡片网格比较常见的激活函数，每张卡片给出定义和一句说明。</p></div>
+<div class="bento" data-md="::::bento
+:::card{span=2x1 title=ReLU}
+$\\max(0, x)$，计算量最小，是深度网络里最常用的激活函数。
+:::
+
+:::card{title=GELU}
+$x \\Phi(x)$，在零点附近平滑。
+:::
+
+:::card{title=SiLU}
+$x \\sigma(x)$，也叫 Swish。
+:::
+
+:::card{title=Tanh}
+输出范围是 $(-1, 1)$。
+:::
+
+:::card{title=Sigmoid}
+输出范围是 $(0, 1)$。
+:::
+
+:::card{span=2x1 title=Softplus}
+$\\log(1 + e^x)$，是 ReLU 的平滑版本。
+:::
+
+:::card{span=4x1 title=比较}
+ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。
+:::
+::::"><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=ReLU}
+$\\max(0, x)$，计算量最小，是深度网络里最常用的激活函数。
+:::"><p class="card-title">ReLU</p><p><span class="math" data-tex="\\max(0, x)"><svg/></span>，计算量最小，是深度网络里最常用的激活函数。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=GELU}
+$x \\Phi(x)$，在零点附近平滑。
+:::"><p class="card-title">GELU</p><p><span class="math" data-tex="x \\Phi(x)"><svg/></span>，在零点附近平滑。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=SiLU}
+$x \\sigma(x)$，也叫 Swish。
+:::"><p class="card-title">SiLU</p><p><span class="math" data-tex="x \\sigma(x)"><svg/></span>，也叫 Swish。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=Tanh}
+输出范围是 $(-1, 1)$。
+:::"><p class="card-title">Tanh</p><p>输出范围是 <span class="math" data-tex="(-1, 1)"><svg/></span>。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=Sigmoid}
+输出范围是 $(0, 1)$。
+:::"><p class="card-title">Sigmoid</p><p>输出范围是 <span class="math" data-tex="(0, 1)"><svg/></span>。</p></section><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=Softplus}
+$\\log(1 + e^x)$，是 ReLU 的平滑版本。
+:::"><p class="card-title">Softplus</p><p><span class="math" data-tex="\\log(1 + e^x)"><svg/></span>，是 ReLU 的平滑版本。</p></section><section class="card" style="--card-columns: 4; --card-rows: 1" data-md=":::card{span=4x1 title=比较}
+ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。
+:::"><p class="card-title">比较</p><p>ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。</p></section></div></article>
+</main>
+</body>
+</html>
+
+`;
+
+exports[`examples/minimal 的整页 HTML > features.md 1`] = `
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bake 的全部写法 · bake minimal</title>
+<link rel="stylesheet" href="/src/styles/base.css">
+<link rel="stylesheet" href="/examples/minimal/themes/default.css">
+<script type="module" src="/src/client/page.js"></script>
+</head>
+<body>
+<svg style="display:none"/><main class="layout-essay">
+<header class="mast"><p class="eyebrow">bake 示例 · 2026-10</p><h1>bake 的全部写法</h1></header>
+<nav class="toc"><details><summary>目录</summary><ol><li class="toc-h2"><a href="#chain-rule">链式法则</a></li><li class="toc-h2"><a href="#images">图片</a></li><li class="toc-h2"><a href="#components">组件</a></li><li class="toc-h2"><a href="#blocks">块</a></li><li class="toc-h2"><a href="#sidenotes">旁注</a></li><li class="toc-h2"><a href="#bento">卡片网格</a></li><li class="toc-h2"><a href="#table">表格与 HTML</a></li><li class="toc-h2"><a href="#math">公式</a></li><li class="toc-h3"><a href="#配置文件中的宏">配置文件中的宏</a></li><li class="toc-h2"><a href="#links">站内引用</a></li><li class="toc-h2"><a href="#lists">列表与代码</a></li></ol></details></nav>
+<article><div class="lede" data-md=":::lede
+这一页按内容格式文档的顺序，使用 bake 支持的每一种写法。
+:::"><p>这一页按内容格式文档的顺序，使用 bake 支持的每一种写法。</p></div>
+<h2 id="chain-rule"><a class="anchor" href="#chain-rule" aria-hidden="true">#</a>反向传播中的链式法则</h2>
+<p class="subtitle" data-md="::subtitle[从标量推广到矩阵]">从标量推广到矩阵</p>
+<p>梯度指向函数值<mark>增长最快</mark>的方向。中文<mark>重点：</mark>后面紧跟标点也能识别。</p>
+<p>中文<strong>加粗：</strong>后面，<strong>「引号」</strong>测试，以及<del>删除线</del>。</p>
+<figure class="quote"><blockquote>
+<p>You shall know a word by the company it keeps.</p>
+</blockquote><figcaption data-md="::source[J. R. Firth, 1957]">J. R. Firth, 1957</figcaption></figure>
+<h2 id="images"><a class="anchor" href="#images" aria-hidden="true">#</a>图片</h2>
+<figure class="image"><img src="./assets/neuron.svg" alt="一个神经元的输入、权重与输出" style="width: 60%"><figcaption>一个神经元的输入、权重与输出</figcaption></figure>
+<figure class="image float-left"><img src="./assets/neuron.svg" alt="神经元" style="width: 160px"><figcaption>神经元</figcaption></figure>
+<p>一个神经元把每个输入乘以对应的权重，求和后加上偏置，再经过激活函数得到输出。多个神经元并排组成一层，多层依次连接组成网络。</p>
+<figure class="image float-right"><img src="./assets/relu.png" alt="ReLU 函数的图像" style="width: 240px"><figcaption>ReLU 函数的图像</figcaption></figure>
+<p>ReLU 在负半轴输出 0，在正半轴输出输入本身。它的导数在负半轴是 0，在正半轴是 1，计算量很小，所以是深度网络里最常用的激活函数。</p>
+<h2 id="components"><a class="anchor" href="#components" aria-hidden="true">#</a>组件</h2>
+<demo-plot class="component" data-md=":::demo-plot{x0=1.2}
+从 $x_0$ 出发沿负梯度方向下降。
+:::"><figcaption>从 <span class="math" data-tex="x_0"><svg/></span> 出发沿负梯度方向下降。</figcaption></demo-plot>
+<demo-plot x0="0.5" showPath="false" class="component" data-md="::demo-plot{x0=0.5 showPath=false}"></demo-plot>
+<h2 id="blocks"><a class="anchor" href="#blocks" aria-hidden="true">#</a>块</h2>
+<details class="fold" data-md=":::fold[推导细节]
+把 $z = Wx + b$ 代入后逐项求导。
+:::"><summary>推导细节</summary><p>把 <span class="math" data-tex="z = Wx + b"><svg/></span> 代入后逐项求导。</p></details>
+<aside class="callout note" data-md=":::callout{kind=note}
+本文的向量都是列向量。
+:::"><p class="callout-label">说明</p><p>本文的向量都是列向量。</p></aside>
+<aside class="callout tip" data-md=":::callout{kind=tip}
+先看图再看公式。
+:::"><p class="callout-label">提示</p><p>先看图再看公式。</p></aside>
+<aside class="callout warning" data-md=":::callout[求和次序]{kind=warning}
+这里的求和不能交换次序。
+:::"><p class="callout-label">求和次序</p><p>这里的求和不能交换次序。</p></aside>
+<p>正文段落。</p>
+<div class="wide" data-md=":::wide
+| 函数 | 定义 | 导数 |
+| - | - | - |
+| ReLU | $\\max(0, x)$ | $\\mathbb{1}[x > 0]$ |
+:::"><div class="table-scroll"><table>
+<thead>
+<tr>
+<th>函数</th>
+<th>定义</th>
+<th>导数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReLU</td>
+<td><span class="math" data-tex="\\max(0, x)"><svg/></span></td>
+<td><span class="math" data-tex="\\mathbb{1}[x > 0]"><svg style="vertical-align: -0.566ex;" xmlns="http://www.w3.org/2000/svg" width="7.958ex" height="2.262ex" role="img" focusable="false" viewBox="0 -750 3517.6 1000"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="TeXAtom" data-mjx-texclass="ORD"><g data-mml-node="mn"><use data-c="1D7D9" href="#MJX-NCM-DS-1D7D9"></use></g></g><g data-mml-node="mo" transform="translate(556,0)"><use data-c="5B" href="#MJX-NCM-N-5B"></use></g><g data-mml-node="mi" transform="translate(834,0)"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g><g data-mml-node="mo" transform="translate(1683.8,0)"><use data-c="3E" href="#MJX-NCM-N-3E"></use></g><g data-mml-node="mn" transform="translate(2739.6,0)"><use data-c="30" href="#MJX-NCM-N-30"></use></g><g data-mml-node="mo" transform="translate(3239.6,0)"><use data-c="5D" href="#MJX-NCM-N-5D"></use></g></g></g></svg></span></td>
+</tr>
+</tbody>
+</table></div></div>
+<p>softmax 把任意实数向量变成概率分布。</p>
+<aside class="sidenote unnumbered" data-md=":::margin
+名字来自 argmax 的平滑版本。
+:::"><p>名字来自 argmax 的平滑版本。</p></aside>
+<h2 id="sidenotes"><a class="anchor" href="#sidenotes" aria-hidden="true">#</a>旁注</h2>
+<p>反向传播从损失函数开始，沿计算图逆向逐层计算梯度。</p>
+<p>每一层的梯度都由上一层传回的梯度乘以本层的局部导数得到<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>。局部导数只依赖本层的输入和输出，所以每一层可以独立计算，再按顺序连乘起来。</p>
+<aside class="sidenote" id="sn-1" data-md="[^d]: 局部导数是本层输出对本层输入的导数 $\\partial y / \\partial x$。
+
+    注释可以有多段，后面的段落缩进四个空格。"><span class="sidenote-number">1</span><p>局部导数是本层输出对本层输入的导数 <span class="math" data-tex="\\partial y / \\partial x"><svg/></span>。</p><p>注释可以有多段，后面的段落缩进四个空格。</p></aside>
+<p><span class="sidenote-span" data-md=":span[激活函数的导数]" data-sidenote="2">激活函数的导数</span><sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>决定了梯度能否顺利传回前面的层。</p>
+<aside class="sidenote" id="sn-2" data-md="[^act]: ReLU 在正半轴的导数是 1。"><span class="sidenote-number">2</span><p>ReLU 在正半轴的导数是 1。</p></aside>
+<p>最后得到的是损失对每个参数的梯度。优化器用这些梯度更新参数，进入下一轮前向传播。</p>
+<h2 id="bento"><a class="anchor" href="#bento" aria-hidden="true">#</a>卡片网格</h2>
+<div class="bento" data-md="::::bento
+:::card{span=2x1 title=ReLU}
+最简单的激活函数。
+:::
+
+:::card{title=GELU}
+平滑。
+:::
+
+:::card{title=SiLU}
+自门控。
+:::
+
+:::card{span=4x1 title=比较}
+三者在零点附近的导数不同。
+:::
+::::"><section class="card" style="--card-columns: 2; --card-rows: 1" data-md=":::card{span=2x1 title=ReLU}
+最简单的激活函数。
+:::"><p class="card-title">ReLU</p><p>最简单的激活函数。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=GELU}
+平滑。
+:::"><p class="card-title">GELU</p><p>平滑。</p></section><section class="card" style="--card-columns: 1; --card-rows: 1" data-md=":::card{title=SiLU}
+自门控。
+:::"><p class="card-title">SiLU</p><p>自门控。</p></section><section class="card" style="--card-columns: 4; --card-rows: 1" data-md=":::card{span=4x1 title=比较}
+三者在零点附近的导数不同。
+:::"><p class="card-title">比较</p><p>三者在零点附近的导数不同。</p></section></div>
+<h2 id="table"><a class="anchor" href="#table" aria-hidden="true">#</a>表格与 HTML</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>函数</th>
+<th align="right">零点处导数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReLU</td>
+<td align="right">不存在</td>
+</tr>
+<tr>
+<td>GELU</td>
+<td align="right">0.5</td>
+</tr>
+<tr>
+<td>SiLU</td>
+<td align="right">0.5</td>
+</tr>
+</tbody>
+</table></div>
+<svg viewBox="0 0 120 40" width="240" fill="none" stroke="currentColor">
+  <rect x="4" y="8" width="40" height="24" rx="4"/>
+  <rect x="76" y="8" width="40" height="24" rx="4"/>
+  <path d="M44 20 H76"/>
+</svg>
+<h2 id="math"><a class="anchor" href="#math" aria-hidden="true">#</a>公式</h2>
+<p>行内公式 <span class="math" data-tex="E = mc^2"><svg/></span> 写在段落里。</p>
+<div class="math display" data-tex="\\label{eq:chain}
+\\frac{\\partial L}{\\partial x} = \\frac{\\partial L}{\\partial y} \\frac{\\partial y}{\\partial x}" id="eq-chain"><svg/></div>
+<p>式 <a class="eqref" href="#eq-chain">(1)</a> 是链式法则。</p>
+<h3 id="配置文件中的宏"><a class="anchor" href="#配置文件中的宏" aria-hidden="true">#</a>配置文件中的宏</h3>
+<p><span class="math" data-tex="\\R"><svg/></span> 是 <code>bake.config.js</code> 的 <code>math.macros</code> 定义的宏，输入向量 <span class="math" data-tex="x \\in \\R^n"><svg/></span>。</p>
+<h2 id="links"><a class="anchor" href="#links" aria-hidden="true">#</a>站内引用</h2>
+<p>这里用到的是<a href="/features/#chain-rule">链式法则</a>。</p>
+<p id="chain-rule-def">链式法则把复合函数的导数写成各层导数的乘积。</p>
+<h2 id="lists"><a class="anchor" href="#lists" aria-hidden="true">#</a>列表与代码</h2>
+<ul>
+<li>第一项</li>
+<li>第二项，带 <em>强调</em> 和 <strong>加粗</strong>
+<ul>
+<li>嵌套项</li>
+</ul>
+</li>
+</ul>
+<ol>
+<li>第一步</li>
+<li>第二步</li>
+<li>第三步</li>
+</ol>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" checked disabled> 已完成的任务</li>
+<li class="task-list-item"><input type="checkbox" disabled> 未完成的任务</li>
+</ul>
+<pre><code class="language-js">export const answer = 42;
+</code></pre>
+<p>第一行末尾是硬换行<br>
+第二行。</p>
+<hr>
+<ol class="references" data-md=":::references
+- Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.
+- Hendrycks, Gimpel. Gaussian Error Linear Units. 2016.
+:::">
+<li>Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. 1986.</li>
+<li>Hendrycks, Gimpel. Gaussian Error Linear Units. 2016.</li>
+</ol></article>
+</main>
+</body>
+</html>
+
+`;
+
+exports[`examples/minimal 的整页 HTML > paper.md 1`] = `
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用梯度下降求函数的最小值 · bake minimal</title>
+<link rel="stylesheet" href="/src/styles/base.css">
+<link rel="stylesheet" href="/examples/minimal/themes/default.css">
+<script type="module" src="/src/client/page.js"></script>
+</head>
+<body>
+<svg style="display:none"/><main class="layout-paper">
+<header class="mast"><h1>用梯度下降求函数的最小值</h1><p class="authors"><span>张三</span><span>李四</span></p><p class="abstract">本文从一元函数出发说明梯度下降的更新规则，给出步长过大时发散的条件，并讨论把它推广到多元函数时需要的记号。</p></header>
+<nav class="toc"><ol><li class="toc-h2"><a href="#problem">问题</a></li><li class="toc-h2"><a href="#update">更新规则</a></li><li class="toc-h3"><a href="#step-size">步长的选择</a></li><li class="toc-h3"><a href="#multivariate">推广到 <span class="math" data-tex="\\mathbb{R}^n"><svg/></span></a></li><li class="toc-h2"><a href="#conclusion">结论</a></li></ol></nav>
+<article class="numbered"><h2 id="problem"><a class="anchor" href="#problem" aria-hidden="true">#</a>问题</h2>
+<p>给定可微函数 <span class="math" data-tex="f: \\R \\to \\R"><svg/></span>，求使 <span class="math" data-tex="f(x)"><svg/></span> 最小的 <span class="math" data-tex="x"><svg/></span>。梯度下降从初始值 <span class="math" data-tex="x_0"><svg/></span> 出发，每一步沿负梯度方向移动<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>。</p>
+<aside class="sidenote" id="sn-1" data-md="[^name]: 一元函数的梯度就是导数 $f&#x27;(x)$，这里沿用多元情形的名称。"><span class="sidenote-number">1</span><p>一元函数的梯度就是导数 <span class="math" data-tex="f&#x27;(x)"><svg/></span>，这里沿用多元情形的名称。</p></aside>
+<h2 id="update"><a class="anchor" href="#update" aria-hidden="true">#</a>更新规则</h2>
+<p>第 <span class="math" data-tex="k"><svg/></span> 步的更新是</p>
+<div class="math display" data-tex="\\label{eq:update}
+x_{k+1} = x_k - \\eta f&#x27;(x_k)" id="eq-update"><svg/></div>
+<p>其中 <span class="math" data-tex="\\eta > 0"><svg style="vertical-align: -0.489ex;" xmlns="http://www.w3.org/2000/svg" width="5.273ex" height="1.995ex" role="img" focusable="false" viewBox="0 -666 2330.6 882"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D702" href="#MJX-NCM-I-1D702"></use></g><g data-mml-node="mo" transform="translate(774.8,0)"><use data-c="3E" href="#MJX-NCM-N-3E"></use></g><g data-mml-node="mn" transform="translate(1830.6,0)"><use data-c="30" href="#MJX-NCM-N-30"></use></g></g></g></svg></span> 是步长。</p>
+<h3 id="step-size"><a class="anchor" href="#step-size" aria-hidden="true">#</a>步长的选择</h3>
+<p>对 <span class="math" data-tex="f(x) = x^2"><svg/></span>，式 <a class="eqref" href="#eq-update">(1)</a> 给出 <span class="math" data-tex="x_{k+1} = (1 - 2\\eta) x_k"><svg/></span>。<span class="sidenote-span" data-md=":span[当 $\\eta > 1$ 时 $|1 - 2\\eta| > 1$，迭代发散]" data-sidenote="2">当 <span class="math" data-tex="\\eta > 1"><svg style="vertical-align: -0.489ex;" xmlns="http://www.w3.org/2000/svg" width="5.273ex" height="1.995ex" role="img" focusable="false" viewBox="0 -666 2330.6 882"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D702" href="#MJX-NCM-I-1D702"></use></g><g data-mml-node="mo" transform="translate(774.8,0)"><use data-c="3E" href="#MJX-NCM-N-3E"></use></g><g data-mml-node="mn" transform="translate(1830.6,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g></g></g></svg></span> 时 <span class="math" data-tex="|1 - 2\\eta| > 1"><svg style="vertical-align: -0.566ex;" xmlns="http://www.w3.org/2000/svg" width="11.559ex" height="2.262ex" role="img" focusable="false" viewBox="0 -750 5109 1000"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mo"><use data-c="7C" href="#MJX-NCM-N-7C"></use></g><g data-mml-node="mn" transform="translate(278,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g><g data-mml-node="mo" transform="translate(1000.2,0)"><use data-c="2212" href="#MJX-NCM-N-2212"></use></g><g data-mml-node="mn" transform="translate(2000.4,0)"><use data-c="32" href="#MJX-NCM-N-32"></use></g><g data-mml-node="mi" transform="translate(2500.4,0)"><use data-c="1D702" href="#MJX-NCM-I-1D702"></use></g><g data-mml-node="mo" transform="translate(2997.4,0)"><use data-c="7C" href="#MJX-NCM-N-7C"></use></g><g data-mml-node="mo" transform="translate(3553.2,0)"><use data-c="3E" href="#MJX-NCM-N-3E"></use></g><g data-mml-node="mn" transform="translate(4609,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g></g></g></svg></span>，迭代发散</span><sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>。</p>
+<aside class="sidenote" id="sn-2" data-md="[^diverge]: $\\eta = 1$ 时迭代在 $x_0$ 和 $-x_0$ 之间来回，既不收敛也不发散。"><span class="sidenote-number">2</span><p><span class="math" data-tex="\\eta = 1"><svg/></span> 时迭代在 <span class="math" data-tex="x_0"><svg/></span> 和 <span class="math" data-tex="-x_0"><svg/></span> 之间来回，既不收敛也不发散。</p></aside>
+<p>步长太小时收敛很慢，实际中常用随迭代次数减小的步长。</p>
+<h3 id="multivariate"><a class="anchor" href="#multivariate" aria-hidden="true">#</a>推广到 <span class="math" data-tex="\\mathbb{R}^n"><svg/></span></h3>
+<p>多元函数把导数换成梯度 <span class="math" data-tex="\\nabla f(x) \\in \\R^n"><svg/></span>，更新规则的形式不变。</p>
+<h2 id="conclusion"><a class="anchor" href="#conclusion" aria-hidden="true">#</a>结论</h2>
+<p>梯度下降只需要计算梯度，适合参数很多的模型。</p></article>
+</main>
+</body>
+</html>
+
+`;
