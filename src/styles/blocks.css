@@ -244,7 +244,8 @@ aside.callout.warning .callout-label {
   font-weight: 600;
 }
 
-ol.references {
+.references > ul,
+.references > ol {
   margin: 0 0 1rem;
   padding-left: 2.4rem;
   list-style: none;
@@ -253,13 +254,15 @@ ol.references {
   line-height: 1.6;
 }
 
-ol.references > li {
+.references > ul > li,
+.references > ol > li {
   position: relative;
   margin-bottom: 0.3rem;
   counter-increment: reference;
 }
 
-ol.references > li::before {
+.references > ul > li::before,
+.references > ol > li::before {
   content: "[" counter(reference) "]";
   position: absolute;
   right: calc(100% + 0.6rem);

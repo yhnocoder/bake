@@ -143,7 +143,7 @@ describe('每种内容的 HTML', () => {
     [
       '参考文献',
       ':::references\n- 甲。\n- 乙。\n:::\n',
-      '<ol class="references" data-md=":::references\n- 甲。\n- 乙。\n:::">\n<li>甲。</li>\n<li>乙。</li>\n</ol>',
+      '<div class="references" data-md=":::references\n- 甲。\n- 乙。\n:::"><ul>\n<li>甲。</li>\n<li>乙。</li>\n</ul></div>',
     ],
     [
       '表格',

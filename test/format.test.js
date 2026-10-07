@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import builtinBlocks from '../src/blocks/index.js';
 import { VFile } from 'vfile';
-import { readFrontmatter, readYaml } from '../src/format/frontmatter.js';
+import { frontmatterLength, readFrontmatter, readYaml } from '../src/format/frontmatter.js';
 import { format, parse, stringify } from '../src/format/index.js';
 import { createProcessor } from '../src/format/processor.js';
 import { createRegistry } from '../src/format/registry.js';
@@ -510,18 +510,19 @@ describe('块类型登记表', () => {
   });
 });
 
+const frontmatterCases = [
+  ['---\ntitle: a\nslug: b\n---\n\n正文\n', { title: 'a', slug: 'b' }],
+  ['---\nnote: |\n  ---\nslug: b\n---  \n\n正文\n', { note: '---\n', slug: 'b' }],
+  ['---\nslug: b\n----\n---\n\n正文\n', {}],
+  ['---\nslug: b\n\n正文\n', {}],
+  ['正文\n\n---\nslug: b\n---\n', {}],
+  ['\uFEFF---\nslug: b\n---\n', { slug: 'b' }],
+  [`正文\n${'\n---\n\n段落\n'.repeat(50)}`, {}],
+];
+
 describe('readFrontmatter', () => {
   test('与完整解析的结果相同', () => {
-    const cases = [
-      ['---\ntitle: a\nslug: b\n---\n\n正文\n', { title: 'a', slug: 'b' }],
-      ['---\nnote: |\n  ---\nslug: b\n---  \n\n正文\n', { note: '---\n', slug: 'b' }],
-      ['---\nslug: b\n----\n---\n\n正文\n', {}],
-      ['---\nslug: b\n\n正文\n', {}],
-      ['正文\n\n---\nslug: b\n---\n', {}],
-      ['\uFEFF---\nslug: b\n---\n', { slug: 'b' }],
-      [`正文\n${'\n---\n\n段落\n'.repeat(50)}`, {}],
-    ];
-    for (const [source, values] of cases) {
+    for (const [source, values] of frontmatterCases) {
       const full = readYaml(createProcessor().parse(source), new VFile(source));
       assert.deepEqual(readFrontmatter(source).values, values, source);
       assert.deepEqual(full?.document.errors.length ? {} : (full?.document.toJS() ?? {}), values, source);
@@ -531,5 +532,16 @@ describe('readFrontmatter', () => {
   test('返回键的位置', () => {
     const { keyPlaces } = readFrontmatter('---\ntitle: a\nslug: b\n---\n');
     assert.deepEqual({ ...keyPlaces.get('slug') }, { line: 3, column: 1, offset: 13 });
+  });
+});
+
+describe('frontmatterLength', () => {
+  test('等于完整解析时 frontmatter 到结束行末尾的长度', () => {
+    for (const [source] of frontmatterCases) {
+      const node = createProcessor().parse(source).children.find((child) => child.type === 'yaml');
+      const lineEnd = node ? source.indexOf('\n', node.position.end.offset) : -1;
+      const expected = node ? (lineEnd === -1 ? source.length : lineEnd + 1) : 0;
+      assert.equal(frontmatterLength(source), expected, source);
+    }
   });
 });

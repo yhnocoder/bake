@@ -1,0 +1,260 @@
+.bake-status-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bake-edit-toggle,
+.bake-conflict-actions button {
+  padding: 1px 8px;
+  border: 1px solid var(--color-border, #e3e0d8);
+  border-radius: 4px;
+  background: var(--color-bg, #fff);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.bake-edit-toggle[aria-pressed="true"] {
+  border-color: var(--color-accent, #2f6fb3);
+  color: var(--color-accent, #2f6fb3);
+}
+
+.bake-save-state[data-kind="failed"],
+.bake-save-state[data-kind="conflict"] {
+  color: var(--color-mark-text, #a0574a);
+}
+
+.bake-save-state:empty,
+.bake-conflict-actions:empty {
+  display: none;
+}
+
+.bake-conflict-actions {
+  display: flex;
+  gap: 4px;
+}
+
+article .milkdown .editor {
+  position: relative;
+  outline: none;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  word-wrap: break-word;
+}
+
+.milkdown pre {
+  white-space: pre-wrap;
+}
+
+.milkdown li {
+  position: relative;
+}
+
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection {
+  caret-color: transparent;
+}
+
+.milkdown img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.milkdown .ProseMirror-selectednode {
+  outline: 2px solid var(--color-accent, #2f6fb3);
+  outline-offset: 2px;
+}
+
+article .milkdown .editor > :first-child {
+  margin-top: 0;
+}
+
+.bake-heading-id {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  font-weight: 400;
+  color: var(--color-muted, #8a8580);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.milkdown h1,
+.milkdown h2,
+.milkdown h3,
+.milkdown h4,
+.milkdown h5,
+.milkdown h6 {
+  position: relative;
+}
+
+.milkdown li > p:only-child,
+.milkdown li > p:first-child:has(+ ul, + ol) {
+  margin: 0;
+}
+
+.milkdown p:has(> figure.image) {
+  display: contents;
+}
+
+.milkdown p:has(> figure.image) > :is(img.ProseMirror-separator, br.ProseMirror-trailingBreak) {
+  display: none !important;
+}
+
+.milkdown blockquote > :has(+ figcaption:last-child) {
+  margin-bottom: 0;
+}
+
+.milkdown blockquote > figcaption:last-child {
+  margin-top: 0.6rem;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: calc(0.85em / 1.25);
+  line-height: 1.8;
+}
+
+.milkdown th > p,
+.milkdown td > p {
+  margin: 0;
+}
+
+.milkdown .bake-component {
+  display: contents;
+}
+
+.milkdown .component > figcaption > p {
+  margin: 0;
+}
+
+.milkdown .math {
+  cursor: pointer;
+}
+
+.milkdown .math-error {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-mark-text, #a0574a);
+}
+
+.bake-math-input {
+  position: absolute;
+  z-index: 1001;
+  min-width: 16rem;
+  padding: 4px 6px;
+  border: 1px solid var(--color-accent, #2f6fb3);
+  border-radius: 4px;
+  background: var(--color-bg, #fff);
+  font: 14px/1.5 var(--font-mono);
+  color: var(--color-text, #1f2328);
+}
+
+textarea.bake-math-input {
+  min-width: 28rem;
+  min-height: 4.5em;
+  resize: vertical;
+}
+
+.milkdown .bake-html {
+  position: relative;
+  cursor: pointer;
+}
+
+.bake-html-source {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-accent, #2f6fb3);
+  border-radius: 4px;
+  font: 13px/1.5 var(--font-mono);
+  resize: vertical;
+}
+
+.milkdown pre {
+  position: relative;
+}
+
+.bake-code-language {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 7em;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  font: 12px/1.6 var(--font-mono);
+  color: var(--color-muted, #8a8580);
+  text-align: right;
+}
+
+.bake-code-language:hover,
+.bake-code-language:focus {
+  border-color: var(--color-border, #e3e0d8);
+  background: var(--color-bg, #fff);
+}
+
+.milkdown .footnote-definition {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.88em;
+  color: var(--color-muted, #8a8580);
+}
+
+.milkdown .footnote-label {
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.milkdown .footnote-definition > div > :first-child {
+  margin-top: 0;
+}
+
+.bake-table-menu {
+  position: absolute;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  min-width: 8em;
+  padding: 4px 0;
+  border: 1px solid var(--color-border, #e3e0d8);
+  border-radius: 6px;
+  background: var(--color-bg, #fff);
+  font: 13px/1.5 system-ui, sans-serif;
+}
+
+.bake-table-menu button {
+  padding: 2px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bake-table-menu button:hover:not(:disabled) {
+  background: var(--color-code-bg, #f4f2ee);
+}
+
+.bake-table-menu button:disabled {
+  color: var(--color-muted, #8a8580);
+  cursor: default;
+}
+
+.milkdown .selectedCell {
+  background: var(--color-code-bg, #f4f2ee);
+}
+
+.bake-link-definition {
+  margin: 0.2rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-muted);
+}

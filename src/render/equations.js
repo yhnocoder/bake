@@ -1,19 +1,14 @@
 import { visit } from 'unist-util-visit';
-import { glyphDefinitions, renderFormula } from './math.js';
+import { glyphDefinitions, renderFormula } from '../math/node.js';
+import { equationId, eqrefOnly, labelNames, labelPattern } from './equation-labels.js';
 
-const label = /\\label\{([^}]*)\}/g;
-const eqrefOnly = /^\s*\\eqref\{([^}]*)\}\s*$/;
 const eqref = /\\eqref\{/;
-
-function equationId(name) {
-  return name.replaceAll(':', '-');
-}
 
 function numberEquations(tree, report) {
   const labels = new Map();
   let count = 0;
   visit(tree, 'math', (node) => {
-    const names = [...node.value.matchAll(label)].map((match) => match[1]);
+    const names = labelNames(node.value);
     if (names.length === 0) return;
     const id = equationId(names[0]);
     const firstIsDuplicate = labels.has(names[0]);
@@ -25,7 +20,7 @@ function numberEquations(tree, report) {
       else labels.set(name, { id, number });
     }
     let index = 0;
-    node.data = { ...node.data, equationId: firstIsDuplicate ? undefined : id, tex: node.value.replace(label, () => `\\tag{${numbers[index++]}}`) };
+    node.data = { ...node.data, equationId: firstIsDuplicate ? undefined : id, tex: node.value.replace(labelPattern, () => `\\tag{${numbers[index++]}}`) };
   });
   return labels;
 }

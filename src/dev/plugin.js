@@ -6,6 +6,7 @@ import { formatMessage } from '../format/index.js';
 import { escapeHtml } from '../layouts/html.js';
 import { readFrontmatter } from '../format/frontmatter.js';
 import { imageExtensions } from '../format/validate.js';
+import { mathConfigId } from '../math/plugin.js';
 import { layoutFrame, loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
 import { brokenLinks, splitHref } from '../site/links.js';
 import { createModuleLoader } from '../site/modules.js';
@@ -14,7 +15,9 @@ import { isPagePath, pageUrl, removePage, updatePage } from '../site/pages.js';
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
 const componentPrefix = '\0bake:component/';
 const bakeStyles = ['base', 'blocks', 'layouts'].map((name) => `src/styles/${name}.css`);
-const bakeScripts = ['src/client/page.js', 'src/dev/client.js'];
+const bakeScripts = ['src/client/page.js', 'src/dev/client.js', 'src/editor/index.js'];
+const registryModule = 'virtual:bake/registry';
+const registryId = `\0${registryModule}`;
 
 class RequestError extends Error {
   constructor(status, message) {
@@ -94,9 +97,16 @@ export function bakeDev({ root }) {
     for (const message of messages) console.error(formatMessage(message));
   }
 
+  function invalidate(id) {
+    const module = server.moduleGraph.getModuleById(id);
+    if (module) server.moduleGraph.invalidateModule(module);
+  }
+
   async function reloadSite() {
     site = await loadSite(root, { loader });
     rendered.clear();
+    invalidate(registryId);
+    invalidate(mathConfigId);
     report(site.messages);
   }
 
@@ -341,7 +351,7 @@ export function bakeDev({ root }) {
 
   return {
     name: 'bake-dev',
-    api: { renderedPage, componentEntry, siteMessages },
+    api: { site: () => site, renderedPage, componentEntry, siteMessages },
     async configureServer(devServer) {
       server = devServer;
       loader = await createModuleLoader(root, { server });
@@ -359,9 +369,16 @@ export function bakeDev({ root }) {
     },
     resolveId(id) {
       if (id.startsWith(componentPrefix)) return id;
+      if (id === registryModule) return registryId;
       return undefined;
     },
     load(id) {
+      if (id === registryId) {
+        const components = Object.fromEntries(Object.entries(site.components).map(([name, { properties }]) => [name, properties]));
+        return `import blocks from ${JSON.stringify(join(bakeRoot, 'src/blocks/index.js'))};
+export default { blocks, components: ${JSON.stringify(components)} };
+`;
+      }
       if (!id.startsWith(componentPrefix)) return undefined;
       const name = id.slice(componentPrefix.length);
       const component = site.components[name];
