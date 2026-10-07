@@ -101,7 +101,8 @@ export function createHandlers({ source, registry, components }) {
 
   function sidenote(state, node) {
     const number = element('span', { className: ['sidenote-number'] }, [{ type: 'text', value: String(node.number) }]);
-    return element('aside', { className: ['sidenote'], id: `sn-${node.number}`, dataMd: sourceOf(node) }, [number, ...state.all(node)]);
+    const body = element('div', { className: ['sidenote-body'] }, state.all(node));
+    return element('aside', { className: ['sidenote'], id: `sn-${node.number}`, dataMd: sourceOf(node) }, [number, body]);
   }
 
   function component(state, node) {

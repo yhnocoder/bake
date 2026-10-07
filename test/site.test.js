@@ -3,7 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, test } from 'node:test';
-import { loadSite, renderArticle, renderDocumentFor, renderPage, siteData } from '../src/site/index.js';
+import { createServer } from 'vite';
+import { layoutFrame, loadSite, renderArticle, renderDocumentFor, renderPage, siteData } from '../src/site/index.js';
+import { createModuleLoader } from '../src/site/modules.js';
 
 const blogs = [];
 const config = "export default { title: '测试站点', theme: 'plain' };\n";
@@ -26,29 +28,58 @@ function article(slug, extra = '') {
   return `---\ntitle: 文章 ${slug}\nslug: ${slug}\n${extra}---\n\n正文。\n`;
 }
 
+async function load(root) {
+  const loader = await createModuleLoader(root);
+  try {
+    return await loadSite(root, { loader });
+  } finally {
+    await loader.close();
+  }
+}
+
 after(() => {
   for (const root of blogs) rmSync(root, { recursive: true, force: true });
 });
 
 describe('配置', () => {
   test('填入默认值', async () => {
-    const site = await loadSite(blog({}));
+    const site = await load(blog({}));
     assert.deepEqual(site.config, { title: '测试站点', theme: 'plain', base: '/', site: {}, math: { macros: {} } });
     assert.deepEqual(site.messages, []);
   });
 
   test('保留配置里的值', async () => {
     const root = blog({ 'bake.config.js': "export default { title: 't', theme: 'plain', base: '/blog/', math: { macros: { R: 'x' } }, site: { a: 1 } };\n" });
-    const { config: loaded } = await loadSite(root);
+    const { config: loaded } = await load(root);
     assert.deepEqual(loaded, { title: 't', theme: 'plain', base: '/blog/', site: { a: 1 }, math: { macros: { R: 'x' } } });
   });
 
   test('缺少 title 和 theme', async () => {
-    const site = await loadSite(blog({ 'bake.config.js': 'export default {};\n' }));
+    const site = await load(blog({ 'bake.config.js': 'export default {};\n' }));
     assert.deepEqual(site.messages, [
       { path: 'bake.config.js', line: 1, column: 1, text: 'Config is missing title' },
       { path: 'bake.config.js', line: 1, column: 1, text: 'Config is missing theme' },
     ]);
+  });
+
+  test('配置文件不存在时报告所在目录', async () => {
+    const root = blog({});
+    rmSync(join(root, 'bake.config.js'));
+    const site = await load(root);
+    assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: `bake.config.js not found in ${root}` }]);
+  });
+
+  test('配置文件载入失败时报错，使用默认值', async () => {
+    const site = await load(blog({ 'bake.config.js': "throw new Error('broken config');\n" }));
+    assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: 'Cannot load bake.config.js: broken config' }]);
+    assert.deepEqual(site.config, { base: '/', site: {}, math: { macros: {} } });
+  });
+
+  test('配置文件有语法错误时报错，位置取自 Vite 的 loc', async () => {
+    const site = await load(blog({ 'bake.config.js': 'export default { {\n' }));
+    assert.equal(site.messages.length, 1);
+    assert.deepEqual({ ...site.messages[0], text: undefined }, { path: 'bake.config.js', line: 1, column: 1, text: undefined });
+    assert.match(site.messages[0].text, /^Cannot load bake\.config\.js: Failed to parse source/);
   });
 });
 
@@ -63,7 +94,7 @@ describe('页面', () => {
       'content/b/components/x.md': article('b/x'),
       'content/b/assets/y.md': article('b/y'),
     });
-    const { pages, messages } = await loadSite(root);
+    const { pages, messages } = await load(root);
     assert.deepEqual(messages, []);
     assert.deepEqual(
       pages.map(({ path, url }) => ({ path, url })),
@@ -77,14 +108,14 @@ describe('页面', () => {
   });
 
   test('地址由 slug 决定，移动文件后地址不变', async () => {
-    const before = await loadSite(blog({ 'content/matrix/deep-learning.md': article('matrix-calculus/deep-learning') }));
-    const moved = await loadSite(blog({ 'content/other/place.md': article('matrix-calculus/deep-learning') }));
+    const before = await load(blog({ 'content/matrix/deep-learning.md': article('matrix-calculus/deep-learning') }));
+    const moved = await load(blog({ 'content/other/place.md': article('matrix-calculus/deep-learning') }));
     assert.equal(before.pages[0].url, '/matrix-calculus/deep-learning/');
     assert.equal(moved.pages[0].url, '/matrix-calculus/deep-learning/');
   });
 
   test('slug 缺失或不合法时没有地址', async () => {
-    const { pages, messages } = await loadSite(blog({ 'content/a.md': '---\ntitle: 无 slug\n---\n', 'content/b.md': article('B') }));
+    const { pages, messages } = await load(blog({ 'content/a.md': '---\ntitle: 无 slug\n---\n', 'content/b.md': article('B') }));
     assert.deepEqual(messages, []);
     assert.deepEqual(
       pages.map(({ url }) => url),
@@ -94,7 +125,7 @@ describe('页面', () => {
 
   test('slug 重复时报错，列出两个文件', async () => {
     const root = blog({ 'content/a.md': article('same'), 'content/z/b.md': `---\ntitle: 重复\ndraft: true\nslug: same\n---\n` });
-    const { messages } = await loadSite(root);
+    const { messages } = await load(root);
     assert.deepEqual(messages, [{ path: 'content/z/b.md', line: 4, column: 1, text: 'Slug same is already used by content/a.md' }]);
   });
 });
@@ -107,7 +138,7 @@ describe('组件和主题', () => {
       'content/topic/components/topic-figure.js': 'export default class extends HTMLElement {}\n',
       'content/topic/post.md': article('topic/post'),
     });
-    const site = await loadSite(root);
+    const site = await load(root);
     assert.deepEqual(site.messages, []);
     assert.deepEqual(site.components, {
       'demo-plot': { path: 'components/demo-plot.js', topic: null, properties: { x0: { label: 'x₀', type: 'number', default: 1 } } },
@@ -116,7 +147,7 @@ describe('组件和主题', () => {
   });
 
   test('读取失败时报错，说明包含组件文件路径', async () => {
-    const site = await loadSite(blog({ 'components/broken-plot.js': 'export default class extends HTMLElement {\n' }));
+    const site = await load(blog({ 'components/broken-plot.js': 'export default class extends HTMLElement {\n' }));
     assert.equal(site.messages.length, 1);
     assert.equal(site.messages[0].path, 'components/broken-plot.js');
     assert.match(site.messages[0].text, /^Cannot read static properties of component components\/broken-plot\.js: /);
@@ -124,12 +155,12 @@ describe('组件和主题', () => {
   });
 
   test('发现主题', async () => {
-    const site = await loadSite(blog({ 'themes/plain.css': ':root {}\n', 'themes/blue.css': ':root {}\n', 'themes/readme.md': '' }));
+    const site = await load(blog({ 'themes/plain.css': ':root {}\n', 'themes/blue.css': ':root {}\n', 'themes/readme.md': '' }));
     assert.deepEqual(site.themes, { blue: 'themes/blue.css', plain: 'themes/plain.css' });
   });
 
   test('配置的 theme 不在 themes 中时报错', async () => {
-    const site = await loadSite(blog({ 'bake.config.js': "export default { title: 't', theme: 'red' };\n" }));
+    const site = await load(blog({ 'bake.config.js': "export default { title: 't', theme: 'red' };\n" }));
     assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: 'Unknown theme red' }]);
     assert.deepEqual(Object.keys(site.layouts), ['essay', 'paper', 'bento']);
   });
@@ -144,7 +175,7 @@ describe('siteData', () => {
       'content/c.md': article('c', 'draft: true\n'),
       'content/d.md': '---\ntitle: 文章 d\nslug: Not_Valid\n---\n\n正文。\n',
     });
-    assert.deepEqual(siteData(await loadSite(root)), {
+    assert.deepEqual(siteData(await load(root)), {
       pages: [
         { url: '/a/', title: '文章 a', slug: 'a', date: '2026-10-06' },
         { url: '/b/', title: '文章 b', slug: 'b', category: 'math', tags: ['x'] },
@@ -159,7 +190,7 @@ describe('renderPage', () => {
 
   test('生成整页 HTML', async () => {
     const root = blog({ 'themes/plain.css': '', 'content/post.md': article('post'), 'content/index.md': article('/') });
-    const site = await loadSite(root);
+    const site = await load(root);
     const { html, rendered, messages } = await renderPage(site, 'content/post.md', { assets });
     assert.deepEqual(messages, []);
     assert.equal(rendered.page.title, '文章 post');
@@ -172,14 +203,14 @@ describe('renderPage', () => {
 
   test('返回渲染错误', async () => {
     const root = blog({ 'themes/plain.css': '', 'content/post.md': article('post', 'theme: red\n') });
-    const site = await loadSite(root);
+    const site = await load(root);
     const { messages } = await renderPage(site, 'content/post.md', { assets });
     assert.deepEqual(messages, [{ path: 'content/post.md', line: 4, column: 1, text: 'Unknown theme red' }]);
   });
 
   test('不认识的版式时不生成 HTML', async () => {
     const root = blog({ 'content/post.md': article('post', 'layout: slides\n') });
-    const site = await loadSite(root);
+    const site = await load(root);
     const { html, messages } = await renderPage(site, 'content/post.md', { assets });
     assert.equal(html, null);
     assert.deepEqual(messages, [{ path: 'content/post.md', line: 4, column: 1, text: 'Unknown layout slides' }]);
@@ -187,14 +218,62 @@ describe('renderPage', () => {
 
   test('分两步渲染时使用传入的源文件，资源由渲染结果决定', async () => {
     const root = blog({ 'themes/plain.css': '', 'components/demo-plot.js': plot, 'content/post.md': article('post') });
-    const site = await loadSite(root);
+    const site = await load(root);
     const source = '---\ntitle: 新标题\nslug: moved\n---\n\n::demo-plot\n';
     const rendered = await renderArticle(site, 'content/post.md', source);
     assert.deepEqual(rendered.components, ['demo-plot']);
+    const { frame } = layoutFrame(site, 'content/post.md', rendered);
     const html = renderDocumentFor(site, 'content/post.md', rendered, {
+      frame,
       assets: { styles: [], scripts: rendered.components.map((name) => `/${name}.js`) },
     });
     assert.match(html, /<title>新标题 · 测试站点<\/title>/);
     assert.match(html, /<script type="module" src="\/demo-plot.js"><\/script>/);
+  });
+});
+
+describe('createModuleLoader', () => {
+  const component = (value) => `import './plot.css';\nimport { scale } from './lib/scale.js';\nexport default class extends HTMLElement {\n  static properties = { k: { label: 'k', type: 'number', default: ${value} }, scale: { label: 's', type: 'number', default: scale } };\n}\n`;
+
+  test('载入导入 lib/ 文件和 CSS 文件的组件', async () => {
+    const root = blog({
+      'components/demo-plot.js': component(1),
+      'components/plot.css': 'p {}\n',
+      'components/lib/scale.js': 'export const scale = 2;\n',
+    });
+    const site = await load(root);
+    assert.deepEqual(site.messages, []);
+    assert.deepEqual(site.components['demo-plot'].properties, {
+      k: { label: 'k', type: 'number', default: 1 },
+      scale: { label: 's', type: 'number', default: 2 },
+    });
+  });
+
+  test('传入开发服务器时，修改 lib/ 文件并调用 invalidate 后再次载入得到新值', async () => {
+    const root = blog({
+      'components/demo-plot.js': component(1),
+      'components/plot.css': 'p {}\n',
+      'components/lib/scale.js': 'export const scale = 2;\n',
+    });
+    const server = await createServer({ root, configFile: false, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true, hmr: false, ws: false } });
+    const loader = await createModuleLoader(root, { server });
+    try {
+      const before = await loadSite(root, { loader });
+      assert.equal(before.components['demo-plot'].properties.scale.default, 2);
+      const scale = join(root, 'components/lib/scale.js');
+      writeFileSync(scale, 'export const scale = 3;\n');
+      loader.invalidate(scale);
+      const after = await loadSite(root, { loader });
+      assert.equal(after.components['demo-plot'].properties.scale.default, 3);
+    } finally {
+      await loader.close();
+      await server.close();
+    }
+  });
+
+  test('close 关闭自己创建的服务器', async () => {
+    const loader = await createModuleLoader(blog({}));
+    await loader.close();
+    await assert.rejects(loader.import('bake.config.js'));
   });
 });

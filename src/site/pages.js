@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { basename, join, relative } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 import { isSlug, readFrontmatter } from '../format/frontmatter.js';
 
 const skippedDirectories = new Set(['notes', 'components', 'assets']);
@@ -25,6 +25,32 @@ export function pageUrl(slug) {
   return slug === '/' ? '/' : `/${slug}/`;
 }
 
+function byPath(a, b) {
+  return a.path < b.path ? -1 : 1;
+}
+
+export function isPagePath(path) {
+  const segments = path.split(sep);
+  return segments[0] === 'content' && path.endsWith('.md') && !basename(path).startsWith('_') && !segments.slice(1, -1).some((segment) => skippedDirectories.has(segment));
+}
+
+async function readPage(root, path) {
+  const { values: frontmatter, keyPlaces } = readFrontmatter(await readFile(join(root, path), 'utf8'));
+  return { path, url: pageUrl(frontmatter.slug), frontmatter, slugPlace: keyPlaces.get('slug') };
+}
+
+function slugMessages(pages) {
+  const messages = [];
+  const owners = new Map();
+  for (const { path, url, frontmatter, slugPlace } of pages) {
+    if (url === null) continue;
+    const owner = owners.get(url);
+    if (owner) messages.push({ path, line: slugPlace.line, column: slugPlace.column, text: `Slug ${frontmatter.slug} is already used by ${owner}` });
+    else owners.set(url, path);
+  }
+  return messages;
+}
+
 export async function findPages(root) {
   const content = join(root, 'content');
   const files = await markdownFiles(content).catch((error) => {
@@ -32,22 +58,20 @@ export async function findPages(root) {
     throw error;
   });
   const pages = [];
-  const messages = [];
-  const owners = new Map();
-  const paths = files.map((file) => relative(root, file)).filter((path) => !basename(path).startsWith('_'));
-  for (const path of paths.sort((a, b) => (a < b ? -1 : 1))) {
-    const { values: frontmatter, keyPlaces } = readFrontmatter(await readFile(join(root, path), 'utf8'));
-    const url = pageUrl(frontmatter.slug);
-    if (url !== null) {
-      const owner = owners.get(url);
-      if (owner) {
-        const { line, column } = keyPlaces.get('slug');
-        messages.push({ path, line, column, text: `Slug ${frontmatter.slug} is already used by ${owner}` });
-      } else {
-        owners.set(url, path);
-      }
-    }
-    pages.push({ path, url, frontmatter });
-  }
-  return { pages, messages };
+  const paths = files.map((file) => relative(root, file)).filter(isPagePath);
+  for (const path of paths.sort()) pages.push(await readPage(root, path));
+  return { pages, messages: slugMessages(pages) };
+}
+
+export async function updatePage(root, pages, path) {
+  const others = pages.filter((page) => page.path !== path);
+  const page = await readPage(root, path);
+  const previousUrl = pages.find((other) => other.path === path)?.url ?? null;
+  const next = [...others, { ...page, url: page.url ?? previousUrl }].sort(byPath);
+  return { pages: next, messages: slugMessages(next) };
+}
+
+export function removePage(pages, path) {
+  const next = pages.filter((page) => page.path !== path);
+  return { pages: next, messages: slugMessages(next) };
 }

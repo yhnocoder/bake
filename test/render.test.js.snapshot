@@ -144,15 +144,15 @@ exports[`features.md > 快照 2`] = `
 <p>softmax 把任意实数向量变成概率分布。</p>
 <aside class="sidenote unnumbered" data-md=":::margin
 名字来自 argmax 的平滑版本。
-:::"><p>名字来自 argmax 的平滑版本。</p></aside>
+:::"><div class="sidenote-body"><p>名字来自 argmax 的平滑版本。</p></div></aside>
 <h2 id="sidenotes"><a class="anchor" href="#sidenotes" aria-hidden="true">#</a>旁注</h2>
 <p>反向传播从损失函数开始，沿计算图逆向逐层计算梯度。</p>
 <p>每一层的梯度都由上一层传回的梯度乘以本层的局部导数得到<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>。局部导数只依赖本层的输入和输出，所以每一层可以独立计算，再按顺序连乘起来。</p>
 <aside class="sidenote" id="sn-1" data-md="[^d]: 局部导数是本层输出对本层输入的导数 $\\partial y / \\partial x$。
 
-    注释可以有多段，后面的段落缩进四个空格。"><span class="sidenote-number">1</span><p>局部导数是本层输出对本层输入的导数 <span class="math" data-tex="\\partial y / \\partial x"><svg style="vertical-align: -0.566ex;" xmlns="http://www.w3.org/2000/svg" width="6.095ex" height="2.262ex" role="img" focusable="false" viewBox="0 -750 2694 1000"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D466" href="#MJX-NCM-I-1D466"></use></g><g data-mml-node="mo" transform="translate(1056,0)"><use data-c="2F" href="#MJX-NCM-N-2F"></use></g><g data-mml-node="mi" transform="translate(1556,0)"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(2122,0)"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g></g></g></svg></span>。</p><p>注释可以有多段，后面的段落缩进四个空格。</p></aside>
+    注释可以有多段，后面的段落缩进四个空格。"><span class="sidenote-number">1</span><div class="sidenote-body"><p>局部导数是本层输出对本层输入的导数 <span class="math" data-tex="\\partial y / \\partial x"><svg style="vertical-align: -0.566ex;" xmlns="http://www.w3.org/2000/svg" width="6.095ex" height="2.262ex" role="img" focusable="false" viewBox="0 -750 2694 1000"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D466" href="#MJX-NCM-I-1D466"></use></g><g data-mml-node="mo" transform="translate(1056,0)"><use data-c="2F" href="#MJX-NCM-N-2F"></use></g><g data-mml-node="mi" transform="translate(1556,0)"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(2122,0)"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g></g></g></svg></span>。</p><p>注释可以有多段，后面的段落缩进四个空格。</p></div></aside>
 <p><span class="sidenote-span" data-md=":span[激活函数的导数]" data-sidenote="2">激活函数的导数</span><sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>决定了梯度能否顺利传回前面的层。</p>
-<aside class="sidenote" id="sn-2" data-md="[^act]: ReLU 在正半轴的导数是 1。"><span class="sidenote-number">2</span><p>ReLU 在正半轴的导数是 1。</p></aside>
+<aside class="sidenote" id="sn-2" data-md="[^act]: ReLU 在正半轴的导数是 1。"><span class="sidenote-number">2</span><div class="sidenote-body"><p>ReLU 在正半轴的导数是 1。</p></div></aside>
 <p>最后得到的是损失对每个参数的梯度。优化器用这些梯度更新参数，进入下一轮前向传播。</p>
 <h2 id="bento"><a class="anchor" href="#bento" aria-hidden="true">#</a>卡片网格</h2>
 <div class="bento" data-md="::::bento
