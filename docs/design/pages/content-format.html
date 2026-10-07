@@ -273,7 +273,7 @@
 </div>
 
 <h3>提示框</h3>
-<p><code>:::callout{kind=note}</code> 输出 <code>&lt;aside class="callout note"&gt;</code>。<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code>，默认 <code>note</code>，三种类型的标签分别是「说明」「提示」「注意」。标签输出为 <code>&lt;aside&gt;</code> 内的第一个元素 <code>&lt;p class="callout-label"&gt;说明&lt;/p&gt;</code>，后面是内容。编辑器里内容直接输入，类型在属性面板里选。</p>
+<p><code>:::callout{kind=note}</code> 输出 <code>&lt;aside class="callout note"&gt;</code>。<code>kind</code> 取 <code>note</code>、<code>tip</code>、<code>warning</code>，默认 <code>note</code>，三种类型的标签分别是「说明」「提示」「注意」。需要别的标签时写在方括号里，例如 <code>:::callout[向量说明]{kind=note}</code>，方括号里可以写行内 Markdown，没有方括号时使用类型对应的标签。标签输出为 <code>&lt;aside&gt;</code> 内的第一个元素 <code>&lt;p class="callout-label"&gt;说明&lt;/p&gt;</code>，后面是内容。编辑器里标签和内容直接输入，类型在属性面板里选。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::callout{kind=note}
 本文的向量都是列向量。
@@ -283,13 +283,13 @@
 先看图再看公式。
 :::
 
-:::callout{kind=warning}
+:::callout[求和次序]{kind=warning}
 这里的求和不能交换次序。
 :::</code></pre>
 <div class="sp">
   <aside class="sp-callout note"><b>说明</b>本文的向量都是列向量。</aside>
   <aside class="sp-callout tip"><b>提示</b>先看图再看公式。</aside>
-  <aside class="sp-callout warning"><b>注意</b>这里的求和不能交换次序。</aside>
+  <aside class="sp-callout warning"><b>求和次序</b>这里的求和不能交换次序。</aside>
 </div>
 </div>
 
