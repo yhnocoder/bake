@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { bakeRoot } from '../../src/dev/plugin.js';
 import { format } from '../../src/format/index.js';
-import { exportMarkdown, openEditor, placeCursor, saveAfter, startSite } from './setup.js';
+import { changedLines, exportMarkdown, openEditor, placeCursor, saveAfter, startSite } from './setup.js';
 
 const path = 'content/features.md';
 const plainPath = 'content/plain.md';
@@ -147,15 +147,34 @@ describe('打开、筛选和关闭', () => {
   });
 });
 
+async function settle(target, file) {
+  let stableSince = Date.now();
+  let last = null;
+  while (Date.now() - stableSince < 1000) {
+    const current = site.read(file) === (await exportMarkdown(target)) ? site.read(file) : null;
+    if (current === null || current !== last) stableSince = Date.now();
+    last = current;
+    await target.waitForTimeout(100);
+  }
+}
+
+async function changesDuring(target, file, steps) {
+  await settle(target, file);
+  const before = site.read(file);
+  await steps();
+  await settle(target, file);
+  return changedLines(before, site.read(file));
+}
+
 function clickItem(target, text) {
   return target.locator('.bake-insert-item').filter({ hasText: new RegExp(`^${text}$`) }).click();
 }
 
 async function insert(name, query, expected, { target = page, file = path, anchor = '正文段落。', choose } = {}) {
-  await newLineAfter(anchor, target);
-  await openMenu(query, target);
-  await site.screenshot(target, `insert-${name}-menu`);
-  const changes = await saveAfter(site, target, file, async () => {
+  const changes = await changesDuring(target, file, async () => {
+    await newLineAfter(anchor, target);
+    await openMenu(query, target);
+    await site.screenshot(target, `insert-${name}-menu`);
     if (choose) await clickItem(target, choose);
     else await target.keyboard.press('Enter');
   });
@@ -238,13 +257,15 @@ describe('位置规则', () => {
     await openMenuAt(plainPage, '');
     assert.equal((await menuItems(plainPage)).includes('导语 lede'), false);
     await clearQuery(plainPage, 1);
-    await plainPage.keyboard.press('ControlOrMeta+Home');
-    await plainPage.keyboard.press('Enter');
-    await plainPage.keyboard.press('ArrowUp');
-    await openMenu('', plainPage);
-    assert.equal((await menuItems(plainPage)).includes('导语 lede'), true);
-    await site.screenshot(plainPage, 'position-lede');
-    const changes = await saveAfter(site, plainPage, plainPath, () => clickItem(plainPage, '导语 lede'));
+    const changes = await changesDuring(plainPage, plainPath, async () => {
+      await plainPage.keyboard.press('ControlOrMeta+Home');
+      await plainPage.keyboard.press('Enter');
+      await plainPage.keyboard.press('ArrowUp');
+      await openMenu('', plainPage);
+      assert.equal((await menuItems(plainPage)).includes('导语 lede'), true);
+      await site.screenshot(plainPage, 'position-lede');
+      await clickItem(plainPage, '导语 lede');
+    });
     assert.deepEqual(changes, { removed: [], added: [':::lede', ':::', ''] });
   });
 
@@ -253,24 +274,28 @@ describe('位置规则', () => {
   });
 
   test('引用块最后一段列出出处，其他段落不列出', async () => {
-    await placeCursor(plainPage, '引文。', { select: true });
-    await openMenu('', plainPage);
-    assert.equal((await menuItems(plainPage)).includes('出处 source'), false);
-    await placeCursor(plainPage, '出处占位', { select: true });
-    await openMenu('so', plainPage);
-    assert.deepEqual(await menuItems(plainPage), ['出处 source']);
-    await site.screenshot(plainPage, 'position-source');
-    const changes = await saveAfter(site, plainPage, plainPath, () => plainPage.keyboard.press('Enter'));
+    const changes = await changesDuring(plainPage, plainPath, async () => {
+      await placeCursor(plainPage, '引文。', { select: true });
+      await openMenu('', plainPage);
+      assert.equal((await menuItems(plainPage)).includes('出处 source'), false);
+      await placeCursor(plainPage, '出处占位', { select: true });
+      await openMenu('so', plainPage);
+      assert.deepEqual(await menuItems(plainPage), ['出处 source']);
+      await site.screenshot(plainPage, 'position-source');
+      await plainPage.keyboard.press('Enter');
+    });
     record('insert-source', changes);
     assert.deepEqual(changes, { removed: ['> 引文。', '>', '> 出处占位'], added: ['> /', '>', '> ::source'] });
   });
 
   test('卡片里列出卡片，新卡片加在当前卡片之后', async () => {
-    await newLineAfter('卡片。', plainPage);
-    await openMenu('card', plainPage);
-    assert.deepEqual(await menuItems(plainPage), ['卡片 card']);
-    await site.screenshot(plainPage, 'position-card');
-    const changes = await saveAfter(site, plainPage, plainPath, () => plainPage.keyboard.press('Enter'));
+    const changes = await changesDuring(plainPage, plainPath, async () => {
+      await newLineAfter('卡片。', plainPage);
+      await openMenu('card', plainPage);
+      assert.deepEqual(await menuItems(plainPage), ['卡片 card']);
+      await site.screenshot(plainPage, 'position-card');
+      await plainPage.keyboard.press('Enter');
+    });
     record('insert-card', changes);
     assert.deepEqual(changes, { removed: [], added: ['', ':::card', ':::'] });
     await saveAfter(site, plainPage, plainPath, () => plainPage.keyboard.type('第二张。'));
@@ -329,14 +354,16 @@ describe('撤销与登记', () => {
         ]);
       });
     }, module);
-    await newLineAfter('正文段落。');
-    await openMenu('');
-    const items = await menuItems();
-    assert.equal(items[items.indexOf('表格') + 1], '测试项');
-    await page.keyboard.press('Backspace');
-    await openMenu('probe');
-    assert.deepEqual(await menuItems(), ['测试项']);
-    const changes = await saveAfter(site, page, path, () => page.keyboard.press('Enter'));
+    const changes = await changesDuring(page, path, async () => {
+      await newLineAfter('正文段落。');
+      await openMenu('');
+      const items = await menuItems();
+      assert.equal(items[items.indexOf('表格') + 1], '测试项');
+      await page.keyboard.press('Backspace');
+      await openMenu('probe');
+      assert.deepEqual(await menuItems(), ['测试项']);
+      await page.keyboard.press('Enter');
+    });
     assert.deepEqual(changes, { removed: [], added: ['测试项已执行', ''] });
     await site.screenshot(page, 'registered-item');
   });
