@@ -311,7 +311,7 @@
 </div>
 
 <h3>边注</h3>
-<p><code>:::margin</code> 输出 <code>&lt;aside class="sidenote unnumbered"&gt;</code>，放在右侧栏，与它前面的段落顶部对齐，不带编号。和旁注使用同一套对齐代码。</p>
+<p><code>:::margin</code> 输出 <code>&lt;aside class="sidenote unnumbered"&gt;</code>，内容同样放在 <code>div.sidenote-body</code> 中，放在右侧栏，与它前面的段落顶部对齐，不带编号。和旁注使用同一套对齐代码。</p>
 <div class="spec">
 <pre><code class="language-markdown">softmax 把任意实数向量变成概率分布。
 
@@ -357,7 +357,7 @@
   <li>注释里不能再写脚注引用，写了时报错。理由：注释本身已经在右侧栏，嵌套的注释没有位置可以放。</li>
   <li>编辑器保存时，注释定义写在第一次引用它的块之后，规则见 <a href="#output-format">输出格式</a>。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
 </ul>
-<p>生成的页面里，正文中的引用输出为 <code>&lt;sup class="sidenote-ref" id="sn-ref-1"&gt;&lt;a href="#sn-1"&gt;1&lt;/a&gt;&lt;/sup&gt;</code>，注释输出为 <code>&lt;aside class="sidenote" id="sn-1" data-md="…"&gt;&lt;span class="sidenote-number"&gt;1&lt;/span&gt;注释内容&lt;/aside&gt;</code>。注释的位置：</p>
+<p>生成的页面里，正文中的引用输出为 <code>&lt;sup class="sidenote-ref" id="sn-ref-1"&gt;&lt;a href="#sn-1"&gt;1&lt;/a&gt;&lt;/sup&gt;</code>，注释输出为 <code>&lt;aside class="sidenote" id="sn-1" data-md="…"&gt;&lt;span class="sidenote-number"&gt;1&lt;/span&gt;&lt;div class="sidenote-body"&gt;注释内容&lt;/div&gt;&lt;/aside&gt;</code>。注释内容放在 <code>div.sidenote-body</code> 中，页面和编辑器使用同一个结构和同一套 CSS。注释的位置：</p>
 <ul>
   <li>引用在段落里时，注释放在这个段落之后。段落在提示框、列表项等块里时，注释也在同一个块里。</li>
   <li>引用在标题里时，注释放在标题之后。</li>
@@ -476,7 +476,8 @@
   </tbody>
 </table>
 <p>编号由 bake 处理，MathJax 不保存公式之间的状态。含 <code>\label{eq:name}</code> 的独立公式按在页面中出现的顺序从 1 开始编号，渲染前把 <code>\label{eq:name}</code> 换成 <code>\tag{n}</code>。一个公式里有多个 <code>\label</code>（例如 <code>align</code> 环境）时每个都编号，外层元素的 id 取第一个 label，指向其中任一个 label 的 <code>\eqref</code> 都链接到这个 id。同一页里两个 <code>\label</code> 同名时报错。<code>\eqref{eq:name}</code> 不交给 MathJax，直接输出上表中的链接，它必须是所在公式的全部内容。理由：每个公式的渲染结果只取决于它自己的源码，可以按源码缓存。</p>
-<p>渲染结果按「行内或独立」加 TeX 源码缓存，同一个公式只调用 MathJax 一次。SVG 输出使用 <code>fontCache: 'global'</code>：每个公式的 SVG 用 <code>&lt;use href="#MJX-…"&gt;</code> 引用字形，一页用到的全部字形放在一个 <code>&lt;svg style="display:none"&gt;&lt;defs&gt;…&lt;/defs&gt;&lt;/svg&gt;</code> 里，由版式放在 <code>&lt;body&gt;</code> 开头。理由：同一个字形在一页里只出现一次，页面体积小。</p>
+<p>渲染结果按「行内或独立」加 TeX 源码缓存，同一个公式只调用 MathJax 一次。SVG 输出使用 <code>fontCache: 'global'</code>：每个公式的 SVG 用 <code>&lt;use href="#MJX-…"&gt;</code> 引用字形，一页用到的全部字形放在字形容器 <code>&lt;svg id="math-defs" style="display:none"&gt;&lt;defs&gt;…&lt;/defs&gt;&lt;/svg&gt;</code> 里，放在 <code>&lt;body&gt;</code> 开头。理由：同一个字形在一页里只出现一次，页面体积小。</p>
+<p>页面上只有这一个字形容器。开发服务器更新正文、编辑器渲染新公式、预览卡片显示其他页面的公式时，都只向容器加入缺少的字形，不删除已有的字形。理由：不再使用的字形不影响显示，删除字形需要追踪每个字形的使用者。</p>
 <p>TeX 语法错误、未定义的宏和 <code>\eqref</code> 指向不存在的 <code>\label</code> 时构建报错，位置是公式在源文件中的行列。</p>
 
 <h2 id="site-links">站内引用怎么写</h2>
@@ -620,7 +621,7 @@ parseSyntax(source, { path })
     <tr><td><code>page</code></td><td><code>parse</code> 返回的 <code>frontmatter</code>，版式字段已填入默认值</td></tr>
     <tr><td><code>html</code></td><td>正文 HTML 片段，旁注已放在对应段落之后</td></tr>
     <tr><td><code>toc</code></td><td><code>[{ id, html, depth }]</code>，包含 <code>h2</code> 和 <code>h3</code>。<code>html</code> 是目录项的内容：有 <code>toc</code> 属性时是它的文字（已转义），没有时是标题内容渲染后的 HTML，不含 <code>#</code> 链接和旁注引用</td></tr>
-    <tr><td><code>mathDefs</code></td><td>这一页的公式用到的全部字形，形式为 <code>&lt;svg style="display:none"&gt;&lt;defs&gt;…&lt;/defs&gt;&lt;/svg&gt;</code>，由版式放在 <code>&lt;body&gt;</code> 开头；没有公式时为空字符串</td></tr>
+    <tr><td><code>mathDefs</code></td><td>这一页的公式用到的全部字形，形式为 <code>&lt;svg id="math-defs" style="display:none"&gt;&lt;defs&gt;…&lt;/defs&gt;&lt;/svg&gt;</code>，放在 <code>&lt;body&gt;</code> 开头；没有公式时为空字符串</td></tr>
     <tr><td><code>ids</code></td><td>页面内的全部 id：标题、<code>^block-id</code>、公式编号</td></tr>
     <tr><td><code>links</code></td><td>站内链接 <code>[{ href, line, column }]</code>。以 <code>/</code> 或 <code>#</code> 开头的链接是站内链接，<code>href</code> 的路径部分统一为带末尾 <code>/</code> 的形式，<code>?</code> 和 <code>#</code> 之后的部分不变，HTML 里的地址同样改写。路径最后一段带扩展名的链接（例如 <code>/assets/a.pdf</code>、<code>/feed.xml</code>）指向文件，不改写，也不进入 <code>links</code>。<code>config.base</code> 由构建加上，这里不加</td></tr>
     <tr><td><code>components</code></td><td>正文用到的组件名</td></tr>

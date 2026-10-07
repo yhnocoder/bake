@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import bento from '../src/layouts/bento.js';
@@ -7,10 +8,13 @@ import essay from '../src/layouts/essay.js';
 import { renderDocument } from '../src/layouts/head.js';
 import paper from '../src/layouts/paper.js';
 import { loadSite, renderPage } from '../src/site/index.js';
+import { createModuleLoader } from '../src/site/modules.js';
 import { themeVariables } from '../src/styles/variables.js';
 
 const root = join(import.meta.dirname, '..');
-const site = await loadSite(join(root, 'examples/minimal'));
+const example = join(root, 'examples/minimal');
+const loader = await createModuleLoader(example);
+const site = await loadSite(example, { loader }).finally(() => loader.close());
 const assets = { styles: ['/src/styles/base.css', '/examples/minimal/themes/default.css'], scripts: ['/src/client/page.js'] };
 const toc = [
   { id: 'a', html: '第一节', depth: 2 },
@@ -20,7 +24,7 @@ const layouts = { essay, paper, bento };
 
 function withoutSvg(html) {
   return html
-    .replace(/<svg style="display:none"><defs>[\s\S]*?<\/defs><\/svg>/, '<svg style="display:none"/>')
+    .replace(/<svg id="math-defs" style="display:none"><defs>[\s\S]*?<\/defs><\/svg>/, '<svg id="math-defs" style="display:none"/>')
     .replace(/(class="math[^>]*>)<svg[\s\S]*?<\/svg><\/(span|div)>/g, '$1<svg/></$2>');
 }
 
@@ -83,6 +87,59 @@ describe('版式', () => {
     assert.match(bento({ page: unsafe, html: '', toc, site: {} }), /<h1>&lt;script&gt;<\/h1>/);
     const document = renderDocument({ page: unsafe, config: { title: 'A & B' }, body: '', mathDefs: '', assets });
     assert.match(document, /<title>&lt;script&gt; · A &amp; B<\/title>/);
+  });
+});
+
+describe('版式输出的检查', () => {
+  const error = { path: 'content/features.md', line: 1, column: 1, text: 'Layout essay must output exactly one <article> that contains the page content' };
+
+  async function renderWith(layout, source) {
+    const calls = [];
+    const render = (input) => {
+      calls.push(input);
+      return layout(input);
+    };
+    const testSite = { ...site, layouts: { ...site.layouts, essay: { ...site.layouts.essay, render } } };
+    const result = await renderPage(testSite, 'content/features.md', { assets });
+    return { ...result, calls };
+  }
+
+  const cases = {
+    两个: ({ html }) => `<article>${html}</article><article></article>`,
+    没有: ({ html }) => `<main>${html}</main>`,
+    占位不在其中: ({ html }) => `<article></article>${html}`,
+    正文重复放入: ({ html }) => `<article>${html}${html}</article>`,
+  };
+  for (const [name, layout] of Object.entries(cases)) {
+    test(`<article> ${name}时报错，不输出页面`, async () => {
+      const { html, messages } = await renderWith(layout);
+      assert.equal(html, null);
+      assert.deepEqual(messages, [error]);
+    });
+  }
+
+  test('版式函数每页只调用一次，正文位置传入占位注释', async () => {
+    const { html, messages, calls } = await renderWith(site.layouts.essay.render);
+    assert.deepEqual(messages, []);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].html, '<!--bake:article-->');
+    assert.doesNotMatch(html, /bake:article/);
+  });
+
+  test('正文中独立的 HTML 块含 <article> 时不报错', async () => {
+    const source = '---\ntitle: 文章\nslug: html-article\n---\n\n<article>嵌入</article>\n';
+    const page = { path: 'content/html.md', url: '/html-article/', frontmatter: {} };
+    const testSite = { ...site, pages: [...site.pages, page] };
+    const copy = mkdtempSync(join(tmpdir(), 'bake-layouts-'));
+    try {
+      mkdirSync(join(copy, 'content'));
+      writeFileSync(join(copy, 'content/html.md'), source);
+      const { html, messages } = await renderPage({ ...testSite, root: copy }, 'content/html.md', { assets });
+      assert.deepEqual(messages, []);
+      assert.equal(articleCount(html), 2);
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
   });
 });
 
