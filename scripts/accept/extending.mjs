@@ -162,7 +162,21 @@ async function packed(origin, output) {
   }
 }
 
-if (scenario === 'pages') await pages(...args);
+async function terminal(file, output) {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 400 } });
+    await page.setContent('<pre style="margin:0;padding:16px;background:#1f2328;color:#e6edf3;font:13px/1.5 monospace;white-space:pre-wrap"></pre>');
+    await page.locator('pre').evaluate((element, text) => (element.textContent = text), readFileSync(file, 'utf8').trimEnd());
+    await page.locator('pre').screenshot({ path: output });
+    console.log(output);
+  } finally {
+    await browser.close();
+  }
+}
+
+if (scenario === 'terminal') await terminal(...args);
+else if (scenario === 'pages') await pages(...args);
 else if (scenario === 'motion') await motion(...args);
 else if (scenario === 'requests') requests(...args);
 else if (scenario === 'dev') await dev(...args);

@@ -345,10 +345,10 @@ export function bakeDev({ root }) {
     await sendPage(entry);
   }
 
-  async function sendOpenPages({ chrome = false } = {}) {
+  async function sendOpenPages() {
     for (const url of openUrls) {
       const entry = pageAt(url);
-      if (entry) await sendPage(entry, { chrome });
+      if (entry) await sendPage(entry, { chrome: true });
     }
   }
 
@@ -362,7 +362,7 @@ export function bakeDev({ root }) {
   async function handleConfig() {
     await reloadSite();
     sendSiteData();
-    await sendOpenPages({ chrome: true });
+    await sendOpenPages();
   }
 
   async function handleExtensions() {
@@ -391,7 +391,7 @@ export function bakeDev({ root }) {
     report(messages);
     if (themesChanged) {
       rendered.clear();
-      await sendOpenPages({ chrome: true });
+      await sendOpenPages();
     } else {
       sendOpenStatuses();
     }

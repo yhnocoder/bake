@@ -107,7 +107,8 @@
     <tr><td><code>format</code></td><td>remark 插件组合、块类型登记表、frontmatter 校验。不认识的指令报错</td></tr>
     <tr><td><code>render</code></td><td>把一篇 <code>.md</code> 渲染成 HTML 片段和目录：标题 id、章节、公式 SVG、图片、表格、旁注、站内链接</td></tr>
     <tr><td><code>layouts</code></td><td>把渲染结果套进整页 HTML。内置 essay、paper、bento</td></tr>
-    <tr><td><code>site</code></td><td>读取配置，按 <code>slug</code> 发现页面，发现组件和主题，把一篇文章经过渲染和版式生成整页 HTML。构建和开发服务器都通过它渲染整页，两者生成的页面相同</td></tr>
+    <tr><td><code>site</code></td><td>读取配置，按 <code>slug</code> 发现页面，发现并校验博客的组件、块类型、版式和主题，把一篇文章经过渲染和版式生成整页 HTML。构建和开发服务器都通过它渲染整页，两者生成的页面相同</td></tr>
+    <tr><td><code>runtime</code></td><td>组件从 <code>bake/runtime</code> 导入的 <code>site</code>、<code>animate</code>、<code>layoutText</code>、<code>renderMath</code>。浏览器中使用实际实现，在 Node 中读取组件的静态字段时使用替代实现</td></tr>
     <tr><td><code>editor</code></td><td>浏览器里的编辑器。节点定义、属性面板、插入菜单由块类型登记表和组件登记表生成</td></tr>
     <tr><td><code>dev</code></td><td>Vite 插件：请求页面时通过 <code>site</code> 即时渲染，提供读写 <code>.md</code> 的接口，监视文件变化并通知页面</td></tr>
     <tr><td><code>build</code></td><td>通过 <code>site</code> 生成每页 HTML，打包每页用到的组件，处理图片，检查站内链接</td></tr>
@@ -123,7 +124,8 @@
 │   ├── layouts/     essay.js、paper.js、bento.js、head.js
 │   ├── styles/      版式和内置块的 CSS，只使用主题变量；variables.js 列出主题变量名
 │   ├── client/      浏览器脚本：page.js 是页面入口，sidenotes.js 导出旁注对齐与悬停高亮
-│   ├── site/        读取配置、页面、组件和主题，渲染整页；pages.js 计算页面地址
+│   ├── site/        读取配置、页面和扩展，渲染整页；pages.js 计算页面地址，extensions.js 发现与校验扩展
+│   ├── runtime/     组件从 bake/runtime 导入的工具，Node 中的替代实现和解析 bake/runtime 的 Vite 插件
 │   ├── editor/
 │   ├── dev/
 │   ├── build/
@@ -131,11 +133,15 @@
 ├── examples/
 │   ├── minimal/                  覆盖全部功能的最小博客
 │   │   ├── bake.config.js
+│   │   ├── content/index.md      首页，用全局组件 page-list 列出全部页面
 │   │   ├── content/features.md   一页展示全部功能
 │   │   ├── content/paper.md      paper 版式
 │   │   ├── content/bento.md      bento 版式
-│   │   ├── components/demo-plot.js
-│   │   └── themes/default.css
+│   │   ├── content/extending/    使用博客自己的版式、主题、块类型和主题组件
+│   │   ├── components/           demo-plot.js、page-list.js
+│   │   ├── blocks/               shape.js、theorem.js
+│   │   ├── layouts/note.js
+│   │   └── themes/               default.css、warm.css 和共用的 lib/blocks.css
 │   └── learn-by-visualization/   真实博客，验证 bake 能承载已有内容
 └── test/</code></pre>
 <p>bake 的测试只针对 <code>examples/</code>。<code>examples/minimal/content/features.md</code> 在一页里使用每一种块、公式、旁注、站内引用、组件、图片和表格；新增一种内置功能时，同时在这一页加上它的用法。</p>
@@ -163,9 +169,9 @@
     <tr><td>开发服务器和打包</td><td>Vite</td><td>按模块热更新，保存时不刷新整页</td></tr>
     <tr><td>公式</td><td>MathJax，构建时输出 SVG</td><td>页面不需要加载 MathJax，打开时不跳动</td></tr>
     <tr><td>代码高亮</td><td>Shiki，渲染时输出带 CSS 变量颜色的 HTML</td><td>使用 VS Code 的 TextMate 语法，语言覆盖全面；颜色由主题的 CSS 变量设定；页面不需要加载高亮脚本</td></tr>
-    <tr><td>组件</td><td>custom element；可以用 SolidJS（solid-element）编写</td><td>不强制框架，简单的图用纯 JS 更短</td></tr>
-    <tr><td>动画</td><td>Motion（不依赖 React 的版本）</td><td>折叠、旁注、预览卡片和编辑器面板的动画；颜色变化用 CSS；遵守系统的减少动态效果设置</td></tr>
-    <tr><td>文字测量</td><td>Pretext，只提供给组件</td><td>SVG 和 canvas 里的文字不会自动换行，组件用它按宽度断行。正文由浏览器排版，不使用它</td></tr>
+    <tr><td>组件</td><td>custom element，用纯 JavaScript 编写</td><td>不依赖框架，简单的图用纯 JS 更短</td></tr>
+    <tr><td>动画</td><td>Motion（npm 包 <code>motion</code>，不依赖 React 的版本）</td><td>折叠、旁注、预览卡片和编辑器面板的动画；颜色变化用 CSS；遵守系统的减少动态效果设置</td></tr>
+    <tr><td>文字测量</td><td>Pretext（npm 包 <code>@chenglou/pretext</code>），只提供给组件</td><td>SVG 和 canvas 里的文字不会自动换行，组件用它按宽度断行。正文由浏览器排版，不使用它</td></tr>
   </tbody>
 </table>
 <p>不使用 Eleventy、Hugo 这类自带 Markdown 解析器的生成器。理由：它们的解析器与编辑器使用的 remark 不同，同一份 Markdown 在编辑器和页面上可能显示不一样。</p>
