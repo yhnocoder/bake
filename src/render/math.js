@@ -64,5 +64,5 @@ export function renderFormula(tex, display, macros = {}) {
 export function glyphDefinitions(glyphIds) {
   if (glyphIds.length === 0) return '';
   const paths = glyphIds.map((id) => `<path id="${id}" d="${glyphs.get(id)}"></path>`).join('');
-  return `<svg style="display:none"><defs>${paths}</defs></svg>`;
+  return `<svg id="math-defs" style="display:none"><defs>${paths}</defs></svg>`;
 }

@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { loadSite, renderPage } from '../src/site/index.js';
+import { createModuleLoader } from '../src/site/modules.js';
 
 const root = resolve(import.meta.dirname, '..');
 const example = 'examples/minimal';
@@ -14,7 +15,8 @@ const contentTypes = {
 };
 
 async function renderExample() {
-  const site = await loadSite(join(root, example));
+  const loader = await createModuleLoader(join(root, example));
+  const site = await loadSite(join(root, example), { loader }).finally(() => loader.close());
   const definitions = Object.entries(site.components).map(
     ([name, { path }], index) => `import C${index} from '/${example}/${path}';\ncustomElements.define('${name}', C${index});\n`,
   );
