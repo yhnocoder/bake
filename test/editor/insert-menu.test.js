@@ -78,7 +78,7 @@ describe('打开、筛选和关闭', () => {
     await openMenu('');
     assert.equal(await menuShown(), true);
     assert.deepEqual(await page.$$eval('.bake-insert-group', (groups) => groups.map((group) => group.textContent)), ['块', '组件']);
-    assert.deepEqual(await menuItems(), ['折叠 fold', '提示框 callout', '加宽 wide', '边注 margin', '卡片网格 bento', '参考文献 references', '表格', 'demo-plot']);
+    assert.deepEqual(await menuItems(), ['折叠 fold', '提示框 callout', '加宽 wide', '边注 margin', '卡片网格 bento', '参考文献 references', '表格', '链接', 'demo-plot']);
     await site.screenshot(page, 'menu-open');
   });
 
@@ -221,11 +221,10 @@ describe('插入内置块、表格和组件，文件只增加插入的几行', (
     assert.deepEqual(changes, { removed: ['| | | |'], added: ['| 列一 | | |'] });
   });
 
-  test('表格单元格里不列出块和组件', async () => {
+  test('表格单元格里不列出块和组件，只列出链接', async () => {
     await page.keyboard.press('Tab');
     await openMenu('');
-    assert.deepEqual(await menuItems(), []);
-    assert.equal(await page.textContent('.bake-insert-menu'), '没有匹配的项');
+    assert.deepEqual(await menuItems(), ['链接']);
     await site.screenshot(page, 'menu-table-cell');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Backspace');
@@ -358,7 +357,7 @@ describe('撤销与登记', () => {
       await newLineAfter('正文段落。');
       await openMenu('');
       const items = await menuItems();
-      assert.equal(items[items.indexOf('表格') + 1], '测试项');
+      assert.deepEqual(items.slice(items.indexOf('表格') + 1, items.indexOf('表格') + 3), ['链接', '测试项']);
       await page.keyboard.press('Backspace');
       await openMenu('probe');
       assert.deepEqual(await menuItems(), ['测试项']);

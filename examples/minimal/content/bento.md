@@ -37,3 +37,5 @@ $\log(1 + e^x)$，是 ReLU 的平滑版本。
 ReLU 在负半轴的导数是 0，GELU 和 SiLU 在负半轴仍有很小的导数，所以训练时不容易出现输出恒为 0 的神经元。
 :::
 ::::
+
+公式的写法见[公式](/features#math)，交互图的写法见[组件](/features#components)。

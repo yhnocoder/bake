@@ -58,13 +58,17 @@ function splitHref(href) {
   return end === -1 ? { path: href, rest: '' } : { path: href.slice(0, end), rest: href.slice(end) };
 }
 
+export function pagePath(path) {
+  return path === '' || path.endsWith('/') || fileExtension.test(path) ? path : `${path}/`;
+}
+
 function collectLinks(tree) {
   const links = [];
   visit(tree, ['link', 'definition'], (node) => {
     if (!node.url.startsWith('/') && !node.url.startsWith('#')) return;
     const { path, rest } = splitHref(node.url);
     if (fileExtension.test(path)) return;
-    if (path !== '' && !path.endsWith('/')) node.url = `${path}/${rest}`;
+    node.url = pagePath(path) + rest;
     links.push({ href: node.url, line: node.position.start.line, column: node.position.start.column });
   });
   return links;

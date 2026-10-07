@@ -77,6 +77,26 @@ exports[`features.md > 快照 1`] = `
       "href": "/features/#chain-rule",
       "line": 147,
       "column": 7
+    },
+    {
+      "href": "#chain-rule-def",
+      "line": 151,
+      "column": 1
+    },
+    {
+      "href": "/paper/",
+      "line": 151,
+      "column": 44
+    },
+    {
+      "href": "/paper/#step-size",
+      "line": 151,
+      "column": 69
+    },
+    {
+      "href": "#components",
+      "line": 151,
+      "column": 112
     }
   ],
   "components": [
@@ -218,6 +238,7 @@ exports[`features.md > 快照 2`] = `
 <h2 id="links"><a class="anchor" href="#links" aria-hidden="true">#</a>站内引用</h2>
 <p>这里用到的是<a href="/features/#chain-rule">链式法则</a>。</p>
 <p id="chain-rule-def">链式法则把复合函数的导数写成各层导数的乘积。</p>
+<p><a href="#chain-rule-def">上面这一段</a>是链式法则的定义。梯度下降的完整推导见<a href="/paper/">用梯度下降求函数的最小值</a>，其中<a href="/paper/#step-size">步长的选择</a>给出了迭代发散的条件。交互图的写法见<a href="#components">组件</a>一节。</p>
 <h2 id="lists"><a class="anchor" href="#lists" aria-hidden="true">#</a>列表与代码</h2>
 <ul>
 <li>第一项</li>

@@ -148,6 +148,8 @@ $\R$ 是 `bake.config.js` 的 `math.macros` 定义的宏，输入向量 $x \in \
 
 链式法则把复合函数的导数写成各层导数的乘积。 ^chain-rule-def
 
+[上面这一段](#chain-rule-def)是链式法则的定义。梯度下降的完整推导见[用梯度下降求函数的最小值](/paper)，其中[步长的选择](/paper#step-size)给出了迭代发散的条件。交互图的写法见[组件](#components)一节。
+
 ## 列表与代码 {#lists}
 
 - 第一项
