@@ -6,7 +6,7 @@ import { bakeMath } from '../math/plugin.js';
 import { bakeDev, bakeRoot } from './plugin.js';
 
 export async function createDevServer({ root, port }) {
-  const dev = bakeDev({ root });
+  const plugin = bakeDev({ root });
   const server = await createServer({
     root,
     configFile: false,
@@ -14,8 +14,13 @@ export async function createDevServer({ root, port }) {
     appType: 'custom',
     server: { host: 'localhost', port, strictPort: false, fs: { allow: [root, bakeRoot] } },
     optimizeDeps: { entries: [join(bakeRoot, 'src/editor/index.js')] },
-    plugins: [dev, bakeMath({ getConfig: () => dev.api.site().config })],
+    plugins: [plugin, bakeMath({ getConfig: () => plugin.api.site().config })],
   });
+  const messages = plugin.api.siteMessages();
+  if (messages.length > 0) {
+    await server.close();
+    throw Object.assign(new Error('Site has errors'), { messages });
+  }
   await server.listen();
   return server;
 }
