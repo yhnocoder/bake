@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import { formatMessage } from '../../src/format/index.js';
 import { loadSite, renderPage } from '../../src/site/index.js';
+import { createModuleLoader } from '../../src/site/modules.js';
 
 const [scenario, output] = process.argv.slice(2);
 const root = resolve(import.meta.dirname, '../..');
@@ -56,7 +57,8 @@ plain <text> & more
 
 async function renderArticle(path, source) {
   writeFileSync(join(blog, path), source);
-  const site = await loadSite(blog);
+  const loader = await createModuleLoader(blog);
+  const site = await loadSite(blog, { loader }).finally(() => loader.close());
   const styles = ['base', 'blocks', 'layouts'].map((name) => pathToFileURL(join(root, `src/styles/${name}.css`)).href);
   const assets = { styles: [...styles, pathToFileURL(join(blog, 'themes/default.css')).href], scripts: [] };
   return renderPage(site, path, { assets });
