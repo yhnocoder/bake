@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { Schema } from '@milkdown/prose/model';
+import { EditorState } from '@milkdown/prose/state';
 import { Transform } from '@milkdown/prose/transform';
 import { fixSidenotes, numberSidenotes } from '../../src/editor/sidenotes/placement.js';
+import { trailingParagraphTransaction } from '../../src/editor/trailing-paragraph.js';
 
 const schema = new Schema({
   nodes: {
@@ -170,6 +172,36 @@ describe('fixSidenotes', () => {
     assert.deepEqual(result, ['甲丙', '乙', '[^x]: 注释 x']);
     const { added } = fix(doc(paragraph(text('甲')), paragraph(text('乙')), def('x')), (tr) => tr.insert(2, text('丙')));
     assert.equal(added.length, 0);
+  });
+
+  test('没有被引用的注释放在文末的空段落之前', () => {
+    const start = doc(paragraph(text('甲')), def('x'), paragraph(text('乙')), paragraph());
+    const { result } = fix(start, (tr) => tr.insert(2, text('丙')));
+    assert.deepEqual(result, ['甲丙', '乙', '[^x]: 注释 x', '']);
+    const { added } = fix(doc(paragraph(text('甲')), def('x'), paragraph()), (tr) => tr.insert(2, text('丙')));
+    assert.equal(added.length, 0);
+  });
+
+  test('与文末补空段落的规则交替运行时一轮后不再修改文档', () => {
+    const starts = [
+      doc(paragraph(text('甲'), ref('a')), def('a')),
+      doc(paragraph(text('甲')), def('x')),
+      doc(paragraph(text('甲'), ref('a')), def('a'), def('x')),
+      doc(paragraph(text('甲')), paragraph(), def('x')),
+    ];
+    for (const start of starts) {
+      let current = start;
+      const rounds = [];
+      for (let round = 0; round < 3; round++) {
+        const trailing = trailingParagraphTransaction(EditorState.create({ doc: current }));
+        const tr = new Transform(trailing?.doc ?? current);
+        fixSidenotes(tr, current);
+        rounds.push(Boolean(trailing) || tr.steps.length > 0);
+        current = tr.doc;
+      }
+      assert.deepEqual(rounds.slice(1), [false, false], describeDoc(start).join(' / '));
+      assert.equal(current.lastChild.type.name, 'paragraph');
+    }
   });
 
   test('注释里的引用不参与修正', () => {

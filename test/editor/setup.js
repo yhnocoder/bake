@@ -1,6 +1,7 @@
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { createDevServer } from '../../src/dev/index.js';
 import { bakeRoot } from '../../src/dev/plugin.js';
@@ -15,12 +16,17 @@ export async function startSite(name) {
   const browser = await chromium.launch();
   const output = join(process.env.BAKE_TEST_OUTPUT ?? join(tmpdir(), 'bake-editor-screenshots'), name);
   mkdirSync(output, { recursive: true });
+  const origin = `http://localhost:${server.httpServer.address().port}`;
   return {
     root,
     output,
-    origin: `http://localhost:${server.httpServer.address().port}`,
+    origin,
     read: (path) => readFileSync(join(root, path), 'utf8'),
     write: (path, text) => writeFileSync(join(root, path), text),
+    async addPage(path, text, url) {
+      writeFileSync(join(root, path), text);
+      while ((await fetch(origin + url)).status === 404) await setTimeout(50);
+    },
     record: (file, text) => writeFileSync(join(output, file), text),
     screenshot: (page, file) => page.screenshot({ path: join(output, `${file}.png`), fullPage: true, caret: 'initial' }),
     async close() {
