@@ -329,9 +329,6 @@ article.numbered h3::before {
 .component {
   display: block;
   margin: 0 0 1rem;
-  padding: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
 }
 
 .component > figcaption {
