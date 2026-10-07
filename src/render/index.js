@@ -4,6 +4,7 @@ import { visit } from 'unist-util-visit';
 import builtinBlocks from '../blocks/index.js';
 import { parse } from '../format/index.js';
 import { createRegistry } from '../format/registry.js';
+import { highlightCode } from './code.js';
 import { renderEquations } from './equations.js';
 import { createHandlers } from './handlers.js';
 import { createHeadingIds } from './heading-ids.js';
@@ -94,6 +95,7 @@ export async function render(source, { path, config = {}, blocks = [], component
   };
   placeSidenotes(tree, report);
   const mathDefs = await renderEquations(tree, { macros: config.math?.macros ?? {}, report });
+  await highlightCode(tree, report);
   const { ids, toc } = assignIds(tree, report);
   const links = collectLinks(tree);
   const handlers = createHandlers({ source, registry: createRegistry(builtinBlocks, blocks), components });
