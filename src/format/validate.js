@@ -20,15 +20,19 @@ export function contentChildren(node) {
   return node.children.filter((child) => !child.data?.directiveLabel);
 }
 
-function checkAttributeValue(key, value, property) {
-  if (property.type === 'number' && (value.trim() === '' || !Number.isFinite(Number(value)))) {
+export function directiveAttributeError(name, key, value, properties) {
+  const property = properties[key];
+  if (property?.type === 'number' && (value.trim() === '' || !Number.isFinite(Number(value)))) {
     return `Attribute ${key} must be a number, got ${value}`;
   }
-  if (property.type === 'boolean' && value !== 'true' && value !== 'false') {
+  if (property?.type === 'boolean' && value !== 'true' && value !== 'false') {
     return `Attribute ${key} must be true or false, got ${value}`;
   }
-  if (property.type === 'enum' && !property.options.includes(value)) {
+  if (property?.type === 'enum' && !property.options.includes(value)) {
     return `Attribute ${key} must be one of ${property.options.join(', ')}, got ${value}`;
+  }
+  if (name === 'card' && key === 'span' && !cardSpan.test(value)) {
+    return `:::card span must be COLUMNSxROWS with 1 to 4 columns, got ${value}`;
   }
   return null;
 }
@@ -40,7 +44,7 @@ function checkDirectiveAttributes(node, properties, report) {
       report(node, `Unknown attribute ${key} on ${directiveLabel(node)}`);
       continue;
     }
-    const error = checkAttributeValue(key, value ?? '', property);
+    const error = directiveAttributeError(node.name, key, value ?? '', properties);
     if (error) report(node, error);
   }
 }
@@ -84,10 +88,6 @@ function checkStructure(node, parent, index, report) {
       break;
     case 'card': {
       if (parent.type !== 'containerDirective' || parent.name !== 'bento') report(node, `${directiveLabel(node)} must be inside :::bento`);
-      const span = node.attributes?.span;
-      if (span !== undefined && !cardSpan.test(span)) {
-        report(node, `${directiveLabel(node)} span must be COLUMNSxROWS with 1 to 4 columns, got ${span}`);
-      }
       break;
     }
     case 'references': {

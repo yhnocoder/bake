@@ -3,8 +3,8 @@ import { visit } from 'unist-util-visit';
 import { location } from 'vfile-location';
 
 const unquotedValue = /^[^\t\n\r "'<=>`}]+$/;
-const headingAttributes = / \{([^{}]*)\}$/;
-const imageAttributes = /^\{([^{}]*)\}/;
+const headingAttributeText = / \{([^{}]*)\}$/;
+const imageAttributeText = /^\{([^{}]*)\}/;
 const attributeToken = /\s*(?:#([^\s"=}]+)|\.([^\s"=}]+)|([A-Za-z][\w-]*)=(?:"([^"]*)"|([^\s"]+)))/y;
 const identifier = /^[A-Za-z][\w-]*$/;
 const size = /^\d+(?:\.\d+)?(?:px|%|em)?$/;
@@ -51,15 +51,21 @@ function readAttributes(content) {
   return { attributes, errors };
 }
 
-function checkAttributes(kind, attributes) {
-  const errors = [];
-  const label = kind === 'heading' ? 'heading' : 'image';
-  for (const [key, value] of Object.entries(attributes)) {
-    const rule = rules[kind][key];
-    if (!rule) errors.push(`Unknown ${label} attribute ${key}`);
-    else if (!rule(value)) errors.push(`${capitalize(label)} attribute ${key} must ${allowedValues[key]}, got ${value}`);
-  }
-  return errors;
+export const headingAttributes = {
+  id: { label: 'id', type: 'string' },
+  toc: { label: '目录短标题', type: 'string' },
+};
+
+export const imageAttributes = {
+  width: { label: '宽度', type: 'string' },
+  height: { label: '高度', type: 'string' },
+  float: { label: '环绕', type: 'enum', options: ['none', 'left', 'right'], default: 'none' },
+};
+
+export function attributeError(kind, key, value) {
+  const rule = rules[kind][key];
+  if (!rule) return `Unknown ${kind} attribute ${key}`;
+  return rule(value) ? null : `${capitalize(kind)} attribute ${key} must ${allowedValues[key]}, got ${value}`;
 }
 
 function capitalize(text) {
@@ -84,7 +90,10 @@ function rank(order, key) {
 
 function apply(file, place, kind, content, onRead) {
   const { attributes, errors } = readAttributes(content);
-  errors.push(...checkAttributes(kind, attributes));
+  for (const [key, value] of Object.entries(attributes)) {
+    const error = attributeError(kind, key, value);
+    if (error) errors.push(error);
+  }
   for (const error of errors) file.message(error, place);
   onRead(attributes);
 }
@@ -95,7 +104,7 @@ function transformAttributes(tree, file) {
   visit(tree, 'heading', (heading) => {
     const last = heading.children.at(-1);
     if (last?.type !== 'text' || !last.position) return;
-    const match = headingAttributes.exec(last.value);
+    const match = headingAttributeText.exec(last.value);
     if (!match || !source.slice(last.position.start.offset, last.position.end.offset).endsWith(match[0])) return;
     const place = points.toPoint(last.position.end.offset - match[0].length + 1);
     apply(file, place, 'heading', match[1], (attributes) => {
@@ -107,7 +116,7 @@ function transformAttributes(tree, file) {
   visit(tree, 'image', (image, index, parent) => {
     const next = parent?.children[index + 1];
     if (next?.type !== 'text' || !next.position) return;
-    const match = imageAttributes.exec(next.value);
+    const match = imageAttributeText.exec(next.value);
     if (!match || !source.slice(next.position.start.offset).startsWith(match[0])) return;
     apply(file, points.toPoint(next.position.start.offset), 'image', match[1], (attributes) => {
       next.value = next.value.slice(match[0].length);
