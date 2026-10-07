@@ -16,7 +16,7 @@ function isDirective(node) {
   return node.type in markers;
 }
 
-function contentChildren(node) {
+export function contentChildren(node) {
   return node.children.filter((child) => !child.data?.directiveLabel);
 }
 

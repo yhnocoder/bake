@@ -75,7 +75,7 @@
     <tr><td><code>form</code></td><td><code>text</code>：行内标记，写作 <code>:name[文字]{属性}</code>；<code>leaf</code>：单行块，写作 <code>::name[文字]{属性}</code>；<code>container</code>：可以包含段落的块，写作 <code>:::name{属性}</code> 到 <code>:::</code></td></tr>
     <tr><td><code>label</code></td><td>插入菜单里显示的名字，默认是 <code>name</code></td></tr>
     <tr><td><code>attributes</code></td><td>属性定义，字段与组件的 <code>static properties</code> 相同，编辑器据此生成属性面板</td></tr>
-    <tr><td><code>render</code></td><td>可选。返回 hast 风格的数组 <code>[标签, 属性, 子节点]</code>。不写时输出 <code>&lt;div class="name"&gt;</code>（<code>text</code> 形式为 <code>&lt;span&gt;</code>），属性写成 <code>data-*</code></td></tr>
+    <tr><td><code>render</code></td><td>可选。参数 <code>attributes</code> 是写在指令上的属性，未写的属性填入默认值，值都是字符串；<code>label</code> 是容器形式 <code>[标题]</code> 转换成的 hast 节点列表，没有方括号时为 <code>undefined</code>；<code>children</code> 是其余内容转换成的 hast 节点列表。返回 hast 风格的数组 <code>[标签, 属性, 子节点列表]</code>，子节点列表里可以是 hast 节点、字符串或同样形式的数组。bake 在返回的最外层元素上加 <code>data-md</code>。不写时输出 <code>&lt;div class="name"&gt;</code>（<code>text</code> 形式为 <code>&lt;span&gt;</code>），属性写成 <code>data-*</code></td></tr>
   </tbody>
 </table>
 <p>块类型的样式写在博客的主题 CSS 里。编辑器中块内的内容可以直接输入，渲染结果与页面相同。理由：<code>render</code> 的输出同时用作编辑器节点的 DOM，编辑器和页面不需要两套定义。</p>
@@ -99,7 +99,7 @@
       ${page.eyebrow ? `&lt;p class="eyebrow"&gt;${page.eyebrow}&lt;/p&gt;` : ''}
       &lt;h1&gt;${page.title}&lt;/h1&gt;
     &lt;/header&gt;
-    &lt;nav class="toc"&gt;${toc.map(t =&gt; `&lt;a href="#${t.id}"&gt;${t.text}&lt;/a&gt;`).join('')}&lt;/nav&gt;
+    &lt;nav class="toc"&gt;${toc.map(t =&gt; `&lt;a href="#${t.id}"&gt;${t.html}&lt;/a&gt;`).join('')}&lt;/nav&gt;
     &lt;article&gt;${html}&lt;/article&gt;`;
 }</code></pre>
 <table>
@@ -109,7 +109,7 @@
   <tbody>
     <tr><td><code>page</code></td><td>frontmatter 全部字段，版式字段已经填入默认值，加上 <code>url</code> 和 <code>path</code>（源文件相对路径）</td></tr>
     <tr><td><code>html</code></td><td>渲染好的正文 HTML，旁注已经放在对应段落之后</td></tr>
-    <tr><td><code>toc</code></td><td>目录项列表 <code>{ id, text, depth }</code>，<code>text</code> 优先使用标题的 <code>toc</code> 属性</td></tr>
+    <tr><td><code>toc</code></td><td>目录项列表 <code>{ id, html, depth }</code>，<code>html</code> 是目录项的 HTML，有 <code>toc</code> 属性时是它的文字，没有时是标题内容渲染后的 HTML</td></tr>
     <tr><td><code>site</code></td><td>站点数据，与组件取得的相同</td></tr>
   </tbody>
 </table>
