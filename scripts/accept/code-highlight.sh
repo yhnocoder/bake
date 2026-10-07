@@ -33,7 +33,18 @@ fi
 
 BLOG="$WORK/typo"
 cp -R "$ROOT/examples/minimal" "$BLOG"
-printf -- '---\ntitle: 拼写错误\nslug: typo\n---\n\n段落\n\n```pyhton\nprint(1)\n```\n' > "$BLOG/content/typo.md"
+cat > "$BLOG/content/typo.md" <<'EOF'
+---
+title: 拼写错误
+slug: typo
+---
+
+段落
+
+```pyhton
+print(1)
+```
+EOF
 note 4 "加入 content/typo.md：$(cat "$BLOG/content/typo.md")"
 run_step 4 sh -c "cd '$BLOG' && node '$BAKE' build"
 if [ "$LAST_STATUS" -eq 1 ] && printf '%s\n' "$LAST_OUTPUT" | grep -qx 'content/typo.md:8:1 Unknown code language pyhton' && [ ! -e "$BLOG/dist" ]; then
