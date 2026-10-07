@@ -414,8 +414,7 @@ describe('启动', () => {
     const empty = mkdtempSync(join(tmpdir(), 'bake-dev-empty-'));
     try {
       await assert.rejects(createDevServer({ root: empty, port: 0 }), (error) => {
-        assert.equal(error.messages.length, 1);
-        assert.match(error.messages[0].text, /^Cannot load bake\.config\.js/);
+        assert.deepEqual(error.messages.map(({ text }) => text), [`bake.config.js not found in ${empty}`]);
         return true;
       });
     } finally {
