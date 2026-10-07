@@ -2,6 +2,7 @@ import { defaultValueCtx, Editor, editorViewCtx, rootCtx } from '@milkdown/core'
 import { history } from '@milkdown/plugin-history';
 import { Plugin } from '@milkdown/prose/state';
 import { $prose } from '@milkdown/utils';
+import { clipboard } from './clipboard/index.js';
 import { codeBlockView } from './code-block.js';
 import { directives } from './directives.js';
 import { enterRules } from './enter-rules.js';
@@ -65,6 +66,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(tableMenu)
     .use(taskList)
     .use(sidenotes)
+    .use(clipboard)
     .use(links)
     .use(changes(onChange))
     .create();

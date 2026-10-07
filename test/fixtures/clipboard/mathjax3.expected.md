@@ -1,0 +1,1 @@
+Given a data point sampled from a real data distribution , let us define a *forward diffusion process* in which we add small amount of Gaussian noise to the sample in  steps, producing a sequence of noisy samples . The step sizes are controlled by a variance schedule .
