@@ -24,11 +24,16 @@ function queryOf(state) {
   }
   const match = /^\/(\S*)$/.exec(text);
   if (!match) return null;
-  return { query: match[1], range: { from: $from.before(), to: $from.after() }, parent: $from.node(-1), index: $from.index(-1) };
+  const outer = $from.depth >= 2 ? { node: $from.node(-2), index: $from.index(-2), end: $from.after(-1) } : null;
+  return { query: match[1], range: { from: $from.before(), to: $from.after() }, parent: $from.node(-1), index: $from.index(-1), outer };
 }
 
 function fits({ parent, index }, node) {
   return parent.canReplaceWith(index, index + 1, node.type) && checkOrder(parent.copy(parent.content.replaceChild(index, node)));
+}
+
+function fitsAfterParent({ parent, outer }, node) {
+  return outer !== null && parent.type === node.type && outer.node.canReplaceWith(outer.index + 1, outer.index + 1, node.type);
 }
 
 function startTransaction(view) {
@@ -67,13 +72,30 @@ function blockItem(schema, block, match) {
     };
   }
   const node = blockNode(schema, block);
-  if (!node || !fits(match, node)) return null;
+  if (!node) return null;
+  const cursorOffset = (created) => 1 + (created.firstChild?.type.name === 'directive_label' && !labelRequired(created.type.name) ? created.firstChild.nodeSize : 0);
+  if (fits(match, node)) {
+    return {
+      ...base,
+      run(view, range) {
+        const created = blockNode(schema, block);
+        replaceParagraph(view, range, created, range.from + cursorOffset(created));
+      },
+    };
+  }
+  if (!fitsAfterParent(match, node)) return null;
   return {
     ...base,
     run(view, range) {
+      const current = queryOf(view.state);
       const created = blockNode(schema, block);
-      const skipLabel = created.firstChild?.type.name === 'directive_label' && !labelRequired(created.type.name);
-      replaceParagraph(view, range, created, range.from + 1 + (skipLabel ? created.firstChild.nodeSize : 0));
+      const tr = startTransaction(view);
+      if (current.parent.childCount > 1) tr.delete(range.from, range.to);
+      else tr.delete(range.from + 1, range.to - 1);
+      const insertAt = tr.mapping.map(current.outer.end);
+      tr.insert(insertAt, created);
+      tr.setSelection(TextSelection.findFrom(tr.doc.resolve(insertAt + cursorOffset(created)), 1));
+      finish(view, tr);
     },
   };
 }

@@ -44,7 +44,7 @@ scene() {
 }
 
 scene 2 menu '打开 features.md 进入编辑，在文末的空行输入 / 和 /cal' '菜单列出块和组件，/cal 只剩提示框；截图在 accept-results/insert-menu/menu/'
-scene 3 insert '用插入菜单依次插入内置块、表格和 demo-plot' '每一步只增加插入的几行，导语、副标题、出处在 positions.md 中各自允许的位置插入；卡片不能单独插入，见 3.txt；截图和 diff 在 accept-results/insert-menu/insert/'
+scene 3 insert '用插入菜单依次插入内置块、表格和 demo-plot' '每一步只增加插入的几行，导语、副标题、出处、卡片在 positions.md 中各自允许的位置插入；截图和 diff 在 accept-results/insert-menu/insert/'
 scene 4 slider '拖动 demo-plot 的滑块' '拖动中没有保存，松开后保存一次；录屏、截图和 diff 在 accept-results/insert-menu/slider/'
 scene 5 blocks '修改提示框的 kind、卡片的 span、标题的 id、图片的 float' 'span 输入 5x1 时显示错误说明，其他修改各自只改变一行；截图和 diff 在 accept-results/insert-menu/blocks/'
 scene 6 page '标题区输入标题，页面属性中修改 title、toc、layout 和 slug' '每一步只改变对应的 frontmatter 行，页面外框随之更新，修改 slug 后地址变为 /all-features/；截图和 diff 在 accept-results/insert-menu/page/'

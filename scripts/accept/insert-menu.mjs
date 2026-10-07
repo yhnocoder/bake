@@ -120,7 +120,7 @@ async function insert() {
     expect(`insert ${name}`, !diff.split('\n').some((line) => line.startsWith('- ')));
   }
   await context.close();
-  writeFileSync(plainPath, '---\ntitle: 插入位置\nslug: positions\n---\n\n第一段。\n\n## 小节 {#section}\n\n> 引文。\n>\n> 出处占位\n\n最后一段。\n');
+  writeFileSync(plainPath, '---\ntitle: 插入位置\nslug: positions\n---\n\n第一段。\n\n## 小节 {#section}\n\n> 引文。\n>\n> 出处占位\n\n::::bento\n:::card\n卡片。\n:::\n::::\n\n最后一段。\n');
   await new Promise((resolve) => setTimeout(resolve, 800));
   const positions = await open('/positions/');
   const other = positions.page;
@@ -133,7 +133,8 @@ async function insert() {
   expect('insert subtitle', subtitle.diff.includes('+ ::subtitle'));
   const source = await insertAt(other, plainPath, 'source', { anchor: '出处占位', select: true, query: 'so', item: '出处 source' });
   expect('insert source', source.diff.includes('+ > ::source'));
-  console.log('card: not inserted; the insert menu lists a block only where it can replace the paragraph, and a paragraph cannot be a direct child of a bento grid');
+  const card = await insertAt(other, plainPath, 'card', { anchor: '卡片。', query: 'card', item: '卡片 card' });
+  expect('insert card', card.diff.includes('+ :::card') && !card.diff.split('\n').some((line) => line.startsWith('- ')));
   await positions.context.close();
 }
 

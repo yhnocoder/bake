@@ -265,6 +265,18 @@ describe('位置规则', () => {
     assert.deepEqual(changes, { removed: ['> 引文。', '>', '> 出处占位'], added: ['> /', '>', '> ::source'] });
   });
 
+  test('卡片里列出卡片，新卡片加在当前卡片之后', async () => {
+    await newLineAfter('卡片。', plainPage);
+    await openMenu('card', plainPage);
+    assert.deepEqual(await menuItems(plainPage), ['卡片 card']);
+    await site.screenshot(plainPage, 'position-card');
+    const changes = await saveAfter(site, plainPage, plainPath, () => plainPage.keyboard.press('Enter'));
+    record('insert-card', changes);
+    assert.deepEqual(changes, { removed: [], added: ['', ':::card', ':::'] });
+    await saveAfter(site, plainPage, plainPath, () => plainPage.keyboard.type('第二张。'));
+    assert.match(site.read(plainPath), /:::card\n卡片。\n:::\n\n:::card\n第二张。\n:::\n::::/);
+  });
+
   test('其他位置不列出副标题和出处', async () => {
     await newLineAfter('第一段。', plainPage);
     await openMenu('', plainPage);
