@@ -5,6 +5,7 @@ import { addGlyphs, glyphsOf } from '../client/math-defs.js';
 import { createEditor } from './editor.js';
 import { docToMarkdown } from './markdown.js';
 import { reloadTransaction, renderedFormulas } from './math.js';
+import { trailingParagraphTransaction } from './trailing-paragraph.js';
 
 const saveDelay = 800;
 
@@ -49,6 +50,8 @@ export async function openEditor(status) {
   }
   const { editor } = created;
   view = created.view;
+  const trailing = trailingParagraphTransaction(view.state);
+  if (trailing) view.dispatch(trailing.setMeta('addToHistory', false));
   savedDoc = view.state.doc;
   article.replaceChildren(...root.childNodes);
   status.saved();
@@ -68,8 +71,9 @@ export async function openEditor(status) {
     hash = nextHash;
     const tr = view.state.tr.setDocAttribute('frontmatter', doc.attrs.frontmatter).replaceWith(0, view.state.doc.content.size, doc.content);
     tr.setSelection(TextSelection.near(tr.doc.resolve(startOfBlock(tr.doc, index) + 1)));
-    savedDoc = tr.doc;
+    savedDoc = null;
     view.dispatch(reloadTransaction(tr));
+    savedDoc = view.state.doc;
     conflict = false;
     status.saved();
   }

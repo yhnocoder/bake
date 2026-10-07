@@ -72,7 +72,55 @@ test('在引用块最后一段末尾和文章第一段开头按 Enter 都新建�
     });
     return names;
   });
-  assert.deepEqual(types, ['paragraph', 'paragraph', 'blockquote', 'paragraph', 'paragraph', 'paragraph']);
+  assert.deepEqual(types, ['paragraph', 'paragraph', 'blockquote', 'paragraph', 'paragraph', 'paragraph', 'paragraph']);
+  assert.deepEqual(errors, []);
+  await browserPage.close();
+});
+
+test('文末插入只含图片的段落后，光标落在后面的空段落，空段落不写入文件', async () => {
+  const file = 'content/image-end.md';
+  const markdown = page('image-end', '段落。\n\n![图](./assets/relu.png)\n');
+  await site.addPage(file, markdown, '/image-end/');
+  const { page: browserPage, errors } = await openEditor(site, '/image-end/');
+  assert.equal(await exportMarkdown(browserPage), markdown);
+  await saveAfter(site, browserPage, file, async () => {
+    await session(browserPage, (current) => {
+      const { state } = current.view;
+      const image = state.schema.nodes.image.create({ src: './assets/relu.png', alt: '第二张' });
+      const size = state.doc.content.size;
+      const tr = state.tr.replaceWith(size - state.doc.lastChild.nodeSize, size, state.schema.nodes.paragraph.create(null, image));
+      current.view.dispatch(tr.setSelection(state.selection.constructor.create(tr.doc, tr.doc.content.size - 1)));
+      current.view.focus();
+    });
+    await browserPage.keyboard.type('后文');
+  });
+  assert.equal(site.read(file), page('image-end', '段落。\n\n![图](./assets/relu.png)\n\n![第二张](./assets/relu.png)\n\n后文\n'));
+  assert.deepEqual(errors, []);
+  await browserPage.close();
+});
+
+test('剪切带 ^id 的整段后，留下的空段落不保留这个 id', async () => {
+  const file = 'content/cut.md';
+  await site.addPage(file, page('cut', '第一段。\n\n被剪切的段落。 ^cut-me\n\n## 被清空的标题 {#cut-heading}\n\n最后一段。\n'), '/cut/');
+  const { page: browserPage, errors } = await openEditor(site, '/cut/');
+  await saveAfter(site, browserPage, file, async () => {
+    await placeCursor(browserPage, '被剪切的段落。', { select: true });
+    await browserPage.keyboard.press('ControlOrMeta+x');
+    await placeCursor(browserPage, '被清空的标题', { select: true });
+    await browserPage.keyboard.press('Backspace');
+  });
+  const saved = site.read(file);
+  assert.doesNotMatch(saved, /cut-me|cut-heading/);
+  const ids = await session(browserPage, (current) => {
+    const found = [];
+    current.view.state.doc.descendants((node) => {
+      if (node.attrs.blockId || node.attrs.attributes?.id) found.push(node.attrs.blockId ?? node.attrs.attributes.id);
+    });
+    return found;
+  });
+  assert.deepEqual(ids, []);
+  await browserPage.keyboard.press('ControlOrMeta+z');
+  assert.match(await exportMarkdown(browserPage), /被清空的标题 \{#cut-heading\}/);
   assert.deepEqual(errors, []);
   await browserPage.close();
 });
