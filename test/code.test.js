@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, mock, test } from 'node:test';
-import { highlighter } from '../src/render/code.js';
+import { codeToLines, highlighter, languageKind, loadLanguage } from '../src/render/highlighter.js';
 import { render } from '../src/render/index.js';
 
 const header = '---\ntitle: 测试\nslug: test\n---\n\n';
@@ -77,6 +77,27 @@ describe('代码高亮', () => {
       [{ path: 'post.md', line: 3, column: 1, text: 'Unknown code language pyhton' }],
     );
     assert.match(html, /<pre><code class="language-pyhton">print\(1 &#x3C; 2\)\n<\/code><\/pre>/);
+  });
+
+  test('languageKind 区分不高亮、支持和未知的语言名', () => {
+    for (const lang of [undefined, '', 'text', 'txt', 'plain']) assert.equal(languageKind(lang), 'plain');
+    for (const lang of ['python', 'py', 'js']) assert.equal(languageKind(lang), 'known');
+    for (const lang of ['pyhton', 'Python']) assert.equal(languageKind(lang), 'unknown');
+  });
+
+  test('codeToLines 的 transformer 得到的范围对应原文中的词法单元', async () => {
+    await loadLanguage('python');
+    const code = 'a = 1\r\nb = "x"\r\n# c';
+    const ranges = [];
+    const recorder = {
+      span(hast, line, col, lineElement, token) {
+        ranges.push({ text: code.slice(token.offset, token.offset + token.content.length), content: token.content });
+      },
+    };
+    const lines = codeToLines(await highlighter(), code, 'python', [recorder]);
+    assert.equal(lines.filter((node) => node.type === 'element').length, 3);
+    assert.ok(ranges.length > 0);
+    for (const { text, content } of ranges) assert.equal(text, content);
   });
 
   test('代码中的 < 和 & 被转义', async () => {
