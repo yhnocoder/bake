@@ -3,6 +3,8 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 import { build } from 'vite';
+import { bakeMath } from '../math/plugin.js';
+import { bakeRuntime } from '../runtime/plugin.js';
 
 const clientScript = { name: 'client/page', path: fileURLToPath(new URL('../client/page.js', import.meta.url)) };
 const componentHelpers = fileURLToPath(new URL('../client/component.js', import.meta.url));
@@ -45,7 +47,7 @@ export async function bundle(site, { outDir, components, themes }) {
       root: site.root,
       base: site.config.base,
       publicDir: false,
-      plugins: [plugin],
+      plugins: [plugin, bakeRuntime(), bakeMath({ getConfig: () => site.config })],
       build: {
         outDir,
         emptyOutDir: true,

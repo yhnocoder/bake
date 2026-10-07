@@ -88,7 +88,7 @@ describe('输出目录', () => {
     const directory = blog({ 'dist/old.txt': 'old' });
     const result = bake(directory, 'build');
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, 'Built 3 pages to dist/\n');
+    assert.equal(result.stdout, 'Built 5 pages to dist/\n');
     assert.ok(!existsSync(join(directory, 'dist/old.txt')));
     assert.ok(existsSync(join(directory, 'dist/features/index.html')));
     assert.deepEqual(
@@ -101,7 +101,7 @@ describe('输出目录', () => {
     const directory = blog();
     const result = bake(directory, 'build', '--out', 'public/site');
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, 'Built 3 pages to public/site/\n');
+    assert.equal(result.stdout, 'Built 5 pages to public/site/\n');
     assert.ok(existsSync(join(directory, 'public/site/paper/index.html')));
   });
 
@@ -333,7 +333,7 @@ describe('草稿', () => {
     const site = JSON.parse(read(dist, 'site.json'));
     assert.deepEqual(
       site.pages.map((page) => page.url),
-      ['/bento/', '/features/', '/paper/'],
+      ['/bento/', '/extending/', '/features/', '/', '/paper/'],
     );
   });
 
@@ -399,7 +399,7 @@ describe('渲染缓存', () => {
     const directory = blog();
     await buildBlog(directory);
     const entries = cacheEntries(directory);
-    assert.equal(entries.length, 3);
+    assert.equal(entries.length, 5);
     const paperEntry = entries.find((file) => JSON.parse(readFileSync(file, 'utf8')).page.slug === 'paper');
     const cached = JSON.parse(readFileSync(paperEntry, 'utf8'));
     cached.html = cached.html.replace('梯度下降', '缓存里的文字');
@@ -409,7 +409,7 @@ describe('渲染缓存', () => {
     const dist = await buildBlog(directory);
     assert.ok(read(dist, 'paper/index.html').includes('缓存里的文字'));
     assert.ok(read(dist, 'features/index.html').includes('修改后的梯度指向函数值'));
-    assert.equal(cacheEntries(directory).length, 3);
+    assert.equal(cacheEntries(directory).length, 5);
   });
 
   test('构建成功后删除这次没有用到的缓存文件', async () => {
@@ -420,19 +420,20 @@ describe('渲染缓存', () => {
     rmSync(join(directory, 'content/bento.md'));
     await buildBlog(directory);
     assert.equal(existsSync(stale), false);
-    assert.equal(cacheEntries(directory).length, 2);
+    assert.equal(cacheEntries(directory).length, 4);
   });
 
   test('blocks/ 或 layouts/ 中（包括子目录）的文件变化后全部重新渲染', async () => {
+    const extensions = { blocks: "export default { name: 'extra', form: 'text' };\n", layouts: "export default () => '<article><!--bake:article--></article>';\n" };
     for (const directoryName of ['blocks', 'layouts']) {
-      const directory = blog({ [`${directoryName}/shape.js`]: 'export default {};\n' });
+      const directory = blog({ [`${directoryName}/extra.js`]: extensions[directoryName] });
       await buildBlog(directory);
       const before = new Set(cacheEntries(directory));
       mkdirSync(join(directory, directoryName, 'lib'));
       writeFileSync(join(directory, directoryName, 'lib/helper.js'), 'export default {};\n');
       await buildBlog(directory);
       const after = cacheEntries(directory);
-      assert.equal(after.length, 3);
+      assert.equal(after.length, 5);
       assert.ok(after.every((file) => !before.has(file)), directoryName);
     }
   });
@@ -533,5 +534,32 @@ describe('构建后的组件', () => {
     } finally {
       await browser.close();
     }
+  });
+});
+
+describe('扩展', () => {
+  test('examples/minimal 的首页和 extending 页面构建成功，使用博客的版式、主题、块类型和组件', async () => {
+    const dist = await buildBlog(blog());
+    const list = files(dist);
+    const home = read(dist, 'index.html');
+    const extending = read(dist, 'extending/index.html');
+    assert.match(home, /<page-list class="component" data-md="::page-list"><\/page-list>/);
+    assert.ok(home.includes(`src="/${matching(list, /^assets\/components\/page-list\.[\w-]+\.js$/)}"`));
+    assert.match(extending, /<p class="note-series">bake 示例<\/p><h1>博客自己的扩展<\/h1>/);
+    assert.match(extending, /<span class="math-shape matrix" data-md=":shape\[W\]\{kind=matrix\}">W<\/span>/);
+    assert.match(extending, /<div class="theorem" data-name="定理" data-md="[^"]*"><p>链式法则<\/p>/);
+    assert.ok(extending.includes(`href="/${matching(list, /^assets\/themes\/warm\.[\w-]+\.css$/)}"`));
+    assert.ok(extending.includes(`src="/${matching(list, /^assets\/components\/wave-figure\.[\w-]+\.js$/)}"`));
+    const warm = read(dist, matching(list, /^assets\/themes\/warm\.[\w-]+\.css$/));
+    assert.ok(warm.includes('.math-shape') && !warm.includes('@import'));
+  });
+
+  test('扩展有错误时只输出扩展错误和汇总行，以 1 退出，输出目录不变', () => {
+    const directory = blog({ 'dist/old.txt': 'old', 'components/plot.js': 'export default class extends HTMLElement {}\n', 'content/broken.md': article('broken', ':::callot\n内容。\n:::') });
+    const result = bake(directory, 'build');
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.equal(result.stderr, 'components/plot.js:1:1 Component file name must be lowercase letters, digits and "-", and contain at least one "-"\n1 error, dist/ was not written\n');
+    assert.deepEqual(files(join(directory, 'dist')), ['old.txt']);
   });
 });

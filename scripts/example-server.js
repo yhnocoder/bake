@@ -17,8 +17,9 @@ const contentTypes = {
 async function renderExample() {
   const loader = await createModuleLoader(join(root, example));
   const site = await loadSite(join(root, example), { loader }).finally(() => loader.close());
+  // why(#25): this server serves files without Vite, so components that import bake/runtime cannot load and are left undefined
   const definitions = Object.entries(site.components).map(
-    ([name, { path }], index) => `import C${index} from '/${example}/${path}';\ncustomElements.define('${name}', C${index});\n`,
+    ([name, { path }]) => `import('/${example}/${path}').then((module) => customElements.define('${name}', module.default), () => {});\n`,
   );
   const files = { '/components.js': definitions.join('') };
   const pages = {};

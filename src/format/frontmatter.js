@@ -20,6 +20,8 @@ const commonFields = {
   draft: { type: 'boolean', default: false },
 };
 
+export const commonFieldNames = Object.keys(commonFields);
+
 function findYamlNode(tree) {
   return tree.children.find((child) => child.type === 'yaml');
 }

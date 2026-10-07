@@ -1,3 +1,5 @@
+@import './lib/blocks.css';
+
 :root {
   --font-body: 'LXGW WenKai Screen', serif;
   --font-mono: 'JetBrains Mono', monospace;

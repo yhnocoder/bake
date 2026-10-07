@@ -1,0 +1,52 @@
+.math-shape {
+  padding: 0 0.2em;
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.math-shape.row {
+  border-radius: 999px;
+}
+
+.math-shape.column {
+  border-width: 0 2px;
+}
+
+.math-shape.matrix {
+  border-width: 0 2px;
+  border-color: var(--color-accent);
+}
+
+div.theorem {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1.1rem;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-highlight);
+}
+
+div.theorem::before {
+  content: attr(data-name);
+  font-weight: 600;
+}
+
+div.theorem > p:first-child {
+  display: inline;
+  font-weight: 600;
+}
+
+div.theorem > p:first-child::before {
+  content: '（';
+}
+
+div.theorem > p:first-child::after {
+  content: '）';
+}
+
+div.theorem > p:nth-child(2) {
+  margin-top: 0.3rem;
+}
+
+div.theorem > :last-child {
+  margin-bottom: 0;
+}

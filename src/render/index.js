@@ -86,8 +86,8 @@ function collectComponents(tree) {
   return [...names];
 }
 
-export async function render(source, { path, config = {}, blocks = [], components, layouts, themes } = {}) {
-  const parsed = parse(source, { path, blocks, components, layouts, themes });
+export async function render(source, { path, config = {}, blocks = [], components, otherTopicComponents, layouts, themes } = {}) {
+  const parsed = parse(source, { path, blocks, components, otherTopicComponents, layouts, themes });
   const { tree } = parsed;
   const messages = [...parsed.messages];
   const report = (node, text) => {
