@@ -20,7 +20,7 @@ fi
 
 (cd "$BLOG" && exec node "$ROOT/src/cli.js" dev) > "$LOG" 2>&1 &
 DEV_PID=$!
-trap 'kill "$DEV_PID" 2>/dev/null; rm -rf "$BLOG"' EXIT
+trap 'kill "$DEV_PID" 2>/dev/null || true; rm -rf "$BLOG"' EXIT
 for _ in $(seq 50); do
   if grep -q '^Local: ' "$LOG"; then break; fi
   sleep 0.2
