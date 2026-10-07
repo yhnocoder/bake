@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { renderDocument } from '../layouts/head.js';
 import { render } from '../render/index.js';
@@ -8,7 +8,11 @@ import { findPages, pageUrl } from './pages.js';
 const configPath = 'bake.config.js';
 const articlePlaceholder = '<!--bake:article-->';
 
-async function readConfig(loader, messages) {
+async function readConfig(root, loader, messages) {
+  if (!(await access(join(root, configPath)).then(() => true, () => false))) {
+    messages.push({ path: configPath, line: 1, column: 1, text: `${configPath} not found in ${root}` });
+    return null;
+  }
   try {
     return (await loader.import(configPath)).default;
   } catch (error) {
@@ -17,8 +21,8 @@ async function readConfig(loader, messages) {
   }
 }
 
-async function loadConfig(loader, messages) {
-  const config = await readConfig(loader, messages);
+async function loadConfig(root, loader, messages) {
+  const config = await readConfig(root, loader, messages);
   for (const field of ['title', 'theme']) {
     if (config && config[field] === undefined) messages.push({ path: configPath, line: 1, column: 1, text: `Config is missing ${field}` });
   }
@@ -27,7 +31,7 @@ async function loadConfig(loader, messages) {
 
 export async function loadSite(root, { loader }) {
   const messages = [];
-  const config = await loadConfig(loader, messages);
+  const config = await loadConfig(root, loader, messages);
   const { pages, messages: pageMessages } = await findPages(root);
   messages.push(...pageMessages);
   const extensions = await loadExtensions(root, loader);

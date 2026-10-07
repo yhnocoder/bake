@@ -221,7 +221,7 @@ themes/warm.css:1:1 Theme warm is missing variables --color-mark, --measure
 3 errors, dist/ was not written</div>
 <ul>
   <li><code>bake build</code> 在扩展有错误时只输出扩展的错误和汇总行，以 1 退出，不渲染页面，输出目录不变。理由：一个出错的扩展会在每个使用它的页面上产生错误，只输出原因更容易定位。</li>
-  <li><code>bake dev</code> 跳过未通过校验的扩展，页面照常显示。错误输出到终端，并计入每个页面状态栏的错误列表。使用了被跳过的组件、块类型、版式或主题的页面另外报告对应的渲染错误。</li>
+  <li><code>bake dev</code> 启动时扩展有错误，与 <code>bake build</code> 一样输出错误和汇总行，不启动服务器。启动之后修改扩展产生的错误不停止服务器：跳过未通过校验的扩展，页面照常显示。错误输出到终端，并计入每个页面状态栏的错误列表。使用了被跳过的组件、块类型、版式或主题的页面另外报告对应的渲染错误。</li>
   <li>同名的两个组件都不使用；覆盖内置版式的文件出错时使用内置版式。</li>
 </ul>
 </main>
