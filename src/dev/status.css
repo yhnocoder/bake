@@ -51,3 +51,26 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+.bake-status-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border, #e3e0d8);
+  border-radius: 6px;
+  background: var(--color-bg, #fff);
+}
+
+.bake-status-message[hidden] {
+  display: none;
+}
+
+.bake-status-message button {
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
