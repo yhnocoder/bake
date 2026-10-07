@@ -29,10 +29,17 @@
     <div class="bar" style="width: 85%"></div>
     <div class="bar" style="width: 60%"></div>
   </div>
-  <div class="foot"><b>D. 状态栏</b>右下角：「编辑」开关、保存状态（已保存、保存中、冲突）。</div>
+  <div class="foot"><b>D. 状态栏</b>右下角：「编辑」开关、「属性」按钮（编辑器打开时显示）、保存状态（已保存、保存中、冲突）。</div>
 </div>
 </div>
-<p>右侧栏在编辑时显示旁注，旁注可以直接输入。选中组件或带属性的块时，属性面板出现在右侧栏顶部；关闭面板后旁注恢复显示。</p>
+<p>右侧栏在编辑时显示旁注，旁注可以直接输入。属性面板打开时固定在窗口右上角，宽度与右侧栏相同，编辑器中的旁注隐藏；关闭面板后旁注恢复显示。打开方式见 <a href="#properties">属性面板</a>。</p>
+<p>A 区的标题直接输入。内置版式的标题是 <code>header.mast &gt; h1</code>，在 <code>&lt;article&gt;</code> 之外：</p>
+<ul>
+  <li>编辑器打开时，这个 <code>h1</code> 设为 <code>contenteditable="plaintext-only"</code>，关闭时去掉。博客版式没有 <code>header.mast &gt; h1</code> 时，标题只能在页面属性中修改。</li>
+  <li>按 <code>Enter</code> 或失去焦点时写回：文字去掉首尾空白后与 frontmatter 的 <code>title</code> 不同时，改写 <code>title</code> 所在的行，与页面属性使用同一个改写函数和同一种编辑步骤，<code>Mod-Z</code> 可以撤销。<code>Enter</code> 不插入换行，焦点回到正文。</li>
+  <li>文字为空时恢复为当前的 <code>title</code>，不写回。按 <code>Esc</code> 恢复为当前的 <code>title</code>，焦点回到正文。</li>
+  <li>页面属性修改 <code>title</code>、撤销或重做改变 <code>title</code> 时，标题区的文字随之更新。保存后页面外框被替换时，新的标题区同样设为可编辑。</li>
+</ul>
 <p>编辑器只存在于 <code>bake dev</code>。<code>bake build</code> 的输出不包含编辑器代码，也不包含「编辑」按钮。</p>
 
 <h2>打开和关闭编辑器时发生什么</h2>
@@ -47,13 +54,13 @@
 <p>再次点击「编辑」关闭编辑器：等待未完成的保存，再请求页面最新的渲染结果替换 <code>&lt;article&gt;</code> 的内容，然后在 <code>window</code> 上发出 <code>bake:page-updated</code> 事件，旁注位置等页面脚本据此重新计算。</p>
 
 <h2>块怎样变成编辑器节点</h2>
-<p>开发服务器提供虚拟模块 <code>virtual:bake/registry</code>，导出块类型登记表和组件的属性表（每个组件的 <code>static properties</code>）。编辑器按块的 <code>form</code> 生成节点：</p>
+<p>开发服务器提供虚拟模块 <code>virtual:bake/registry</code>。默认导出是块类型登记表和组件的属性表（每个组件的 <code>static properties</code>）；另外导出 <code>layouts</code>（<code>{ 版式名: fields }</code>）、<code>themes</code>（主题名列表）和 <code>defaultTheme</code>（<code>bake.config.js</code> 的 <code>theme</code>），供页面属性使用。编辑器按块的 <code>form</code> 生成节点：</p>
 <table>
   <thead>
     <tr><th>块的 <code>form</code></th><th>编辑器节点</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>container</code></td><td>块节点，内容是一个或多个块。指令方括号里的文字（例如 <code>:::fold[推导细节]</code> 的标题、<code>:::callout[向量说明]</code> 的名称）是第一个子节点，可以直接输入；折叠块必须有这个子节点，其他块的这个子节点删空后保存时不写方括号</td></tr>
+    <tr><td><code>container</code></td><td>块节点，内容是一个或多个块。指令方括号里的文字（例如 <code>:::fold[推导细节]</code> 的标题、<code>:::callout[向量说明]</code> 的名称）是第一个子节点，可以直接输入；折叠块必须有这个子节点，其他块的这个子节点删空后保存时不写方括号。<code>render</code> 显示名称的块（例如提示框）在编辑器里总有这个子节点，为空时显示默认名称（提示框为 <code>kind</code> 对应的「说明」「提示」「注意」）作为占位文字，点击名称把光标放进这个子节点。只含一个空段落的容器块保存为 <code>:::callout</code> 加 <code>:::</code> 两行，不写空行</td></tr>
     <tr><td><code>leaf</code></td><td>块节点，内容是方括号里的行内文字</td></tr>
     <tr><td><code>text</code></td><td>行内格式（mark），方括号里的文字可以直接编辑</td></tr>
   </tbody>
@@ -74,11 +81,11 @@
     <tr><td>独立公式</td><td>空行输入 <code>$$</code> 后回车；编辑方式同行内公式，输入框为多行</td></tr>
     <tr><td>容器块（折叠、提示框、加宽、边注、卡片网格、参考文献）</td><td>插入菜单插入；块内内容直接输入；属性在属性面板里改</td></tr>
     <tr><td>组件</td><td>插入菜单插入；组件照常运行；属性面板按组件的 <code>static properties</code> 生成控件；图题直接输入</td></tr>
-    <tr><td>图片</td><td>粘贴或拖入；说明文字直接输入</td></tr>
+    <tr><td>图片</td><td>粘贴或拖入；说明文字直接输入；点击图片打开属性面板，改 <code>width</code>、<code>height</code>、<code>float</code></td></tr>
     <tr><td>表格</td><td>单元格直接输入；<code>Tab</code> 移到下一格；右键菜单增删行列</td></tr>
     <tr><td>代码块</td><td>输入三个反引号加语言名后回车；语言名在代码块右上角修改</td></tr>
     <tr><td>独立的 HTML 块</td><td>显示渲染结果；点击后显示源码输入框</td></tr>
-    <tr><td>标题 id 和目录短标题</td><td>标题左侧显示 id；在属性面板里改 <code>id</code> 和 <code>toc</code></td></tr>
+    <tr><td>标题 id 和目录短标题</td><td>标题左侧显示 id；点击 id 打开属性面板，改 <code>id</code> 和 <code>toc</code></td></tr>
   </tbody>
 </table>
 <p><code>Mod</code> 在 macOS 上是 Command，其他系统上是 Ctrl。</p>
@@ -86,23 +93,123 @@
 <p>段落的 <code>^id</code> 和标题的 <code>{#id}</code> 属于块的内容：剪切或删除使段落或标题变空时，它的 id 一起删除，撤销时恢复。理由：留下的空块会保存成只有 id 的一行，并占用这个 id，把剪切的内容粘贴到别处时 id 会因为重复而被删除。</p>
 
 <h3>插入菜单</h3>
-<p>在空行输入 <code>/</code> 打开插入菜单，继续输入文字筛选，<code>Enter</code> 插入。菜单列出全部内置块类型、博客 <code>blocks/</code> 里的块类型，以及当前文章能使用的组件（全局组件和本主题的组件）。菜单项由块类型登记表和组件登记表生成，新增块类型或组件后不需要修改编辑器。</p>
-
-<h3>属性面板</h3>
-<p>属性面板的控件由定义生成：</p>
+<p>光标所在的段落全部内容是 <code>/</code> 加若干个非空白字符、并且光标在段落末尾时，光标下方显示插入菜单，<code>/</code> 之后的文字是查询文字。在段落中间输入 <code>/</code> 不显示菜单。输入 <code>/</code> 后菜单立即显示，筛选结果随输入立即更新（<code>@milkdown/plugin-slash</code> 的显示延迟设为 <code>0</code>，它默认是 <code>200ms</code>）。菜单的定位由 <code>@milkdown/plugin-slash</code> 负责，筛选、键盘选择和插入由 bake 实现，菜单的 DOM 由 bake 生成。</p>
+<ul>
+  <li>查询文字为空时列出全部可插入的项；不为空时只列出名字、显示文字或关键词包含查询文字的项，不区分大小写，保持原有顺序。没有匹配项时显示「没有匹配的项」，<code>Enter</code> 按普通回车处理。</li>
+  <li><code>↑</code>、<code>↓</code> 移动高亮项，在两端循环；<code>Enter</code> 插入高亮项；鼠标点击插入该项。<code>Esc</code> 关闭菜单，<code>/查询文字</code> 留在段落里，之后再输入时菜单重新显示。</li>
+  <li>段落内容不再符合上面的条件（例如输入了空格、删掉了 <code>/</code>）时菜单关闭。</li>
+</ul>
+<p>菜单分「块」和「组件」两组，菜单项由块类型登记表和组件属性表生成，新增块类型或组件后不需要修改编辑器：</p>
 <table>
   <thead>
-    <tr><th><code>type</code></th><th>控件</th><th>写回的属性值</th></tr>
+    <tr><th>组</th><th>项</th><th>显示</th><th>顺序</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>number</code></td><td>滑块加数字输入框，使用 <code>min</code>、<code>max</code>、<code>step</code></td><td>数字</td></tr>
-    <tr><td><code>string</code></td><td>单行输入框</td><td>字符串</td></tr>
-    <tr><td><code>boolean</code></td><td>开关</td><td>为 <code>true</code> 时写属性名，为 <code>false</code> 时不写</td></tr>
-    <tr><td><code>enum</code></td><td>下拉框，选项来自 <code>options</code></td><td>选中的字符串</td></tr>
+    <tr><td rowspan="3">块</td><td>块类型登记表中的块（内置块，再是博客块），<code>:span</code> 除外</td><td><code>label</code> 和 <code>name</code>，例如「提示框 callout」</td><td>登记表顺序</td></tr>
+    <tr><td>「表格」</td><td>「表格」，关键词 <code>table</code></td><td>块组的内置项之后</td></tr>
+    <tr><td>其他模块登记的项（例如链接选择器的「链接」）</td><td>登记时给出的文字</td><td>登记顺序</td></tr>
+    <tr><td>组件</td><td><code>virtual:bake/registry</code> 中的组件</td><td>组件名，例如 <code>demo-plot</code></td><td>按名字排序</td></tr>
   </tbody>
 </table>
-<p>没有选中任何块时，属性面板显示页面属性：通用 frontmatter 字段和当前版式声明的字段，见 <a href="content-format.html">内容格式</a> 的 frontmatter 一节。修改后写回文件开头的 frontmatter。</p>
-<p>拖动滑块时组件实时重画，文件在停止拖动后写回。属性值等于 <code>default</code> 时不写进 Markdown。理由：文件里只保留与默认值不同的属性，默认值修改后所有没有显式设置的地方一起生效。</p>
+<p>其他模块通过 Milkdown 的 ctx slice <code>insertMenuItemsCtx</code>（<code>src/editor/insert-menu.js</code> 导出）登记菜单项，每项为 <code>{ label, keywords, run(view, range) }</code>，<code>range</code> 是 <code>/查询文字</code> 所在段落的位置 <code>{ from, to }</code>，<code>run</code> 自己删除查询文字并插入内容。<code>:span</code> 不列出：它必须紧跟一个旁注引用，由旁注模块插入。</p>
+<p>一个块类型、表格或组件只在当前位置允许插入时列出。判断只用 schema 和副标题的检查函数：</p>
+<ol>
+  <li>设 <code>/查询文字</code> 所在段落的父节点为 <code>parent</code>、序号为 <code>index</code>，<code>parent.canReplaceWith(index, index + 1, nodeType)</code> 为真。</li>
+  <li>把段落换成这个节点后，<code>parent</code> 通过副标题的检查函数。</li>
+</ol>
+<p>所以导语只在正文的第一个块处列出，副标题只在标题之后列出，出处只在引用块的最后一段列出，表格单元格里只列出 <code>text</code> 形式的块。插入卡片网格时生成第一张卡片。text 形式的块只要求段落允许它的 mark。</p>
+<p>段落不能是卡片网格的直接子节点，所以卡片另有一条规则：<code>/查询文字</code> 所在段落是卡片的直接子节点时列出卡片，新卡片插在当前卡片之后，<code>/查询文字</code> 从当前卡片中删除。</p>
+<p>插入前删除 <code>/查询文字</code>，每种形式插入的内容和插入后光标的位置如下：</p>
+<table>
+  <thead>
+    <tr><th>形式</th><th>插入的内容</th><th>光标</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>container</code></td><td><code>createAndFill({ attributes: {} })</code> 创建的块节点，替换所在段落。必需的子节点由 schema 生成，例如折叠得到空标题和一个空段落，卡片网格得到一张带空段落的卡片；显示名称的块（提示框）带一个空的名称子节点</td><td>第一个可以输入文字的位置；可以留空的名称子节点跳过，光标在第一个段落</td></tr>
+    <tr><td><code>leaf</code></td><td>同上，内容为空</td><td>块内</td></tr>
+    <tr><td><code>text</code></td><td>段落内容替换为 <code>label</code> 文字，加上该块的 mark，属性为空</td><td>选中这段文字，直接输入时替换文字并保留 mark</td></tr>
+    <tr><td>组件</td><td>组件节点，属性为空，图题为空，替换所在段落</td><td>图题内</td></tr>
+    <tr><td>表格</td><td><code>@milkdown/preset-gfm</code> 的 <code>createTable</code> 生成的 3 行 3 列表格，替换所在段落</td><td>第一个单元格</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>属性为空表示全部使用默认值，插入后的 Markdown 是 <code>:::callout</code>、<code>::demo-plot</code> 这样不带属性的写法。图题为空的组件写成 <code>::demo-plot</code>，输入图题后写成 <code>:::demo-plot</code> 加图题。</li>
+  <li>一次插入是一个事务，事务开始前调用 prosemirror-history 的 <code>closeHistory</code>，所以 <code>Mod-Z</code> 一步撤销插入，撤销后恢复 <code>/查询文字</code>。</li>
+</ul>
+
+<h3 id="properties">属性面板</h3>
+<p>属性面板有两种内容：块属性（对象是一个节点或一段 mark）和页面属性（对象是 frontmatter）。可以作为块属性对象的内容和属性定义的来源：</p>
+<table>
+  <thead>
+    <tr><th>内容</th><th>属性定义的来源</th><th>面板标题</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>组件</td><td>组件的 <code>static properties</code></td><td>组件名</td></tr>
+    <tr><td>指令块（<code>container</code>、<code>leaf</code>），定义里的 <code>attributes</code> 不为空</td><td>块定义的 <code>attributes</code></td><td>块的 <code>label</code></td></tr>
+    <tr><td><code>text</code> 形式的 mark，定义里的 <code>attributes</code> 不为空</td><td>同上</td><td>同上</td></tr>
+    <tr><td>标题</td><td><code>src/format/attributes.js</code> 的 <code>headingAttributes</code>：<code>id</code>（id）、<code>toc</code>（目录短标题）</td><td>「标题」</td></tr>
+    <tr><td>图片</td><td><code>src/format/attributes.js</code> 的 <code>imageAttributes</code>：<code>width</code>（宽度）、<code>height</code>（高度）、<code>float</code>（环绕，<code>none</code> | <code>left</code> | <code>right</code>，默认 <code>none</code>）</td><td>「图片」</td></tr>
+  </tbody>
+</table>
+<p>打开面板的方式：</p>
+<ul>
+  <li>点击节点内容区以外的部分：组件的绘图区（<code>&lt;figcaption&gt;</code> 以外的部分）、容器块的边框和不可编辑的部分（例如卡片的标题）、标题左侧的 id、图片。面板打开，对象是这个节点。点击块内的段落、提示框的名称或组件的图题时只移动光标。</li>
+  <li>状态栏的「属性」按钮：面板关闭时打开，对象是光标所在位置最内层的可作为对象的内容；光标不在这样的内容里时显示页面属性。面板打开时再次点击关闭面板。</li>
+  <li>面板右上角的「关闭」按钮，或焦点在面板内时按 <code>Esc</code>，关闭面板，焦点回到正文。</li>
+</ul>
+<p>面板打开时，对象随选区变化：选区离开当前对象时，对象改为新选区所在位置最内层的可作为对象的内容，没有时显示页面属性。对象被删除（包括编辑器重新载入文件）时显示页面属性。理由：光标在块里输入时面板不会自动出现，旁注保持显示；打开面板后移动光标就能查看另一个块的属性。</p>
+<p>面板是 <code>&lt;body&gt;</code> 下的一个元素，固定在窗口右上角，宽度为 <code>--sidenote-width</code>；内容超过窗口高度时面板内部滚动。没有右侧栏的版式（bento）和窗口宽度 <code>1100px</code> 以下时位置相同，盖在正文上方。面板的颜色只使用主题变量。面板打开时 <code>&lt;body&gt;</code> 有 <code>class="properties-open"</code>，编辑器中的旁注在这个 class 下隐藏。</p>
+<p>控件按属性定义的 <code>type</code> 生成，属性名旁显示 <code>label</code>，没有 <code>label</code> 时显示属性名：</p>
+<table>
+  <thead>
+    <tr><th><code>type</code></th><th>控件</th><th>写回的时机</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>number</code></td><td>有 <code>min</code> 和 <code>max</code> 时为滑块加数字输入框，使用 <code>min</code>、<code>max</code>、<code>step</code>；缺少其中一个时只有数字输入框</td><td>滑块：拖动中只更新组件元素，松开时写回；数字输入框：<code>Enter</code> 或失去焦点时写回</td></tr>
+    <tr><td><code>string</code></td><td>单行输入框；标题的 <code>id</code> 为空时显示生成的 id 作为提示文字</td><td><code>Enter</code> 或失去焦点时写回</td></tr>
+    <tr><td><code>boolean</code></td><td>开关</td><td>切换时写回</td></tr>
+    <tr><td><code>enum</code></td><td>下拉框，选项来自 <code>options</code>；没有 <code>default</code> 时第一个选项是「（未设置）」</td><td>选择时写回</td></tr>
+    <tr><td><code>list</code>（只用于版式字段）</td><td>多行输入框，每行一项，空行忽略</td><td>失去焦点时写回</td></tr>
+  </tbody>
+</table>
+<p>写回的值：</p>
+<ul>
+  <li>属性值等于 <code>default</code> 时，从 Markdown 中删除这个属性；frontmatter 中删除这个字段。理由：文件里只保留与默认值不同的属性，默认值修改后所有没有显式设置的地方一起生效。</li>
+  <li>输入框清空、下拉框选「（未设置）」时，删除这个属性。</li>
+  <li><code>number</code> 写成 <code>String(Number(输入值))</code>，例如输入 <code>1.50</code> 写成 <code>1.5</code>。</li>
+  <li><code>boolean</code> 写成 <code>key=true</code> 或 <code>key=false</code>，等于 <code>default</code> 时不写。理由：与内容格式的校验（只接受 <code>true</code>、<code>false</code>）一致，<code>default: true</code> 的属性也能设成 <code>false</code>。</li>
+  <li>写回前用内容格式模块的校验函数检查这一个值：标题和图片用 <code>attributeError(kind, key, value)</code>，指令和组件用 <code>directiveAttributeError(name, key, value, properties)</code>，frontmatter 字段用 <code>fieldError(name, value, field)</code>，与 <code>parse</code> 使用同一份代码。不合法时控件下方显示英文的错误说明，不写回。</li>
+</ul>
+<p>每次写回是一个事务，事务开始前调用 <code>closeHistory</code>，<code>Mod-Z</code> 一步撤销一次修改。写回后由自动保存在 <code>800ms</code> 后保存，所以拖动滑块时文件在松开后写入。节点的属性用 <code>tr.setNodeAttribute(pos, 'attributes', 新的属性对象)</code> 修改；<code>text</code> 形式的 mark 在同一个事务里 <code>removeMark</code> 后 <code>addMark</code>。属性对象保留原有键的顺序，新增的键加在末尾；标题和图片的属性删空后不写花括号。</p>
+<p>组件节点的属性变化时，编辑器不重新创建组件元素，只同步元素的属性，组件的 <code>attributeChangedCallback</code> 被调用，内部状态和图题保留。拖动滑块时面板直接对组件元素调用 <code>setAttribute</code>，组件实时重画，文档不变；组件节点视图忽略 <code>contentDOM</code> 以外的 DOM 变化，所以这次变化不会让 ProseMirror 重新读取节点。</p>
+
+<h3>页面属性</h3>
+<p>没有选中块时，属性面板显示页面属性，修改写回文件开头的 frontmatter。面板列出：</p>
+<ul>
+  <li>通用字段，顺序为 <code>title</code>（标题）、<code>slug</code>（地址）、<code>date</code>（日期）、<code>layout</code>（版式）、<code>theme</code>（主题）、<code>width</code>（正文宽度）、<code>draft</code>（草稿），见 <a href="content-format.html">内容格式</a> 的 frontmatter 一节。<code>layout</code> 是下拉框，选项是 <code>virtual:bake/registry</code> 的 <code>layouts</code>；<code>theme</code> 是下拉框，选项是 <code>themes</code>，默认值是 <code>defaultTheme</code>，所以选择站点默认主题时删除这个字段。</li>
+  <li>小标题「版式字段」下列出当前版式的 <code>fields</code>。当前版式没有字段时不显示这一节。</li>
+  <li>其他字段（例如 <code>category</code>、<code>tags</code>）不显示，原样保留。</li>
+</ul>
+<p>frontmatter 的 YAML 有语法错误时，面板只显示 <code>parse</code> 给出的错误说明，不显示控件。字段的当前值不合法时，控件显示默认值，下方显示 <code>fieldError</code> 的说明。</p>
+<p>frontmatter 原文存在文档根节点的 <code>frontmatter</code> 属性中，页面属性的修改是 <code>tr.setDocAttribute('frontmatter', 新原文)</code>，与正文的修改一样触发自动保存，可以撤销，重新载入和冲突处理使用同一套代码。新原文由 <code>src/format/frontmatter.js</code> 的两个函数按行改写：</p>
+<pre><code class="language-js">setFrontmatterField(raw, name, value)  // → string
+deleteFrontmatterField(raw, name)      // → string</code></pre>
+<ul>
+  <li>一个字段所占的行是从键所在的行到值结束的那一行，由 <code>yaml</code> 包的 <code>parseDocument</code> 找到顶层的同名键。</li>
+  <li>修改已有字段时只重写这个字段所占的行，新内容是 <code>yaml</code> 包的 <code>stringify({ [name]: value }, { lineWidth: 0 })</code>：字符串需要时加引号，列表写成 <code>- 项</code> 的块形式，缩进 2 个空格。被重写的行的行尾注释随之删除。</li>
+  <li>新增字段加在最后一行之后；删除字段时删除这个字段所占的行。</li>
+  <li>其他行逐字节不变，包括注释、空行、引号写法和流式列表 <code>[a, b]</code>。原文末尾没有换行时，结果保持没有换行。</li>
+</ul>
+<p>理由：内容格式规定 frontmatter 原文不变，<code>bake format</code> 不改写它。<code>yaml</code> 包的 <code>Document.toString()</code> 会改变没有修改的行（<code>[GELU, SiLU]</code> 变成 <code>[ GELU, SiLU ]</code>，折叠字符串重新排版），文件的 diff 会包含无关的行。按行改写后的原文仍是合法的 YAML，<code>bake format</code> 保持它不变。</p>
+<p>修改 <code>layout</code> 时，在同一个事务里：</p>
+<ol>
+  <li>写入新的 <code>layout</code>；新值等于默认值 <code>essay</code> 时删除这个字段。</li>
+  <li>旧版式声明、新版式没有声明的字段，从 frontmatter 中删除。</li>
+  <li>两个版式都声明的同名字段（例如 essay 和 paper 的 <code>toc</code>、<code>numbered</code>），值通过新版式的 <code>fieldError</code> 检查时保留，否则删除；值等于新版式的默认值时也删除。</li>
+</ol>
+<p>理由：文章使用其他版式的字段时构建报错，切换后留下的字段会让构建失败。删除的值可以用 <code>Mod-Z</code> 一步恢复，所以不弹出确认框。</p>
+<p>修改 <code>slug</code> 后页面地址改变：<code>/__bake/save</code> 返回新地址，编辑器用 <code>history.replaceState</code> 改变浏览器地址；新 <code>slug</code> 已被另一篇文章使用时保存返回 <code>400</code>，状态栏显示「保存失败」和原因。<code>slug</code> 的格式由 <code>fieldError</code> 检查，格式不合法的值不会写入。</p>
+<p><code>title</code>、<code>layout</code>、<code>theme</code>、<code>width</code> 和版式字段决定 <code>&lt;article&gt;</code> 以外的页面结构和样式。保存成功、并且这次保存的 frontmatter 与上一次保存的不同时（比较 <code>bake:editor-saved</code> 事件的 <code>detail.frontmatter</code>），编辑器请求当前页面地址，用 <code>DOMParser</code> 解析开发服务器渲染的整页 HTML，调用 <code>replaceChrome</code> 替换 <code>&lt;article&gt;</code> 以外的页面结构和样式表，保留当前的 <code>&lt;article&gt;</code> 元素，编辑器不重新创建，然后在 <code>window</code> 上发出 <code>bake:page-updated</code>。滚动位置、焦点、属性面板和 <code>&lt;body&gt;</code> 上的 <code>bake-editing</code>、<code>properties-open</code> 保持不变。</p>
 
 <h2>怎样移动块</h2>
 <p>鼠标移到一个块上时，块的左侧显示拖动手柄 <code>⋮⋮</code>。按住手柄拖动，目标位置显示一条横线，松开后块移到横线处。点击手柄打开块菜单，菜单里有「删除」「复制一份」「上移」「下移」。</p>

@@ -560,7 +560,7 @@ tags: [GELU, SiLU, GLU]
   <li>通用字段和当前版式声明的字段由 bake 校验，类型不符或取值不在范围内时构建报错。</li>
   <li>文章使用了另一个版式的字段时构建报错。例如 essay 文章写了 <code>authors</code>。理由：这种情况通常是切换版式后忘了删字段，字段在页面上不会显示。</li>
   <li>其他字段 bake 不解释，原样放进站点数据，供首页这类组件使用，见 <a href="extending.html">扩展接口</a>。</li>
-  <li>编辑器的页面属性面板列出通用字段和当前版式的字段，控件按字段类型生成。</li>
+  <li>编辑器的页面属性面板列出通用字段和当前版式的字段，控件按字段类型生成。编辑器修改一个字段时只重写这个字段所在的行，其他行（注释、空行、引号写法、流式列表）逐字节不变，规则见 <a href="editor.html#properties">编辑器</a> 的页面属性一节。</li>
 </ul>
 
 <h2 id="output-format">Markdown 的输出格式是什么</h2>
@@ -581,7 +581,7 @@ tags: [GELU, SiLU, GLU]
     <tr><td>有序列表</td><td>起始编号保留原值，后续编号依次递增，例如 <code>1. 1. 1.</code> 输出为 <code>1. 2. 3.</code></td></tr>
     <tr><td>硬换行</td><td>行尾反斜杠</td></tr>
     <tr><td>旁注定义的位置</td><td>写在第一次引用它的块之后。这个块是正文的顶层块，例如引用在提示框里的段落中时，定义写在整个提示框之后。同一个块引用了多条注释时，按引用顺序排列</td></tr>
-    <tr><td>frontmatter</td><td>原文不变</td></tr>
+    <tr><td>frontmatter</td><td>原文不变。编辑器修改字段时只重写该字段所在的行</td></tr>
   </tbody>
 </table>
 <p>已有文件不符合这个格式时，第一次保存会改变这些写法。迁移博客时先用 <code>bake format</code> 统一一次，之后的 diff 只包含实际修改。</p>
@@ -610,6 +610,18 @@ parseSyntax(source, { path })
   </tbody>
 </table>
 <p><code>components</code>、<code>layouts</code>、<code>themes</code> 没有传入时，跳过对应的检查。</p>
+<p>编辑器的属性面板按单个值校验，使用与 <code>parse</code> 相同的函数。每个函数返回英文的错误说明（与 <code>messages</code> 中的 <code>text</code> 相同）或 <code>null</code>：</p>
+<table>
+  <thead>
+    <tr><th>函数</th><th>所在文件</th><th>检查</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>attributeError(kind, key, value)</code></td><td><code>src/format/attributes.js</code></td><td>标题和图片的属性：id 格式、尺寸格式、<code>float</code> 取值</td></tr>
+    <tr><td><code>directiveAttributeError(name, key, value, properties)</code></td><td><code>src/format/validate.js</code></td><td>指令和组件属性的类型、enum 取值，以及卡片的 <code>span</code> 格式</td></tr>
+    <tr><td><code>fieldError(name, value, field)</code></td><td><code>src/format/frontmatter.js</code></td><td>frontmatter 字段的类型、范围，<code>slug</code> 和 <code>date</code> 的格式</td></tr>
+  </tbody>
+</table>
+<p><code>src/format/attributes.js</code> 同时导出标题和图片的属性定义 <code>headingAttributes</code>、<code>imageAttributes</code>，格式与块的 <code>attributes</code> 相同；<code>src/format/frontmatter.js</code> 导出带 <code>label</code> 的通用字段定义 <code>commonFields</code>，以及按行改写 frontmatter 的 <code>setFrontmatterField</code>、<code>deleteFrontmatterField</code>。</p>
 <p><code>src/render/index.js</code> 导出 <code>render</code>，把一篇文章渲染成正文 HTML 片段和目录。版式、构建和开发服务器从它取数据：</p>
 <pre><code class="language-js">await render(source, { path, config, blocks, components, layouts, themes })
   // → { page, html, toc, mathDefs, ids, links, components, messages }</code></pre>

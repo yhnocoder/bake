@@ -17,6 +17,7 @@
     "@milkdown/core": "7.22.2",
     "@milkdown/ctx": "7.22.2",
     "@milkdown/plugin-history": "7.22.2",
+    "@milkdown/plugin-slash": "7.22.2",
     "@milkdown/preset-commonmark": "7.22.2",
     "@milkdown/preset-gfm": "7.22.2",
     "@milkdown/prose": "7.22.2",

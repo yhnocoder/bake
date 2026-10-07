@@ -1,6 +1,6 @@
 import { VFile } from 'vfile';
 import { location } from 'vfile-location';
-import { isMap, parseDocument } from 'yaml';
+import { isMap, parseDocument, stringify } from 'yaml';
 import { createProcessor } from './processor.js';
 
 const slugPattern = /^(?:\/|[a-z0-9-]+(?:\/[a-z0-9-]+)*)$/;
@@ -10,14 +10,14 @@ export function isSlug(value) {
   return typeof value === 'string' && slugPattern.test(value);
 }
 
-const commonFields = {
-  title: { type: 'string' },
-  slug: { type: 'slug' },
-  date: { type: 'date' },
-  layout: { type: 'string', default: 'essay' },
-  theme: { type: 'string' },
-  width: { type: 'enum', options: ['normal', 'wide'], default: 'normal' },
-  draft: { type: 'boolean', default: false },
+export const commonFields = {
+  title: { label: '标题', type: 'string' },
+  slug: { label: '地址', type: 'slug' },
+  date: { label: '日期', type: 'date' },
+  layout: { label: '版式', type: 'string', default: 'essay' },
+  theme: { label: '主题', type: 'string' },
+  width: { label: '正文宽度', type: 'enum', options: ['normal', 'wide'], default: 'normal' },
+  draft: { label: '草稿', type: 'boolean', default: false },
 };
 
 function findYamlNode(tree) {
@@ -41,7 +41,7 @@ export function readYaml(tree, file) {
   return { node, document, contentOffset };
 }
 
-function typeError(name, value, field) {
+export function fieldError(name, value, field) {
   switch (field.type) {
     case 'string':
       return typeof value === 'string' ? null : `Frontmatter field ${name} must be a string`;
@@ -146,7 +146,7 @@ export function checkFrontmatter(file, yaml, { layouts, themes }) {
   for (const [name, value] of Object.entries(values)) {
     const field = fields[name];
     if (field) {
-      const error = typeError(name, value, field);
+      const error = fieldError(name, value, field);
       if (error) file.message(error, placeOf(name));
       continue;
     }
@@ -155,4 +155,37 @@ export function checkFrontmatter(file, yaml, { layouts, themes }) {
     if (owner) file.message(`Frontmatter field ${name} belongs to layout ${owner}, current layout is ${layout}`, placeOf(name));
   }
   return withDefaults(values, fields);
+}
+
+function fieldLines(raw, name) {
+  const contents = parseDocument(raw).contents;
+  const pair = isMap(contents) ? contents.items.find((item) => String(item.key?.value) === name) : undefined;
+  if (!pair) return null;
+  const keyStart = pair.key.range[0];
+  const valueEnd = pair.value?.range?.[1] ?? pair.key.range[1];
+  const start = raw.lastIndexOf('\n', keyStart - 1) + 1;
+  const newline = raw.indexOf('\n', Math.max(valueEnd - 1, keyStart));
+  return { start, end: newline === -1 ? raw.length : newline + 1 };
+}
+
+function fieldText(name, value) {
+  return stringify({ [name]: value }, { lineWidth: 0 });
+}
+
+export function setFrontmatterField(raw, name, value) {
+  const lines = fieldLines(raw, name);
+  const text = fieldText(name, value);
+  if (!lines) {
+    if (raw === '') return text.slice(0, -1);
+    return raw.endsWith('\n') ? raw + text : `${raw}\n${text.slice(0, -1)}`;
+  }
+  const replacement = raw.slice(lines.start, lines.end).endsWith('\n') ? text : text.slice(0, -1);
+  return raw.slice(0, lines.start) + replacement + raw.slice(lines.end);
+}
+
+export function deleteFrontmatterField(raw, name) {
+  const lines = fieldLines(raw, name);
+  if (!lines) return raw;
+  const start = lines.end === raw.length && !raw.endsWith('\n') && lines.start > 0 ? lines.start - 1 : lines.start;
+  return raw.slice(0, start) + raw.slice(lines.end);
 }

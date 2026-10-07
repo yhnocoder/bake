@@ -4,10 +4,12 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import builtinBlocks from '../src/blocks/index.js';
 import { VFile } from 'vfile';
-import { frontmatterLength, readFrontmatter, readYaml } from '../src/format/frontmatter.js';
+import { attributeError, headingAttributes, imageAttributes } from '../src/format/attributes.js';
+import { commonFields, fieldError, frontmatterLength, readFrontmatter, readYaml } from '../src/format/frontmatter.js';
 import { format, parse, stringify } from '../src/format/index.js';
 import { createProcessor } from '../src/format/processor.js';
 import { createRegistry } from '../src/format/registry.js';
+import { directiveAttributeError } from '../src/format/validate.js';
 import * as bento from '../src/layouts/bento.js';
 import * as essay from '../src/layouts/essay.js';
 import * as paper from '../src/layouts/paper.js';
@@ -543,5 +545,72 @@ describe('frontmatterLength', () => {
       const expected = node ? (lineEnd === -1 ? source.length : lineEnd + 1) : 0;
       assert.equal(frontmatterLength(source), expected, source);
     }
+  });
+});
+
+describe('按单个属性校验', () => {
+  test('attributeError：标题和图片的属性', () => {
+    assert.equal(attributeError('heading', 'id', 'chain-rule'), null);
+    assert.equal(attributeError('heading', 'id', '1a'), 'Heading attribute id must start with a letter and contain only letters, digits, - and _, got 1a');
+    assert.equal(attributeError('heading', 'toc', '短 标题'), null);
+    assert.equal(attributeError('heading', 'width', '1'), 'Unknown heading attribute width');
+    assert.equal(attributeError('image', 'width', '60%'), null);
+    assert.equal(attributeError('image', 'height', '2.5em'), null);
+    assert.equal(attributeError('image', 'width', 'wide'), 'Image attribute width must be a number with optional px, %, or em, got wide');
+    assert.equal(attributeError('image', 'float', 'left'), null);
+    assert.equal(attributeError('image', 'float', 'center'), 'Image attribute float must be one of none, left, right, got center');
+    assert.equal(attributeError('image', 'id', 'a'), 'Unknown image attribute id');
+  });
+
+  test('attributeError 与 parse 给出相同的说明', () => {
+    assert.equal(only('## 标题 {#1a}\n').text, attributeError('heading', 'id', '1a'));
+    assert.equal(only('![图](./a.png){float=center}\n').text, attributeError('image', 'float', 'center'));
+  });
+
+  test('headingAttributes 和 imageAttributes 的定义', () => {
+    assert.deepEqual(Object.keys(headingAttributes), ['id', 'toc']);
+    assert.deepEqual(imageAttributes.float, { label: '环绕', type: 'enum', options: ['none', 'left', 'right'], default: 'none' });
+  });
+
+  test('directiveAttributeError：类型、enum 取值和卡片的 span', () => {
+    const callout = builtinBlocks.find((block) => block.name === 'callout').attributes;
+    const card = builtinBlocks.find((block) => block.name === 'card').attributes;
+    const plot = { x0: { type: 'number' }, showPath: { type: 'boolean' } };
+    assert.equal(directiveAttributeError('callout', 'kind', 'tip', callout), null);
+    assert.equal(directiveAttributeError('callout', 'kind', 'info', callout), 'Attribute kind must be one of note, tip, warning, got info');
+    assert.equal(directiveAttributeError('demo-plot', 'x0', '1.5', plot), null);
+    assert.equal(directiveAttributeError('demo-plot', 'x0', 'abc', plot), 'Attribute x0 must be a number, got abc');
+    assert.equal(directiveAttributeError('demo-plot', 'x0', ' ', plot), 'Attribute x0 must be a number, got  ');
+    assert.equal(directiveAttributeError('demo-plot', 'showPath', 'false', plot), null);
+    assert.equal(directiveAttributeError('demo-plot', 'showPath', 'yes', plot), 'Attribute showPath must be true or false, got yes');
+    assert.equal(directiveAttributeError('card', 'span', '4x2', card), null);
+    assert.equal(directiveAttributeError('card', 'span', '5x1', card), ':::card span must be COLUMNSxROWS with 1 to 4 columns, got 5x1');
+    assert.equal(directiveAttributeError('card', 'title', '5x1', card), null);
+  });
+
+  test('directiveAttributeError 与 parse 给出相同的说明', () => {
+    assert.equal(only('::::bento\n:::card{span=5x1}\n内容\n:::\n::::\n').text, directiveAttributeError('card', 'span', '5x1', {}));
+    assert.equal(only(':::callout{kind=info}\n内容\n:::\n').text, directiveAttributeError('callout', 'kind', 'info', builtinBlocks.find((block) => block.name === 'callout').attributes));
+  });
+
+  test('fieldError：frontmatter 字段的类型、范围和格式', () => {
+    assert.equal(fieldError('title', '标题', commonFields.title), null);
+    assert.equal(fieldError('title', 3, commonFields.title), 'Frontmatter field title must be a string');
+    assert.equal(fieldError('slug', 'notes/a-1', commonFields.slug), null);
+    assert.equal(fieldError('slug', 'Notes', commonFields.slug), 'Frontmatter field slug must be / or segments of lowercase letters, digits and - separated by /, got Notes');
+    assert.equal(fieldError('date', '2026-10-07', commonFields.date), null);
+    assert.equal(fieldError('date', '2026/10/07', commonFields.date), 'Frontmatter field date must be YYYY-MM-DD, got 2026/10/07');
+    assert.equal(fieldError('width', 'full', commonFields.width), 'Frontmatter field width must be one of normal, wide, got full');
+    assert.equal(fieldError('draft', 'yes', commonFields.draft), 'Frontmatter field draft must be true or false');
+    assert.equal(fieldError('authors', ['a'], paper.fields.authors), null);
+    assert.equal(fieldError('authors', 'a', paper.fields.authors), 'Frontmatter field authors must be a list of strings');
+    assert.equal(fieldError('n', 5, { type: 'number', min: 0, max: 3 }), 'Frontmatter field n must be between 0 and 3, got 5');
+    assert.equal(fieldError('n', 'a', { type: 'number' }), 'Frontmatter field n must be a number');
+  });
+
+  test('commonFields 的 label', () => {
+    assert.deepEqual(Object.fromEntries(Object.entries(commonFields).map(([name, field]) => [name, field.label])), {
+      title: '标题', slug: '地址', date: '日期', layout: '版式', theme: '主题', width: '正文宽度', draft: '草稿',
+    });
   });
 });

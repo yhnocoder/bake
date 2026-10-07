@@ -1,6 +1,6 @@
 import { parserCtx } from '@milkdown/core';
 import { TextSelection } from '@milkdown/prose/state';
-import registry from 'virtual:bake/registry';
+import blockRegistry, { defaultTheme, layouts, themes } from 'virtual:bake/registry';
 import { addGlyphs, glyphsOf } from '../client/math-defs.js';
 import { createEditor } from './editor.js';
 import { docToMarkdown } from './markdown.js';
@@ -8,6 +8,7 @@ import { reloadTransaction, renderedFormulas } from './math.js';
 import { trailingParagraphTransaction } from './trailing-paragraph.js';
 
 const saveDelay = 800;
+const registry = { ...blockRegistry, layouts, themes, defaultTheme };
 
 async function requestJson(url, options) {
   const response = await fetch(url, options);
@@ -147,6 +148,7 @@ export async function openEditor(status) {
 
   return {
     view,
+    editor,
     markdown,
     async close() {
       window.removeEventListener('bake:page-update', onPageUpdate);
