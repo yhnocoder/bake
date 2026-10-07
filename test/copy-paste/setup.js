@@ -93,7 +93,7 @@ export async function statusMessage(page) {
 
 export async function clipboardContent(page) {
   return page.evaluate(async () => {
-    const [item] = await navigator.clipboard.read();
+    const [item] = await navigator.clipboard.read({ unsanitized: ['text/html'] });
     const read = async (type) => (item.types.includes(type) ? (await item.getType(type)).text() : '');
     return { text: await read('text/plain'), html: await read('text/html') };
   });

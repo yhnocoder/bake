@@ -92,6 +92,13 @@ describe('处理顺序', () => {
     assert.equal(result, '**粗体** 与 $x^2$\n');
   });
 
+  for (const component of [':::demo-plot{x0=1.2}\n从 $x_0$ 出发。\n:::', '::demo-plot{x0=0.5}']) {
+    test(`4. 粘贴进空段落的组件保持完整：${component.split('\n')[0]}`, async () => {
+      const result = await plainPasteInto('rule-marker-component', '', { types: { 'text/html': '<div data-bake-markdown></div>', 'text/plain': component } });
+      assert.equal(result, `${component}\n`);
+    });
+  }
+
   test('5. SVG 源码先于 vscode-editor-data，存成 .svg', async () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="6"/></svg>\n';
     const result = await plainPasteInto('rule-svg', '', { types: { 'text/plain': svg, 'vscode-editor-data': JSON.stringify({ mode: 'xml' }) } });

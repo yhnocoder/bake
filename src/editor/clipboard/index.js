@@ -1,6 +1,6 @@
 import { parserCtx, remarkCtx } from '@milkdown/core';
 import { Fragment, Slice } from '@milkdown/prose/model';
-import { Plugin, TextSelection } from '@milkdown/prose/state';
+import { Plugin, Selection, TextSelection } from '@milkdown/prose/state';
 import { $prose } from '@milkdown/utils';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import { toClipboardHtml } from '../../client/copy-markdown.js';
@@ -77,6 +77,13 @@ function insertMdast(ctx, view, tree, text, tr) {
     return;
   }
   const content = dropDuplicateIds(doc.content, documentIds(view.state.doc));
+  const { $from, empty } = tr.selection;
+  if (empty && $from.parent.type.name === 'paragraph' && $from.parent.content.size === 0) {
+    const end = $from.after();
+    tr.replaceRange($from.before(), end, new Slice(content, 0, 0));
+    view.dispatch(tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(end)), -1)).scrollIntoView());
+    return;
+  }
   view.dispatch(tr.replaceSelection(Slice.maxOpen(content, false)).scrollIntoView());
 }
 

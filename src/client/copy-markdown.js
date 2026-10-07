@@ -48,7 +48,19 @@ function createConverter(range) {
   const document = range.commonAncestorContainer.ownerDocument;
   const pendingNotes = [];
 
+  function textNodes(element) {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: (text) => (text.data.trim() === '' || text.parentElement.closest(skipped) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+
   function contains(node) {
+    const texts = textNodes(node);
+    if (texts.length > 0) {
+      const last = texts.at(-1);
+      return range.comparePoint(texts[0], 0) === 0 && range.comparePoint(last, last.data.length) === 0;
+    }
     const nodeRange = document.createRange();
     nodeRange.selectNode(node);
     return range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 && range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0;

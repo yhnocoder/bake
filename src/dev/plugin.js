@@ -14,7 +14,7 @@ import { isPagePath, pageUrl, removePage, updatePage } from '../site/pages.js';
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
 const componentPrefix = '\0bake:component/';
 const bakeStyles = ['base', 'blocks', 'layouts'].map((name) => `src/styles/${name}.css`);
-const bakeScripts = ['src/client/page.js', 'src/dev/client.js', 'src/editor/index.js'];
+const bakeScripts = ['src/client/page.js', 'src/client/copy.js', 'src/dev/client.js', 'src/editor/index.js'];
 const registryModule = 'virtual:bake/registry';
 const registryId = `\0${registryModule}`;
 
