@@ -232,7 +232,7 @@ class InsertMenuView {
 
   update(view, previous) {
     this.view = view;
-    if (!previous.doc.eq(view.state.doc)) this.dismissed = false;
+    if (previous.doc !== view.state.doc) this.dismissed = false;
     this.provider.update(view, previous);
   }
 

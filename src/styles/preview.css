@@ -113,7 +113,7 @@
   display: none;
 }
 
-.link-picker li {
+.link-picker li[role="option"] {
   display: flex;
   gap: 8px;
   align-items: baseline;
@@ -122,8 +122,13 @@
 }
 
 .link-picker li[aria-selected="true"],
-.link-picker li:hover {
+.link-picker li[role="option"]:hover {
   background: color-mix(in srgb, var(--color-border) 45%, var(--color-bg));
+}
+
+.link-picker-message {
+  padding: 2px 10px;
+  color: var(--color-muted);
 }
 
 .link-picker-kind {

@@ -38,11 +38,18 @@ function containsSpec(spec, target) {
   return children.some((child) => containsSpec(child, target));
 }
 
-export function labelShown(block) {
+function rendersLabel(block) {
   if (block.form !== 'container' || labelRequired(`directive_${block.name}`)) return false;
   const label = { type: 'text', value: '' };
   const render = blockRender(block, block.name, block.form);
   return containsSpec(render({ attributes: withDefaults({}, block.attributes), label: [label], children: [] }), label);
+}
+
+const labelShownByBlock = new WeakMap();
+
+export function labelShown(block) {
+  if (!labelShownByBlock.has(block)) labelShownByBlock.set(block, rendersLabel(block));
+  return labelShownByBlock.get(block);
 }
 
 function locate(node, target) {

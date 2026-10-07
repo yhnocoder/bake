@@ -167,6 +167,30 @@ describe('链接选择器', () => {
     assert.equal(await page.locator('.link-picker').count(), 0);
   });
 
+  test('选择器打开期间文件在外部被修改，选择器关闭', async () => {
+    await placeCursor(page, '第二行。');
+    await openPicker();
+    site.write(path, site.read(path).replace('第二行。', '第二行。（外部修改）'));
+    await page.waitForFunction(() => document.querySelector('.milkdown').textContent.includes('（外部修改）'));
+    assert.equal(await page.locator('.link-picker').count(), 0);
+    const before = site.read(path);
+    await page.waitForTimeout(1200);
+    assert.equal(site.read(path), before);
+    site.write(path, before.replace('第二行。（外部修改）', '第二行。'));
+    await page.waitForFunction(() => !document.querySelector('.milkdown').textContent.includes('（外部修改）'));
+  });
+
+  test('读取 /__bake/sections 失败时列表显示说明', async () => {
+    await page.route('**/__bake/sections', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"failed"}' }));
+    await placeCursor(page, '第二行。');
+    await page.keyboard.press('ControlOrMeta+k');
+    await page.waitForSelector('.link-picker-message');
+    assert.equal(await page.textContent('.link-picker-message'), '无法读取站内的文章和标题');
+    await page.keyboard.press('Escape');
+    await page.unroute('**/__bake/sections');
+    assert.deepEqual(errors.splice(0), ['Failed to load resource: the server responded with a status of 500 (Internal Server Error)']);
+  });
+
   test('空行输入 /链接，选择「链接」后选择器打开，/链接 被删除', async () => {
     const before = site.read(path);
     await placeCursor(page, '第二行。');

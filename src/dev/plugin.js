@@ -252,7 +252,6 @@ export function bakeDev({ root }) {
     return { path: `./assets/${name}` };
   }
 
-
   async function handleApi(request, response, url) {
     const endpoint = endpoints[`${request.method} ${url.pathname}`];
     if (!endpoint) {

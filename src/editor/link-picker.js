@@ -205,11 +205,21 @@ export function openLinkPicker(view) {
   input.focus();
   input.select();
   fetch('/__bake/sections')
-    .then((response) => response.json())
+    .then((response) => {
+      if (!response.ok) throw new Error(`/__bake/sections returned ${response.status}`);
+      return response.json();
+    })
     .then((data) => {
       if (openPicker !== picker) return;
       candidates = candidatesOf(data.pages);
       render();
+    })
+    .catch(() => {
+      if (openPicker !== picker) return;
+      const message = document.createElement('li');
+      message.className = 'link-picker-message';
+      message.textContent = '无法读取站内的文章和标题';
+      list.replaceChildren(message);
     });
   return picker;
 }
@@ -232,5 +242,15 @@ export const linkPicker = [
       },
     }),
   ),
-  $prose(() => new Plugin({ view: () => ({ destroy: () => openPicker?.close({ focus: false }) }) })),
+  $prose(
+    () =>
+      new Plugin({
+        view: () => ({
+          update: (view, previous) => {
+            if (view.state.doc !== previous.doc) openPicker?.close({ focus: false });
+          },
+          destroy: () => openPicker?.close({ focus: false }),
+        }),
+      }),
+  ),
 ];
