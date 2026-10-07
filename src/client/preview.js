@@ -48,11 +48,12 @@ function createCard(preview) {
   return card;
 }
 
-function place(card, rect) {
+function place(card, rect, components) {
   card.style.visibility = 'hidden';
   document.body.append(card);
   const viewportWidth = document.documentElement.clientWidth;
-  const height = card.offsetHeight;
+  const pending = components.some((name) => !customElements.get(name));
+  const height = pending ? parseFloat(getComputedStyle(card).maxHeight) : card.offsetHeight;
   const below = window.innerHeight - rect.bottom - gap;
   const above = rect.top - gap;
   const top = height <= below || above <= below ? rect.bottom + gap : rect.top - gap - height;
@@ -98,7 +99,7 @@ export function installPreview({ load }) {
     close();
     addGlyphs(preview.glyphs);
     const card = createCard(preview);
-    place(card, referenceRect(link, point));
+    place(card, referenceRect(link, point), preview.components);
     shown = { card, link };
     loadComponents(preview);
   }
