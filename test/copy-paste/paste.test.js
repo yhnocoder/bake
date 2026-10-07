@@ -53,7 +53,7 @@ async function plainPasteInto(name, initial, data, options) {
 
 describe('处理顺序', () => {
   test('1. 光标在代码块里时按纯文本插入', async () => {
-    const result = await plainPasteInto('rule-code-block', '```js\nlet a\n```\n', { types: { 'text/plain': '# 标题', 'text/html': '<h1>标题</h1>' } }, { place: (page) => selectBetween(page, 'let a', 'let a').then(() => page.keyboard.press('End')) });
+    const result = await plainPasteInto('rule-code-block', '```js\nlet a\n```\n', { types: { 'text/plain': '# 标题', 'text/html': '<h1>标题</h1>' } }, { place: (page) => selectBetween(page, 'let a', 'let a', { afterStart: true }) });
     assert.equal(result, '```js\nlet a# 标题\n```\n');
   });
 

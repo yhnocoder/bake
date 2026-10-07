@@ -53,7 +53,7 @@ export async function focusEditor(page) {
 
 export async function selectBetween(page, startText, endText, { afterStart = false } = {}) {
   await page.evaluate(
-    ({ startText, endText, afterStart }) => {
+    async ({ startText, endText, afterStart }) => {
       const editor = document.querySelector('.milkdown .editor');
       const find = (text) => {
         const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
@@ -69,12 +69,14 @@ export async function selectBetween(page, startText, endText, { afterStart = fal
       const range = document.createRange();
       range.setStart(startNode, afterStart ? startIndex + startText.length : startIndex);
       range.setEnd(endNode, endIndex + endText.length);
+      const changed = new Promise((resolve) => document.addEventListener('selectionchange', resolve, { once: true }));
       getSelection().removeAllRanges();
       getSelection().addRange(range);
+      await changed;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
     },
     { startText, endText, afterStart },
   );
-  await page.waitForTimeout(50);
 }
 
 export async function waitForSave(page, action) {

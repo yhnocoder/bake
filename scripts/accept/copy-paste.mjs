@@ -209,8 +209,8 @@ async function pagePaste(browser, dist, origin, blog, output) {
   server.close();
 }
 
-async function selectInEditor(page, startText, endText) {
-  await page.evaluate(({ startText, endText }) => {
+async function selectInEditor(page, startText, endText, { collapse = false } = {}) {
+  await page.evaluate(async ({ startText, endText, collapse }) => {
     const editor = document.querySelector('.milkdown .editor');
     const find = (text) => {
       const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
@@ -226,10 +226,13 @@ async function selectInEditor(page, startText, endText) {
     const range = document.createRange();
     range.setStart(startNode, startIndex);
     range.setEnd(endNode, endIndex + endText.length);
+    if (collapse) range.collapse(false);
+    const changed = new Promise((resolve) => document.addEventListener('selectionchange', resolve, { once: true }));
     getSelection().removeAllRanges();
     getSelection().addRange(range);
-  }, { startText, endText });
-  await page.waitForTimeout(50);
+    await changed;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }, { startText, endText, collapse });
 }
 
 async function editorCopy(browser, origin, blog, output) {
@@ -244,8 +247,7 @@ async function editorCopy(browser, origin, blog, output) {
   console.log('clipboard text/plain:');
   console.log(content.text);
   console.log('');
-  await selectInEditor(page, '优化器用这些梯度更新参数，进入下一轮前向传播。', '优化器用这些梯度更新参数，进入下一轮前向传播。');
-  await page.keyboard.press('ArrowRight');
+  await selectInEditor(page, '优化器用这些梯度更新参数，进入下一轮前向传播。', '优化器用这些梯度更新参数，进入下一轮前向传播。', { collapse: true });
   await waitForSave(page, () => page.keyboard.press('Control+v'));
   await page.screenshot({ path: join(output, 'pasted.png'), fullPage: true });
   const after = readFileSync(path, 'utf8');
@@ -267,8 +269,7 @@ async function imageTwice(browser, origin, blog, output) {
   const page = await openEditor(context, origin, emptyArticle.url);
   const screenshot = (await page.screenshot({ clip: { x: 0, y: 0, width: 320, height: 200 } })).toString('base64');
   for (const paragraph of ['第一段。', '第二段。']) {
-    await selectInEditor(page, paragraph, paragraph);
-    await page.keyboard.press('End');
+    await selectInEditor(page, paragraph, paragraph, { collapse: true });
     await page.evaluate(async (base64) => {
       const blob = new Blob([Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))], { type: 'image/png' });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
