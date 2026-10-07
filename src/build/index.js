@@ -120,7 +120,7 @@ async function writeOutput(site, pages, images, outDir) {
     const html = rewriteHtml(rendered.html, { base: site.config.base, images: pageImages.get(entry) ?? new Map() });
     const assets = {
       styles: [bundled.files.bake, bundled.files[`themes/${themeOf(page)}`]],
-      scripts: [bundled.client, ...rendered.components.map((name) => bundled.files[`components/${name}`])],
+      scripts: [...bundled.client, ...rendered.components.map((name) => bundled.files[`components/${name}`])],
     };
     const directory = join(outDir, entry.url);
     await mkdir(directory, { recursive: true });

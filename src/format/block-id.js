@@ -21,8 +21,12 @@ function handleParagraph(node, parent, state, info) {
   return node.data?.blockId ? `${value} ^${node.data.blockId}` : value;
 }
 
+export function blockIdToMarkdown() {
+  return { handlers: { paragraph: handleParagraph } };
+}
+
 export default function remarkBlockId() {
   const data = this.data();
-  (data.toMarkdownExtensions ??= []).push({ handlers: { paragraph: handleParagraph } });
+  (data.toMarkdownExtensions ??= []).push(blockIdToMarkdown());
   return transformBlockId;
 }

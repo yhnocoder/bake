@@ -131,8 +131,12 @@ function handleImage(node, parent, state, info) {
 
 handleImage.peek = defaultHandlers.image.peek;
 
+export function attributesToMarkdown() {
+  return { handlers: { heading: handleHeading, image: handleImage } };
+}
+
 export default function remarkAttributes() {
   const data = this.data();
-  (data.toMarkdownExtensions ??= []).push({ handlers: { heading: handleHeading, image: handleImage } });
+  (data.toMarkdownExtensions ??= []).push(attributesToMarkdown());
   return transformAttributes;
 }

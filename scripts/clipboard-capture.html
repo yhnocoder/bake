@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>剪贴板样本采集</title>
+<style>
+  body { font: 15px/1.6 -apple-system, system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  label { display: block; margin: .75rem 0 .25rem; font-weight: 600; }
+  input { width: 100%; box-sizing: border-box; padding: .4rem; font: inherit; }
+  #paste-area { margin: 1rem 0; padding: 2rem; border: 2px dashed #888; border-radius: 6px; text-align: center; color: #555; }
+  #paste-area:focus { outline: none; border-color: #2563eb; color: #2563eb; }
+  button { font: inherit; padding: .4rem 1rem; }
+  section { margin: 1rem 0; border: 1px solid #ddd; border-radius: 6px; }
+  section h2 { margin: 0; padding: .4rem .75rem; font-size: 14px; background: #f3f3f3; }
+  pre { margin: 0; padding: .75rem; max-height: 20rem; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>剪贴板样本采集</h1>
+<p>先在来源应用中复制内容，再点击下方虚线框并按 Cmd+V。页面列出剪贴板的每种类型和文件，然后点击「下载 JSON」保存样本。</p>
+<label for="name">样本名字</label>
+<input id="name" placeholder="例如 vscode-python">
+<label for="source">来源说明</label>
+<input id="source" placeholder="例如 Chrome 141, macOS 15, VS Code 1.105 中选中一个 Python 函数后 Cmd+C">
+<div id="paste-area" tabindex="0">点击这里，然后按 Cmd+V</div>
+<button id="download" disabled>下载 JSON</button>
+<div id="result"></div>
+<script>
+  const pasteArea = document.getElementById('paste-area');
+  const downloadButton = document.getElementById('download');
+  const result = document.getElementById('result');
+  let sample = null;
+
+  function readAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.slice(reader.result.indexOf(',') + 1));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function addSection(title, text) {
+    const section = document.createElement('section');
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    const content = document.createElement('pre');
+    content.textContent = text;
+    section.append(heading, content);
+    result.append(section);
+  }
+
+  pasteArea.addEventListener('paste', async (event) => {
+    event.preventDefault();
+    const data = event.clipboardData;
+    const types = {};
+    for (const type of data.types) {
+      if (type !== 'Files') types[type] = data.getData(type);
+    }
+    const files = [];
+    for (const file of data.files) {
+      files.push({ name: file.name, type: file.type, base64: await readAsBase64(file) });
+    }
+    sample = { source: '', types, files };
+    result.replaceChildren();
+    addSection('clipboardData.types', JSON.stringify([...data.types]));
+    for (const [type, value] of Object.entries(types)) addSection(type, value);
+    for (const file of files) addSection(`文件 ${file.name}（${file.type}）`, `${file.base64.length} 个 base64 字符`);
+    downloadButton.disabled = false;
+  });
+
+  downloadButton.addEventListener('click', () => {
+    const name = document.getElementById('name').value.trim() || 'sample';
+    sample.source = document.getElementById('source').value.trim();
+    const blob = new Blob([JSON.stringify(sample, null, 2) + '\n'], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${name}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+</script>
+</body>
+</html>

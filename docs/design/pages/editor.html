@@ -170,32 +170,86 @@
 </table>
 
 <h2>复制与粘贴怎么处理</h2>
-<p>粘贴进编辑器的内容自动转换成对应的格式。从编辑器或发布的页面复制出去时，剪贴板的纯文本是 Markdown，同时附带 HTML，粘贴到支持格式的应用时保留格式。</p>
+<p>粘贴进编辑器的内容自动转换成对应的格式，保存后的写法与 <code>bake format</code> 相同。从编辑器或发布的页面复制出去时，剪贴板的纯文本是 bake 格式的 Markdown，同时附带 HTML，粘贴到支持格式的应用时保留格式。</p>
+
+<h3>剪贴板标记</h3>
+<p>bake 写剪贴板时，HTML 的最外层是 <code>&lt;div data-bake-markdown&gt;</code>，表示同时写入的纯文本就是 bake 格式的 Markdown。编辑器粘贴时看到这个标记就直接使用纯文本。理由：bake 页面和编辑器之间复制粘贴的结果与原文逐字相同，不经过 HTML 转换。</p>
 
 <h3>粘贴进编辑器</h3>
+<p>粘贴时按下表从上到下检查剪贴板，第一个符合的规则决定结果。</p>
 <table>
   <thead>
-    <tr><th>来源</th><th>剪贴板内容</th><th>转换结果</th></tr>
+    <tr><th>顺序</th><th>条件</th><th>结果</th></tr>
   </thead>
   <tbody>
-    <tr><td>bake 生成的页面</td><td>HTML，元素上带 <code>data-tex</code> 和 <code>data-md</code></td><td>与原文相同的公式、组件、旁注和块</td></tr>
-    <tr><td>其他网页</td><td>HTML</td><td>标题、列表、链接、表格、代码块、加粗、斜体对应到编辑器格式；不认识的标签只保留文字</td></tr>
-    <tr><td>网页里的公式</td><td>MathJax 或 KaTeX 输出中的 TeX 源码，或 MathML</td><td>公式</td></tr>
-    <tr><td>VS Code 等代码编辑器</td><td>纯文本和 <code>vscode-editor-data</code> 中的语言名</td><td>带语言名的代码块</td></tr>
-    <tr><td>Markdown 文本</td><td>纯文本</td><td>按 Markdown 解析后插入，公式和表格保留</td></tr>
-    <tr><td>Excel、Numbers、Google Sheets</td><td>HTML 表格</td><td>GFM 表格</td></tr>
-    <tr><td>截图、图片文件、SVG 文件</td><td>图片数据</td><td>文件存进文章所在目录的 <code>assets/</code>，插入图片</td></tr>
-    <tr><td>SVG 源码</td><td>以 <code>&lt;svg</code> 开头的文本</td><td>存成 <code>assets/</code> 里的 <code>.svg</code> 文件，插入图片</td></tr>
+    <tr><td>1</td><td>光标在代码块里</td><td>按纯文本插入</td></tr>
+    <tr><td>2</td><td>这次粘贴由 <code>Mod-Shift-V</code> 触发</td><td>按纯文本插入</td></tr>
+    <tr><td>3</td><td>有图片文件，并且没有 HTML 或 HTML 中除 <code>img</code> 元素以外没有文字</td><td>保存图片并插入</td></tr>
+    <tr><td>4</td><td>HTML 最外层带 <code>data-bake-markdown</code></td><td>纯文本按 Markdown 插入</td></tr>
+    <tr><td>5</td><td>纯文本去掉首尾空白后以 <code>&lt;svg</code> 开头，并且能按 SVG 解析</td><td>存成 <code>assets/</code> 里的 <code>.svg</code> 文件，插入图片</td></tr>
+    <tr><td>6</td><td>有 VS Code 的 <code>vscode-editor-data</code></td><td>语言为 <code>markdown</code> 时按第 8 条处理；为 <code>plaintext</code> 时按纯文本插入；其他语言插入带这个语言名的代码块</td></tr>
+    <tr><td>7</td><td>有 HTML</td><td>转换成 Markdown 后插入，见下文</td></tr>
+    <tr><td>8</td><td>只有纯文本，并且出现块级 Markdown 写法</td><td>按 Markdown 插入</td></tr>
+    <tr><td>9</td><td>其他</td><td>按纯文本插入</td></tr>
   </tbody>
 </table>
-<p>纯文本按 Markdown 解析的条件：文本中出现 Markdown 的块级写法（标题、列表、表格、代码块、公式块）。不满足时按普通文本插入。按 <code>Mod-Shift-V</code> 始终按普通文本插入。</p>
-<p>粘贴的图片文件名是内容哈希的前 <code>8</code> 位加原扩展名，例如 <code>assets/3f9a1c2e.png</code>。理由：同一张图片粘贴两次只保存一个文件。图片通过 <code>POST /__bake/asset</code> 写入。</p>
-
-<h3>复制出去</h3>
 <ul>
-  <li>编辑器里：选区用保存时使用的同一个 Markdown 输出器转成文本，复制出去的内容和 <code>.md</code> 文件里的写法相同。</li>
-  <li>发布的页面：页面空闲时加载复制脚本，拦截 <code>copy</code> 事件，把选区的 HTML 转回 Markdown。构建时给公式加 <code>data-tex</code>，给组件、旁注和指令块加 <code>data-md</code>（该元素对应的 Markdown 源码），转换时直接使用这些属性。选区只包含公式或组件的一部分时，按整个元素处理。</li>
+  <li><code>Mod-Shift-V</code> 的判断：Chromium 中 <code>Ctrl+Shift+V</code> 触发的 <code>paste</code> 事件只有纯文本，无法从事件本身区分。编辑器在按键时记下这个快捷键，下一次 <code>paste</code> 读取后清除，按下其他键时也清除。</li>
+  <li>第 3 条先于 HTML 检查。理由：浏览器「复制图片」时 HTML 只有一个 <code>img</code> 元素，应当插入文件；Excel 等表格软件同时提供表格 HTML 和单元格的图片，应当按表格处理。</li>
+  <li>第 5 条先于第 6 条：从 VS Code 复制 SVG 源码时插入图片。需要代码块时，先输入三个反引号建代码块再粘贴，按第 1 条插入纯文本。</li>
+  <li>块级 Markdown 写法指标题、列表、表格、公式块和用反引号或波浪号围栏写的代码块。缩进写法的代码块不算。理由：带缩进的普通文字会被误判成代码块。</li>
+  <li>其他代码编辑器（JetBrains 等）只提供纯文本和带 <code>&lt;pre&gt;</code> 的 HTML，按第 7 条得到没有语言名的代码块。</li>
 </ul>
+<p>所有来源都先转成 bake 格式的 Markdown，再由编辑器的严格解析器解析后插入。只有一个段落时，内容并入光标所在的段落；光标所在的段落为空时，粘贴的块替换这个空段落；有多个块时，光标所在的段落被拆开。表格单元格和组件作为整体插入，不与光标所在的块合并。粘贴的内容不符合结构规则时（例如卡片网格中直接写段落），把剪贴板的纯文本按换行分成段落插入，状态栏显示「粘贴的内容不符合结构规则，已按纯文本插入」。</p>
+
+<h3>粘贴网页的 HTML</h3>
+<p>标题、列表、链接、表格、代码块、加粗、斜体、高亮对应到编辑器格式，不认识的标签只保留文字。带 <code>data-md</code> 的元素直接使用它的值。远程图片被去掉，理由：bake 的图片必须在文章的 <code>assets/</code> 中，远程地址会让构建报错。代码块的语言名从 <code>language-*</code> 类名读取，Shiki 不支持的语言名由构建报错。</p>
+<p>网页里的公式按下表找到 TeX 源码，找不到时只保留公式的文字。</p>
+<table>
+  <thead>
+    <tr><th>公式来源</th><th>TeX 源码的位置</th><th>独立公式的判断</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>bake 页面</td><td>元素的 <code>data-tex</code></td><td><code>class</code> 含 <code>display</code></td></tr>
+    <tr><td>KaTeX</td><td><code>.katex</code> 内 TeX 格式的 <code>annotation</code></td><td>外层是 <code>.katex-display</code>，或 <code>math[display="block"]</code></td></tr>
+    <tr><td>MathJax 4</td><td><code>mjx-container</code> 内的 <code>mjx-math[data-latex]</code></td><td><code>mjx-container[display="true"]</code></td></tr>
+    <tr><td>MathML（Wikipedia 等）</td><td><code>math</code> 内 TeX 格式的 <code>annotation</code>，没有时用 <code>alttext</code></td><td><code>math[display="block"]</code></td></tr>
+  </tbody>
+</table>
+<p>TeX 格式的 <code>annotation</code> 指 <code>encoding</code> 属性为 <code>application/x-tex</code> 的 <code>annotation</code> 元素。MathJax 3（CHTML 和 SVG 输出）复制得到的 HTML 既没有 TeX 也没有 MathML，这类公式无法还原。Chromium 复制 KaTeX 的行内公式时不带 <code>annotation</code>，这类公式也只保留文字。TeX 在 HTML 转换之前取出，理由：转换会合并空白，多行 TeX 中的换行和 <code>%</code> 注释会被破坏。</p>
+
+<h3>粘贴图片</h3>
+<ul>
+  <li>接受的类型：<code>image/png</code>、<code>image/jpeg</code>、<code>image/gif</code>、<code>image/webp</code>、<code>image/avif</code>、<code>image/svg+xml</code>，扩展名分别为 <code>png</code>、<code>jpg</code>、<code>gif</code>、<code>webp</code>、<code>avif</code>、<code>svg</code>。其他类型的文件忽略。</li>
+  <li>图片通过 <code>POST /__bake/asset</code> 写入文章所在目录的 <code>assets/</code>，文件名是内容哈希的前 <code>8</code> 位加扩展名，例如 <code>assets/3f9a1c2e.png</code>。理由：同一张图片粘贴两次只保存一个文件。插入的图片说明文字为空。</li>
+  <li>保存期间，插入位置显示「图片保存中…」，这个位置随编辑移动；保存完成后图片插在这个位置。图片独占一段：光标在段落中间时段落被拆开，位置在表格内时插在表格之后。多个文件按顺序插入，每张图片一个段落。</li>
+  <li>保存失败时，状态栏显示「图片保存失败：」加英文的错误信息，已经保存成功的图片保留。</li>
+</ul>
+
+<h3>粘贴内容中的 id 和旁注名</h3>
+<ul>
+  <li>标题的 <code>{#id}</code>、段落的 <code>^block-id</code>、独立公式的 <code>\label{…}</code> 与文档中已有的相同时去掉，标题改用生成的 id。理由：重复的 id 会让渲染报错。剪切后粘贴时原内容已经删除，id 保留。</li>
+  <li>粘贴的旁注引用与文档中已有的引用同名时，新粘贴的引用和它的注释改用新名字，见上文旁注一节。</li>
+</ul>
+
+<h3>拖入</h3>
+<p>从编辑器之外拖入的内容按上表第 3 到 9 条处理，插入位置是放下的位置。编辑器内部的拖动由拖动手柄处理。</p>
+
+<h3>从编辑器复制</h3>
+<p>选区用保存时使用的同一个 Markdown 输出器转成文本，复制出去的内容和 <code>.md</code> 文件里的写法相同。选区在一个表格单元格或一个列表项内时，只输出其中的文字，不带表格或列表的外层；跨单元格选择时补上表格的外层，第一行作为表头。选区引用到的旁注，注释一起复制，放在引用它的段落之后。剪切与复制得到相同的内容，写入后删除选区。</p>
+
+<h3>从发布的页面复制</h3>
+<ul>
+  <li>加载：页面加载完成后，在浏览器空闲时加载复制脚本（<code>copy-markdown.js</code>）。加载完成之前的复制由浏览器默认处理。<code>copy-markdown.js</code> 不包含 Markdown 解析器，打包压缩后 gzip 不超过 <code>16 KB</code>，测试检查。</li>
+  <li>范围：只处理选区在 <code>&lt;article&gt;</code> 内的复制；编辑器已经处理的复制、空选区不处理。选区在一个代码块内时，纯文本直接是选中的代码，不加围栏。</li>
+  <li>选区的起点或终点在一个公式、组件或旁注内时，扩展到包含整个元素。</li>
+  <li>完全选中的带 <code>data-md</code> 的元素（指令块、组件、旁注、带属性的标题、图片）直接使用 <code>data-md</code>；组件和旁注总是按完全选中处理。部分选中的指令块只转换选中的子元素，例如只选提示框中的一句时不带提示框。</li>
+  <li>渲染生成的文字（标题的锚点、卡片标题、旁注编号、提示框标签、折叠块的标题）不进入复制结果。没有 <code>data-md</code> 的标题不写 <code>{#id}</code>，理由：这个 id 是生成的。</li>
+  <li>站内链接以站点的 <code>base</code> 开头时去掉这个前缀，改回 <code>/</code> 开头的站内地址。</li>
+  <li>选区中有旁注引用而对应的旁注不在选区内时，把旁注的原文加在引用所在的顶层块之后。</li>
+  <li>独立的 HTML 块使用浏览器序列化后的 HTML，与原文可能不同（例如 <code>&lt;rect/&gt;</code> 变成 <code>&lt;rect&gt;&lt;/rect&gt;</code>），再次渲染的结果相同。</li>
+</ul>
+<p>两种复制写入的 HTML 都放在 <code>&lt;div data-bake-markdown&gt;</code> 中。公式的 SVG 引用页面字形容器中的字形，复制时把引用到的字形放进 HTML 开头的一个隐藏的 <code>&lt;svg&gt;</code>，粘贴到其他网页编辑器时公式能显示。</p>
 
 <h2 id="math">公式在编辑器里怎么渲染</h2>
 <p>打开编辑器时，编辑器直接使用页面上已经渲染好的公式 SVG，不在浏览器里重新渲染。只有被修改的公式才在浏览器里用 MathJax 渲染，结果按 TeX 源码缓存，同一个公式只渲染一次。MathJax 只在第一次修改公式时加载。</p>

@@ -37,6 +37,10 @@ export async function startSite(name) {
   };
 }
 
+export async function gotoPage(page, url) {
+  while ((await page.goto(url)).status() === 404) await page.waitForTimeout(50);
+}
+
 export async function openEditor(site, url) {
   const page = await site.browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
@@ -48,7 +52,7 @@ export async function openEditor(site, url) {
   page.on('request', (request) => {
     if (request.url().endsWith('/__bake/save')) saves.push(JSON.parse(request.postData()));
   });
-  await page.goto(site.origin + url);
+  await gotoPage(page, site.origin + url);
   await page.click('.bake-edit-toggle');
   await page.waitForFunction(() => document.querySelector('.bake-save-state').textContent !== '');
   return { page, errors, saves };
@@ -70,7 +74,7 @@ export function exportMarkdown(page) {
 
 export async function placeCursor(page, text, { select = false } = {}) {
   await page.evaluate(
-    ({ text, select }) => {
+    async ({ text, select }) => {
       const editor = document.querySelector('.milkdown .editor');
       const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
@@ -80,15 +84,17 @@ export async function placeCursor(page, text, { select = false } = {}) {
         const range = document.createRange();
         range.setStart(walker.currentNode, select ? index : index + text.length);
         range.setEnd(walker.currentNode, index + text.length);
+        const changed = new Promise((resolve) => document.addEventListener('selectionchange', resolve, { once: true }));
         getSelection().removeAllRanges();
         getSelection().addRange(range);
+        await changed;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
         return;
       }
       throw new Error(`Text not found: ${text}`);
     },
     { text, select },
   );
-  await page.waitForTimeout(50);
 }
 
 export async function saveAfter(site, page, path, action) {

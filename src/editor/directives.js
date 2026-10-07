@@ -292,6 +292,7 @@ const componentSchema = $nodeSchema('component', () => ({
   group: 'block',
   content: 'block*',
   atom: false,
+  isolating: true,
   attrs: { name: { default: '' }, attributes: { default: {} }, container: { default: false } },
   parseDOM: [],
   toDOM: (node) => [node.attrs.name, { class: 'component' }, ['figcaption', 0]],

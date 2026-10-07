@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 import { build } from 'vite';
 
-const clientScript = { name: 'client/page', path: fileURLToPath(new URL('../client/page.js', import.meta.url)) };
+const clientScripts = ['page', 'copy'].map((name) => ({ name: `client/${name}`, path: fileURLToPath(new URL(`../client/${name}.js`, import.meta.url)) }));
 const componentHelpers = fileURLToPath(new URL('../client/component.js', import.meta.url));
 const styles = ['base', 'blocks', 'layouts'].map((name) => fileURLToPath(new URL(`../styles/${name}.css`, import.meta.url)));
 const virtualPrefix = '\0bake:';
@@ -19,7 +19,7 @@ function errorLines(root, error) {
 
 export async function bundle(site, { outDir, components, themes }) {
   const modules = { 'bake.css': styles.map((path) => `@import ${JSON.stringify(path)};\n`).join('') };
-  const input = { bake: 'bake.css', [clientScript.name]: clientScript.path };
+  const input = { bake: 'bake.css', ...Object.fromEntries(clientScripts.map(({ name, path }) => [name, path])) };
   for (const name of components) {
     const path = join(site.root, site.components[name].path);
     modules[`component-${name}.js`] = [
@@ -71,5 +71,5 @@ export async function bundle(site, { outDir, components, themes }) {
       .filter((chunk) => chunk.isEntry)
       .map((chunk) => [chunk.name, `${site.config.base}${chunk.file}`]),
   );
-  return { files, client: files[clientScript.name] };
+  return { files, client: clientScripts.map(({ name }) => files[name]) };
 }
