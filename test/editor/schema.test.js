@@ -24,7 +24,7 @@ for (const [name, body] of [
 ]) {
   test(`结构错误：${name}时编辑器不打开`, async () => {
     const slug = `broken-${name.length}`;
-    site.write(`content/${slug}.md`, page(slug, body));
+    await site.addPage(`content/${slug}.md`, page(slug, body), `/${slug}/`);
     const { page: browserPage } = await openEditor(site, `/${slug}/`);
     assert.equal(await browserPage.textContent('.bake-save-state'), '文章有结构错误，修正后才能编辑');
     assert.equal(await browserPage.locator('article .milkdown').count(), 0);
@@ -51,7 +51,7 @@ test('在两个段落之间插入空段落后保存，文件中没有 <br />', a
 
 test('旁注名大小写不同时往返不变，空注释导出为 [^n1]:', async () => {
   const markdown = page('notes', '引用大写[^D]，再引用空注释[^n1]。\n\n[^d]: 小写的注释。\n\n[^n1]:\n');
-  site.write('content/notes.md', markdown);
+  await site.addPage('content/notes.md', markdown, '/notes/');
   const { page: browserPage, errors } = await openEditor(site, '/notes/');
   assert.equal(await exportMarkdown(browserPage), markdown);
   assert.deepEqual(errors, []);
@@ -140,7 +140,7 @@ test('加宽块里的表格与下一段的间距在阅读模式和编辑模式�
 
 test('slug 改变后浏览器地址和之后的保存使用新地址', async () => {
   const file = 'content/rename.md';
-  site.write(file, page('rename', '改名前的段落。\n'));
+  await site.addPage(file, page('rename', '改名前的段落。\n'), '/rename/');
   const { page: browserPage, errors, saves } = await openEditor(site, '/rename/');
   const response = browserPage.waitForResponse((response) => response.url().endsWith('/__bake/save'));
   await session(browserPage, (current) => {
