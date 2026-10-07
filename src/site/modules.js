@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { createServer, createServerModuleRunner } from 'vite';
+import { bakeRuntime } from '../runtime/plugin.js';
 
 export async function createModuleLoader(root, { server } = {}) {
   const ownServer = server
@@ -11,6 +12,7 @@ export async function createModuleLoader(root, { server } = {}) {
         logLevel: 'silent',
         server: { middlewareMode: true, hmr: false, ws: false },
         optimizeDeps: { noDiscovery: true },
+        plugins: [bakeRuntime()],
       });
   const environment = (server ?? ownServer).environments.ssr;
   const runner = createServerModuleRunner(environment, { hmr: false });

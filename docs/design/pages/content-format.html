@@ -243,7 +243,7 @@
 </div>
 
 <h3>组件</h3>
-<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错。输出同名 custom element，带 <code>class="component"</code>，例如 <code>&lt;gradient-figure x0="1.5" class="component" data-md="…"&gt;&lt;figcaption&gt;图题&lt;/figcaption&gt;&lt;/gradient-figure&gt;</code>。属性值等于 <code>static properties</code> 中 <code>default</code> 的属性不写进元素；没有图题时元素内没有 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供组件与前后内容的间距和图题的样式，不加边框。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
+<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错；使用另一个主题的组件时报错 <code>Component ::名字 belongs to topic 主题, move it to components/ to use it in other topics</code>。输出同名 custom element，带 <code>class="component"</code>，例如 <code>&lt;gradient-figure x0="1.5" class="component" data-md="…"&gt;&lt;figcaption&gt;图题&lt;/figcaption&gt;&lt;/gradient-figure&gt;</code>。属性值等于 <code>static properties</code> 中 <code>default</code> 的属性不写进元素；没有图题时元素内没有 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供组件与前后内容的间距和图题的样式，不加边框。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::gradient-figure{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
@@ -464,7 +464,7 @@
 
 <h2>公式怎么写</h2>
 <p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
-<p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
+<p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，直接调用 <code>bake/runtime</code> 的 <code>renderMath</code>，见 <a href="extending.html">扩展接口</a>。MathJax 在第一次调用时才加载，没有调用它的页面不加载 MathJax。</p>
 <p>渲染使用 MathJax 4（<code>@mathjax/src</code>）和 New Computer Modern 字体（<code>@mathjax/mathjax-newcm-font</code>）。TeX 输入加载 <code>base</code>、<code>ams</code>、<code>newcommand</code>、<code>configmacros</code> 四个包，宏取自 <code>math.macros</code>。公式的 HTML：</p>
 <table>
   <thead>
@@ -588,7 +588,7 @@ tags: [GELU, SiLU, GLU]
 
 <h2>模块接口</h2>
 <p><code>src/format/index.js</code> 导出四个函数，渲染模块和编辑器通过它们读写 Markdown：</p>
-<pre><code class="language-js">parse(source, { path, blocks, components, layouts, themes })
+<pre><code class="language-js">parse(source, { path, blocks, components, otherTopicComponents, layouts, themes })
   // → { tree, frontmatter, messages }
 stringify(tree)   // → string
 format(source)    // → string，等于 stringify(parse(source).tree)
@@ -601,7 +601,8 @@ parseSyntax(source, { path })
   </thead>
   <tbody>
     <tr><td><code>blocks</code></td><td>博客 <code>blocks/</code> 里的块类型定义列表，与内置块类型合并，重名时报错</td></tr>
-    <tr><td><code>components</code></td><td><code>{ 组件名: static properties }</code></td></tr>
+    <tr><td><code>components</code></td><td><code>{ 组件名: static properties }</code>，这一页可以使用的组件：全局组件和本主题的组件</td></tr>
+    <tr><td><code>otherTopicComponents</code></td><td><code>{ 组件名: 主题名 }</code>，其他主题的组件，用于报告跨主题使用组件的错误</td></tr>
     <tr><td><code>layouts</code></td><td><code>{ 版式名: fields }</code></td></tr>
     <tr><td><code>themes</code></td><td>主题名列表</td></tr>
     <tr><td><code>tree</code></td><td>mdast 语法树。高亮是 <code>mark</code> 节点；标题和图片的属性在节点的 <code>data.attributes</code>；段落的块引用 id 在 <code>data.blockId</code></td></tr>
@@ -611,7 +612,7 @@ parseSyntax(source, { path })
 </table>
 <p><code>components</code>、<code>layouts</code>、<code>themes</code> 没有传入时，跳过对应的检查。</p>
 <p><code>src/render/index.js</code> 导出 <code>render</code>，把一篇文章渲染成正文 HTML 片段和目录。版式、构建和开发服务器从它取数据：</p>
-<pre><code class="language-js">await render(source, { path, config, blocks, components, layouts, themes })
+<pre><code class="language-js">await render(source, { path, config, blocks, components, otherTopicComponents, layouts, themes })
   // → { page, html, toc, mathDefs, ids, links, components, messages }</code></pre>
 <p><code>render</code> 是异步函数，因为 MathJax 按字符范围加载字体数据。<code>config</code> 是 <code>bake.config.js</code> 的内容，用到其中的 <code>math.macros</code>；其他参数与 <code>parse</code> 相同。</p>
 <table>

@@ -6,9 +6,11 @@ import { after, describe, test } from 'node:test';
 import { createServer } from 'vite';
 import { layoutFrame, loadSite, renderArticle, renderDocumentFor, renderPage, siteData } from '../src/site/index.js';
 import { createModuleLoader } from '../src/site/modules.js';
+import { themeVariables } from '../src/styles/variables.js';
 
 const blogs = [];
 const config = "export default { title: '测试站点', theme: 'plain' };\n";
+const theme = `:root {\n${themeVariables.map((variable) => `  ${variable}: 0;\n`).join('')}}\n`;
 const plot = `export default class extends HTMLElement {
   static properties = { x0: { label: 'x₀', type: 'number', default: 1 } };
 }
@@ -17,7 +19,7 @@ const plot = `export default class extends HTMLElement {
 function blog(files) {
   const root = mkdtempSync(join(tmpdir(), 'bake-site-'));
   blogs.push(root);
-  for (const [path, content] of Object.entries({ 'bake.config.js': config, 'themes/plain.css': ':root {}\n', ...files })) {
+  for (const [path, content] of Object.entries({ 'bake.config.js': config, 'themes/plain.css': theme, ...files })) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
   }
@@ -150,12 +152,12 @@ describe('组件和主题', () => {
     const site = await load(blog({ 'components/broken-plot.js': 'export default class extends HTMLElement {\n' }));
     assert.equal(site.messages.length, 1);
     assert.equal(site.messages[0].path, 'components/broken-plot.js');
-    assert.match(site.messages[0].text, /^Cannot read static properties of component components\/broken-plot\.js: /);
+    assert.match(site.messages[0].text, /^Cannot load components\/broken-plot\.js: /);
     assert.deepEqual(site.components, {});
   });
 
   test('发现主题', async () => {
-    const site = await load(blog({ 'themes/plain.css': ':root {}\n', 'themes/blue.css': ':root {}\n', 'themes/readme.md': '' }));
+    const site = await load(blog({ 'themes/plain.css': theme, 'themes/blue.css': theme, 'themes/readme.md': '' }));
     assert.deepEqual(site.themes, { blue: 'themes/blue.css', plain: 'themes/plain.css' });
   });
 
@@ -189,7 +191,7 @@ describe('renderPage', () => {
   const assets = { styles: ['/bake.css', '/theme.css'], scripts: ['/sidenotes.js'] };
 
   test('生成整页 HTML', async () => {
-    const root = blog({ 'themes/plain.css': '', 'content/post.md': article('post'), 'content/index.md': article('/') });
+    const root = blog({ 'content/post.md': article('post'), 'content/index.md': article('/') });
     const site = await load(root);
     const { html, rendered, messages } = await renderPage(site, 'content/post.md', { assets });
     assert.deepEqual(messages, []);
@@ -202,7 +204,7 @@ describe('renderPage', () => {
   });
 
   test('返回渲染错误', async () => {
-    const root = blog({ 'themes/plain.css': '', 'content/post.md': article('post', 'theme: red\n') });
+    const root = blog({ 'content/post.md': article('post', 'theme: red\n') });
     const site = await load(root);
     const { messages } = await renderPage(site, 'content/post.md', { assets });
     assert.deepEqual(messages, [{ path: 'content/post.md', line: 4, column: 1, text: 'Unknown theme red' }]);
@@ -217,7 +219,7 @@ describe('renderPage', () => {
   });
 
   test('分两步渲染时使用传入的源文件，资源由渲染结果决定', async () => {
-    const root = blog({ 'themes/plain.css': '', 'components/demo-plot.js': plot, 'content/post.md': article('post') });
+    const root = blog({ 'components/demo-plot.js': plot, 'content/post.md': article('post') });
     const site = await load(root);
     const source = '---\ntitle: 新标题\nslug: moved\n---\n\n::demo-plot\n';
     const rendered = await renderArticle(site, 'content/post.md', source);

@@ -138,16 +138,14 @@ describe('接口', () => {
   });
 
   test('/__bake/source 和 /__bake/save 可以读写首页', async () => {
-    const markdown = '---\ntitle: 首页\nslug: /\n---\n\n正文。\n';
-    writeFileSync(join(root, 'content/home.md'), markdown);
-    await until(async () => (await fetch(`${origin}/`)).status === 200);
+    const file = join(root, 'content/index.md');
+    const markdown = readFileSync(file, 'utf8');
     const response = await fetch(`${origin}/__bake/source?page=/`);
-    assert.deepEqual(await response.json(), { path: 'content/home.md', markdown, hash: sha256(markdown) });
-    const changed = markdown.replace('正文。', '首页正文。');
+    assert.deepEqual(await response.json(), { path: 'content/index.md', markdown, hash: sha256(markdown) });
+    const changed = markdown.replace('最小示例博客', '最小的示例博客');
     const saved = await post('/__bake/save', { page: '/', markdown: changed, hash: sha256(markdown) });
     assert.deepEqual(saved, { status: 200, body: { hash: sha256(changed), url: '/' } });
-    rmSync(join(root, 'content/home.md'));
-    await until(async () => (await fetch(`${origin}/`)).status === 404);
+    writeFileSync(file, markdown);
   });
 
   test('/__bake/source 对不存在的页面返回 404', async () => {
@@ -422,6 +420,73 @@ describe('站点模块', () => {
     await until(async () => (await texts()).some((text) => text.startsWith('Unknown attribute size')));
     edit('components/lib/sized-properties.js', () => "export default { size: { label: '尺寸', type: 'number', default: 1 } };\n");
     await until(async () => (await texts()).length === 0);
+  });
+});
+
+describe('扩展', () => {
+  const statusItems = (page) => page.evaluate(() => [...document.querySelectorAll('.bake-status-list li')].map((item) => item.textContent));
+
+  test('/site.json 返回站点数据', async () => {
+    const response = await fetch(`${origin}/site.json`);
+    assert.equal(response.status, 200);
+    const { pages, config } = await response.json();
+    assert.deepEqual(config, {});
+    assert.ok(pages.some((page) => page.url === '/extending/' && page.title === '博客自己的扩展'));
+  });
+
+  test('修改文章的 title 后首页的 page-list 收到 bake:site 并显示新标题，页面没有刷新', async () => {
+    const { page, errors } = await open('/');
+    await page.waitForFunction(() => document.querySelector('page-list li'));
+    await page.evaluate(() => {
+      window.siteEvents = 0;
+      document.addEventListener('bake:site', () => window.siteEvents++);
+    });
+    edit('content/paper.md', (source) => source.replace('title: 用梯度下降求函数的最小值', 'title: 梯度下降（新标题）'));
+    await page.waitForFunction(() => document.querySelector('page-list').textContent.includes('梯度下降（新标题）'));
+    assert.equal(await page.evaluate(() => window.marker), 'kept');
+    assert.ok((await page.evaluate(() => window.siteEvents)) >= 1);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  test('修改 blocks/shape.js 的 render 后已打开的页面收到 bake:page', async () => {
+    const { page, errors } = await open('/extending/');
+    edit('blocks/shape.js', (source) => source.replace('`math-shape ${attributes.kind}`', '`math-shape changed ${attributes.kind}`'));
+    await page.waitForFunction(() => document.querySelector('article .math-shape.changed'));
+    assert.ok((await page.evaluate(() => window.updates)) >= 1);
+    assert.equal(await page.evaluate(() => window.marker), 'kept');
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  test('主题删去一个变量后各页的状态栏显示错误，补回后错误消失', async () => {
+    const pages = [await open('/extending/'), await open('/paper/')];
+    edit('themes/warm.css', (source) => source.replace('  --measure: 40rem;\n', ''));
+    for (const { page } of pages) {
+      await page.waitForFunction(() => [...document.querySelectorAll('.bake-status-list li')].some((item) => item.textContent.includes('Theme warm is missing')));
+      assert.ok((await statusItems(page)).includes('themes/warm.css:1:1 Theme warm is missing variables --measure'));
+    }
+    edit('themes/warm.css', (source) => source.replace('  --measure-wide: 58rem;\n', '  --measure: 40rem;\n  --measure-wide: 58rem;\n'));
+    for (const { page, errors } of pages) {
+      await page.waitForFunction(() => document.querySelector('.bake-status-problems').textContent === '没有错误');
+      assert.equal(await page.evaluate(() => window.marker), 'kept');
+      assert.deepEqual(errors, []);
+      await page.close();
+    }
+  });
+
+  test('只修改组件的画图代码时不重新渲染，修改 static properties 后重新渲染', async () => {
+    const { page, errors } = await open('/features/');
+    await page.waitForFunction(() => customElements.get('demo-plot'));
+    edit('components/demo-plot.js', (source) => source.replace("line.setAttribute('stroke-width', '2');", "line.setAttribute('stroke-width', '3');"));
+    await page.waitForFunction(() => document.querySelector('demo-plot polyline[stroke-width="3"]'));
+    await page.waitForTimeout(1500);
+    assert.equal(await page.evaluate(() => window.updates), 0);
+    edit('components/demo-plot.js', (source) => source.replace("label: 'x₀ 初始值'", "label: 'x₀ 起点'"));
+    await page.waitForFunction(() => window.updates > 0);
+    assert.equal(await page.evaluate(() => window.marker), 'kept');
+    assert.deepEqual(errors, []);
+    await page.close();
   });
 });
 

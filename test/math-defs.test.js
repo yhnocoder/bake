@@ -15,7 +15,7 @@ before(async () => {
 
 after(async () => {
   await browser?.close();
-  server?.close();
+  await server?.close();
 });
 
 async function open() {

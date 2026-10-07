@@ -23,9 +23,9 @@ export function parseSyntax(source, { path } = {}) {
   return { tree, messages: toMessages(file, path) };
 }
 
-export function parse(source, { path, blocks, components, layouts, themes } = {}) {
+export function parse(source, { path, blocks, components, otherTopicComponents, layouts, themes } = {}) {
   const { processor, file, tree, yaml } = load(source, { path, blocks, components });
-  validateContent(tree, file, { registry: processor.data('registry'), components: processor.data('components') });
+  validateContent(tree, file, { registry: processor.data('registry'), components: processor.data('components'), otherTopicComponents });
   const frontmatter = checkFrontmatter(file, yaml, { layouts, themes });
   return { tree, frontmatter, messages: toMessages(file, path) };
 }

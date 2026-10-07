@@ -1,0 +1,31 @@
+@import './lib/blocks.css';
+
+:root {
+  --font-body: 'LXGW WenKai Screen', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif: 'Source Serif 4', 'Noto Serif SC', serif;
+  --color-text: #3b2f2a;
+  --color-muted: #84705f;
+  --color-bg: #fdf6ec;
+  --color-accent: #c0582b;
+  --color-mark: #f7dcc0;
+  --color-mark-text: #8a3b1d;
+  --color-highlight: #fbe9d7;
+  --color-border: #ead8c3;
+  --measure: 40rem;
+  --measure-wide: 58rem;
+  --sidenote-width: 15rem;
+}
+
+.note-series {
+  margin: 0 0 0.4rem;
+  color: var(--color-accent);
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+}
+
+wave-figure svg.wave-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+}

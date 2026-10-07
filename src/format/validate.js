@@ -45,14 +45,16 @@ function checkDirectiveAttributes(node, properties, report) {
   }
 }
 
-function checkComponent(node, components, report) {
+function checkComponent(node, { components, otherTopicComponents }, report) {
   if (node.type === 'textDirective') {
     report(node, `Component ${directiveLabel(node)} must be written as ::${node.name} or :::${node.name}`);
     return;
   }
   if (!components) return;
   if (!Object.hasOwn(components, node.name)) {
-    report(node, `Unknown component ${directiveLabel(node)}`);
+    const topic = otherTopicComponents?.[node.name];
+    if (topic !== undefined) report(node, `Component ${directiveLabel(node)} belongs to topic ${topic}, move it to components/ to use it in other topics`);
+    else report(node, `Unknown component ${directiveLabel(node)}`);
     return;
   }
   checkDirectiveAttributes(node, components[node.name], report);
@@ -101,9 +103,9 @@ function checkStructure(node, parent, index, report) {
   }
 }
 
-function checkDirective(node, parent, index, { registry, components }, report) {
+function checkDirective(node, parent, index, { registry, components, otherTopicComponents }, report) {
   if (node.name.includes('-')) {
-    checkComponent(node, components, report);
+    checkComponent(node, { components, otherTopicComponents }, report);
     return;
   }
   const block = registry.get(node.name);
@@ -152,7 +154,7 @@ function checkFootnotes(source, points, footnotes, report, reportAt) {
   }
 }
 
-export function validateContent(tree, file, { registry, components }) {
+export function validateContent(tree, file, { registry, components, otherTopicComponents }) {
   const source = String(file.value);
   const points = location(file);
   const report = (node, text) => file.message(text, node.position);
@@ -161,7 +163,7 @@ export function validateContent(tree, file, { registry, components }) {
   const walk = (node, ancestors) => {
     const parent = ancestors.at(-1);
     const index = parent ? parent.children.indexOf(node) : -1;
-    if (isDirective(node)) checkDirective(node, parent, index, { registry, components }, report);
+    if (isDirective(node)) checkDirective(node, parent, index, { registry, components, otherTopicComponents }, report);
     else if (node.type === 'image') checkImage(node, parent, report);
     else if (node.type === 'html' && !node.value.startsWith('</')) checkHtml(node, ancestors, report);
     else if (node.type === 'footnoteReference') footnotes.references.push(node);

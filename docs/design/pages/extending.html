@@ -20,6 +20,23 @@
 <h1>扩展接口</h1>
 <p class="lead">博客通过四种方式扩展 bake：组件、块类型、版式和主题。四种方式都是<mark>把文件放进约定的目录</mark>，bake 按目录发现它们，配置文件不需要登记。</p>
 
+<h2>bake 怎么发现扩展</h2>
+<table>
+  <thead>
+    <tr><th>扩展</th><th>位置</th><th>名字</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>全局组件</td><td><code>components/*.js</code></td><td>文件名</td></tr>
+    <tr><td>主题组件</td><td><code>content/&lt;主题&gt;/components/*.js</code>，<code>&lt;主题&gt;</code> 是 <code>content/</code> 下第一层目录</td><td>文件名</td></tr>
+    <tr><td>块类型</td><td><code>blocks/*.js</code></td><td>文件名，必须与默认导出的 <code>name</code> 相同</td></tr>
+    <tr><td>版式</td><td><code>layouts/*.js</code></td><td>文件名</td></tr>
+    <tr><td>主题</td><td><code>themes/*.css</code></td><td>文件名</td></tr>
+  </tbody>
+</table>
+<p>每个扩展目录只发现第一层的文件。子目录不发现，用于存放共用的模块，例如 <code>components/lib/</code>、<code>blocks/lib/</code>、<code>themes/lib/</code>。</p>
+<p>一个页面所属的主题是它的路径在 <code>content/</code> 下的第一层目录名，例如 <code>content/matrix-calculus/deep-learning.md</code> 属于主题 <code>matrix-calculus</code>。直接放在 <code>content/</code> 下的页面不属于任何主题，只能使用全局组件。</p>
+<p>bake 在 Node 中通过 Vite 载入博客的 <code>bake.config.js</code>、组件、块类型和版式。扩展在发现时校验，未通过校验的扩展不使用，错误的处理见 <a href="#errors">扩展出错时会怎样</a>。</p>
+
 <h2>组件怎么写</h2>
 <p>组件是用代码画的交互图。<code>components/</code>（全局）和 <code>content/&lt;主题&gt;/components/</code>（只在这个主题的文章里可用）下的每个 <code>.js</code> 文件定义一个 custom element，元素名就是文件名。文件名必须包含 <code>-</code>，这是 custom element 的命名规则。</p>
 <pre><code class="language-js">export default class GradientFigure extends HTMLElement {
@@ -27,7 +44,6 @@
     x0: { label: 'x₀ 初始值', type: 'number', min: -2, max: 2, step: 0.01, default: 1.2 },
     showPath: { label: '显示路径', type: 'boolean', default: true },
   };
-  static runtimeMath = true;
 }</code></pre>
 <p>bake 对组件的要求：</p>
 <table>
@@ -35,28 +51,29 @@
     <tr><th>要求</th><th>理由</th></tr>
   </thead>
   <tbody>
+    <tr><td>文件名以小写字母开头，只含小写字母、数字和 <code>-</code>，至少包含一个 <code>-</code>，不是 HTML 规范保留的名字（例如 <code>font-face</code>）</td><td>custom element 的命名规则</td></tr>
     <tr><td>默认导出一个继承 <code>HTMLElement</code> 的类，bake 用文件名调用 <code>customElements.define</code></td><td>组件不需要自己注册，改名只改文件名</td></tr>
-    <tr><td><code>static properties</code> 列出可调属性，字段为 <code>label</code>、<code>type</code>（<code>number</code> | <code>string</code> | <code>boolean</code> | <code>enum</code>）、<code>default</code>，以及 <code>min</code>、<code>max</code>、<code>step</code>、<code>options</code></td><td>编辑器据此生成属性面板；bake 据此生成 <code>observedAttributes</code></td></tr>
+    <tr><td><code>static properties</code> 列出可调属性，可以省略。字段为 <code>label</code>、<code>type</code>（<code>number</code> | <code>string</code> | <code>boolean</code> | <code>enum</code>）、<code>default</code>，以及 <code>min</code>、<code>max</code>、<code>step</code>、<code>options</code>。<code>enum</code> 必须有非空的 <code>options</code>；<code>min</code>、<code>max</code>、<code>step</code> 只用于 <code>number</code>；<code>default</code> 必须符合类型和取值范围</td><td>编辑器据此生成属性面板；bake 据此生成 <code>observedAttributes</code></td></tr>
     <tr><td>属性变化时重画（<code>attributeChangedCallback</code>）</td><td>属性面板修改属性时组件实时更新</td></tr>
     <tr><td>保留元素内原有的 <code>&lt;figcaption&gt;</code></td><td>图题是 Markdown 内容，由编辑器管理</td></tr>
-    <tr><td>浏览器端需要渲染公式时声明 <code>static runtimeMath = true</code></td><td>bake 只在用到这个组件的页面加载 MathJax</td></tr>
+    <tr><td>模块顶层不访问 DOM，只在类的方法里访问</td><td>bake 在 Node 中载入组件模块读取 <code>static properties</code>，Node 中只有一个空的 <code>HTMLElement</code> 类</td></tr>
   </tbody>
 </table>
-<p>bake 在 Node 中通过 Vite 载入组件模块，读取 <code>static properties</code>，不执行 <code>customElements.define</code>。组件可以导入 <code>components/lib/</code> 中的文件、CSS 文件等 Vite 能处理的模块。开发服务器修改组件或它导入的文件后，bake 重新读取 <code>static properties</code>，不需要重启。<code>bake.config.js</code> 用同样的方式载入。</p>
+<p>bake 在 Node 中通过 Vite 载入组件模块，读取 <code>static properties</code>，不执行 <code>customElements.define</code>。在 Node 中，<code>bake/runtime</code> 解析到替代实现：<code>site</code> 为 <code>{ pages: [], config: {} }</code>，其他函数调用时报错。组件可以导入 <code>components/lib/</code> 中的文件、CSS 文件等 Vite 能处理的模块。开发服务器修改组件或它导入的文件后，bake 重新读取 <code>static properties</code>，不需要重启。<code>bake.config.js</code> 用同样的方式载入。</p>
 <p>开发服务器中，组件文件修改后页面不刷新，组件实例换成新的实现。bake 为每个组件注册一个包装类：包装类构造元素时使用当前的实现类，把生命周期回调和属性变化转发给元素自己的实现，<code>observedAttributes</code> 来自 <code>static properties</code>。组件模块热更新时，包装类换用新的实现类，并把页面上这个名字的每个元素替换成新元素：新元素使用当前的属性和元素第一次连接时原有子节点的副本，所以属性不变，图题保留，旧实现生成的内容不会带到新元素中。理由：一个 custom element 名字只能注册一次，直接重新注册会失败。注册时的 <code>observedAttributes</code> 不随热更新改变，新增的属性在刷新页面后才响应变化。</p>
-<p>组件可以用纯 JavaScript 编写，也可以用 SolidJS 通过 <code>solid-element</code> 编写。组件可以从 <code>bake/runtime</code> 导入以下工具：</p>
+<p>组件用纯 JavaScript 编写。组件可以从 <code>bake/runtime</code> 导入以下工具，只导入用到的工具时，页面只加载对应的代码：</p>
 <table>
   <thead>
     <tr><th>导入</th><th>作用</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>animate</code></td><td>Motion 的 <code>animate</code>，系统开启减少动态效果时动画时长为 0</td></tr>
-    <tr><td><code>layoutText</code></td><td>Pretext 的封装：给定文字、字体和宽度，返回断行结果和高度，用于 SVG 和 canvas 里的文字</td></tr>
-    <tr><td><code>renderMath</code></td><td>在浏览器里渲染 TeX，使用站点的 MathJax 配置；只在声明 <code>runtimeMath</code> 的组件里可用</td></tr>
+    <tr><td><code>animate</code></td><td>Motion（<code>motion</code>）的 <code>animate</code>，参数和返回值与它相同。每次调用时检查系统是否开启减少动态效果，开启时改用 <code>createScopedAnimate({ skipAnimations: true })</code> 创建的函数，属性直接设为最后一帧，<code>finished</code> 立即完成。理由：Motion 自带的 <code>reduceMotion</code> 选项只关闭位移类动画，透明度等动画仍然进行</td></tr>
+    <tr><td><code>layoutText</code></td><td><code>layoutText({ text, font, width, lineHeight })</code> 返回 <code>{ lines: [{ text, width }], height }</code>，<code>height</code> 是行数乘 <code>lineHeight</code>。<code>font</code> 是 canvas 的字体写法，例如 <code>16px "LXGW WenKai Screen"</code>；<code>width</code> 和 <code>lineHeight</code> 是像素数。使用 Pretext（<code>@chenglou/pretext</code>）断行，用于 SVG 和 canvas 里的文字。字体载入完成后 bake 清除 Pretext 的宽度缓存，组件在 <code>document.fonts.ready</code> 之后排版</td></tr>
+    <tr><td><code>renderMath</code></td><td><code>renderMath(tex, { display = false })</code> 返回 <code>Promise&lt;SVGSVGElement&gt;</code>，使用站点的 MathJax 配置和宏。SVG 自带它用到的字形，不引用页面上的字形容器。理由：组件可能使用 shadow DOM，shadow root 里找不到页面上的字形。MathJax 在第一次调用时才加载，没有调用的页面不加载。同一公式每次调用返回新的元素。TeX 有错误时 Promise 以 <code>Error</code> 拒绝，说明是 MathJax 的错误文字</td></tr>
     <tr><td><code>site</code></td><td>站点数据，见 <a href="#site-data">组件怎么取得站点数据</a></td></tr>
   </tbody>
 </table>
-<p>组件名在全站唯一，主题组件与全局组件重名时构建报错。一个主题的组件被另一个主题的文章使用时构建报错，提示把它移到全局 <code>components/</code>。<code>components/lib/</code> 下的文件是组件共用的模块，不定义组件。</p>
+<p>组件名在全站唯一，主题组件与全局组件重名、两个主题的组件重名时构建报错。一个主题的组件被另一个主题的文章或 <code>content/</code> 下第一层的页面使用时构建报错，提示把它移到全局 <code>components/</code>。<code>components/lib/</code> 下的文件是组件共用的模块，不定义组件。</p>
 
 <h2>块类型怎么定义</h2>
 <p>块类型是扩展的 Markdown 写法。bake 的内置块类型在 <code>src/blocks/</code>，博客自己的块类型在 <code>blocks/</code>，每个文件定义一种，格式相同。</p>
@@ -73,13 +90,14 @@
     <tr><th>字段</th><th>说明</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>name</code></td><td>指令名，全站唯一。博客的块类型与内置块类型重名时构建报错</td></tr>
+    <tr><td><code>name</code></td><td>指令名，必须与文件名相同，只含小写字母和数字并以字母开头。不能包含 <code>-</code>，因为指令名包含 <code>-</code> 时按组件处理。博客的块类型与内置块类型重名时构建报错。理由：与组件、版式、主题一样按文件名命名，找定义时直接看文件名</td></tr>
     <tr><td><code>form</code></td><td><code>text</code>：行内标记，写作 <code>:name[文字]{属性}</code>；<code>leaf</code>：单行块，写作 <code>::name[文字]{属性}</code>；<code>container</code>：可以包含段落的块，写作 <code>:::name{属性}</code> 到 <code>:::</code></td></tr>
     <tr><td><code>label</code></td><td>插入菜单里显示的名字，默认是 <code>name</code></td></tr>
     <tr><td><code>attributes</code></td><td>属性定义，字段与组件的 <code>static properties</code> 相同，编辑器据此生成属性面板</td></tr>
     <tr><td><code>render</code></td><td>可选。参数 <code>attributes</code> 是写在指令上的属性，未写的属性填入默认值，值都是字符串；<code>label</code> 是容器形式 <code>[标题]</code> 转换成的 hast 节点列表，没有方括号时为 <code>undefined</code>；<code>children</code> 是其余内容转换成的 hast 节点列表。<code>children</code> 要按原顺序连续放在同一个父元素里，<code>label</code> 放进一个单独的元素，这个元素也放在同一个父元素里，编辑器用这两处作为可输入的区域。返回 hast 风格的数组 <code>[标签, 属性, 子节点列表]</code>，子节点列表里可以是 hast 节点、字符串或同样形式的数组。bake 在返回的最外层元素上加 <code>data-md</code>。不写时输出 <code>&lt;div class="name"&gt;</code>（<code>text</code> 形式为 <code>&lt;span&gt;</code>），属性写成 <code>data-*</code></td></tr>
   </tbody>
 </table>
+<p>块类型文件在 Node 中用于渲染，在浏览器中用于生成编辑器节点，所以只能导入在两种环境都能运行的模块。编辑器打开之后再修改块类型定义，阅读视图立即更新，编辑器在刷新页面后使用新定义。理由：浏览器不会重新执行已载入的模块，修改块类型定义是开发扩展时的操作。</p>
 <p>块类型的样式写在博客的主题 CSS 里。编辑器中块内的内容可以直接输入，渲染结果与页面相同。理由：<code>render</code> 的输出同时用作编辑器节点的 DOM，编辑器和页面不需要两套定义。</p>
 
 <h2>版式怎么写</h2>
@@ -94,7 +112,7 @@
     <tr><td><code>bento</code></td><td>标题和导语，下方是整页宽度的卡片网格，没有目录和旁注栏</td></tr>
   </tbody>
 </table>
-<p>博客可以在 <code>layouts/</code> 中新增版式，或用同名文件覆盖内置版式。版式是一个函数，返回 <code>&lt;body&gt;</code> 内的 HTML：</p>
+<p>博客可以在 <code>layouts/</code> 中新增版式，或用同名文件覆盖内置版式，覆盖时函数和 <code>fields</code> 一起替换。版式文件默认导出一个函数，返回 <code>&lt;body&gt;</code> 内的 HTML：</p>
 <pre><code class="language-js">export default function essay({ page, html, toc, site }) {
   return `
     &lt;header class="mast"&gt;
@@ -155,7 +173,8 @@
   --measure-wide: 60rem;
   --sidenote-width: 16rem;
 }</code></pre>
-<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。变量名列表是 <code>src/styles/variables.js</code> 的 <code>themeVariables</code>，检查主题时使用它。</p>
+<p><code>--color-highlight</code> 是旁注悬停时正文的高亮色，<code>--color-mark-text</code> 和 <code>--color-mark</code> 是 <code>==文字==</code> 的文字颜色和底色。主题缺少某个变量时，构建报错并列出缺少的变量。变量名列表是 <code>src/styles/variables.js</code> 的 <code>themeVariables</code>，检查主题时使用它。检查只读主题文件本身，收集文件中任意选择器下声明的自定义属性。</p>
+<p>几个主题可以把共用的样式放在 <code>themes/lib/</code>，用 <code>@import './lib/blocks.css'</code> 导入，<code>themes/lib/</code> 下的文件不是主题。被导入的文件里声明的变量不计入检查，每个主题文件自己写出全部变量。</p>
 <p>代码高亮的颜色使用 13 个可选的代码变量，列在同一文件的 <code>optionalVariables</code>，检查主题时不要求它们。主题不写某个代码变量时，它回退到下表的主题变量。理由：只设定必需变量的主题也有代码颜色，深色模式只需要换变量的值。</p>
 <table>
   <thead>
@@ -186,7 +205,25 @@ site.config;</code></pre>
     <tr><td><code>site.config</code></td><td><code>bake.config.js</code> 中的 <code>site</code> 字段，例如首页分类</td></tr>
   </tbody>
 </table>
-<p>构建时 <code>site</code> 从 <code>dist/site.json</code> 读取，只有导入了 <code>site</code> 的组件所在页面才请求这个文件。开发服务器中，页面增删或 frontmatter 修改后 <code>site</code> 自动更新，并派发 <code>bake:site</code> 事件。</p>
+<p>导入 <code>site</code> 的组件模块在站点数据到达后才执行，组件里可以直接读 <code>site.pages</code>。构建后 <code>site</code> 从 <code>&lt;base&gt;site.json</code> 读取，地址带 <code>bake.config.js</code> 的 <code>base</code>。只有导入了 <code>site</code> 的组件所在页面才请求这个文件，同一页面只请求一次；请求失败时导入它的组件不注册。开发服务器中，页面增删或 frontmatter 修改后 <code>site.pages</code> 和 <code>site.config</code> 换成新值，然后在 <code>document</code> 上派发 <code>bake:site</code> 事件，组件监听它重画：</p>
+<pre><code class="language-js">connectedCallback() {
+  this.redraw = () =&gt; this.draw();
+  document.addEventListener('bake:site', this.redraw);
+  this.draw();
+}</code></pre>
+
+<h2 id="errors">扩展出错时会怎样</h2>
+<p>扩展的错误使用与文章相同的格式 <code>文件路径:行:列 错误说明</code>，位置是 <code>1:1</code>，说明是英文。模块载入失败（语法错误、导入失败、顶层抛出异常）时报告 <code>Cannot load &lt;文件路径&gt;: &lt;错误说明&gt;</code>，语法错误带 Vite 给出的行列。</p>
+<div class="term"><span class="prompt">$</span> bake build
+components/wave-figure.js:1:1 Component wave-figure is also defined in content/extending/components/wave-figure.js
+content/extending/components/wave-figure.js:1:1 Component wave-figure is also defined in components/wave-figure.js
+themes/warm.css:1:1 Theme warm is missing variables --color-mark, --measure
+3 errors, dist/ was not written</div>
+<ul>
+  <li><code>bake build</code> 在扩展有错误时只输出扩展的错误和汇总行，以 1 退出，不渲染页面，输出目录不变。理由：一个出错的扩展会在每个使用它的页面上产生错误，只输出原因更容易定位。</li>
+  <li><code>bake dev</code> 启动时扩展有错误，与 <code>bake build</code> 一样输出错误和汇总行，不启动服务器。启动之后修改扩展产生的错误不停止服务器：跳过未通过校验的扩展，页面照常显示。错误输出到终端，并计入每个页面状态栏的错误列表。使用了被跳过的组件、块类型、版式或主题的页面另外报告对应的渲染错误。</li>
+  <li>同名的两个组件都不使用；覆盖内置版式的文件出错时使用内置版式。</li>
+</ul>
 </main>
 </body>
 </html>

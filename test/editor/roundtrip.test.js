@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { exportMarkdown, openEditor, placeCursor, saveAfter, startSite } from './setup.js';
 
-const pages = readdirSync(join(import.meta.dirname, '..', '..', 'examples', 'minimal', 'content')).filter((name) => name.endsWith('.md'));
+const pages = readdirSync(join(import.meta.dirname, '..', '..', 'examples', 'minimal', 'content'), { recursive: true }).filter((name) => name.endsWith('.md')).sort();
 let site;
 
 before(async () => {
@@ -21,7 +21,7 @@ for (const name of pages) {
     const slug = /^slug: (.+)$/m.exec(site.read(path))[1];
     const { page, errors, saves } = await openEditor(site, slug === '/' ? '/' : `/${slug}/`);
     assert.equal(await page.textContent('.bake-save-state'), '已保存');
-    await site.screenshot(page, name.replace('.md', ''));
+    await site.screenshot(page, name.replace('.md', '').replaceAll('/', '-'));
     assert.equal(await exportMarkdown(page), site.read(path));
     await page.waitForTimeout(1200);
     assert.deepEqual(saves, []);

@@ -7,7 +7,8 @@ import { escapeHtml } from '../layouts/html.js';
 import { readFrontmatter } from '../format/frontmatter.js';
 import { imageExtensions } from '../format/validate.js';
 import { mathConfigId } from '../math/plugin.js';
-import { layoutFrame, loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
+import { isExtensionPath, loadThemes } from '../site/extensions.js';
+import { layoutFrame, loadSite, pageComponents, renderArticle, renderDocumentFor, siteData } from '../site/index.js';
 import { brokenLinks, splitHref } from '../site/links.js';
 import { createModuleLoader } from '../site/modules.js';
 import { isPagePath, pageUrl, removePage, updatePage } from '../site/pages.js';
@@ -42,8 +43,20 @@ function isInside(directory, path) {
   return path.startsWith(directory + sep);
 }
 
+function slashPath(path) {
+  return path.split(sep).join('/');
+}
+
 function isComponentPath(path) {
-  return /^(components|content\/[^/]+\/components)\/[^/]+\.js$/.test(path.split(sep).join('/'));
+  return /^(components|content\/[^/]+\/components)\/[^/]+\.js$/.test(slashPath(path));
+}
+
+function isRenderModulePath(path) {
+  return /^(blocks|layouts)[/]/.test(slashPath(path));
+}
+
+function isThemePath(path) {
+  return slashPath(path).startsWith('themes/');
 }
 
 function sendJson(response, status, body) {
@@ -83,6 +96,7 @@ export function bakeDev({ root }) {
   const chromes = new Map();
   const openUrls = new Set();
   let site;
+  let sentSiteData;
   let server;
   let loader;
   let queue = Promise.resolve();
@@ -102,12 +116,32 @@ export function bakeDev({ root }) {
     if (module) server.moduleGraph.invalidateModule(module);
   }
 
-  async function reloadSite() {
-    site = await loadSite(root, { loader });
+  function useSite(next) {
+    site = next;
     rendered.clear();
     invalidate(registryId);
     invalidate(mathConfigId);
     report(site.messages);
+  }
+
+  async function reloadSite() {
+    useSite(await loadSite(root, { loader }));
+  }
+
+  function extensionMessages() {
+    return site.messages.filter((message) => isExtensionPath(slashPath(message.path)));
+  }
+
+  function pageErrors(result) {
+    return [...extensionMessages(), ...result.messages];
+  }
+
+  function sendSiteData() {
+    const data = siteData(site);
+    const text = JSON.stringify(data);
+    if (text === sentSiteData) return;
+    sentSiteData = text;
+    server.ws.send('bake:site', data);
   }
 
   function siteMessages() {
@@ -169,7 +203,7 @@ export function bakeDev({ root }) {
   async function sendStatus(entry, client) {
     const result = await renderEntry(entry);
     const links = brokenLinks(entry, result.rendered.links, await linkTargets(entry, result.rendered));
-    const status = { errors: result.messages, links };
+    const status = { errors: pageErrors(result), links };
     statuses.set(entry.url, status);
     client.send('bake:status', { url: entry.url, ...status });
   }
@@ -184,13 +218,13 @@ export function bakeDev({ root }) {
     shownHashes.set(entry.path, rendered.get(entry.path).hash);
     const changed = chromeChanged(entry, result);
     const { html, toc, mathDefs } = result.rendered;
-    server.ws.send('bake:page', { url: entry.url, html, toc, mathDefs, chrome: chrome || changed, errors: result.messages });
+    server.ws.send('bake:page', { url: entry.url, html, toc, mathDefs, chrome: chrome || changed, errors: pageErrors(result) });
     checkLinks(entry);
   }
 
   async function servePage(entry, request, response) {
     const result = await renderEntry(entry);
-    statuses.set(entry.url, { errors: result.messages, links: statuses.get(entry.url)?.links ?? [] });
+    statuses.set(entry.url, { errors: pageErrors(result), links: statuses.get(entry.url)?.links ?? [] });
     if (result.html === null) {
       sendText(response, 500, result.messages.map(formatMessage).join('\n') + '\n');
       return;
@@ -297,6 +331,7 @@ export function bakeDev({ root }) {
     const url = new URL(request.originalUrl ?? request.url, 'http://localhost');
     if (url.pathname.startsWith('/__bake/')) return handleApi(request, response, url);
     if (request.method !== 'GET' && request.method !== 'HEAD') return next();
+    if (url.pathname === `${server.config.base}site.json`) return sendJson(response, 200, siteData(site));
     const entry = pageAt(url.pathname);
     if (entry) return servePage(entry, request, response);
     const file = assetFile(url.pathname);
@@ -313,30 +348,84 @@ export function bakeDev({ root }) {
     const previous = site.pages.find((page) => page.path === path);
     const { pages, messages } = event === 'unlink' ? removePage(site.pages, path) : await updatePage(root, site.pages, path);
     site = { ...site, pages };
+    sendSiteData();
     const entry = pages.find((page) => page.path === path);
-    if (previous?.url !== entry?.url) report(messages);
+    if (previous?.url !== entry?.url) {
+      report(messages);
+      invalidate(registryId);
+    }
     if (!entry?.url) return;
     if (shownHashes.get(path) === sha256(await readFile(file))) return;
     await sendPage(entry);
   }
 
-  async function handleConfig() {
-    await reloadSite();
+  async function sendOpenPages() {
     for (const url of openUrls) {
       const entry = pageAt(url);
       if (entry) await sendPage(entry, { chrome: true });
     }
   }
 
+  function sendOpenStatuses() {
+    for (const url of openUrls) {
+      const entry = pageAt(url);
+      if (entry) checkLinks(entry);
+    }
+  }
+
+  async function handleConfig() {
+    await reloadSite();
+    sendSiteData();
+    await sendOpenPages();
+  }
+
+  async function handleExtensions() {
+    await reloadSite();
+    await sendOpenPages();
+  }
+
+  function componentState(state) {
+    return JSON.stringify([state.components, state.messages]);
+  }
+
+  async function handleComponentModule() {
+    const next = await loadSite(root, { loader });
+    if (componentState(next) === componentState(site)) {
+      site = next;
+      return;
+    }
+    useSite(next);
+    await sendOpenPages();
+  }
+
+  async function handleTheme() {
+    const { themes, messages } = await loadThemes(root);
+    const themesChanged = JSON.stringify(themes) !== JSON.stringify(site.themes);
+    site = { ...site, themes, messages: [...site.messages.filter((message) => !isThemePath(message.path)), ...messages] };
+    report(messages);
+    if (themesChanged) {
+      rendered.clear();
+      await sendOpenPages();
+    } else {
+      sendOpenStatuses();
+    }
+    return themesChanged;
+  }
+
   function handleFile(event, file) {
+    const path = relative(root, file);
     if (file === configFile) {
       loader.invalidate(file);
       return serialize(handleConfig);
     }
-    if (isPagePath(relative(root, file))) return serialize(() => handleMarkdown(event, file));
-    if (isComponentPath(relative(root, file)) || server.environments.ssr.moduleGraph.getModulesByFile(file)?.size) {
+    if (isPagePath(path)) return serialize(() => handleMarkdown(event, file));
+    if (isRenderModulePath(path) || (isComponentPath(path) && event !== 'change')) {
       loader.invalidate(file);
-      return serialize(reloadSite);
+      return serialize(handleExtensions);
+    }
+    if (isComponentPath(path) || server.environments.ssr.moduleGraph.getModulesByFile(file)?.size) {
+      loader.invalidate(file);
+      return serialize(handleComponentModule);
     }
     return undefined;
   }
@@ -355,7 +444,8 @@ export function bakeDev({ root }) {
     async configureServer(devServer) {
       server = devServer;
       loader = await createModuleLoader(root, { server });
-      site = await loadSite(root, { loader });
+      await reloadSite();
+      sentSiteData = JSON.stringify(siteData(site));
       server.watcher.add(configFile);
       server.watcher.on('all', (event, file) => {
         handleFile(event, file)?.catch((error) => server.config.logger.error(error.stack));
@@ -374,9 +464,13 @@ export function bakeDev({ root }) {
     },
     load(id) {
       if (id === registryId) {
-        const components = Object.fromEntries(Object.entries(site.components).map(([name, { properties }]) => [name, properties]));
-        return `import blocks from ${JSON.stringify(join(bakeRoot, 'src/blocks/index.js'))};
-export default { blocks, components: ${JSON.stringify(components)} };
+        const pages = site.pages.filter((page) => page.url !== null);
+        const components = Object.fromEntries(pages.map((page) => [page.url, pageComponents(site, page.path).components]));
+        const blogBlocks = site.blocks.map((block) => `/blocks/${block.name}.js`);
+        return `import builtinBlocks from ${JSON.stringify(join(bakeRoot, 'src/blocks/index.js'))};
+${blogBlocks.map((file, index) => `import block${index} from ${JSON.stringify(file)};`).join('\n')}
+const components = ${JSON.stringify(components)};
+export default { blocks: [...builtinBlocks, ${blogBlocks.map((_, index) => `block${index}`).join(', ')}], components: components[location.pathname] ?? {} };
 `;
       }
       if (!id.startsWith(componentPrefix)) return undefined;
@@ -389,6 +483,14 @@ import { defineComponent } from ${JSON.stringify(bakeUrl('src/dev/component.js')
 const replace = defineComponent(${JSON.stringify(name)}, Component);
 if (import.meta.hot) import.meta.hot.accept(${file}, (module) => module && replace(module.default));
 `;
+    },
+    async hotUpdate({ file }) {
+      if (this.environment.name !== 'client') return undefined;
+      const path = relative(root, file);
+      if (isRenderModulePath(path)) return [];
+      // why(#25): when the set of valid themes changes, bake:page replaces the stylesheet links; a pending Vite CSS update on a removed link would block later HMR messages
+      if (isThemePath(path)) return (await serialize(handleTheme)) ? [] : undefined;
+      return undefined;
     },
     transformIndexHtml(html, context) {
       const status = statuses.get(context.path);
