@@ -408,3 +408,19 @@ describe('站点模块', () => {
     await until(async () => (await texts()).length === 0);
   });
 });
+
+describe('启动', () => {
+  test('站点有错误时不启动，抛出带 messages 的错误', async () => {
+    const empty = mkdtempSync(join(tmpdir(), 'bake-dev-empty-'));
+    try {
+      await assert.rejects(createDevServer({ root: empty, port: 0 }), (error) => {
+        assert.equal(error.messages.length, 1);
+        assert.match(error.messages[0].text, /^Cannot load bake\.config\.js/);
+        return true;
+      });
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+});
+

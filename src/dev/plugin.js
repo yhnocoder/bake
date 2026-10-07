@@ -99,6 +99,10 @@ export function bakeDev({ root }) {
     report(site.messages);
   }
 
+  function siteMessages() {
+    return site.messages;
+  }
+
   function pageAt(url) {
     return site.pages.find((page) => page.url === url);
   }
@@ -326,11 +330,11 @@ export function bakeDev({ root }) {
 
   return {
     name: 'bake-dev',
-    api: { renderedPage, componentEntry },
+    api: { renderedPage, componentEntry, siteMessages },
     async configureServer(devServer) {
       server = devServer;
       loader = await createModuleLoader(root, { server });
-      await reloadSite();
+      site = await loadSite(root, { loader });
       server.watcher.add(configFile);
       server.watcher.on('all', (event, file) => {
         handleFile(event, file)?.catch((error) => server.config.logger.error(error.stack));
