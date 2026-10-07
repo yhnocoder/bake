@@ -49,6 +49,6 @@ export function loadLanguage(lang) {
 }
 
 export function codeToLines(shiki, code, lang, transformers = []) {
-  const [pre] = shiki.codeToHast(code, { lang, theme: 'bake', transformers }).children;
+  const [pre] = shiki.codeToHast(code, { lang, theme: 'bake', transformers, tokenizeTimeLimit: 0 }).children;
   return pre.children[0].children;
 }
