@@ -6,8 +6,9 @@ import { formatMessage } from '../format/index.js';
 import { readFrontmatter } from '../format/frontmatter.js';
 import { imageExtensions } from '../format/validate.js';
 import { mathConfigId } from '../math/plugin.js';
-import { loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
+import { layoutFrame, loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
 import { brokenLinks, splitHref } from '../site/links.js';
+import { createModuleLoader } from '../site/modules.js';
 import { isPagePath, pageUrl, removePage, updatePage } from '../site/pages.js';
 
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -38,6 +39,10 @@ export function componentEntry(name) {
 
 function isInside(directory, path) {
   return path.startsWith(directory + sep);
+}
+
+function isComponentPath(path) {
+  return /^(components|content\/[^/]+\/components)\/[^/]+\.js$/.test(path.split(sep).join('/'));
 }
 
 function sendJson(response, status, body) {
@@ -78,6 +83,7 @@ export function bakeDev({ root }) {
   const openUrls = new Set();
   let site;
   let server;
+  let loader;
   let queue = Promise.resolve();
 
   function serialize(task) {
@@ -96,7 +102,7 @@ export function bakeDev({ root }) {
   }
 
   async function reloadSite() {
-    site = await loadSite(root);
+    site = await loadSite(root, { loader });
     rendered.clear();
     invalidate(registryId);
     invalidate(mathConfigId);
@@ -121,8 +127,9 @@ export function bakeDev({ root }) {
     const cached = rendered.get(entry.path);
     if (cached?.hash === hash) return cached.result;
     const article = await renderArticle(site, entry.path, bytes.toString('utf8'));
-    const html = renderDocumentFor(site, entry.path, article, { assets: pageAssets(article) });
-    const result = { html, rendered: article, messages: article.messages };
+    const { frame, messages } = layoutFrame(site, entry.path, article);
+    const html = frame === null ? null : renderDocumentFor(site, entry.path, article, { frame, assets: pageAssets(article) });
+    const result = { html, frame, rendered: article, messages: [...article.messages, ...messages] };
     rendered.set(entry.path, { hash, result });
     report(result.messages);
     return result;
@@ -143,12 +150,12 @@ export function bakeDev({ root }) {
     return targets;
   }
 
-  function chromeOf(entry, article) {
-    return renderDocumentFor(site, entry.path, { ...article, html: '', mathDefs: '' }, { assets: pageAssets(article) });
+  function chromeOf(entry, { frame, rendered }) {
+    return renderDocumentFor(site, entry.path, { ...rendered, html: '', mathDefs: '' }, { frame, assets: pageAssets(rendered) });
   }
 
   function chromeChanged(entry, result) {
-    const chrome = chromeOf(entry, result.rendered);
+    const chrome = chromeOf(entry, result);
     const changed = chromes.get(entry.url) !== chrome;
     chromes.set(entry.url, chrome);
     return changed;
@@ -307,16 +314,23 @@ export function bakeDev({ root }) {
   }
 
   function handleFile(event, file) {
-    if (file === configFile) return serialize(handleConfig);
+    if (file === configFile) {
+      loader.invalidate(file);
+      return serialize(handleConfig);
+    }
     if (isPagePath(relative(root, file))) return serialize(() => handleMarkdown(event, file));
-    if (Object.values(site.components).some(({ path }) => join(root, path) === file)) return serialize(reloadSite);
+    if (isComponentPath(relative(root, file)) || server.environments.ssr.moduleGraph.getModulesByFile(file)?.size) {
+      loader.invalidate(file);
+      return serialize(reloadSite);
+    }
     return undefined;
   }
 
   async function renderedPage(url) {
     const entry = pageAt(url);
     if (!entry) return null;
-    const { page, html, toc, mathDefs, components, messages } = (await renderEntry(entry)).rendered;
+    const { rendered, messages } = await renderEntry(entry);
+    const { page, html, toc, mathDefs, components } = rendered;
     return { path: entry.path, page, html, toc, mathDefs, components, messages };
   }
 
@@ -325,6 +339,7 @@ export function bakeDev({ root }) {
     api: { site: () => site, renderedPage, componentEntry },
     async configureServer(devServer) {
       server = devServer;
+      loader = await createModuleLoader(root, { server });
       await reloadSite();
       server.watcher.add(configFile);
       server.watcher.on('all', (event, file) => {

@@ -39,6 +39,7 @@
 <span class="dim">2 errors, dist/ was not written</span> <span class="ref">2</span></div>
 <ol class="callouts">
   <li>每个错误一行，构建继续检查其余文件，最后一行汇总错误数，1 个错误时写 <code>1 error</code>。</li>
+  <li>站点本身有错误时（<code>bake.config.js</code> 不能载入、组件不能读取、主题不存在、<code>slug</code> 重复），只输出这些错误，不渲染页面。理由：配置和组件的错误会让很多页面报出由它引起的错误，例如配置中的宏缺失后每个用到它的公式都报错。</li>
   <li>有任何错误时不写入输出目录，已有的 <code>dist/</code> 保持不变。没有错误时先写到输出目录旁的临时目录，完成后替换输出目录。</li>
 </ol>
 
@@ -103,7 +104,7 @@
   <li>图片由 sharp 处理：PNG 和 JPEG 转成 WebP；PNG、JPEG、WebP、AVIF 宽度超过 <code>1600px</code> 的缩到 <code>1600px</code>；GIF 和 SVG 原样复制。理由：GIF 可能是动图，转换会丢失动画。</li>
   <li>图片输出到 <code>assets/&lt;slug&gt;/&lt;文件名&gt;.&lt;哈希&gt;.&lt;扩展名&gt;</code>，哈希是源文件内容 SHA-256 的前 4 位十六进制。按 <code>slug</code> 分目录，所以移动文章文件不改变图片地址。</li>
   <li>每张图片输出 <code>width</code> 和 <code>height</code> 属性防止加载时页面跳动，并加 <code>loading="lazy"</code>。文章里写了 <code>width</code> 或 <code>height</code> 时，这两个值写进 <code>style</code>。</li>
-  <li>构建缓存渲染结果，缓存放在 <code>node_modules/.cache/bake/</code>。缓存键是文章内容、渲染参数（配置、组件属性、版式字段、主题名）和渲染代码三者的 SHA-256。渲染代码的哈希由 bake 的 <code>src/render/</code>、<code>src/format/</code>、<code>src/blocks/</code> 的文件内容和 <code>package-lock.json</code> 计算，修改 bake 源码或升级依赖后缓存失效；渲染参数变化时缓存也失效，例如新加一个组件后，之前报告“未知组件”的文章会重新渲染。只修改一篇文章时，其他文章不重新渲染公式。缓存读写失败时直接重新渲染，不报错。构建成功后删除这次没有用到的缓存文件。</li>
+  <li>构建缓存渲染结果，缓存放在 <code>node_modules/.cache/bake/</code>。缓存键是文章内容、渲染参数（配置、组件属性、版式字段、主题名）和渲染代码三者的 SHA-256。渲染代码的哈希由 bake 的 <code>src/render/</code>、<code>src/format/</code>、<code>src/blocks/</code> 的文件内容、<code>package-lock.json</code>，以及博客 <code>blocks/</code> 和 <code>layouts/</code> 下全部文件的内容计算，修改 bake 源码、升级依赖或修改博客的块类型和版式后缓存失效；组件文件不参与计算，组件影响渲染的只有 <code>static properties</code>，已经在渲染参数中；渲染参数变化时缓存也失效，例如新加一个组件后，之前报告“未知组件”的文章会重新渲染。只修改一篇文章时，其他文章不重新渲染公式。缓存读写失败时直接重新渲染，不报错。构建成功后删除这次没有用到的缓存文件。</li>
 </ul>
 
 <h2>悬停预览的数据怎么生成</h2>
@@ -149,7 +150,7 @@ Local: http://localhost:4321/</div>
 <ul>
   <li><code>ext</code> 只接受 <a href="content-format.html">内容格式</a> 列出的图片扩展名，其他返回 400。缺少字段或请求不是 JSON 时返回 400，页面地址不存在时返回 404。</li>
   <li>接口把 <code>page</code> 和文件路径解析成绝对路径后检查是否在 <code>content/</code> 内，不在时返回 403。</li>
-  <li><code>/__bake/save</code> 写入的内容改变了 <code>slug</code> 时，开发服务器在返回之前更新地址表，返回的 <code>url</code> 是新地址，编辑器之后的请求使用它。<code>slug</code> 格式不合法时照常写入，错误由渲染报告，<code>url</code> 是原地址。</li>
+  <li><code>/__bake/save</code> 写入的内容改变了 <code>slug</code> 时，开发服务器在返回之前更新地址表，返回的 <code>url</code> 是新地址，编辑器之后的请求使用它。<code>slug</code> 格式不合法时照常写入，错误由渲染报告，这篇文章继续使用原地址，返回的 <code>url</code> 也是原地址。</li>
   <li>开发服务器的 Vite 插件在 <code>api</code> 字段提供 <code>renderedPage(url)</code> 和 <code>componentEntry(name)</code>，供其他功能的接口使用：前者返回这个地址使用缓存的渲染结果 <code>{ path, page, html, toc, mathDefs, components, messages }</code>，地址不存在时返回 <code>null</code>；后者返回组件入口模块的地址，与页面加载组件时使用的地址相同。</li>
 </ul>
 

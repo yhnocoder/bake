@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -170,6 +170,22 @@ describe('接口', () => {
     const response = await post('/__bake/save', { page: '/bento/', markdown: changed, hash: sha256(original) });
     assert.deepEqual(response, { status: 400, body: { error: 'Slug paper is already used by content/paper.md' } });
     assert.equal(readFileSync(file, 'utf8'), original);
+  });
+
+  test('/__bake/save 写入不合法的 slug 后原地址仍然可以访问，渲染报告错误，下一次保存成功', async () => {
+    const markdown = '---\ntitle: 格式\nslug: valid-slug\n---\n\n正文。\n';
+    writeFileSync(join(root, 'content/invalid.md'), markdown);
+    await until(async () => (await fetch(`${origin}/valid-slug/`)).status === 200);
+    const invalid = markdown.replace('valid-slug', 'Invalid Slug');
+    const saved = await post('/__bake/save', { page: '/valid-slug/', markdown: invalid, hash: sha256(markdown) });
+    assert.deepEqual(saved, { status: 200, body: { hash: sha256(invalid), url: '/valid-slug/' } });
+    const api = server.config.plugins.find((plugin) => plugin.name === 'bake-dev').api;
+    const rendered = await api.renderedPage('/valid-slug/');
+    assert.ok(rendered.messages.some(({ text }) => text.startsWith('Frontmatter field slug must be')));
+    assert.equal((await fetch(`${origin}/valid-slug/`)).status, 200);
+    const fixed = invalid.replace('Invalid Slug', 'fixed-slug');
+    const next = await post('/__bake/save', { page: '/valid-slug/', markdown: fixed, hash: sha256(invalid) });
+    assert.deepEqual(next, { status: 200, body: { hash: sha256(fixed), url: '/fixed-slug/' } });
   });
 
   test('/__bake/save 对缺少字段的请求返回 400', async () => {
@@ -364,5 +380,31 @@ describe('状态栏', () => {
     assert.equal(await shown(), null);
     assert.deepEqual(errors, []);
     await page.close();
+  });
+});
+
+describe('站点模块', () => {
+  const api = () => server.config.plugins.find((plugin) => plugin.name === 'bake-dev').api;
+
+  test('修改 bake.config.js 后已打开的页面不刷新整页就换成新的配置', async () => {
+    const { page, errors } = await open('/paper/');
+    edit('bake.config.js', (source) => source.replace("title: 'bake minimal'", "title: 'bake changed'"));
+    await page.waitForFunction(() => document.title.endsWith('bake changed'));
+    assert.equal(await page.evaluate(() => window.marker), 'kept');
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  test('新增组件和修改组件导入的文件后重新读取 static properties', async () => {
+    writeFileSync(join(root, 'content/sized.md'), '---\ntitle: 尺寸\nslug: sized\n---\n\n::sized-box{size=3}\n');
+    await until(async () => (await fetch(`${origin}/sized/`)).status === 200);
+    const texts = async () => (await api().renderedPage('/sized/')).messages.map(({ text }) => text);
+    assert.match((await texts()).join('\n'), /Unknown component/);
+    mkdirSync(join(root, 'components/lib'));
+    writeFileSync(join(root, 'components/lib/sized-properties.js'), 'export default {};\n');
+    writeFileSync(join(root, 'components/sized-box.js'), "import properties from './lib/sized-properties.js';\nexport default class SizedBox extends HTMLElement {\n  static properties = properties;\n}\n");
+    await until(async () => (await texts()).some((text) => text.startsWith('Unknown attribute size')));
+    edit('components/lib/sized-properties.js', () => "export default { size: { label: '尺寸', type: 'number', default: 1 } };\n");
+    await until(async () => (await texts()).length === 0);
   });
 });

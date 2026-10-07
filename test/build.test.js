@@ -172,6 +172,14 @@ describe('组件与脚本', () => {
     assert.deepEqual(files(join(directory, 'dist')), ['old.txt']);
   });
 
+  test('配置文件有语法错误时报错，不渲染页面', () => {
+    const directory = blog();
+    writeFileSync(join(directory, 'bake.config.js'), "export default { {\n  title: 't',\n};\n");
+    const result = bake(directory, 'build');
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^bake\.config\.js:1:1 Cannot load bake\.config\.js: Failed to parse source[^\n]*\n1 error, dist\/ was not written\n$/);
+  });
+
   test('配置的主题不存在时报错', () => {
     const directory = blog();
     writeFileSync(join(directory, 'bake.config.js'), "export default { title: 't', theme: 'missing', math: { macros: { R: '\\\\mathbb{R}' } } };\n");
@@ -413,6 +421,30 @@ describe('渲染缓存', () => {
     await buildBlog(directory);
     assert.equal(existsSync(stale), false);
     assert.equal(cacheEntries(directory).length, 2);
+  });
+
+  test('blocks/ 或 layouts/ 中（包括子目录）的文件变化后全部重新渲染', async () => {
+    for (const directoryName of ['blocks', 'layouts']) {
+      const directory = blog({ [`${directoryName}/shape.js`]: 'export default {};\n' });
+      await buildBlog(directory);
+      const before = new Set(cacheEntries(directory));
+      mkdirSync(join(directory, directoryName, 'lib'));
+      writeFileSync(join(directory, directoryName, 'lib/helper.js'), 'export default {};\n');
+      await buildBlog(directory);
+      const after = cacheEntries(directory);
+      assert.equal(after.length, 3);
+      assert.ok(after.every((file) => !before.has(file)), directoryName);
+    }
+  });
+
+  test('只修改组件中 properties 以外的代码时使用缓存', async () => {
+    const directory = blog();
+    await buildBlog(directory);
+    const before = cacheEntries(directory).sort();
+    const component = join(directory, 'components/demo-plot.js');
+    writeFileSync(component, `${readFileSync(component, 'utf8')}\nexport const unused = 1;\n`);
+    await buildBlog(directory);
+    assert.deepEqual(cacheEntries(directory).sort(), before);
   });
 
   test('缓存文件损坏时重新渲染', async () => {

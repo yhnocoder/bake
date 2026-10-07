@@ -4,7 +4,8 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
 import { brokenLinks } from '../site/links.js';
-import { loadSite, renderArticle, renderDocumentFor, renderOptions, siteData } from '../site/index.js';
+import { layoutFrame, loadSite, renderArticle, renderDocumentFor, renderOptions, siteData } from '../site/index.js';
+import { createModuleLoader } from '../site/modules.js';
 import { bundle } from './bundle.js';
 import { rewriteHtml } from './html.js';
 import { isLocalImage, processImage } from './images.js';
@@ -12,20 +13,34 @@ import { pageSections } from './sections.js';
 
 const bakeRoot = fileURLToPath(new URL('../../', import.meta.url));
 const renderSources = ['src/render', 'src/format', 'src/blocks'];
+const blogRenderSources = ['blocks', 'layouts'];
 const cacheDirectory = 'node_modules/.cache/bake';
+
+async function hashFiles(hash, root, directories) {
+  for (const directory of directories) {
+    const entries = await readdir(join(root, directory), { recursive: true, withFileTypes: true }).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const files = entries.filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name));
+    for (const file of files.sort()) hash.update(relative(root, file)).update(await readFile(file));
+  }
+}
 
 async function renderCodeHash() {
   const hash = createHash('sha256');
-  for (const directory of renderSources) {
-    const entries = await readdir(join(bakeRoot, directory), { recursive: true, withFileTypes: true });
-    const files = entries.filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name));
-    for (const file of files.sort()) hash.update(relative(bakeRoot, file)).update(await readFile(file));
-  }
+  await hashFiles(hash, bakeRoot, renderSources);
   hash.update(await readFile(join(bakeRoot, 'package-lock.json')).catch(() => ''));
   return hash.digest('hex');
 }
 
-const renderCode = await renderCodeHash();
+const bakeRenderCode = await renderCodeHash();
+
+async function blogRenderCodeHash(root) {
+  const hash = createHash('sha256').update(bakeRenderCode);
+  await hashFiles(hash, root, blogRenderSources);
+  return hash.digest('hex');
+}
 
 function decode(text) {
   try {
@@ -35,7 +50,7 @@ function decode(text) {
   }
 }
 
-async function cachedRender(site, path, source, used) {
+async function cachedRender(site, path, source, { renderCode, used }) {
   const key = createHash('sha256').update(JSON.stringify([source, renderOptions(site, path), renderCode])).digest('hex');
   const file = join(site.root, cacheDirectory, `${key}.json`);
   used.add(`${key}.json`);
@@ -101,7 +116,7 @@ async function writeOutput(site, pages, images, outDir) {
   if (bundled.errors) return bundled.errors;
   const pageImages = await writeImages(site, images, outDir);
   for (const page of pages) {
-    const { entry, rendered } = page;
+    const { entry, rendered, frame } = page;
     const html = rewriteHtml(rendered.html, { base: site.config.base, images: pageImages.get(entry) ?? new Map() });
     const assets = {
       styles: [bundled.files.bake, bundled.files[`themes/${themeOf(page)}`]],
@@ -109,23 +124,35 @@ async function writeOutput(site, pages, images, outDir) {
     };
     const directory = join(outDir, entry.url);
     await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'index.html'), renderDocumentFor(site, entry.path, { ...rendered, html }, { assets }));
+    await writeFile(join(directory, 'index.html'), renderDocumentFor(site, entry.path, { ...rendered, html }, { frame, assets }));
     await writeFile(join(directory, 'sections.json'), JSON.stringify(pageSections({ title: rendered.page.title, html })));
   }
   await writeFile(join(outDir, 'site.json'), JSON.stringify(siteData(site)));
   return [];
 }
 
-export async function build(root, { out }) {
-  const site = await loadSite(root);
-  const messages = [...site.messages];
-  const pages = [];
-  const usedCache = new Set();
-  for (const entry of site.pages.filter((page) => page.frontmatter.draft !== true)) {
-    const rendered = await cachedRender(site, entry.path, await readFile(join(root, entry.path), 'utf8'), usedCache);
-    messages.push(...rendered.messages);
-    pages.push({ entry, rendered });
+async function renderPages(root) {
+  const loader = await createModuleLoader(root);
+  try {
+    const site = await loadSite(root, { loader });
+    const messages = [...site.messages];
+    const pages = [];
+    if (messages.length > 0) return { site, messages, pages, usedCache: new Set() };
+    const cache = { renderCode: await blogRenderCodeHash(root), used: new Set() };
+    for (const entry of site.pages.filter((page) => page.frontmatter.draft !== true)) {
+      const rendered = await cachedRender(site, entry.path, await readFile(join(root, entry.path), 'utf8'), cache);
+      const layout = layoutFrame(site, entry.path, rendered);
+      messages.push(...rendered.messages, ...layout.messages);
+      pages.push({ entry, rendered, frame: layout.frame });
+    }
+    return { site, messages, pages, usedCache: cache.used };
+  } finally {
+    await loader.close();
   }
+}
+
+export async function build(root, { out }) {
+  const { site, messages, pages, usedCache } = await renderPages(root);
   checkLinks(pages, messages);
   const images = await findImages(root, pages, messages);
   if (messages.length > 0) return { errors: messages.map(formatMessage) };

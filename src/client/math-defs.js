@@ -1,20 +1,16 @@
 const svgNamespace = 'http://www.w3.org/2000/svg';
-const pathPattern = /<path id="([^"]+)" d="([^"]*)"/g;
-
-export function glyphsOf(mathDefs) {
-  return Object.fromEntries([...mathDefs.matchAll(pathPattern)].map(([, id, d]) => [id, d]));
-}
+const glyphPattern = /<path id="([^"]+)" d="([^"]*)"/g;
 
 function container() {
-  let element = document.getElementById('math-defs');
-  if (!element) {
-    element = document.createElementNS(svgNamespace, 'svg');
-    element.id = 'math-defs';
-    element.style.display = 'none';
-    element.append(document.createElementNS(svgNamespace, 'defs'));
-    document.body.prepend(element);
-  }
-  return element.querySelector('defs');
+  const existing = document.getElementById('math-defs');
+  if (existing) return existing.querySelector('defs');
+  const svg = document.createElementNS(svgNamespace, 'svg');
+  svg.id = 'math-defs';
+  svg.style.display = 'none';
+  const defs = document.createElementNS(svgNamespace, 'defs');
+  svg.append(defs);
+  document.body.prepend(svg);
+  return defs;
 }
 
 export function addGlyphs(glyphs) {
@@ -26,4 +22,8 @@ export function addGlyphs(glyphs) {
     path.setAttribute('d', d);
     defs.append(path);
   }
+}
+
+export function glyphsOf(mathDefs) {
+  return Object.fromEntries([...mathDefs.matchAll(glyphPattern)].map(([, id, d]) => [id, d]));
 }

@@ -195,13 +195,13 @@ aside.callout.warning .callout-label {
   color: var(--color-text);
 }
 
-.sidenote > p,
-.sidenote > ul,
-.sidenote > ol {
+.sidenote-body > p,
+.sidenote-body > ul,
+.sidenote-body > ol {
   margin: 0 0 0.4rem;
 }
 
-.sidenote > :last-child {
+.sidenote-body > :last-child {
   margin-bottom: 0;
 }
 
