@@ -415,6 +415,30 @@ describe('渲染缓存', () => {
     assert.equal(cacheEntries(directory).length, 2);
   });
 
+  test('blocks/ 或 layouts/ 中（包括子目录）的文件变化后全部重新渲染', async () => {
+    for (const directoryName of ['blocks', 'layouts']) {
+      const directory = blog({ [`${directoryName}/shape.js`]: 'export default {};\n' });
+      await buildBlog(directory);
+      const before = new Set(cacheEntries(directory));
+      mkdirSync(join(directory, directoryName, 'lib'));
+      writeFileSync(join(directory, directoryName, 'lib/helper.js'), 'export default {};\n');
+      await buildBlog(directory);
+      const after = cacheEntries(directory);
+      assert.equal(after.length, 3);
+      assert.ok(after.every((file) => !before.has(file)), directoryName);
+    }
+  });
+
+  test('只修改组件中 properties 以外的代码时使用缓存', async () => {
+    const directory = blog();
+    await buildBlog(directory);
+    const before = cacheEntries(directory).sort();
+    const component = join(directory, 'components/demo-plot.js');
+    writeFileSync(component, `${readFileSync(component, 'utf8')}\nexport const unused = 1;\n`);
+    await buildBlog(directory);
+    assert.deepEqual(cacheEntries(directory).sort(), before);
+  });
+
   test('缓存文件损坏时重新渲染', async () => {
     const directory = blog();
     await buildBlog(directory);

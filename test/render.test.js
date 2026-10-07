@@ -131,7 +131,7 @@ describe('每种内容的 HTML', () => {
     [
       '边注',
       '正文。\n\n:::margin\n边注。\n:::\n',
-      '<aside class="sidenote unnumbered" data-md=":::margin\n边注。\n:::"><p>边注。</p></aside>',
+      '<aside class="sidenote unnumbered" data-md=":::margin\n边注。\n:::"><div class="sidenote-body"><p>边注。</p></div></aside>',
     ],
     [
       '卡片网格',
@@ -333,8 +333,8 @@ describe('旁注', () => {
     assert.ok(
       html.includes(
         '<p>甲<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>乙<sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>。</p>\n' +
-          '<aside class="sidenote" id="sn-1" data-md="[^b]: 注释 B"><span class="sidenote-number">1</span><p>注释 B</p></aside>\n' +
-          '<aside class="sidenote" id="sn-2" data-md="[^a]: 注释 A"><span class="sidenote-number">2</span><p>注释 A</p></aside>',
+          '<aside class="sidenote" id="sn-1" data-md="[^b]: 注释 B"><span class="sidenote-number">1</span><div class="sidenote-body"><p>注释 B</p></div></aside>\n' +
+          '<aside class="sidenote" id="sn-2" data-md="[^a]: 注释 A"><span class="sidenote-number">2</span><div class="sidenote-body"><p>注释 A</p></div></aside>',
       ),
       html,
     );
