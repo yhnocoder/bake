@@ -100,6 +100,17 @@ describe('代码高亮', () => {
     for (const { text, content } of ranges) assert.equal(text, content);
   });
 
+  test('分词不受时间影响：时钟每次读取前进 1 秒时，整行仍然完整分词', async () => {
+    const expected = await htmlOf('```ts\nconst answer: number = 42;\n```');
+    let now = 0;
+    const clock = mock.method(Date, 'now', () => (now += 1000));
+    try {
+      assert.equal(await htmlOf('```ts\nconst answer: number = 42;\n```'), expected);
+    } finally {
+      clock.mock.restore();
+    }
+  });
+
   test('代码中的 < 和 & 被转义', async () => {
     const html = await htmlOf('```js\nif (a < b && c) {}\n```');
     assert.doesNotMatch(html.replace(/<\/?span[^>]*>|<\/?(?:pre|code)[^>]*>/g, ''), /[<]|&(?!#x)/);
