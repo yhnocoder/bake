@@ -355,6 +355,7 @@
   <li>定义了但没有被引用的注释，以及引用了但没有定义的注释，构建报错。</li>
   <li>同一条注释只能引用一次，引用第二次时报错。理由：每条注释在右侧栏只显示一次，只能和一处位置对齐。</li>
   <li>注释里不能再写脚注引用，写了时报错。理由：注释本身已经在右侧栏，嵌套的注释没有位置可以放。</li>
+  <li>注释可以为空，写作 <code>[^d]:</code>，页面上显示一条只有编号的空注释。编辑器插入编号后还没有输入内容时就按这个写法保存。</li>
   <li>编辑器保存时，注释定义写在第一次引用它的块之后，规则见 <a href="#output-format">输出格式</a>。理由：读源码时注释和正文挨在一起，往返测试也依赖这个固定位置。</li>
 </ul>
 <p>生成的页面里，正文中的引用输出为 <code>&lt;sup class="sidenote-ref" id="sn-ref-1"&gt;&lt;a href="#sn-1"&gt;1&lt;/a&gt;&lt;/sup&gt;</code>，注释输出为 <code>&lt;aside class="sidenote" id="sn-1" data-md="…"&gt;&lt;span class="sidenote-number"&gt;1&lt;/span&gt;&lt;div class="sidenote-body"&gt;注释内容&lt;/div&gt;&lt;/aside&gt;</code>。注释内容放在 <code>div.sidenote-body</code> 中，页面和编辑器使用同一个结构和同一套 CSS。注释的位置：</p>

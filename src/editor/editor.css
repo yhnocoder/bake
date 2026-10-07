@@ -200,22 +200,6 @@ textarea.bake-math-input {
   background: var(--color-bg, #fff);
 }
 
-.milkdown .footnote-definition {
-  display: flex;
-  gap: 0.5rem;
-  font-size: 0.88em;
-  color: var(--color-muted, #8a8580);
-}
-
-.milkdown .footnote-label {
-  font-family: var(--font-mono);
-  user-select: none;
-}
-
-.milkdown .footnote-definition > div > :first-child {
-  margin-top: 0;
-}
-
 .bake-table-menu {
   position: absolute;
   z-index: 1001;
