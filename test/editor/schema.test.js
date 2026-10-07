@@ -49,6 +49,34 @@ test('在两个段落之间插入空段落后保存，文件中没有 <br />', a
   site.write(path, original);
 });
 
+test('在引用块最后一段末尾和文章第一段开头按 Enter 都新建普通段落', async () => {
+  const file = 'content/quote.md';
+  await site.addPage(file, page('quote', '首段。\n\n> 引用的第一段。\n>\n> 引用的最后一段。\n'), '/quote/');
+  const { page: browserPage, errors } = await openEditor(site, '/quote/');
+  await saveAfter(site, browserPage, file, async () => {
+    await placeCursor(browserPage, '引用的最后一段。');
+    await browserPage.keyboard.press('Enter');
+    await browserPage.keyboard.type('新段落');
+  });
+  assert.equal(site.read(file), page('quote', '首段。\n\n> 引用的第一段。\n>\n> 引用的最后一段。\n>\n> 新段落\n'));
+  await session(browserPage, (current) => {
+    const { state } = current.view;
+    current.view.dispatch(state.tr.setSelection(state.selection.constructor.near(state.doc.resolve(1))));
+    current.view.focus();
+  });
+  await browserPage.keyboard.press('Enter');
+  const types = await session(browserPage, (current) => {
+    const names = [];
+    current.view.state.doc.descendants((node) => {
+      if (node.isBlock) names.push(node.type.name);
+    });
+    return names;
+  });
+  assert.deepEqual(types, ['paragraph', 'paragraph', 'blockquote', 'paragraph', 'paragraph', 'paragraph']);
+  assert.deepEqual(errors, []);
+  await browserPage.close();
+});
+
 test('旁注名大小写不同时往返不变，空注释导出为 [^n1]:', async () => {
   const markdown = page('notes', '引用大写[^D]，再引用空注释[^n1]。\n\n[^d]: 小写的注释。\n\n[^n1]:\n');
   await site.addPage('content/notes.md', markdown, '/notes/');

@@ -8,6 +8,7 @@ const contentRules = {
 };
 
 const outsideBlockGroup = new Set(['directive_lede', 'directive_card', 'directive_source']);
+const insertedOnlyByUser = new Set(['directive_lede', 'directive_source']);
 
 export function containerContent(id) {
   return contentRules[id] ?? 'directive_label? block+';
@@ -19,6 +20,10 @@ export function labelRequired(id) {
 
 export function blockGroup(id) {
   return outsideBlockGroup.has(id) ? undefined : 'block';
+}
+
+export function directiveAttrs(id) {
+  return { attributes: insertedOnlyByUser.has(id) ? {} : { default: {} } };
 }
 
 export function checkOrder(node) {
