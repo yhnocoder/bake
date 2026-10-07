@@ -306,7 +306,7 @@ describe('sections.json', () => {
     assert.match(sections.lede, /^<div class="lede"/);
     assert.equal(sections.sections['chain-rule-def'].kind, 'block');
     assert.deepEqual(sections.sections.components.components, ['demo-plot']);
-    assert.match(sections.sections.links.html, /^<h2 id="links">/);
+    assert.match(sections.sections.links.html, /^<h2 id="links" data-md="## 站内引用 \{#links\}">/);
     assert.ok(sections.sections.links.html.includes('href="/features/#chain-rule"'));
   });
 });

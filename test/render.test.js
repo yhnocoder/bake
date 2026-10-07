@@ -74,7 +74,9 @@ describe('features.md', () => {
     const rendered = [...html.matchAll(/data-md="([^"]*)"/g)].map((match) => decodeAttribute(match[1])).sort();
     const expected = [];
     visit(parse(source).tree, (node) => {
-      if (['containerDirective', 'leafDirective', 'textDirective', 'footnoteDefinition'].includes(node.type)) {
+      const withAttributes = node.type === 'heading' && node.data?.attributes;
+      const onlyImage = node.type === 'paragraph' && node.children.length === 1 && node.children[0].type === 'image';
+      if (['containerDirective', 'leafDirective', 'textDirective', 'footnoteDefinition'].includes(node.type) || withAttributes || onlyImage) {
         expected.push(source.slice(node.position.start.offset, node.position.end.offset));
       }
     });
@@ -92,7 +94,7 @@ describe('features.md', () => {
 
 describe('每种内容的 HTML', () => {
   const cases = [
-    ['标题', '## 链式法则 {#chain-rule}\n', '<h2 id="chain-rule"><a class="anchor" href="#chain-rule" aria-hidden="true">#</a>链式法则</h2>'],
+    ['标题', '## 链式法则 {#chain-rule}\n', '<h2 id="chain-rule" data-md="## 链式法则 {#chain-rule}"><a class="anchor" href="#chain-rule" aria-hidden="true">#</a>链式法则</h2>'],
     ['带块引用 id 的段落', '链式法则把导数写成乘积。 ^chain-rule-def\n', '<p id="chain-rule-def">链式法则把导数写成乘积。</p>'],
     ['高亮', '梯度指向==增长最快==的方向。\n', '<p>梯度指向<mark>增长最快</mark>的方向。</p>'],
     ['导语', ':::lede\n导语。\n:::\n', '<div class="lede" data-md=":::lede\n导语。\n:::"><p>导语。</p></div>'],
@@ -153,22 +155,22 @@ describe('每种内容的 HTML', () => {
     [
       '居中的图片',
       '![一个神经元](./assets/neuron.svg){width=60%}\n',
-      '<figure class="image"><img src="./assets/neuron.svg" alt="一个神经元" style="width: 60%"><figcaption>一个神经元</figcaption></figure>',
+      '<figure class="image" data-md="![一个神经元](./assets/neuron.svg){width=60%}"><img src="./assets/neuron.svg" alt="一个神经元" style="width: 60%"><figcaption>一个神经元</figcaption></figure>',
     ],
     [
       '浮动的图片',
       '![说明](./assets/neuron.svg){width=160 height=2em float=left}\n',
-      '<figure class="image float-left"><img src="./assets/neuron.svg" alt="说明" style="width: 160px; height: 2em"><figcaption>说明</figcaption></figure>',
+      '<figure class="image float-left" data-md="![说明](./assets/neuron.svg){width=160 height=2em float=left}"><img src="./assets/neuron.svg" alt="说明" style="width: 160px; height: 2em"><figcaption>说明</figcaption></figure>',
     ],
     [
       '只写高度的图片',
       '![说明](./assets/neuron.svg){height=100}\n',
-      '<figure class="image"><img src="./assets/neuron.svg" alt="说明" style="height: 100px; width: auto"><figcaption>说明</figcaption></figure>',
+      '<figure class="image" data-md="![说明](./assets/neuron.svg){height=100}"><img src="./assets/neuron.svg" alt="说明" style="height: 100px; width: auto"><figcaption>说明</figcaption></figure>',
     ],
     [
       'float 为 none 的图片',
       '![说明](./assets/neuron.svg){float=none}\n',
-      '<figure class="image"><img src="./assets/neuron.svg" alt="说明"><figcaption>说明</figcaption></figure>',
+      '<figure class="image" data-md="![说明](./assets/neuron.svg){float=none}"><img src="./assets/neuron.svg" alt="说明"><figcaption>说明</figcaption></figure>',
     ],
     [
       '有图题的组件',
@@ -221,7 +223,7 @@ describe('公式', () => {
   test('同一个公式的多个 label 都指向这个公式', async () => {
     const html = await htmlOf('$$\n\\begin{align} a &= 1 \\label{eq:a} \\\\ b &= 2 \\label{eq:b} \\end{align}\n$$\n\n$\\eqref{eq:b}$\n');
     assert.ok(html.includes('id="eq-a"'), html);
-    assert.ok(html.includes('<a class="eqref" href="#eq-a">(2)</a>'), html);
+    assert.ok(html.includes('<a class="eqref" href="#eq-a" data-tex="\\eqref{eq:b}">(2)</a>'), html);
   });
 
   test('同名的 label 作为公式的第一个 label 时只报一条错误', async () => {
@@ -280,7 +282,7 @@ describe('公式', () => {
     const body = '见式 $\\eqref{eq:b}$ 和 $\\eqref{eq:a}$。\n\n$$\n\\label{eq:a}\na = 1\n$$\n\n$$\nc = 3\n$$\n\n$$\n\\label{eq:b}\nb = 2\n$$\n';
     const { html, ids, messages } = await renderBody(body);
     assert.deepEqual(messages, []);
-    assert.ok(html.includes('见式 <a class="eqref" href="#eq-b">(2)</a> 和 <a class="eqref" href="#eq-a">(1)</a>。'), html);
+    assert.ok(html.includes('见式 <a class="eqref" href="#eq-b" data-tex="\\eqref{eq:b}">(2)</a> 和 <a class="eqref" href="#eq-a" data-tex="\\eqref{eq:a}">(1)</a>。'), html);
     const plain = withoutSvg(html);
     assert.ok(plain.includes('<div class="math display" data-tex="\\label{eq:a}\na = 1" id="eq-a"><svg/></div>'), plain);
     assert.ok(plain.includes('<div class="math display" data-tex="c = 3"><svg/></div>'), plain);
@@ -419,7 +421,7 @@ describe('id 和目录', () => {
 
   test('只含图片的段落把 ^block-id 放在 figure 上', async () => {
     const html = await htmlOf('![图](./assets/neuron.svg) ^fig\n');
-    assert.ok(html.startsWith('<figure class="image" id="fig">'), html);
+    assert.ok(html.startsWith('<figure class="image" data-md="![图](./assets/neuron.svg) ^fig" id="fig">'), html);
   });
 });
 

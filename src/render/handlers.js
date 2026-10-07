@@ -5,6 +5,8 @@ import { contentChildren } from '../format/validate.js';
 import { blockRender, isDefault, withDefaults } from './block-render.js';
 import { imageAppearance } from './image.js';
 
+const imageAttributeSource = /^\{[^{}]*\}/;
+
 function element(tagName, properties, children = []) {
   return { type: 'element', tagName, properties, children };
 }
@@ -23,17 +25,23 @@ export function createHandlers({ source, registry, components }) {
     const tocContent = tocText === undefined ? content.filter((child) => !child.properties?.className?.includes('sidenote-ref')) : [{ type: 'text', value: tocText }];
     node.data.tocHtml = toHtml(tocContent, { allowDangerousHtml: true });
     const anchor = element('a', { className: ['anchor'], href: `#${id}`, ariaHidden: 'true' }, [{ type: 'text', value: '#' }]);
-    return element(`h${node.depth}`, { id }, [anchor, ...content]);
+    const properties = node.data.attributes ? { id, dataMd: sourceOf(node) } : { id };
+    return element(`h${node.depth}`, properties, [anchor, ...content]);
   }
 
   function paragraph(state, node) {
     const properties = node.data?.blockId ? { id: node.data.blockId } : {};
     if (node.children.length === 1 && node.children[0].type === 'image') {
       const figure = state.one(node.children[0], node);
-      Object.assign(figure.properties, properties);
+      Object.assign(figure.properties, properties, { dataMd: sourceOf(node) });
       return figure;
     }
     return element('p', properties, state.all(node));
+  }
+
+  function imageSource(node) {
+    const attributes = node.data?.attributes ? imageAttributeSource.exec(source.slice(node.position.end.offset))[0] : '';
+    return sourceOf(node) + attributes;
   }
 
   function image(_, node) {
@@ -42,7 +50,7 @@ export function createHandlers({ source, registry, components }) {
     if (style) properties.style = style;
     const children = [element('img', properties)];
     if (node.alt) children.push(element('figcaption', {}, [{ type: 'text', value: node.alt }]));
-    return element('figure', { className }, children);
+    return element('figure', { className, dataMd: imageSource(node) }, children);
   }
 
   function mark(state, node) {
@@ -63,7 +71,7 @@ export function createHandlers({ source, registry, components }) {
   function math(node, tagName, className) {
     if (node.data?.eqref) {
       const { id, number } = node.data.eqref;
-      return element('a', { className: ['eqref'], href: `#${id}` }, [{ type: 'text', value: `(${number})` }]);
+      return element('a', { className: ['eqref'], href: `#${id}`, dataTex: node.value }, [{ type: 'text', value: `(${number})` }]);
     }
     const properties = { className, dataTex: node.value };
     if (node.data?.equationId) properties.id = node.data.equationId;

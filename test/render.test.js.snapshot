@@ -89,25 +89,25 @@ exports[`features.md > 快照 2`] = `
 <div class="lede" data-md=":::lede
 这一页按内容格式文档的顺序，使用 bake 支持的每一种写法。
 :::"><p>这一页按内容格式文档的顺序，使用 bake 支持的每一种写法。</p></div>
-<h2 id="chain-rule"><a class="anchor" href="#chain-rule" aria-hidden="true">#</a>反向传播中的链式法则</h2>
+<h2 id="chain-rule" data-md="## 反向传播中的链式法则 {#chain-rule toc=链式法则}"><a class="anchor" href="#chain-rule" aria-hidden="true">#</a>反向传播中的链式法则</h2>
 <p class="subtitle" data-md="::subtitle[从标量推广到矩阵]">从标量推广到矩阵</p>
 <p>梯度指向函数值<mark>增长最快</mark>的方向。中文<mark>重点：</mark>后面紧跟标点也能识别。</p>
 <p>中文<strong>加粗：</strong>后面，<strong>「引号」</strong>测试，以及<del>删除线</del>。</p>
 <figure class="quote"><blockquote>
 <p>You shall know a word by the company it keeps.</p>
 </blockquote><figcaption data-md="::source[J. R. Firth, 1957]">J. R. Firth, 1957</figcaption></figure>
-<h2 id="images"><a class="anchor" href="#images" aria-hidden="true">#</a>图片</h2>
-<figure class="image"><img src="./assets/neuron.svg" alt="一个神经元的输入、权重与输出" style="width: 60%"><figcaption>一个神经元的输入、权重与输出</figcaption></figure>
-<figure class="image float-left"><img src="./assets/neuron.svg" alt="神经元" style="width: 160px"><figcaption>神经元</figcaption></figure>
+<h2 id="images" data-md="## 图片 {#images}"><a class="anchor" href="#images" aria-hidden="true">#</a>图片</h2>
+<figure class="image" data-md="![一个神经元的输入、权重与输出](./assets/neuron.svg){width=60%}"><img src="./assets/neuron.svg" alt="一个神经元的输入、权重与输出" style="width: 60%"><figcaption>一个神经元的输入、权重与输出</figcaption></figure>
+<figure class="image float-left" data-md="![神经元](./assets/neuron.svg){width=160px float=left}"><img src="./assets/neuron.svg" alt="神经元" style="width: 160px"><figcaption>神经元</figcaption></figure>
 <p>一个神经元把每个输入乘以对应的权重，求和后加上偏置，再经过激活函数得到输出。多个神经元并排组成一层，多层依次连接组成网络。</p>
-<figure class="image float-right"><img src="./assets/relu.png" alt="ReLU 函数的图像" style="width: 240px"><figcaption>ReLU 函数的图像</figcaption></figure>
+<figure class="image float-right" data-md="![ReLU 函数的图像](./assets/relu.png){width=240 float=right}"><img src="./assets/relu.png" alt="ReLU 函数的图像" style="width: 240px"><figcaption>ReLU 函数的图像</figcaption></figure>
 <p>ReLU 在负半轴输出 0，在正半轴输出输入本身。它的导数在负半轴是 0，在正半轴是 1，计算量很小，所以是深度网络里最常用的激活函数。</p>
-<h2 id="components"><a class="anchor" href="#components" aria-hidden="true">#</a>组件</h2>
+<h2 id="components" data-md="## 组件 {#components}"><a class="anchor" href="#components" aria-hidden="true">#</a>组件</h2>
 <demo-plot class="component" data-md=":::demo-plot{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
 :::"><figcaption>从 <span class="math" data-tex="x_0"><svg style="vertical-align: -0.375ex;" xmlns="http://www.w3.org/2000/svg" width="2.282ex" height="1.375ex" role="img" focusable="false" viewBox="0 -442 1008.6 607.6"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="msub"><g data-mml-node="mi"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g><g data-mml-node="mn" transform="translate(605,-150) scale(0.707)"><use data-c="30" href="#MJX-NCM-N-30"></use></g></g></g></g></svg></span> 出发沿负梯度方向下降。</figcaption></demo-plot>
 <demo-plot x0="0.5" showPath="false" class="component" data-md="::demo-plot{x0=0.5 showPath=false}"></demo-plot>
-<h2 id="blocks"><a class="anchor" href="#blocks" aria-hidden="true">#</a>块</h2>
+<h2 id="blocks" data-md="## 块 {#blocks}"><a class="anchor" href="#blocks" aria-hidden="true">#</a>块</h2>
 <details class="fold" data-md=":::fold[推导细节]
 把 $z = Wx + b$ 代入后逐项求导。
 :::"><summary>推导细节</summary><p>把 <span class="math" data-tex="z = Wx + b"><svg style="vertical-align: -0.188ex;" xmlns="http://www.w3.org/2000/svg" width="11.475ex" height="1.758ex" role="img" focusable="false" viewBox="0 -694 5072 777"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D467" href="#MJX-NCM-I-1D467"></use></g><g data-mml-node="mo" transform="translate(744.8,0)"><use data-c="3D" href="#MJX-NCM-N-3D"></use></g><g data-mml-node="mi" transform="translate(1800.6,0)"><use data-c="1D44A" href="#MJX-NCM-I-1D44A"></use></g><g data-mml-node="mi" transform="translate(2848.6,0)"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g><g data-mml-node="mo" transform="translate(3642.8,0)"><use data-c="2B" href="#MJX-NCM-N-2B"></use></g><g data-mml-node="mi" transform="translate(4643,0)"><use data-c="1D44F" href="#MJX-NCM-I-1D44F"></use></g></g></g></svg></span> 代入后逐项求导。</p></details>
@@ -145,7 +145,7 @@ exports[`features.md > 快照 2`] = `
 <aside class="sidenote unnumbered" data-md=":::margin
 名字来自 argmax 的平滑版本。
 :::"><div class="sidenote-body"><p>名字来自 argmax 的平滑版本。</p></div></aside>
-<h2 id="sidenotes"><a class="anchor" href="#sidenotes" aria-hidden="true">#</a>旁注</h2>
+<h2 id="sidenotes" data-md="## 旁注 {#sidenotes}"><a class="anchor" href="#sidenotes" aria-hidden="true">#</a>旁注</h2>
 <p>反向传播从损失函数开始，沿计算图逆向逐层计算梯度。</p>
 <p>每一层的梯度都由上一层传回的梯度乘以本层的局部导数得到<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>。局部导数只依赖本层的输入和输出，所以每一层可以独立计算，再按顺序连乘起来。</p>
 <aside class="sidenote" id="sn-1" data-md="[^d]: 局部导数是本层输出对本层输入的导数 $\\partial y / \\partial x$。
@@ -154,7 +154,7 @@ exports[`features.md > 快照 2`] = `
 <p><span class="sidenote-span" data-md=":span[激活函数的导数]" data-sidenote="2">激活函数的导数</span><sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>决定了梯度能否顺利传回前面的层。</p>
 <aside class="sidenote" id="sn-2" data-md="[^act]: ReLU 在正半轴的导数是 1。"><span class="sidenote-number">2</span><div class="sidenote-body"><p>ReLU 在正半轴的导数是 1。</p></div></aside>
 <p>最后得到的是损失对每个参数的梯度。优化器用这些梯度更新参数，进入下一轮前向传播。</p>
-<h2 id="bento"><a class="anchor" href="#bento" aria-hidden="true">#</a>卡片网格</h2>
+<h2 id="bento" data-md="## 卡片网格 {#bento}"><a class="anchor" href="#bento" aria-hidden="true">#</a>卡片网格</h2>
 <div class="bento" data-md="::::bento
 :::card{span=2x1 title=ReLU}
 最简单的激活函数。
@@ -180,7 +180,7 @@ exports[`features.md > 快照 2`] = `
 :::"><p class="card-title">SiLU</p><p>自门控。</p></section><section class="card" style="--card-columns: 4; --card-rows: 1" data-md=":::card{span=4x1 title=比较}
 三者在零点附近的导数不同。
 :::"><p class="card-title">比较</p><p>三者在零点附近的导数不同。</p></section></div>
-<h2 id="table"><a class="anchor" href="#table" aria-hidden="true">#</a>表格与 HTML</h2>
+<h2 id="table" data-md="## 表格与 HTML {#table}"><a class="anchor" href="#table" aria-hidden="true">#</a>表格与 HTML</h2>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -208,17 +208,17 @@ exports[`features.md > 快照 2`] = `
   <rect x="76" y="8" width="40" height="24" rx="4"/>
   <path d="M44 20 H76"/>
 </svg>
-<h2 id="math"><a class="anchor" href="#math" aria-hidden="true">#</a>公式</h2>
+<h2 id="math" data-md="## 公式 {#math}"><a class="anchor" href="#math" aria-hidden="true">#</a>公式</h2>
 <p>行内公式 <span class="math" data-tex="E = mc^2"><svg style="vertical-align: -0.025ex;" xmlns="http://www.w3.org/2000/svg" width="8.704ex" height="1.912ex" role="img" focusable="false" viewBox="0 -833.9 3847.1 844.9"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D438" href="#MJX-NCM-I-1D438"></use></g><g data-mml-node="mo" transform="translate(1043.8,0)"><use data-c="3D" href="#MJX-NCM-N-3D"></use></g><g data-mml-node="mi" transform="translate(2099.6,0)"><use data-c="1D45A" href="#MJX-NCM-I-1D45A"></use></g><g data-mml-node="msup" transform="translate(2977.6,0)"><g data-mml-node="mi"><use data-c="1D450" href="#MJX-NCM-I-1D450"></use></g><g data-mml-node="mn" transform="translate(466,363) scale(0.707)"><use data-c="32" href="#MJX-NCM-N-32"></use></g></g></g></g></svg></span> 写在段落里。</p>
 <div class="math display" data-tex="\\label{eq:chain}
 \\frac{\\partial L}{\\partial x} = \\frac{\\partial L}{\\partial y} \\frac{\\partial y}{\\partial x}" id="eq-chain"><svg style="vertical-align: -2.017ex; min-width: 23.623ex;" xmlns="http://www.w3.org/2000/svg" width="100%" height="5.165ex" role="img" focusable="false" data-mjx-viewBox="0 -1391.5 10441.6 2283"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(0.0181,-0.0181) translate(0, -1391.5)"><g data-mml-node="math"><g data-mml-node="mtable" transform="translate(2078,0) translate(-2078,0)"><g transform="translate(0 1391.5) matrix(1 0 0 -1 0 0) scale(55.25)"><svg data-table="true" preserveAspectRatio="xMidYMid" viewBox="3142.8 -1391.5 1 2283"><g transform="matrix(1 0 0 -1 0 0)"><g data-mml-node="mlabeledtr" transform="translate(0,-0.5)"><g data-mml-node="mtd"><g data-mml-node="mfrac"><g data-mml-node="mrow" transform="translate(220,676)"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D43F" href="#MJX-NCM-I-1D43F"></use></g></g><g data-mml-node="mrow" transform="translate(274.5,-686)"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g></g><rect width="1447" height="60" x="120" y="220"></rect></g><g data-mml-node="mo" transform="translate(1964.8,0)"><use data-c="3D" href="#MJX-NCM-N-3D"></use></g><g data-mml-node="mfrac" transform="translate(3020.6,0)"><g data-mml-node="mrow" transform="translate(220,676)"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D43F" href="#MJX-NCM-I-1D43F"></use></g></g><g data-mml-node="mrow" transform="translate(315.5,-686)"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D466" href="#MJX-NCM-I-1D466"></use></g></g><rect width="1447" height="60" x="120" y="220"></rect></g><g data-mml-node="mfrac" transform="translate(4707.6,0)"><g data-mml-node="mrow" transform="translate(261,676)"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D466" href="#MJX-NCM-I-1D466"></use></g></g><g data-mml-node="mrow" transform="translate(220,-686)"><g data-mml-node="mi"><use data-c="1D715" href="#MJX-NCM-I-1D715"></use></g><g data-mml-node="mi" transform="translate(566,0)"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g></g><rect width="1338" height="60" x="120" y="220"></rect></g></g></g></g></svg><svg data-labels="true" preserveAspectRatio="xMaxYMid" viewBox="1278 -1391.5 1 2283"><g data-labels="true" transform="matrix(1 0 0 -1 0 0)"><g data-mml-node="mtd" id="mjx-eqn:1" transform="translate(0,747.5)"><text data-id-align="true"></text><g data-idbox="true" transform="translate(0,-748)"><g data-mml-node="mtext"><use data-c="28" href="#MJX-NCM-N-28"></use></g><g data-mml-node="mtext" transform="translate(389,0)"><use data-c="31" href="#MJX-NCM-N-31"></use></g><g data-mml-node="mtext" transform="translate(889,0)"><use data-c="29" href="#MJX-NCM-N-29"></use></g></g></g></g></svg></g></g></g></g></svg></div>
-<p>式 <a class="eqref" href="#eq-chain">(1)</a> 是链式法则。</p>
+<p>式 <a class="eqref" href="#eq-chain" data-tex="\\eqref{eq:chain}">(1)</a> 是链式法则。</p>
 <h3 id="配置文件中的宏"><a class="anchor" href="#配置文件中的宏" aria-hidden="true">#</a>配置文件中的宏</h3>
 <p><span class="math" data-tex="\\R"><svg style="vertical-align: 0;" xmlns="http://www.w3.org/2000/svg" width="1.633ex" height="1.55ex" role="img" focusable="false" viewBox="0 -685 722 685"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="TeXAtom" data-mjx-texclass="ORD"><g data-mml-node="mi"><use data-c="211D" href="#MJX-NCM-DS-211D"></use></g></g></g></g></svg></span> 是 <code>bake.config.js</code> 的 <code>math.macros</code> 定义的宏，输入向量 <span class="math" data-tex="x \\in \\R^n"><svg style="vertical-align: -0.097ex;" xmlns="http://www.w3.org/2000/svg" width="6.841ex" height="1.647ex" role="img" focusable="false" viewBox="0 -685 3023.8 728"><g stroke="currentColor" fill="currentColor" stroke-width="0" transform="scale(1,-1)"><g data-mml-node="math"><g data-mml-node="mi"><use data-c="1D465" href="#MJX-NCM-I-1D465"></use></g><g data-mml-node="mo" transform="translate(849.8,0)"><use data-c="2208" href="#MJX-NCM-N-2208"></use></g><g data-mml-node="msup" transform="translate(1794.6,0)"><g data-mml-node="TeXAtom" data-mjx-texclass="ORD"><g data-mml-node="mi"><use data-c="211D" href="#MJX-NCM-DS-211D"></use></g></g><g data-mml-node="mi" transform="translate(755,363) scale(0.707)"><use data-c="1D45B" href="#MJX-NCM-I-1D45B"></use></g></g></g></g></svg></span>。</p>
-<h2 id="links"><a class="anchor" href="#links" aria-hidden="true">#</a>站内引用</h2>
+<h2 id="links" data-md="## 站内引用 {#links}"><a class="anchor" href="#links" aria-hidden="true">#</a>站内引用</h2>
 <p>这里用到的是<a href="/features/#chain-rule">链式法则</a>。</p>
 <p id="chain-rule-def">链式法则把复合函数的导数写成各层导数的乘积。</p>
-<h2 id="lists"><a class="anchor" href="#lists" aria-hidden="true">#</a>列表与代码</h2>
+<h2 id="lists" data-md="## 列表与代码 {#lists}"><a class="anchor" href="#lists" aria-hidden="true">#</a>列表与代码</h2>
 <ul>
 <li>第一项</li>
 <li>第二项，带 <em>强调</em> 和 <strong>加粗</strong>
