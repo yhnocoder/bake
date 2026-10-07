@@ -122,6 +122,11 @@ describe('每种内容的 HTML', () => {
       ':::callout\n内容。\n:::\n',
       '<aside class="callout note" data-md=":::callout\n内容。\n:::"><p class="callout-label">说明</p><p>内容。</p></aside>',
     ],
+    [
+      '提示框自定义标签',
+      ':::callout[向量 $x$ 说明]{kind=tip}\n内容。\n:::\n',
+      '<aside class="callout tip" data-md=":::callout[向量 $x$ 说明]{kind=tip}\n内容。\n:::"><p class="callout-label">向量 <span class="math" data-tex="x"><svg/></span> 说明</p><p>内容。</p></aside>',
+    ],
     ['加宽', ':::wide\n内容。\n:::\n', '<div class="wide" data-md=":::wide\n内容。\n:::"><p>内容。</p></div>'],
     [
       '边注',
@@ -181,7 +186,8 @@ describe('每种内容的 HTML', () => {
 
   for (const [name, body, expected] of cases) {
     test(name, async () => {
-      assert.ok((await htmlOf(body)).includes(expected), await htmlOf(body));
+      const html = withoutSvg(await htmlOf(body));
+      assert.ok(html.includes(expected), html);
     });
   }
 
