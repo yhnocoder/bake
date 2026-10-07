@@ -147,7 +147,9 @@ export function fixSidenotes(tr, oldDoc) {
 
   const desired = new Map(bodyIndexes.map((index) => [index, []]));
   for (const entry of references) desired.get(entry.reference.index).push(assigned.get(entry));
-  desired.get(bodyIndexes.at(-1)).push(...orphans.map((definition) => ({ source: definition, node: definition.node })));
+  const lastIsEmptyParagraph = doc.lastChild.type.name === 'paragraph' && doc.lastChild.childCount === 0;
+  const orphanAnchor = lastIsEmptyParagraph && bodyIndexes.length > 1 ? bodyIndexes.at(-2) : bodyIndexes.at(-1);
+  desired.get(orphanAnchor).push(...orphans.map((definition) => ({ source: definition, node: definition.node })));
 
   const placed = new Map();
   for (const definition of current.definitions) {

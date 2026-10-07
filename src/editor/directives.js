@@ -2,7 +2,7 @@ import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { $markSchema, $nodeSchema, $prose, $view } from '@milkdown/utils';
 import { blockRender, isDefault, withDefaults } from '../render/block-render.js';
-import { blockGroup, containerContent, labelRequired } from './structure.js';
+import { blockGroup, containerContent, directiveAttrs, labelRequired } from './structure.js';
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 
@@ -135,7 +135,7 @@ function containerSchema(block) {
     group: blockGroup(id),
     content: containerContent(id),
     defining: true,
-    attrs: { attributes: { default: {} } },
+    attrs: directiveAttrs(id),
     parseDOM: [],
     toDOM: () => ['div', { class: block.name }, 0],
     parseMarkdown: {
@@ -164,7 +164,7 @@ function leafSchema(block) {
   return $nodeSchema(id, () => ({
     group: blockGroup(id),
     content: 'inline*',
-    attrs: { attributes: { default: {} } },
+    attrs: directiveAttrs(id),
     parseDOM: [],
     toDOM: () => ['p', { class: block.name }, 0],
     parseMarkdown: {
