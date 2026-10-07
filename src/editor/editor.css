@@ -242,3 +242,78 @@ textarea.bake-math-input {
   font-size: 0.8em;
   color: var(--color-muted);
 }
+
+.bake-block-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+.bake-block-handle {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 24px;
+  border-radius: 4px;
+  font: 16px/1 system-ui, sans-serif;
+  letter-spacing: -4px;
+  color: var(--color-muted);
+  cursor: grab;
+  user-select: none;
+}
+
+.bake-block-handle:hover {
+  background: var(--color-border);
+}
+
+.bake-block-handle[hidden] {
+  display: none;
+}
+
+.milkdown .bake-dragging {
+  opacity: 0.4;
+}
+
+.bake-drop-line {
+  position: absolute;
+  z-index: 1000;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.bake-block-menu {
+  position: absolute;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 8em;
+  padding: 4px 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  font: 13px/1.5 system-ui, sans-serif;
+}
+
+.bake-block-menu button {
+  padding: 2px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bake-block-menu button:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.bake-block-menu button:disabled {
+  color: var(--color-muted);
+  cursor: default;
+}

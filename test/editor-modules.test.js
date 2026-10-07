@@ -63,6 +63,11 @@ test('dropDuplicateIds 去掉重复的 id，保留不重复的 id', () => {
   assert.equal(result.child(0).textContent, '标题');
 });
 
+test('dropDuplicateIds 去掉独占一行的 \\label 时同时去掉这一行', () => {
+  const pasted = doc.create(null, [math.create({ value: '\\label{eq:a}\ny = x \\label{eq:c}' })]);
+  assert.equal(dropDuplicateIds(pasted.content, documentIds(page)).child(0).attrs.value, 'y = x \\label{eq:c}');
+});
+
 test('checkOrder 要求副标题紧跟标题', () => {
   assert.equal(checkOrder(doc.create(null, [heading.create(null, text('标题')), subtitle.create(null, text('副标题'))])), true);
   assert.equal(checkOrder(doc.create(null, [paragraph.create(null, text('段落')), subtitle.create(null, text('副标题'))])), false);

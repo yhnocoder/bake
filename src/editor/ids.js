@@ -25,6 +25,13 @@ function withoutId(attributes) {
   return Object.keys(rest).length > 0 ? rest : null;
 }
 
+const labelLine = new RegExp(String.raw`^[ \t]*${labelPattern.source}[ \t]*\n`, 'gm');
+
+function withoutLabels(tex, ids) {
+  const drop = (label, name) => (ids.has(equationId(name)) ? '' : label);
+  return tex.replace(labelLine, drop).replace(labelPattern, drop);
+}
+
 function blockId(node) {
   if (node.type.name === 'paragraph') return node.attrs.blockId;
   if (node.type.name === 'heading') return node.attrs.attributes?.id ?? null;
@@ -39,7 +46,7 @@ function attrsWithoutId(node) {
 function dropFromNode(node, ids) {
   if (node.isText) return node;
   let attrs = ids.has(blockId(node)) ? attrsWithoutId(node) : node.attrs;
-  if (node.type.name === 'math_block') attrs = { ...attrs, value: attrs.value.replace(labelPattern, (label, name) => (ids.has(equationId(name)) ? '' : label)) };
+  if (node.type.name === 'math_block') attrs = { ...attrs, value: withoutLabels(attrs.value, ids) };
   return node.type.create(attrs, dropDuplicateIds(node.content, ids), node.marks);
 }
 

@@ -9,6 +9,7 @@ import { headingIds } from './heading-ids.js';
 import { html } from './html.js';
 import { emptyBlocksDropIds } from './ids.js';
 import { math } from './math.js';
+import { move } from './move/index.js';
 import { nodes } from './nodes.js';
 import { strictParsing } from './parser.js';
 import { references } from './references.js';
@@ -69,6 +70,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(sidenotes)
     .use(trailingParagraph)
     .use(emptyBlocksDropIds)
+    .use(move)
     .use(links)
     .use(changes(onChange))
     .create();
