@@ -128,7 +128,7 @@ export function fixSidenotes(tr, oldDoc) {
   const current = numberSidenotes(doc);
   const previous = numberSidenotes(oldDoc);
   const bodyIndexes = [];
-  const ends = new Map();
+  const ends = new Map([[-1, 0]]);
   const anchors = new Map();
   doc.forEach((block, offset, index) => {
     if (block.type.name === 'footnote_definition') {
@@ -145,10 +145,10 @@ export function fixSidenotes(tr, oldDoc) {
   const referencedNow = new Set(current.references.map((reference) => reference.key));
   const orphans = unassigned.filter((definition) => !referencedBefore.has(definition.key) || referencedNow.has(definition.key));
 
-  const desired = new Map(bodyIndexes.map((index) => [index, []]));
+  const desired = new Map([-1, ...bodyIndexes].map((index) => [index, []]));
   for (const entry of references) desired.get(entry.reference.index).push(assigned.get(entry));
   const lastIsEmptyParagraph = doc.lastChild.type.name === 'paragraph' && doc.lastChild.childCount === 0;
-  const orphanAnchor = lastIsEmptyParagraph && bodyIndexes.length > 1 ? bodyIndexes.at(-2) : bodyIndexes.at(-1);
+  const orphanAnchor = lastIsEmptyParagraph ? (bodyIndexes.at(-2) ?? -1) : bodyIndexes.at(-1);
   desired.get(orphanAnchor).push(...orphans.map((definition) => ({ source: definition, node: definition.node })));
 
   const placed = new Map();
@@ -176,7 +176,7 @@ export function fixSidenotes(tr, oldDoc) {
   const deletionStart = tr.steps.length;
   for (const definition of [...current.definitions].reverse()) if (!keptSources.has(definition)) removeDefinition(tr, definition);
   const deletions = tr.mapping.slice(deletionStart);
-  for (const index of [...bodyIndexes].reverse()) {
+  for (const index of [-1, ...bodyIndexes].reverse()) {
     let cursor = deletions.map(ends.get(index), -1);
     for (const item of desired.get(index)) {
       if (!kept.has(item)) tr.insert(cursor, item.node);
