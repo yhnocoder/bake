@@ -7,7 +7,7 @@ import { after, describe, test } from 'node:test';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { build } from '../src/build/index.js';
-import { pageSections } from '../src/build/sections.js';
+import { pageSections, sectionList } from '../src/build/sections.js';
 
 const root = join(import.meta.dirname, '..');
 const cli = join(root, 'src/cli.js');
@@ -255,6 +255,9 @@ describe('图片', () => {
 });
 
 describe('sections.json', () => {
+  const page = (html, extra = {}) => pageSections({ title: '标题', html, mathDefs: '', url: '/a/b/', scripts: {}, ...extra });
+  const glyph = (id) => `<svg><use data-c="1" href="#${id}"></use></svg>`;
+
   test('标题范围到下一个同级或更高级标题之前，块范围是带 id 的段落', () => {
     const html = [
       '<div class="lede"><p>导语。</p></div>',
@@ -267,47 +270,114 @@ describe('sections.json', () => {
       '<h2 id="c">C</h2>',
       '<div class="callout"><p id="inner">块里的段落。</p></div>',
     ].join('');
-    assert.deepEqual(pageSections({ title: '标题', html }), {
+    assert.deepEqual(page(html, { scripts: { 'demo-plot': '/assets/components/demo-plot.js', other: '/assets/components/other.js' } }), {
       title: '标题',
-      lede: '<div class="lede"><p>导语。</p></div>',
+      lede: { html: '<div class="lede"><p>导语。</p></div>', components: [] },
       sections: {
         a: {
           kind: 'heading',
-          html: '<h2 id="a">A</h2><p>a 的正文。</p><h3 id="b">B</h3><p id="def">定义。</p><demo-plot class="component"></demo-plot><h4>没有 id</h4>',
+          html: '<h2>A</h2><p>a 的正文。</p><h3>B</h3><p>定义。</p><demo-plot class="component"></demo-plot><h4>没有 id</h4>',
           components: ['demo-plot'],
         },
-        b: {
-          kind: 'heading',
-          html: '<h3 id="b">B</h3><p id="def">定义。</p><demo-plot class="component"></demo-plot><h4>没有 id</h4>',
-          components: ['demo-plot'],
-        },
-        c: { kind: 'heading', html: '<h2 id="c">C</h2><div class="callout"><p id="inner">块里的段落。</p></div>', components: [] },
-        def: { kind: 'block', html: '<p id="def">定义。</p>', components: [] },
-        inner: { kind: 'block', html: '<p id="inner">块里的段落。</p>', components: [] },
+        b: { kind: 'heading', html: '<h3>B</h3><p>定义。</p><demo-plot class="component"></demo-plot><h4>没有 id</h4>', components: ['demo-plot'] },
+        c: { kind: 'heading', html: '<h2>C</h2><div class="callout"><p>块里的段落。</p></div>', components: [] },
+        def: { kind: 'block', html: '<p>定义。</p>', components: [] },
+        inner: { kind: 'block', html: '<p>块里的段落。</p>', components: [] },
       },
+      glyphs: {},
+      scripts: { 'demo-plot': '/assets/components/demo-plot.js' },
     });
   });
 
   test('只含图片的块是 figure，也有块范围', () => {
-    const html = '<figure class="image" id="fig"><img src="a.webp" alt="图"><figcaption>图</figcaption></figure><figure id="other"></figure>';
-    assert.deepEqual(pageSections({ title: 't', html }).sections, {
-      fig: { kind: 'block', html: '<figure class="image" id="fig"><img src="a.webp" alt="图"><figcaption>图</figcaption></figure>', components: [] },
+    const html = '<figure class="image" id="fig"><img src="/assets/a.webp" alt="图"><figcaption>图</figcaption></figure><figure id="other"></figure>';
+    assert.deepEqual(page(html).sections, {
+      fig: { kind: 'block', html: '<figure class="image"><img src="/assets/a.webp" alt="图"><figcaption>图</figcaption></figure>', components: [] },
     });
   });
 
-  test('没有导语时为空字符串', () => {
-    assert.deepEqual(pageSections({ title: 't', html: '<p>正文。</p>' }), { title: 't', lede: '', sections: {} });
+  test('没有导语时 lede 为 null', () => {
+    assert.deepEqual(page('<p>正文。</p>'), { title: '标题', lede: null, sections: {}, glyphs: {}, scripts: {} });
+  });
+
+  test('导语中的组件列在 lede 的 components，scripts 只包含出现的组件', () => {
+    const html = '<div class="lede"><demo-plot class="component"></demo-plot></div><h2 id="a">A</h2>';
+    const result = page(html, { scripts: { 'demo-plot': '/d.js', unused: '/u.js' } });
+    assert.deepEqual(result.lede.components, ['demo-plot']);
+    assert.deepEqual(result.scripts, { 'demo-plot': '/d.js' });
+  });
+
+  test('去掉 id，#… 链接加上页面地址，相对地址解析成绝对路径', () => {
+    const html = [
+      '<h2 id="a"><a class="anchor" href="#a" aria-hidden="true">#</a>A</h2>',
+      '<p id="p">见 <a href="#a">A</a>、<a href="../c/#x">C</a>、<a href="/d/">D</a>、<a href="https://example.com/">外部</a>。</p>',
+      '<figure class="image" id="f"><img src="./assets/a.png" alt=""></figure>',
+      '<p><img src="https://example.com/a.png" alt=""></p>',
+    ].join('');
+    const result = page(html);
+    for (const item of Object.values(result.sections)) assert.ok(!item.html.includes(' id='), item.html);
+    assert.equal(
+      result.sections.p.html,
+      '<p>见 <a href="/a/b/#a">A</a>、<a href="/a/c/#x">C</a>、<a href="/d/">D</a>、<a href="https://example.com/">外部</a>。</p>',
+    );
+    assert.ok(result.sections.a.html.startsWith('<h2><a class="anchor" href="/a/b/#a" aria-hidden="true">#</a>A</h2>'));
+    assert.equal(result.sections.f.html, '<figure class="image"><img src="/a/b/assets/a.png" alt=""></figure>');
+    assert.ok(result.sections.a.html.includes('<img src="https://example.com/a.png" alt="">'));
+  });
+
+  test('去掉旁注编号和注释，:span 只保留文字', () => {
+    const html = [
+      '<h2 id="a">A</h2>',
+      '<p id="p">正文<sup class="sidenote-ref" id="sn-ref-1"><a href="#sn-1">1</a></sup>，<span class="sidenote-span" data-sidenote="2">文字 <em>强调</em></span><sup class="sidenote-ref" id="sn-ref-2"><a href="#sn-2">2</a></sup>。</p>',
+      '<aside class="sidenote" id="sn-1"><span class="sidenote-number">1</span><div class="sidenote-body"><p>注释。</p></div></aside>',
+      '<aside class="sidenote unnumbered"><div class="sidenote-body"><p>边注。</p></div></aside>',
+    ].join('');
+    const result = page(html);
+    assert.equal(result.sections.p.html, '<p>正文，文字 <em>强调</em>。</p>');
+    assert.equal(result.sections.a.html, '<h2>A</h2><p>正文，文字 <em>强调</em>。</p>');
+  });
+
+  test('glyphs 只包含引用到的字形', () => {
+    const mathDefs = '<svg id="math-defs" style="display:none"><defs><path id="MJX-NCM-I-1D465" d="M1 1"></path><path id="MJX-NCM-N-31" d="M2 2"></path><path id="MJX-NCM-N-32" d="M3 3"></path></defs></svg>';
+    const html = `<div class="lede"><p>${glyph('MJX-NCM-I-1D465')}</p></div><h2 id="a">A</h2><p id="p">${glyph('MJX-NCM-N-31')}</p>`;
+    assert.deepEqual(page(html, { mathDefs }).glyphs, { 'MJX-NCM-I-1D465': 'M1 1', 'MJX-NCM-N-31': 'M2 2' });
+  });
+
+  test('sectionList 按页面顺序列出标题和段落，去掉锚点和旁注编号，公式用 TeX 源码', () => {
+    const html = [
+      '<div class="lede"><p>导语。</p></div>',
+      '<h2 id="a"><a class="anchor" href="#a" aria-hidden="true">#</a>标题 <span class="math" data-tex="x^2"><svg></svg></span></h2>',
+      '<p id="p">段落<sup class="sidenote-ref"><a href="#sn-1">1</a></sup>。</p>',
+      '<aside class="sidenote"><span class="sidenote-number">1</span><div class="sidenote-body"><p>注释。</p></div></aside>',
+      '<p>没有 id。</p>',
+      '<div class="callout"><p id="inner">块里的段落。</p></div>',
+      '<h3 id="b">B</h3>',
+    ].join('');
+    assert.deepEqual(sectionList(html), [
+      { id: 'a', kind: 'heading', text: '标题 x^2' },
+      { id: 'p', kind: 'block', text: '段落。' },
+      { id: 'inner', kind: 'block', text: '块里的段落。' },
+      { id: 'b', kind: 'heading', text: 'B' },
+    ]);
   });
 
   test('构建写出的 sections.json', async () => {
     const dist = await buildBlog(blog());
     const sections = JSON.parse(read(dist, 'features/sections.json'));
     assert.equal(sections.title, 'bake 的全部写法');
-    assert.match(sections.lede, /^<div class="lede"/);
+    assert.match(sections.lede.html, /^<div class="lede"/);
     assert.equal(sections.sections['chain-rule-def'].kind, 'block');
     assert.deepEqual(sections.sections.components.components, ['demo-plot']);
-    assert.match(sections.sections.links.html, /^<h2 id="links">/);
+    assert.deepEqual(Object.keys(sections.scripts), ['demo-plot']);
+    assert.match(sections.scripts['demo-plot'], /^\/assets\/components\/demo-plot\.[\w-]+\.js$/);
+    assert.match(sections.sections.links.html, /^<h2><a class="anchor" href="\/features\/#links"/);
     assert.ok(sections.sections.links.html.includes('href="/features/#chain-rule"'));
+    assert.ok(sections.sections.links.html.includes('href="/features/#chain-rule-def"'));
+    const html = JSON.stringify(sections.lede) + Object.values(sections.sections).map((item) => item.html).join('');
+    const referenced = new Set([...html.matchAll(/href=\\?"#(MJX-[^"\\]+)/g)].map(([, id]) => id));
+    assert.ok(referenced.size > 0);
+    assert.deepEqual(Object.keys(sections.glyphs).sort(), [...referenced].sort());
+    assert.equal(JSON.parse(read(dist, 'paper/sections.json')).lede, null);
   });
 });
 

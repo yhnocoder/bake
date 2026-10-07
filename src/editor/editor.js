@@ -7,7 +7,8 @@ import { directives } from './directives.js';
 import { enterRules } from './enter-rules.js';
 import { headingIds } from './heading-ids.js';
 import { html } from './html.js';
-import { insertMenu } from './insert-menu.js';
+import { insertMenu, insertMenuItemsCtx } from './insert-menu.js';
+import { linkMenuItem, linkPicker } from './link-picker.js';
 import { math } from './math.js';
 import { nodes } from './nodes.js';
 import { strictParsing } from './parser.js';
@@ -52,6 +53,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
       ctx.set(defaultValueCtx, markdown);
       configureStringify(ctx);
       menu.configure(ctx);
+      ctx.update(insertMenuItemsCtx, (items) => [...items, linkMenuItem]);
     })
     .use(menu.plugins)
     .use(bakeRemark)
@@ -70,6 +72,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(taskList)
     .use(properties(registry))
     .use(links)
+    .use(linkPicker)
     .use(changes(onChange))
     .create();
   return { editor, view: editor.action((ctx) => ctx.get(editorViewCtx)) };

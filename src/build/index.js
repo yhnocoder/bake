@@ -118,14 +118,15 @@ async function writeOutput(site, pages, images, outDir) {
   for (const page of pages) {
     const { entry, rendered, frame } = page;
     const html = rewriteHtml(rendered.html, { base: site.config.base, images: pageImages.get(entry) ?? new Map() });
+    const scripts = Object.fromEntries(rendered.components.map((name) => [name, bundled.files[`components/${name}`]]));
     const assets = {
       styles: [bundled.files.bake, bundled.files[`themes/${themeOf(page)}`]],
-      scripts: [bundled.client, ...rendered.components.map((name) => bundled.files[`components/${name}`])],
+      scripts: [bundled.client, ...(rendered.links.length > 0 ? [bundled.preview] : []), ...Object.values(scripts)],
     };
     const directory = join(outDir, entry.url);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'index.html'), renderDocumentFor(site, entry.path, { ...rendered, html }, { frame, assets }));
-    await writeFile(join(directory, 'sections.json'), JSON.stringify(pageSections({ title: rendered.page.title, html })));
+    await writeFile(join(directory, 'sections.json'), JSON.stringify(pageSections({ title: rendered.page.title, html, mathDefs: rendered.mathDefs, url: site.config.base + entry.url.slice(1), scripts })));
   }
   await writeFile(join(outDir, 'site.json'), JSON.stringify(siteData(site)));
   return [];

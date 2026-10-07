@@ -11,20 +11,15 @@ import { layoutFrame, loadSite, renderArticle, renderDocumentFor } from '../site
 import { brokenLinks, splitHref } from '../site/links.js';
 import { createModuleLoader } from '../site/modules.js';
 import { isPagePath, pageUrl, removePage, updatePage } from '../site/pages.js';
+import { linkApi } from './link-api.js';
+import { RequestError } from './request-error.js';
 
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
 const componentPrefix = '\0bake:component/';
-const bakeStyles = ['base', 'blocks', 'layouts'].map((name) => `src/styles/${name}.css`);
-const bakeScripts = ['src/client/page.js', 'src/dev/client.js', 'src/editor/index.js'];
+const bakeStyles = ['base', 'blocks', 'layouts', 'preview'].map((name) => `src/styles/${name}.css`);
+const bakeScripts = ['src/client/page.js', 'src/dev/client.js', 'src/dev/preview-client.js', 'src/editor/index.js'];
 const registryModule = 'virtual:bake/registry';
 const registryId = `\0${registryModule}`;
-
-class RequestError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -257,11 +252,6 @@ export function bakeDev({ root }) {
     return { path: `./assets/${name}` };
   }
 
-  const endpoints = {
-    'GET /__bake/source': (request, url) => source(url),
-    'POST /__bake/save': async (request) => serialize(async () => save(await readJson(request))),
-    'POST /__bake/asset': async (request) => serialize(async () => asset(await readJson(request))),
-  };
 
   async function handleApi(request, response, url) {
     const endpoint = endpoints[`${request.method} ${url.pathname}`];
@@ -348,6 +338,13 @@ export function bakeDev({ root }) {
     const { page, html, toc, mathDefs, components } = rendered;
     return { path: entry.path, page, html, toc, mathDefs, components, messages };
   }
+
+  const endpoints = {
+    'GET /__bake/source': (request, url) => source(url),
+    'POST /__bake/save': async (request) => serialize(async () => save(await readJson(request))),
+    'POST /__bake/asset': async (request) => serialize(async () => asset(await readJson(request))),
+    ...linkApi({ site: () => site, renderedPage, componentEntry }),
+  };
 
   return {
     name: 'bake-dev',
