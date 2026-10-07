@@ -137,6 +137,7 @@ async function renderPages(root) {
     const site = await loadSite(root, { loader });
     const messages = [...site.messages];
     const pages = [];
+    if (messages.length > 0) return { site, messages, pages, usedCache: new Set() };
     const cache = { renderCode: await blogRenderCodeHash(root), used: new Set() };
     for (const entry of site.pages.filter((page) => page.frontmatter.draft !== true)) {
       const rendered = await cachedRender(site, entry.path, await readFile(join(root, entry.path), 'utf8'), cache);

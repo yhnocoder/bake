@@ -39,6 +39,7 @@
 <span class="dim">2 errors, dist/ was not written</span> <span class="ref">2</span></div>
 <ol class="callouts">
   <li>每个错误一行，构建继续检查其余文件，最后一行汇总错误数，1 个错误时写 <code>1 error</code>。</li>
+  <li>站点本身有错误时（<code>bake.config.js</code> 不能载入、组件不能读取、主题不存在、<code>slug</code> 重复），只输出这些错误，不渲染页面。理由：配置和组件的错误会让很多页面报出由它引起的错误，例如配置中的宏缺失后每个用到它的公式都报错。</li>
   <li>有任何错误时不写入输出目录，已有的 <code>dist/</code> 保持不变。没有错误时先写到输出目录旁的临时目录，完成后替换输出目录。</li>
 </ol>
 

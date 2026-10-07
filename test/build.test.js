@@ -172,6 +172,14 @@ describe('组件与脚本', () => {
     assert.deepEqual(files(join(directory, 'dist')), ['old.txt']);
   });
 
+  test('配置文件有语法错误时报错，不渲染页面', () => {
+    const directory = blog();
+    writeFileSync(join(directory, 'bake.config.js'), "export default { {\n  title: 't',\n};\n");
+    const result = bake(directory, 'build');
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^bake\.config\.js:1:1 Cannot load bake\.config\.js: Failed to parse source[^\n]*\n1 error, dist\/ was not written\n$/);
+  });
+
   test('配置的主题不存在时报错', () => {
     const directory = blog();
     writeFileSync(join(directory, 'bake.config.js'), "export default { title: 't', theme: 'missing', math: { macros: { R: '\\\\mathbb{R}' } } };\n");

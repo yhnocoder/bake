@@ -38,12 +38,26 @@ async function importDefault(loader, path) {
   return module.default;
 }
 
-async function loadConfig(loader, messages) {
-  const config = await importDefault(loader, configPath);
-  for (const field of ['title', 'theme']) {
-    if (config[field] === undefined) messages.push({ path: configPath, line: 1, column: 1, text: `Config is missing ${field}` });
+function loadError(path, error, text) {
+  const { line = 1, column = 0 } = error.loc ?? {};
+  return { path, line, column: column + 1, text: `${text}: ${error.message.split('\n')[0]}` };
+}
+
+async function readConfig(loader, messages) {
+  try {
+    return await importDefault(loader, configPath);
+  } catch (error) {
+    messages.push(loadError(configPath, error, `Cannot load ${configPath}`));
+    return null;
   }
-  return { base: '/', site: {}, ...config, math: { macros: {}, ...config.math } };
+}
+
+async function loadConfig(loader, messages) {
+  const config = await readConfig(loader, messages);
+  for (const field of ['title', 'theme']) {
+    if (config && config[field] === undefined) messages.push({ path: configPath, line: 1, column: 1, text: `Config is missing ${field}` });
+  }
+  return { base: '/', site: {}, ...config, math: { macros: {}, ...config?.math } };
 }
 
 async function loadComponents(root, loader, messages) {
@@ -58,7 +72,7 @@ async function loadComponents(root, loader, messages) {
       const component = await importDefault(loader, path);
       components[basename(path, '.js')] = { path, topic, properties: component.properties ?? {} };
     } catch (error) {
-      messages.push({ path, line: 1, column: 1, text: `Cannot read static properties of component ${path}: ${error.message}` });
+      messages.push(loadError(path, error, `Cannot read static properties of component ${path}`));
     }
   }
   return components;

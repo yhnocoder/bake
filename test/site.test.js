@@ -61,6 +61,19 @@ describe('配置', () => {
       { path: 'bake.config.js', line: 1, column: 1, text: 'Config is missing theme' },
     ]);
   });
+
+  test('配置文件载入失败时报错，使用默认值', async () => {
+    const site = await load(blog({ 'bake.config.js': "throw new Error('broken config');\n" }));
+    assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: 'Cannot load bake.config.js: broken config' }]);
+    assert.deepEqual(site.config, { base: '/', site: {}, math: { macros: {} } });
+  });
+
+  test('配置文件有语法错误时报错，位置取自 Vite 的 loc', async () => {
+    const site = await load(blog({ 'bake.config.js': 'export default { {\n' }));
+    assert.equal(site.messages.length, 1);
+    assert.deepEqual({ ...site.messages[0], text: undefined }, { path: 'bake.config.js', line: 1, column: 1, text: undefined });
+    assert.match(site.messages[0].text, /^Cannot load bake\.config\.js: Failed to parse source/);
+  });
 });
 
 describe('页面', () => {
