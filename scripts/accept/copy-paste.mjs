@@ -158,6 +158,7 @@ async function pageCopy(browser, dist, output) {
     const content = await readClipboard(page);
     writeFileSync(join(output, `${name}.md`), content.text);
     writeFileSync(join(output, `${name}.html`), content.html);
+    await page.evaluate(() => getSelection().getRangeAt(0).startContainer.parentElement.scrollIntoView({ block: 'center' }));
     await page.screenshot({ path: join(output, `${name}.png`) });
     console.log(`## ${name}`);
     console.log(`clipboard types: ${content.types.join(', ')}`);
