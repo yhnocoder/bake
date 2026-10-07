@@ -137,6 +137,19 @@ describe('接口', () => {
     assert.deepEqual(await response.json(), { path: 'content/paper.md', markdown, hash: sha256(markdown) });
   });
 
+  test('/__bake/source 和 /__bake/save 可以读写首页', async () => {
+    const markdown = '---\ntitle: 首页\nslug: /\n---\n\n正文。\n';
+    writeFileSync(join(root, 'content/home.md'), markdown);
+    await until(async () => (await fetch(`${origin}/`)).status === 200);
+    const response = await fetch(`${origin}/__bake/source?page=/`);
+    assert.deepEqual(await response.json(), { path: 'content/home.md', markdown, hash: sha256(markdown) });
+    const changed = markdown.replace('正文。', '首页正文。');
+    const saved = await post('/__bake/save', { page: '/', markdown: changed, hash: sha256(markdown) });
+    assert.deepEqual(saved, { status: 200, body: { hash: sha256(changed), url: '/' } });
+    rmSync(join(root, 'content/home.md'));
+    await until(async () => (await fetch(`${origin}/`)).status === 404);
+  });
+
   test('/__bake/source 对不存在的页面返回 404', async () => {
     const response = await fetch(`${origin}/__bake/source?page=/missing/`);
     assert.equal(response.status, 404);

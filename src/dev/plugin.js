@@ -190,7 +190,8 @@ export function bakeDev({ root }) {
   }
 
   async function pageFile(page) {
-    if (!isInside(content, resolve(content, `.${page}`))) throw new RequestError(403, 'Path is outside content/');
+    const target = resolve(content, `.${page}`);
+    if (target !== content && !isInside(content, target)) throw new RequestError(403, 'Path is outside content/');
     const entry = pageAt(page);
     if (!entry) throw new RequestError(404, `No page at ${page}`);
     const file = join(root, entry.path);
