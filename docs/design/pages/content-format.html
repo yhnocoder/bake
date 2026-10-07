@@ -242,7 +242,7 @@
 </div>
 
 <h3>组件</h3>
-<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错。输出同名 custom element，带 <code>class="component"</code>，例如 <code>&lt;gradient-figure x0="1.5" class="component" data-md="…"&gt;&lt;figcaption&gt;图题&lt;/figcaption&gt;&lt;/gradient-figure&gt;</code>。属性值等于 <code>static properties</code> 中 <code>default</code> 的属性不写进元素；没有图题时元素内没有 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供外框和图题的样式。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
+<p>有图题时写 <code>:::name{属性}</code>，容器里的文字是图题；没有图题时写 <code>::name{属性}</code>。指令名包含 <code>-</code> 时按组件处理，组件不能写成行内形式 <code>:name</code>。组件名不存在、属性不在组件的 <code>static properties</code> 中或类型不符时报错。输出同名 custom element，带 <code>class="component"</code>，例如 <code>&lt;gradient-figure x0="1.5" class="component" data-md="…"&gt;&lt;figcaption&gt;图题&lt;/figcaption&gt;&lt;/gradient-figure&gt;</code>。属性值等于 <code>static properties</code> 中 <code>default</code> 的属性不写进元素；没有图题时元素内没有 <code>&lt;figcaption&gt;</code>。组件自己决定画什么，bake 只提供组件与前后内容的间距和图题的样式，不加边框。编辑器里组件照常运行，属性面板修改参数，图题直接输入。</p>
 <div class="spec">
 <pre><code class="language-markdown">:::gradient-figure{x0=1.2}
 从 $x_0$ 出发沿负梯度方向下降。
