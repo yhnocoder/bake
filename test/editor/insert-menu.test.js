@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { bakeRoot } from '../../src/dev/plugin.js';
+import { format } from '../../src/format/index.js';
 import { exportMarkdown, openEditor, placeCursor, saveAfter, startSite } from './setup.js';
 
 const path = 'content/features.md';
@@ -38,8 +39,10 @@ before(async () => {
 });
 
 after(async () => {
+  const files = [site.read(path), site.read(plainPath)];
   await site.close();
   assert.deepEqual(errors, []);
+  for (const text of files) assert.equal(format(text), text);
 });
 
 function menuShown(target = page) {
@@ -164,29 +167,29 @@ async function insert(name, query, expected, { target = page, file = path, ancho
 
 describe('插入内置块、表格和组件，文件只增加插入的几行', () => {
   test('折叠：光标在标题里', async () => {
-    await insert('fold', 'fold', { removed: [], added: [':::fold', '', ':::', ''] });
+    await insert('fold', 'fold', { removed: [], added: [':::fold', ':::', ''] });
     await page.keyboard.type('细节');
     await page.waitForTimeout(900);
     assert.match(site.read(path), /^:::fold\[细节\]$/m);
   });
 
   test('提示框：光标在正文段落，直接输入', async () => {
-    await insert('callout', 'callout', { removed: [], added: [':::callout', '', ':::', ''] });
+    await insert('callout', 'callout', { removed: [], added: [':::callout', ':::', ''] });
     const changes = await saveAfter(site, page, path, () => page.keyboard.type('提示内容。'));
-    assert.deepEqual(changes, { removed: [''], added: ['提示内容。'] });
+    assert.deepEqual(changes, { removed: [], added: ['提示内容。'] });
     assert.equal(await page.getAttribute('.milkdown aside.callout.note .callout-label', 'data-placeholder'), '说明');
   });
 
   test('加宽', async () => {
-    await insert('wide', 'wide', { removed: [], added: [':::wide', '', ':::', ''] });
+    await insert('wide', 'wide', { removed: [], added: [':::wide', ':::', ''] });
   });
 
   test('边注，用鼠标点击菜单项', async () => {
-    await insert('margin', 'mar', { removed: [], added: [':::margin', '', ':::', ''] }, { choose: '边注 margin' });
+    await insert('margin', 'mar', { removed: [], added: [':::margin', ':::', ''] }, { choose: '边注 margin' });
   });
 
   test('卡片网格：生成一张卡片', async () => {
-    await insert('bento', 'bento', { removed: [], added: ['::::bento', ':::card', '', ':::', '::::', ''] });
+    await insert('bento', 'bento', { removed: [], added: ['::::bento', ':::card', ':::', '::::', ''] });
   });
 
   test('参考文献：生成一个列表', async () => {
@@ -242,7 +245,7 @@ describe('位置规则', () => {
     assert.equal((await menuItems(plainPage)).includes('导语 lede'), true);
     await site.screenshot(plainPage, 'position-lede');
     const changes = await saveAfter(site, plainPage, plainPath, () => clickItem(plainPage, '导语 lede'));
-    assert.deepEqual(changes, { removed: [], added: [':::lede', '', ':::', ''] });
+    assert.deepEqual(changes, { removed: [], added: [':::lede', ':::', ''] });
   });
 
   test('标题之后列出副标题', async () => {
@@ -290,12 +293,12 @@ describe('撤销与登记', () => {
     await openMenu('wid');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(50);
-    assert.match(await exportMarkdown(page), /正文段落。\n\n:::wide\n\n:::\n/);
+    assert.match(await exportMarkdown(page), /正文段落。\n\n:::wide\n:::\n/);
     await page.keyboard.press('ControlOrMeta+z');
     await page.waitForTimeout(50);
     assert.match(await exportMarkdown(page), /正文段落。\n\n\/wid\n/);
     await site.screenshot(page, 'undo-insert');
-    await clearQuery(page, 4);
+    await clearQuery(page, 5);
   });
 
   test('用 insertMenuItemsCtx 登记的菜单项出现在块组末尾并可以执行', async () => {

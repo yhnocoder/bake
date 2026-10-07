@@ -185,8 +185,9 @@ function containerSchema(block) {
       match: (node) => node.type.name === id,
       runner: (state, node) => {
         state.openNode('containerDirective', undefined, { name: block.name, attributes: node.attrs.attributes });
+        const onlyEmptyParagraph = node.lastChild.type.name === 'paragraph' && node.lastChild.content.size === 0 && node.childCount === (hasLabel(node) ? 2 : 1);
         node.forEach((child) => {
-          if (keepEmptyLabel || child.type.name !== 'directive_label' || child.content.size > 0) state.next(child);
+          if (child.type.name === 'directive_label' ? keepEmptyLabel || child.content.size > 0 : !onlyEmptyParagraph) state.next(child);
         });
         state.closeNode();
       },

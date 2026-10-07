@@ -218,8 +218,8 @@ describe('块属性', () => {
 describe('页面属性与标题区', () => {
   async function openPage() {
     await placeCursor(page, '正文段落。');
-    await page.click('.bake-properties-toggle');
-    await page.waitForFunction(() => document.querySelector('.bake-properties:not([hidden]) h2')?.textContent === '页面属性');
+    if (await page.isHidden(panel)) await page.click('.bake-properties-toggle');
+    await waitTitle('页面属性');
   }
 
   async function chromeUpdated(action) {
