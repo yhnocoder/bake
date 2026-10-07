@@ -93,17 +93,9 @@ async function screenshot(withoutCodeVariables) {
   if (colors.keywordColor !== expected || colors.highlightedBlocks !== 4) process.exitCode = 1;
 }
 
-async function unknownLanguage() {
-  const source = '---\ntitle: 拼写错误\nslug: typo\nlayout: essay\n---\n\n段落\n\n```pyhton\nprint(1)\n```\n';
-  const { messages } = await renderArticle('content/typo.md', source);
-  for (const message of messages) console.log(formatMessage(message));
-  process.exitCode = messages.length > 0 ? 1 : 0;
-}
-
 try {
   if (scenario === 'full') await screenshot(false);
   else if (scenario === 'fallback') await screenshot(true);
-  else if (scenario === 'unknown') await unknownLanguage();
   else throw new Error(`Unknown scenario ${scenario}`);
 } finally {
   rmSync(blog, { recursive: true, force: true });

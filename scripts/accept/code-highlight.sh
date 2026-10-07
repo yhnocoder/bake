@@ -5,6 +5,9 @@ set -eu
 
 accept_init code-highlight
 SCRIPT="$ROOT/scripts/accept/code-highlight.mjs"
+BAKE="$ROOT/src/cli.js"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
 
 run_step 1 "$ROOT/scripts/test.sh"
 if [ "$LAST_STATUS" -eq 0 ]; then
@@ -28,11 +31,15 @@ else
   record 3 '去掉主题中的代码变量后再次渲染' 失败 "退出码 $LAST_STATUS，问题见 3.txt"
 fi
 
-run_step 4 node "$SCRIPT" unknown
-if [ "$LAST_STATUS" -eq 1 ] && printf '%s\n' "$LAST_OUTPUT" | grep -qx 'content/typo.md:9:1 Unknown code language pyhton'; then
-  record 4 '未知语言名报错' 通过 'render 的 messages 有一条错误 content/typo.md:9:1 Unknown code language pyhton，脚本以 1 退出；bake build 的场景在构建 Task 的 PR 合并后执行'
+BLOG="$WORK/typo"
+cp -R "$ROOT/examples/minimal" "$BLOG"
+printf -- '---\ntitle: 拼写错误\nslug: typo\n---\n\n段落\n\n```pyhton\nprint(1)\n```\n' > "$BLOG/content/typo.md"
+note 4 "加入 content/typo.md：$(cat "$BLOG/content/typo.md")"
+run_step 4 sh -c "cd '$BLOG' && node '$BAKE' build"
+if [ "$LAST_STATUS" -eq 1 ] && printf '%s\n' "$LAST_OUTPUT" | grep -qx 'content/typo.md:8:1 Unknown code language pyhton' && [ ! -e "$BLOG/dist" ]; then
+  record 4 '加入未知语言名的文章后 bake build' 通过 '输出 content/typo.md:8:1 Unknown code language pyhton 和汇总行，退出码 1，没有写出 dist/'
 else
-  record 4 '未知语言名报错' 失败 "退出码 $LAST_STATUS，输出见 4.txt"
+  record 4 '加入未知语言名的文章后 bake build' 失败 "退出码 $LAST_STATUS，输出见 4.txt"
 fi
 
 write_summary
