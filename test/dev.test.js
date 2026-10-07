@@ -328,8 +328,7 @@ describe('文件变化', () => {
   test('渲染错误和断开的站内链接显示在状态栏', async () => {
     const { page } = await open('/features/');
     edit('content/features.md', (source) => `${source}\n[断开](/missing/)\n\n:::callot\n内容\n:::\n`);
-    await page.waitForFunction(() => document.querySelector('.bake-status-problems').textContent !== '没有错误');
-    assert.equal(await page.evaluate(() => document.querySelector('.bake-status-problems').textContent), '1 个渲染错误，1 个断开的站内链接');
+    await page.waitForFunction(() => document.querySelector('.bake-status-problems').textContent === '1 个渲染错误，1 个断开的站内链接');
     await page.click('.bake-status-problems');
     const items = await page.evaluate(() => [...document.querySelectorAll('.bake-status-list li')].map((item) => item.textContent));
     assert.equal(items.length, 2);
