@@ -117,9 +117,9 @@ exports[`features.md > 快照 2`] = `
 <aside class="callout tip" data-md=":::callout{kind=tip}
 先看图再看公式。
 :::"><p class="callout-label">提示</p><p>先看图再看公式。</p></aside>
-<aside class="callout warning" data-md=":::callout{kind=warning}
+<aside class="callout warning" data-md=":::callout[求和次序]{kind=warning}
 这里的求和不能交换次序。
-:::"><p class="callout-label">注意</p><p>这里的求和不能交换次序。</p></aside>
+:::"><p class="callout-label">求和次序</p><p>这里的求和不能交换次序。</p></aside>
 <p>正文段落。</p>
 <div class="wide" data-md=":::wide
 | 函数 | 定义 | 导数 |

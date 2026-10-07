@@ -120,6 +120,21 @@ describe('编辑后保存的文件只改变对应的行', () => {
     }, { removed: ['先看图再看公式。'], added: ['先看图再看公式。图在上一节。'] });
   });
 
+  test('修改提示框的自定义名称', async () => {
+    await check('callout-label', async () => {
+      await placeCursor(page, '求和次序');
+      await page.keyboard.type('的限制');
+    }, { removed: [':::callout[求和次序]{kind=warning}'], added: [':::callout[求和次序的限制]{kind=warning}'] });
+    assert.equal(await page.textContent('.milkdown aside.callout.warning > .callout-label'), '求和次序的限制');
+  });
+
+  test('删空提示框的自定义名称后不再写方括号', async () => {
+    await check('callout-label-empty', async () => {
+      await placeCursor(page, '求和次序的限制', { select: true });
+      await page.keyboard.press('Backspace');
+    }, { removed: [':::callout[求和次序的限制]{kind=warning}'], added: [':::callout{kind=warning}'] });
+  });
+
   test('修改组件图题', async () => {
     await check('component-caption', async () => {
       await placeCursor(page, '出发沿负梯度方向下降。');

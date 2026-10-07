@@ -101,9 +101,11 @@ export function createHandlers({ source, registry, components }) {
     if (node.name.includes('-')) return component(state, node);
     const block = registry.get(node.name);
     const attributes = withDefaults(node.attributes, block?.attributes);
-    const children = state.all(node);
+    const labelParagraph = node.children.find((child) => child.data?.directiveLabel);
+    const label = labelParagraph ? state.all(labelParagraph) : undefined;
+    const children = state.all({ ...node, children: contentChildren(node) });
     const form = { textDirective: 'text', leafDirective: 'leaf', containerDirective: 'container' }[node.type];
-    const result = fromArray(blockRender(block, node.name, form)({ attributes, children }));
+    const result = fromArray(blockRender(block, node.name, form)({ attributes, label, children }));
     result.properties.dataMd = sourceOf(node);
     return state.applyData(node, result);
   }

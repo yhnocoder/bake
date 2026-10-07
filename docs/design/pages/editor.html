@@ -53,7 +53,7 @@
     <tr><th>块的 <code>form</code></th><th>编辑器节点</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>container</code></td><td>块节点，内容是一个或多个块。指令方括号里的文字（例如 <code>:::fold[推导细节]</code> 的标题）是第一个子节点，可以直接输入；折叠块必须有这个子节点</td></tr>
+    <tr><td><code>container</code></td><td>块节点，内容是一个或多个块。指令方括号里的文字（例如 <code>:::fold[推导细节]</code> 的标题、<code>:::callout[向量说明]</code> 的名称）是第一个子节点，可以直接输入；折叠块必须有这个子节点，其他块的这个子节点删空后保存时不写方括号</td></tr>
     <tr><td><code>leaf</code></td><td>块节点，内容是方括号里的行内文字</td></tr>
     <tr><td><code>text</code></td><td>行内格式（mark），方括号里的文字可以直接编辑</td></tr>
   </tbody>

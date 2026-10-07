@@ -12,5 +12,9 @@ export function isDefault(value, property) {
 export function blockRender(block, name, form) {
   if (block?.render) return block.render;
   const tagName = form === 'text' ? 'span' : 'div';
-  return ({ attributes, children }) => [tagName, { class: name, ...Object.fromEntries(Object.entries(attributes).map(([key, value]) => [`data-${key}`, value])) }, children];
+  return ({ attributes, label, children }) => [
+    tagName,
+    { class: name, ...Object.fromEntries(Object.entries(attributes).map(([key, value]) => [`data-${key}`, value])) },
+    label ? [['p', {}, label], ...children] : children,
+  ];
 }

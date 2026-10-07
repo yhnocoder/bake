@@ -41,12 +41,11 @@ function follow(node, path) {
 
 export function blockShape(block, attributes, hasLabel) {
   const labelText = { type: 'text', value: '' };
-  const label = { type: 'element', tagName: 'p', properties: {}, children: [labelText] };
   const content = { type: 'text', value: '' };
   const contentHolder = block.form === 'container' ? { type: 'element', tagName: 'div', properties: {}, children: [content] } : content;
   const created = new Map();
   const render = blockRender(block, block.name, block.form);
-  const dom = build(render({ attributes: withDefaults(attributes, block.attributes), children: hasLabel ? [label, contentHolder] : [contentHolder] }), null, created);
+  const dom = build(render({ attributes: withDefaults(attributes, block.attributes), label: hasLabel ? [labelText] : undefined, children: [contentHolder] }), null, created);
   const contentNode = created.get(block.form === 'container' ? contentHolder : content);
   if (!contentNode?.parentNode) throw new Error(`Block ${block.name} must place its children in one element`);
   const contentDOM = contentNode.parentNode;
@@ -130,9 +129,10 @@ function staticWidgets(doc, shapes) {
 
 function containerSchema(block) {
   const id = `directive_${block.name}`;
+  const labelRequired = block.name === 'fold';
   return $nodeSchema(id, () => ({
     group: 'block',
-    content: block.name === 'fold' ? 'directive_label block+' : 'directive_label? block+',
+    content: labelRequired ? 'directive_label block+' : 'directive_label? block+',
     defining: true,
     attrs: { attributes: { default: {} } },
     parseDOM: [],
@@ -149,7 +149,9 @@ function containerSchema(block) {
       match: (node) => node.type.name === id,
       runner: (state, node) => {
         state.openNode('containerDirective', undefined, { name: block.name, attributes: node.attrs.attributes });
-        state.next(node.content);
+        node.forEach((child) => {
+          if (labelRequired || child.type.name !== 'directive_label' || child.content.size > 0) state.next(child);
+        });
         state.closeNode();
       },
     },
