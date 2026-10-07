@@ -76,6 +76,9 @@ export async function loadSite(root) {
   messages.push(...pageMessages);
   const components = await loadComponents(root, messages);
   const themes = await loadThemes(root);
+  if (config.theme !== undefined && !Object.hasOwn(themes, config.theme)) {
+    messages.push({ path: configPath, line: 1, column: 1, text: `Unknown theme ${config.theme}` });
+  }
   return { root, config, pages, components, themes, layouts, messages };
 }
 
@@ -86,14 +89,18 @@ export function siteData(site) {
   return { pages, config: site.config.site };
 }
 
-export function renderArticle(site, pagePath, source) {
-  return render(source, {
+export function renderOptions(site, pagePath) {
+  return {
     path: pagePath,
     config: site.config,
     components: Object.fromEntries(Object.entries(site.components).map(([name, { properties }]) => [name, properties])),
     layouts: Object.fromEntries(Object.entries(site.layouts).map(([name, { fields }]) => [name, fields])),
     themes: Object.keys(site.themes),
-  });
+  };
+}
+
+export function renderArticle(site, pagePath, source) {
+  return render(source, renderOptions(site, pagePath));
 }
 
 export function renderDocumentFor(site, pagePath, rendered, { assets }) {
