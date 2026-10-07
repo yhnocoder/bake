@@ -70,26 +70,26 @@ export function exportMarkdown(page) {
 }
 
 export async function placeCursor(page, text, { select = false } = {}) {
-  await page.evaluate(
-    ({ text, select }) => {
-      const editor = document.querySelector('.milkdown .editor');
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  await session(
+    page,
+    (current, { text, select }) => {
+      const { view } = current;
+      view.focus();
+      const walker = document.createTreeWalker(view.dom, NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
         const index = walker.currentNode.data.indexOf(text);
-        if (index === -1) continue;
-        editor.focus();
-        const range = document.createRange();
-        range.setStart(walker.currentNode, select ? index : index + text.length);
-        range.setEnd(walker.currentNode, index + text.length);
-        getSelection().removeAllRanges();
-        getSelection().addRange(range);
+        if (index === -1 || walker.currentNode.parentElement.closest('[contenteditable="false"]')) continue;
+        const head = view.posAtDOM(walker.currentNode, index + text.length);
+        const anchor = select ? view.posAtDOM(walker.currentNode, index) : head;
+        const { doc } = view.state;
+        const TextSelection = view.state.selection.constructor.near(doc.resolve(head)).constructor;
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, anchor, head)));
         return;
       }
       throw new Error(`Text not found: ${text}`);
     },
     { text, select },
   );
-  await page.waitForTimeout(50);
 }
 
 export async function saveAfter(site, page, path, action) {
