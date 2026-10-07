@@ -64,7 +64,7 @@ fi
 EMPTY="$WORK/empty"
 mkdir -p "$EMPTY/themes"
 printf "export default { title: 'Hello', theme: 'plain' };\n" > "$EMPTY/bake.config.js"
-printf ':root {\n  --color-text: #222;\n  --color-bg: #fff;\n}\n' > "$EMPTY/themes/plain.css"
+sed "/@import/d" "$ROOT/examples/minimal/themes/default.css" > "$EMPTY/themes/plain.css"
 run_step 5 bake_in "$EMPTY" new hello/world
 new_status=$LAST_STATUS
 run_step 5 cat "$EMPTY/content/hello/world.md"

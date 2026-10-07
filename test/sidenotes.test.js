@@ -13,7 +13,7 @@ before(async () => {
 
 after(async () => {
   await browser?.close();
-  server?.close();
+  await server?.close();
 });
 
 async function open(width, errors = []) {
@@ -86,7 +86,7 @@ describe('旁注脚本', () => {
 
   test('导入 sidenotes.js 不对页面产生作用', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await page.route('**/src/client/page.js', (route) => route.fulfill({ contentType: 'text/javascript', body: '' }));
+    await page.route('**/assets/client/page.*.js', (route) => route.fulfill({ contentType: 'text/javascript', body: '' }));
     await page.goto(server.origin + server.pages.features);
     const exported = await page.evaluate(async () => Object.keys(await import('/src/client/sidenotes.js')).sort());
     assert.deepEqual(exported, ['alignSidenotes', 'watchSidenotes']);

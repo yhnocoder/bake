@@ -1,56 +1,55 @@
-import { readFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { basename, dirname, extname, join, resolve, sep } from 'node:path';
-import { loadSite, renderPage } from '../src/site/index.js';
+import { tmpdir } from 'node:os';
+import { extname, join, relative, resolve, sep } from 'node:path';
+import { build } from '../src/build/index.js';
+import { loadSite } from '../src/site/index.js';
 import { createModuleLoader } from '../src/site/modules.js';
 
 const root = resolve(import.meta.dirname, '..');
-const example = 'examples/minimal';
+const example = join(root, 'examples/minimal');
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
 };
 
-async function renderExample() {
-  const loader = await createModuleLoader(join(root, example));
-  const site = await loadSite(join(root, example), { loader }).finally(() => loader.close());
-  // why(#25): this server serves files without Vite, so components that import bake/runtime cannot load and are left undefined
-  const definitions = Object.entries(site.components).map(
-    ([name, { path }]) => `import('/${example}/${path}').then((module) => customElements.define('${name}', module.default), () => {});\n`,
-  );
-  const files = { '/components.js': definitions.join('') };
+async function builtPages(directory) {
+  const loader = await createModuleLoader(directory);
+  const site = await loadSite(directory, { loader }).finally(() => loader.close());
   const pages = {};
-  const messages = [...site.messages];
-  for (const { path, frontmatter } of site.pages) {
-    const theme = site.themes[frontmatter.theme ?? site.config.theme];
-    const assets = {
-      styles: ['base', 'blocks', 'layouts'].map((name) => `/src/styles/${name}.css`).concat(`/${example}/${theme}`),
-      scripts: ['/src/client/page.js', '/components.js'],
-    };
-    const result = await renderPage(site, path, { assets });
-    messages.push(...result.messages);
-    const url = `/${example}/${dirname(path)}/${basename(path, '.md')}.html`;
-    files[url] = result.html;
-    pages[basename(path, '.md')] = url;
+  for (const { path, url, frontmatter } of site.pages) {
+    if (url === null || frontmatter.draft === true) continue;
+    const name = relative('content', path).slice(0, -'.md'.length).split(sep).join('-');
+    pages[name] = site.config.base + url.slice(1);
   }
-  return { files, pages, messages };
+  return { pages, base: site.config.base };
 }
 
 export async function serveExample() {
-  const { files, pages, messages } = await renderExample();
+  const directory = await mkdtemp(join(tmpdir(), 'bake-example-'));
+  await cp(example, directory, { recursive: true });
+  const { errors: messages } = await build(directory, { out: 'dist' });
+  const dist = join(directory, 'dist');
+  const { pages, base } = await builtPages(directory);
+  const fileIn = async (directory, path) => {
+    const file = resolve(join(directory, path, path.endsWith('/') ? 'index.html' : ''));
+    const body = file.startsWith(directory + sep) ? await readFile(file).catch(() => undefined) : undefined;
+    return body === undefined ? undefined : { file, body };
+  };
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
-    const file = resolve(join(root, path));
-    let body = files[path];
-    if (body === undefined && file.startsWith(root + sep)) body = await readFile(file).catch(() => undefined);
-    if (body === undefined) {
+    const found = (path.startsWith(base) ? await fileIn(dist, path.slice(base.length - 1)) : undefined) ?? (await fileIn(root, path));
+    if (found === undefined) {
       response.writeHead(404).end();
       return;
     }
-    response.writeHead(200, { 'content-type': contentTypes[extname(path)] ?? 'application/octet-stream' }).end(body);
+    response.writeHead(200, { 'content-type': contentTypes[extname(found.file)] ?? 'application/octet-stream' }).end(found.body);
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -58,9 +57,10 @@ export async function serveExample() {
     origin,
     pages,
     messages,
-    close: () => {
+    close: async () => {
       server.closeAllConnections();
       server.close();
+      await rm(directory, { recursive: true, force: true });
     },
   };
 }

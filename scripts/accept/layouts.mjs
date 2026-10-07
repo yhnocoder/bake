@@ -1,14 +1,13 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { formatMessage } from '../../src/format/index.js';
 import { serveExample } from '../example-server.js';
 
 const [scenario, output] = process.argv.slice(2);
 const widths = [1440, 1100, 600, 375];
 const server = await serveExample();
 const browser = await chromium.launch();
-const problems = server.messages.map(formatMessage);
+const problems = [...server.messages];
 
 async function open(name, width) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -94,7 +93,7 @@ try {
   await { screenshots, hover, overflow, console: consoleErrors }[scenario]();
 } finally {
   await browser.close();
-  server.close();
+  await server.close();
 }
 for (const problem of problems) console.log(problem);
 process.exitCode = problems.length > 0 ? 1 : 0;
