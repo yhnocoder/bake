@@ -17,6 +17,7 @@ export async function startSite(name) {
   mkdirSync(output, { recursive: true });
   return {
     root,
+    output,
     origin: `http://localhost:${server.httpServer.address().port}`,
     read: (path) => readFileSync(join(root, path), 'utf8'),
     write: (path, text) => writeFileSync(join(root, path), text),
@@ -31,8 +32,8 @@ export async function startSite(name) {
   };
 }
 
-export async function openEditor(site, url) {
-  const page = await site.browser.newPage({ viewport: { width: 1440, height: 900 } });
+export async function openEditor(site, url, options = {}) {
+  const page = await site.browser.newPage({ viewport: { width: 1440, height: 900 }, ...options });
   const errors = [];
   const saves = [];
   page.on('pageerror', (error) => errors.push(error.message));

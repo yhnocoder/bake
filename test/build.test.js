@@ -88,7 +88,7 @@ describe('输出目录', () => {
     const directory = blog({ 'dist/old.txt': 'old' });
     const result = bake(directory, 'build');
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, 'Built 3 pages to dist/\n');
+    assert.equal(result.stdout, 'Built 4 pages to dist/\n');
     assert.ok(!existsSync(join(directory, 'dist/old.txt')));
     assert.ok(existsSync(join(directory, 'dist/features/index.html')));
     assert.deepEqual(
@@ -101,7 +101,7 @@ describe('输出目录', () => {
     const directory = blog();
     const result = bake(directory, 'build', '--out', 'public/site');
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, 'Built 3 pages to public/site/\n');
+    assert.equal(result.stdout, 'Built 4 pages to public/site/\n');
     assert.ok(existsSync(join(directory, 'public/site/paper/index.html')));
   });
 
@@ -333,7 +333,7 @@ describe('草稿', () => {
     const site = JSON.parse(read(dist, 'site.json'));
     assert.deepEqual(
       site.pages.map((page) => page.url),
-      ['/bento/', '/features/', '/paper/'],
+      ['/bento/', '/blocks/', '/features/', '/paper/'],
     );
   });
 
@@ -399,7 +399,7 @@ describe('渲染缓存', () => {
     const directory = blog();
     await buildBlog(directory);
     const entries = cacheEntries(directory);
-    assert.equal(entries.length, 3);
+    assert.equal(entries.length, 4);
     const paperEntry = entries.find((file) => JSON.parse(readFileSync(file, 'utf8')).page.slug === 'paper');
     const cached = JSON.parse(readFileSync(paperEntry, 'utf8'));
     cached.html = cached.html.replace('梯度下降', '缓存里的文字');
@@ -409,7 +409,7 @@ describe('渲染缓存', () => {
     const dist = await buildBlog(directory);
     assert.ok(read(dist, 'paper/index.html').includes('缓存里的文字'));
     assert.ok(read(dist, 'features/index.html').includes('修改后的梯度指向函数值'));
-    assert.equal(cacheEntries(directory).length, 3);
+    assert.equal(cacheEntries(directory).length, 4);
   });
 
   test('构建成功后删除这次没有用到的缓存文件', async () => {
@@ -420,7 +420,7 @@ describe('渲染缓存', () => {
     rmSync(join(directory, 'content/bento.md'));
     await buildBlog(directory);
     assert.equal(existsSync(stale), false);
-    assert.equal(cacheEntries(directory).length, 2);
+    assert.equal(cacheEntries(directory).length, 3);
   });
 
   test('blocks/ 或 layouts/ 中（包括子目录）的文件变化后全部重新渲染', async () => {
@@ -432,7 +432,7 @@ describe('渲染缓存', () => {
       writeFileSync(join(directory, directoryName, 'lib/helper.js'), 'export default {};\n');
       await buildBlog(directory);
       const after = cacheEntries(directory);
-      assert.equal(after.length, 3);
+      assert.equal(after.length, 4);
       assert.ok(after.every((file) => !before.has(file)), directoryName);
     }
   });

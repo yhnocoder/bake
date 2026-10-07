@@ -8,6 +8,7 @@ import { enterRules } from './enter-rules.js';
 import { headingIds } from './heading-ids.js';
 import { html } from './html.js';
 import { math } from './math.js';
+import { move } from './move/index.js';
 import { nodes } from './nodes.js';
 import { strictParsing } from './parser.js';
 import { references } from './references.js';
@@ -65,6 +66,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(tableMenu)
     .use(taskList)
     .use(sidenotes)
+    .use(move)
     .use(links)
     .use(changes(onChange))
     .create();
