@@ -5,6 +5,7 @@
 }
 
 .bake-edit-toggle,
+.bake-properties-toggle,
 .bake-conflict-actions button {
   padding: 1px 8px;
   border: 1px solid var(--color-border, #e3e0d8);
@@ -15,7 +16,8 @@
   cursor: pointer;
 }
 
-.bake-edit-toggle[aria-pressed="true"] {
+.bake-edit-toggle[aria-pressed="true"],
+body.properties-open .bake-properties-toggle {
   border-color: var(--color-accent, #2f6fb3);
   color: var(--color-accent, #2f6fb3);
 }
@@ -257,4 +259,183 @@ textarea.bake-math-input {
   font-family: var(--font-mono);
   font-size: 0.8em;
   color: var(--color-muted);
+}
+
+.bake-properties-toggle[hidden] {
+  display: none;
+}
+
+.milkdown .bake-label-empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.milkdown .bake-label-empty > br.ProseMirror-trailingBreak {
+  display: none;
+}
+
+body.properties-open .milkdown :is(.footnote-definition, .sidenote) {
+  display: none;
+}
+
+.bake-insert-menu {
+  position: absolute;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  min-width: 12em;
+  max-height: 20rem;
+  padding: 4px 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 13px/1.5 system-ui, sans-serif;
+}
+
+.bake-insert-menu[data-show="false"],
+.bake-insert-menu:not([data-show]) {
+  display: none;
+}
+
+.bake-insert-group {
+  padding: 4px 12px 2px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.bake-insert-item {
+  padding: 2px 12px;
+  cursor: pointer;
+}
+
+.bake-insert-item:hover,
+.bake-insert-item[aria-selected="true"] {
+  background: color-mix(in srgb, var(--color-border) 45%, var(--color-bg));
+}
+
+.bake-insert-name {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.bake-insert-empty {
+  padding: 2px 12px;
+  color: var(--color-muted);
+}
+
+.bake-properties {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1001;
+  box-sizing: border-box;
+  width: var(--sidenote-width);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  padding: 8px 12px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 13px/1.5 system-ui, sans-serif;
+}
+
+.bake-properties[hidden] {
+  display: none;
+}
+
+.bake-properties > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bake-properties h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bake-properties h3 {
+  margin: 12px 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bake-properties-close {
+  padding: 1px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.bake-field {
+  margin-bottom: 8px;
+}
+
+.bake-field-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-muted);
+}
+
+.bake-field-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bake-field-controls :is(input[type="text"], input[type="number"], select, textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  font: inherit;
+  color: inherit;
+}
+
+.bake-field-number input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--color-accent);
+}
+
+.bake-field-number input[type="range"] + input[type="number"] {
+  flex: 0 0 5em;
+  width: 5em;
+}
+
+.bake-field-boolean input {
+  accent-color: var(--color-accent);
+}
+
+.bake-field-list textarea {
+  resize: vertical;
+}
+
+.bake-field-error {
+  margin: 2px 0 0;
+  color: var(--color-mark-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.bake-field-error[hidden] {
+  display: none;
 }

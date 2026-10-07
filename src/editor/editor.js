@@ -7,9 +7,11 @@ import { directives } from './directives.js';
 import { enterRules } from './enter-rules.js';
 import { headingIds } from './heading-ids.js';
 import { html } from './html.js';
+import { insertMenu } from './insert-menu.js';
 import { math } from './math.js';
 import { nodes } from './nodes.js';
 import { strictParsing } from './parser.js';
+import { properties } from './properties/panel.js';
 import { references } from './references.js';
 import { bakeRemark, configureStringify, presets } from './remark.js';
 import { tableMenu } from './table-menu.js';
@@ -43,12 +45,15 @@ function changes(onChange) {
 }
 
 export async function createEditor({ root, markdown, registry, formulas, onChange }) {
+  const menu = insertMenu(registry);
   const editor = await Editor.make()
     .config((ctx) => {
       ctx.set(rootCtx, root);
       ctx.set(defaultValueCtx, markdown);
       configureStringify(ctx);
+      menu.configure(ctx);
     })
+    .use(menu.plugins)
     .use(bakeRemark)
     .use(presets)
     .use(history)
@@ -63,6 +68,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(enterRules)
     .use(tableMenu)
     .use(taskList)
+    .use(properties(registry))
     .use(links)
     .use(changes(onChange))
     .create();

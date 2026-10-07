@@ -360,8 +360,12 @@ export function bakeDev({ root }) {
     load(id) {
       if (id === registryId) {
         const components = Object.fromEntries(Object.entries(site.components).map(([name, { properties }]) => [name, properties]));
+        const layouts = Object.fromEntries(Object.entries(site.layouts).map(([name, { fields }]) => [name, fields]));
         return `import blocks from ${JSON.stringify(join(bakeRoot, 'src/blocks/index.js'))};
 export default { blocks, components: ${JSON.stringify(components)} };
+export const layouts = ${JSON.stringify(layouts)};
+export const themes = ${JSON.stringify(Object.keys(site.themes))};
+export const defaultTheme = ${JSON.stringify(site.config.theme ?? null)};
 `;
       }
       if (!id.startsWith(componentPrefix)) return undefined;

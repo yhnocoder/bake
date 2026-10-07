@@ -2,6 +2,7 @@ import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { $markSchema, $nodeSchema, $prose, $view } from '@milkdown/utils';
 import { blockRender, isDefault, withDefaults } from '../render/block-render.js';
+import { selectTarget } from './properties/state.js';
 import { blockGroup, containerContent, labelRequired } from './structure.js';
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -28,6 +29,20 @@ function build(spec, parent, created) {
   if (!Array.isArray(spec)) created.set(spec, element);
   if (tagName === 'details') element.setAttribute('open', '');
   return element;
+}
+
+function containsSpec(spec, target) {
+  if (spec === target) return true;
+  if (spec === null || typeof spec !== 'object') return false;
+  const children = Array.isArray(spec) ? spec : spec.children ?? [];
+  return children.some((child) => containsSpec(child, target));
+}
+
+export function labelShown(block) {
+  if (block.form !== 'container' || labelRequired(`directive_${block.name}`)) return false;
+  const label = { type: 'text', value: '' };
+  const render = blockRender(block, block.name, block.form);
+  return containsSpec(render({ attributes: withDefaults({}, block.attributes), label: [label], children: [] }), label);
 }
 
 function locate(node, target) {
@@ -96,12 +111,27 @@ class BlockView {
   }
 }
 
+function defaultLabel(shapeOf, attributes, label) {
+  const plain = shapeOf(attributes, false);
+  const shown = plain.before.find((child) => child.nodeType === Node.ELEMENT_NODE && child.localName === label.localName && child.className === label.className);
+  return shown?.textContent ?? '';
+}
+
 class LabelView {
   constructor(node, view, getPos, shapes) {
     const parent = view.state.doc.resolve(getPos()).parent;
-    const shape = shapes.get(parent.type.name)?.(parent.attrs.attributes, true);
+    const shapeOf = shapes.get(parent.type.name);
+    const shape = shapeOf?.(parent.attrs.attributes, true);
     this.dom = shape?.label ? shape.label.cloneNode(false) : document.createElement('p');
     this.contentDOM = this.dom;
+    if (shape?.label) this.dom.dataset.placeholder = defaultLabel(shapeOf, parent.attrs.attributes, shape.label);
+    this.update(node);
+  }
+
+  update(node) {
+    if (node.type.name !== 'directive_label') return false;
+    this.dom.classList.toggle('bake-label-empty', node.content.size === 0);
+    return true;
   }
 
   ignoreMutation(mutation) {
@@ -131,6 +161,7 @@ function staticWidgets(doc, shapes) {
 function containerSchema(block) {
   const id = `directive_${block.name}`;
   const keepEmptyLabel = labelRequired(id);
+  const addEmptyLabel = labelShown(block);
   return $nodeSchema(id, () => ({
     group: blockGroup(id),
     content: containerContent(id),
@@ -142,6 +173,10 @@ function containerSchema(block) {
       match: (node) => node.type === 'containerDirective' && node.name === block.name,
       runner: (state, node, type) => {
         state.openNode(type, { attributes: { ...node.attributes } });
+        if (addEmptyLabel && !node.children[0]?.data?.directiveLabel) {
+          state.openNode(state.schema.nodes.directive_label);
+          state.closeNode();
+        }
         state.next(node.children);
         state.closeNode();
       },
@@ -237,10 +272,13 @@ const labelSchema = $nodeSchema('directive_label', () => ({
 }));
 
 class ComponentView {
-  constructor(node, properties) {
+  constructor(node, view, getPos, properties) {
     this.properties = properties;
     this.dom = document.createElement('div');
     this.dom.className = 'bake-component';
+    this.dom.addEventListener('pointerdown', (event) => {
+      if (!this.contentDOM?.contains(event.target)) selectTarget(view, { pos: getPos() });
+    });
     const element = document.createElement(node.attrs.name);
     element.className = 'component';
     if (node.attrs.container) {
@@ -288,6 +326,10 @@ function rejectLabel(node) {
   }
 }
 
+function isEmptyCaption(node) {
+  return node.childCount === 1 && node.firstChild.type.name === 'paragraph' && node.firstChild.content.size === 0;
+}
+
 const componentSchema = $nodeSchema('component', () => ({
   group: 'block',
   content: 'block*',
@@ -307,8 +349,9 @@ const componentSchema = $nodeSchema('component', () => ({
   toMarkdown: {
     match: (node) => node.type.name === 'component',
     runner: (state, node) => {
-      state.openNode(node.attrs.container ? 'containerDirective' : 'leafDirective', undefined, { name: node.attrs.name, attributes: node.attrs.attributes });
-      if (node.attrs.container) state.next(node.content);
+      const container = node.attrs.container && !isEmptyCaption(node);
+      state.openNode(container ? 'containerDirective' : 'leafDirective', undefined, { name: node.attrs.name, attributes: node.attrs.attributes });
+      if (container) state.next(node.content);
       state.closeNode();
     },
   },
@@ -343,7 +386,7 @@ export function directives({ blocks, components }) {
     labelSchema,
     $view(labelSchema.node, () => (node, view, getPos) => new LabelView(node, view, getPos, shapes)),
     componentSchema,
-    $view(componentSchema.node, () => (node) => new ComponentView(node, components)),
+    $view(componentSchema.node, () => (node, view, getPos) => new ComponentView(node, view, getPos, components)),
     ...schemas,
     ...views,
     statics,
