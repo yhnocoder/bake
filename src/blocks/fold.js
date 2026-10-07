@@ -3,5 +3,5 @@ export default {
   form: 'container',
   label: '折叠',
   attributes: {},
-  render: ({ children: [title, ...content] }) => ['details', { class: 'fold' }, [['summary', {}, title?.children ?? []], ...content]],
+  render: ({ label, children }) => ['details', { class: 'fold' }, [['summary', {}, label], ...children]],
 };

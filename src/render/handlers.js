@@ -122,13 +122,14 @@ export function createHandlers({ source, registry, components }) {
     if (node.name.includes('-')) return component(state, node);
     const block = registry.get(node.name);
     const attributes = withDefaults(node.attributes, block?.attributes);
-    const children = state.all(node);
+    const labelParagraph = node.children.find((child) => child.data?.directiveLabel);
+    const label = labelParagraph ? state.all(labelParagraph) : undefined;
     const result = block?.render
-      ? fromArray(block.render({ attributes, children }))
+      ? fromArray(block.render({ attributes, label, children: state.all({ ...node, children: contentChildren(node) }) }))
       : h(
           node.type === 'textDirective' ? 'span' : 'div',
           { class: node.name, ...Object.fromEntries(Object.entries(attributes).map(([key, value]) => [`data-${key}`, value])) },
-          children,
+          state.all(node),
         );
     result.properties.dataMd = sourceOf(node);
     return state.applyData(node, result);
