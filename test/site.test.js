@@ -242,7 +242,7 @@ describe('createModuleLoader', () => {
     });
   });
 
-  test('传入开发服务器时，修改 lib/ 文件后再次载入得到新值', async () => {
+  test('传入开发服务器时，修改 lib/ 文件并调用 invalidate 后再次载入得到新值', async () => {
     const root = blog({
       'components/demo-plot.js': component(1),
       'components/plot.css': 'p {}\n',
@@ -253,9 +253,9 @@ describe('createModuleLoader', () => {
     try {
       const before = await loadSite(root, { loader });
       assert.equal(before.components['demo-plot'].properties.scale.default, 2);
-      const changed = new Promise((resolve) => server.watcher.once('change', resolve));
-      writeFileSync(join(root, 'components/lib/scale.js'), 'export const scale = 3;\n');
-      await changed;
+      const scale = join(root, 'components/lib/scale.js');
+      writeFileSync(scale, 'export const scale = 3;\n');
+      loader.invalidate(scale);
       const after = await loadSite(root, { loader });
       assert.equal(after.components['demo-plot'].properties.scale.default, 3);
     } finally {
