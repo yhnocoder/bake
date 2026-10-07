@@ -350,7 +350,10 @@ describe('文件中没有被引用的注释', () => {
       { text: '有引用的注释。', number: '1', unnumbered: false },
       { text: '没有被引用的注释。', number: '', unnumbered: true },
     ]);
-    assert.equal(await orphan.page.evaluate(() => document.querySelector('.milkdown .editor').lastElementChild.textContent), '没有被引用的注释。');
+    assert.deepEqual(await orphan.page.evaluate(() => [...document.querySelector('.milkdown .editor').children].slice(-2).map((element) => [element.localName, element.textContent])), [
+      ['aside', '没有被引用的注释。'],
+      ['p', ''],
+    ]);
     const changes = await saveAfter(site, orphan.page, orphanPath, async () => {
       await orphan.page.evaluate(() => {
         const paragraph = [...document.querySelectorAll('.milkdown p')].find((element) => element.textContent === '第二段。');
