@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import renderBento, { fields as bentoFields } from '../layouts/bento.js';
 import renderEssay, { fields as essayFields } from '../layouts/essay.js';
@@ -43,7 +43,11 @@ function loadError(path, error, text) {
   return { path, line, column: column + 1, text: `${text}: ${error.message.split('\n')[0]}` };
 }
 
-async function readConfig(loader, messages) {
+async function readConfig(root, loader, messages) {
+  if (!(await access(join(root, configPath)).then(() => true, () => false))) {
+    messages.push({ path: configPath, line: 1, column: 1, text: `${configPath} not found in ${root}` });
+    return null;
+  }
   try {
     return await importDefault(loader, configPath);
   } catch (error) {
@@ -52,8 +56,8 @@ async function readConfig(loader, messages) {
   }
 }
 
-async function loadConfig(loader, messages) {
-  const config = await readConfig(loader, messages);
+async function loadConfig(root, loader, messages) {
+  const config = await readConfig(root, loader, messages);
   for (const field of ['title', 'theme']) {
     if (config && config[field] === undefined) messages.push({ path: configPath, line: 1, column: 1, text: `Config is missing ${field}` });
   }
@@ -85,7 +89,7 @@ async function loadThemes(root) {
 
 export async function loadSite(root, { loader }) {
   const messages = [];
-  const config = await loadConfig(loader, messages);
+  const config = await loadConfig(root, loader, messages);
   const { pages, messages: pageMessages } = await findPages(root);
   messages.push(...pageMessages);
   const components = await loadComponents(root, loader, messages);

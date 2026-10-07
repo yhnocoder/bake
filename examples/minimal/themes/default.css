@@ -13,4 +13,17 @@
   --measure: 42rem;
   --measure-wide: 60rem;
   --sidenote-width: 16rem;
+  --code-foreground: #1f2328;
+  --code-token-keyword: #8250df;
+  --code-token-comment: #6e7781;
+  --code-token-string: #0a3069;
+  --code-token-string-expression: #116329;
+  --code-token-constant: #0550ae;
+  --code-token-parameter: #953800;
+  --code-token-function: #6639ba;
+  --code-token-punctuation: #57606a;
+  --code-token-link: #0969da;
+  --code-token-inserted: #116329;
+  --code-token-deleted: #82071e;
+  --code-token-changed: #953800;
 }

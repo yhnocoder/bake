@@ -3,6 +3,7 @@ import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
+import { escapeHtml } from '../layouts/html.js';
 import { readFrontmatter } from '../format/frontmatter.js';
 import { imageExtensions } from '../format/validate.js';
 import { mathConfigId } from '../math/plugin.js';
@@ -109,6 +110,10 @@ export function bakeDev({ root }) {
     report(site.messages);
   }
 
+  function siteMessages() {
+    return site.messages;
+  }
+
   function pageAt(url) {
     return site.pages.find((page) => page.url === url);
   }
@@ -195,7 +200,8 @@ export function bakeDev({ root }) {
   }
 
   async function pageFile(page) {
-    if (!isInside(content, resolve(content, `.${page}`))) throw new RequestError(403, 'Path is outside content/');
+    const target = resolve(content, `.${page}`);
+    if (target !== content && !isInside(content, target)) throw new RequestError(403, 'Path is outside content/');
     const entry = pageAt(page);
     if (!entry) throw new RequestError(404, `No page at ${page}`);
     const file = join(root, entry.path);
@@ -278,6 +284,15 @@ export function bakeDev({ root }) {
     return `/${posix.join(dirname(owner.path).split(sep).join('/'), pathname.slice(owner.url.length))}`;
   }
 
+  function missingPage(pathname) {
+    const pages = site.pages.filter((page) => page.url !== null).sort((a, b) => a.url.localeCompare(b.url));
+    const items = pages.map(({ url, path, frontmatter }) => `<li><a href="${escapeHtml(url)}">${escapeHtml(url)}</a> ${escapeHtml(String(frontmatter.title ?? ''))} <code>${escapeHtml(path)}</code></li>`);
+    return `<!doctype html>
+<html><head><meta charset="utf-8"><title>No page at ${escapeHtml(pathname)}</title></head>
+<body><p>No page at ${escapeHtml(pathname)}</p><ul>${items.join('')}</ul></body></html>
+`;
+  }
+
   async function handleRequest(request, response, next) {
     const url = new URL(request.originalUrl ?? request.url, 'http://localhost');
     if (url.pathname.startsWith('/__bake/')) return handleApi(request, response, url);
@@ -289,7 +304,7 @@ export function bakeDev({ root }) {
       request.url = file + url.search;
       return next();
     }
-    if (url.pathname.endsWith('/')) return sendText(response, 404, `No page at ${url.pathname}\n`);
+    if (url.pathname.endsWith('/')) return sendText(response, 404, missingPage(url.pathname), 'text/html');
     return next();
   }
 
@@ -336,11 +351,11 @@ export function bakeDev({ root }) {
 
   return {
     name: 'bake-dev',
-    api: { site: () => site, renderedPage, componentEntry },
+    api: { site: () => site, renderedPage, componentEntry, siteMessages },
     async configureServer(devServer) {
       server = devServer;
       loader = await createModuleLoader(root, { server });
-      await reloadSite();
+      site = await loadSite(root, { loader });
       server.watcher.add(configFile);
       server.watcher.on('all', (event, file) => {
         handleFile(event, file)?.catch((error) => server.config.logger.error(error.stack));
