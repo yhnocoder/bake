@@ -162,6 +162,7 @@
     <tr><td>编辑器</td><td>Milkdown（ProseMirror 加 remark）</td><td>与渲染共用 remark 解析，编辑器和页面对同一份 Markdown 的理解一致</td></tr>
     <tr><td>开发服务器和打包</td><td>Vite</td><td>按模块热更新，保存时不刷新整页</td></tr>
     <tr><td>公式</td><td>MathJax，构建时输出 SVG</td><td>页面不需要加载 MathJax，打开时不跳动</td></tr>
+    <tr><td>代码高亮</td><td>Shiki，渲染时输出带 CSS 变量颜色的 HTML</td><td>使用 VS Code 的 TextMate 语法，语言覆盖全面；颜色由主题的 CSS 变量设定；页面不需要加载高亮脚本</td></tr>
     <tr><td>组件</td><td>custom element；可以用 SolidJS（solid-element）编写</td><td>不强制框架，简单的图用纯 JS 更短</td></tr>
     <tr><td>动画</td><td>Motion（不依赖 React 的版本）</td><td>折叠、旁注、预览卡片和编辑器面板的动画；颜色变化用 CSS；遵守系统的减少动态效果设置</td></tr>
     <tr><td>文字测量</td><td>Pretext，只提供给组件</td><td>SVG 和 canvas 里的文字不会自动换行，组件用它按宽度断行。正文由浏览器排版，不使用它</td></tr>

@@ -138,6 +138,7 @@
   </tbody>
 </table>
 <p>基础语法按 CommonMark 的规定输出 HTML。代码块输出 <code>&lt;pre&gt;&lt;code class="language-python"&gt;</code>，语言名写在 <code>class</code> 里。</p>
+<p>代码块在渲染时用 Shiki 高亮，页面不加载高亮脚本。<code>code</code> 里每一行是一个 <code>&lt;span class="line"&gt;</code>，每个词法单元是一个 <code>&lt;span&gt;</code>，颜色写成 <code>style="color:var(--code-token-keyword, var(--color-accent))"</code>，变量见 <a href="extending.html#theme">主题怎么写</a>。没有语言名，或语言名是 <code>text</code>、<code>txt</code>、<code>plain</code> 的代码块不高亮。语言名不是 Shiki 支持的语言时报错，例如 <code>content/a.md:12:1 Unknown code language pyhton</code>，构建失败，代码块按纯文本输出。理由：报错能发现语言名的拼写错误。</p>
 <p>属性、高亮和块引用 id 三个扩展各自包含解析和输出两部分。理由：现有的 remark 插件要么没有输出规则，写回时报错或丢失属性，要么把正文里的 <code>=</code> 转义成 <code>\=</code>，往返测试无法通过。</p>
 
 <h2>段落里能不能写 HTML</h2>
