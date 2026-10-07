@@ -256,3 +256,18 @@ test('代码块改为段落后，段落中没有代码的颜色', async () => {
   assert.deepEqual(errors, []);
   await closeEditor(page);
 });
+
+test('在代码块中输入时，相邻代码块的未知语言名提示保留', async () => {
+  site.write('content/adjacent.md', '---\ntitle: 相邻代码块\nslug: adjacent\n---\n\n```pyhton\nx\n```\n\n```python\ny = 1\n```\n');
+  const { page, errors } = await openEditor(site, '/adjacent/');
+  await page.waitForFunction(() => document.querySelectorAll('.milkdown pre')[1].querySelector('code span[style]'));
+  const language = codeBlock(page, 0).locator('.bake-code-language');
+  assert.equal(await language.getAttribute('class'), 'bake-code-language unknown-language');
+  await placeCursor(page, 'y = 1');
+  await page.keyboard.type('2');
+  assert.equal(await codeBlock(page, 1).locator('code').textContent(), 'y = 12');
+  assert.equal(await language.getAttribute('class'), 'bake-code-language unknown-language');
+  await site.screenshot(page, 'adjacent');
+  assert.deepEqual(errors, []);
+  await closeEditor(page);
+});

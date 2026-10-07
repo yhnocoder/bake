@@ -68,32 +68,24 @@ function createHighlighting() {
     if (tr.getMeta(codeHighlightKey)) return create(tr.doc);
     if (!tr.docChanged) return prev;
     let decorations = prev.decorations.map(tr.mapping, tr.doc);
-    const previous = new Map();
-    const stale = [];
+    const within = (from, to) => decorations.find(from, to).filter((decoration) => decoration.from >= from && decoration.to <= to);
+    const kept = new Set();
     for (const { node, pos } of prev.blocks) {
       const mapped = tr.mapping.mapResult(pos, 1);
-      if (!mapped.deleted) previous.set(mapped.pos, node);
-      if (mapped.deleted || tr.doc.nodeAt(mapped.pos)?.type.name !== 'code_block') stale.push({ from: mapped.pos, to: tr.mapping.map(pos + node.nodeSize, -1) });
+      const current = tr.doc.nodeAt(mapped.pos);
+      if (!mapped.deleted && current === node) kept.add(mapped.pos);
+      else if (mapped.deleted || current?.type.name !== 'code_block') decorations = decorations.remove(within(mapped.pos, tr.mapping.map(pos + node.nodeSize, -1)));
     }
     const blocks = codeBlocks(tr.doc);
-    const remove = [];
-    const add = [];
-    const within = (from, to) => decorations.find(from, to).filter((decoration) => decoration.from >= from && decoration.to <= to);
-    const inCodeBlock = (decoration) => (decoration.spec.unknownLanguage ? tr.doc.nodeAt(decoration.from) : tr.doc.resolve(decoration.from).parent)?.type.name === 'code_block';
-    for (const { from, to } of stale) {
-      if (from < to) remove.push(...within(from, to).filter((decoration) => !inCodeBlock(decoration)));
-    }
     for (const block of blocks) {
-      if (previous.get(block.pos) === block.node) continue;
+      if (kept.has(block.pos)) continue;
       const wanted = blockDecorations(block);
       const wantedKeys = new Set(wanted.map(decorationKey));
       const existing = within(block.pos, block.pos + block.node.nodeSize);
       const existingKeys = new Set(existing.map(decorationKey));
-      remove.push(...existing.filter((decoration) => !wantedKeys.has(decorationKey(decoration))));
-      add.push(...wanted.filter((decoration) => !existingKeys.has(decorationKey(decoration))));
+      decorations = decorations.remove(existing.filter((decoration) => !wantedKeys.has(decorationKey(decoration))));
+      decorations = decorations.add(tr.doc, wanted.filter((decoration) => !existingKeys.has(decorationKey(decoration))));
     }
-    if (remove.length > 0) decorations = decorations.remove(remove);
-    if (add.length > 0) decorations = decorations.add(tr.doc, add);
     return { blocks, decorations };
   }
 
