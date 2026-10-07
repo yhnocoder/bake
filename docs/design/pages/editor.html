@@ -232,8 +232,18 @@ deleteFrontmatterField(raw, name)      // → string</code></pre>
 </ul>
 
 <h2 id="links">站内链接怎么插入</h2>
-<p>按 <code>Mod-K</code> 或在插入菜单选择「链接」，打开链接选择器。输入文章标题、标题文字或段落 id，候选列表显示全站的文章、标题和带 <code>^block-id</code> 的段落，按匹配程度排序。选中后填入路径和 <code>#id</code>，链接文字默认是目标的标题文字。输入以 <code>http</code> 开头的地址时作为外部链接插入。</p>
-<p>编辑器里鼠标停留在站内链接上同样显示预览，内容由开发服务器即时渲染。候选列表的数据来自开发服务器的 <code>/__bake/sections</code> 接口，见 <a href="build-dev.html">构建与开发服务器</a>。</p>
+<p>按 <code>Mod-K</code> 或在插入菜单选择「链接」，在光标下方打开链接选择器。选择器每次打开时请求开发服务器的 <code>/__bake/sections</code>，见 <a href="build-dev.html">构建与开发服务器</a>，所以新加的标题和段落也能找到。</p>
+<ul>
+  <li>候选是全站的文章、标题和带 <code>^block-id</code> 的段落，每一项显示种类（文章、标题、段落）、文字和目标：文章的目标是页面地址，标题和段落的目标是所在文章的标题加 <code>#id</code>。</li>
+  <li>输入为空时按页面顺序列出，当前文章的标题和段落排在最前。输入不为空时按不区分大小写的子串匹配，分三档：文字以输入开头，文字包含输入，id 或页面地址包含输入。同一档内文章在前、标题其次、段落最后，再按页面顺序。最多显示 <code>20</code> 项。</li>
+  <li><code>↑</code>、<code>↓</code> 移动选中项，<code>Enter</code> 确认，<code>Esc</code> 或点击选择器外部关闭，关闭后焦点回到编辑器。</li>
+  <li>地址的写法：目标在当前文章时写 <code>#id</code>；其他文章写不带末尾 <code>/</code> 的页面地址，有 id 时加 <code>#id</code>，例如 <code>/features#chain-rule</code>，首页写 <code>/</code>。与 <a href="content-format.html#site-links">内容格式中站内引用的写法</a> 一致。</li>
+  <li>输入以 <code>http://</code> 或 <code>https://</code> 开头时，<code>Enter</code> 把输入作为外部链接插入。</li>
+  <li>有选区时给选区加链接，文字不变。没有选区时在光标处插入链接文字：文章用文章标题，标题用标题文字，段落用所在文章的标题，外部链接用地址本身。理由：规则简单，作者通常会改写。</li>
+  <li>光标在已有链接上时，输入框填入这个链接的地址，选择后修改这个链接的地址；清空输入框后按 <code>Enter</code> 去掉链接，文字保留。</li>
+  <li>每次插入或修改是一步，<code>Mod-Z</code> 一步撤销。</li>
+</ul>
+<p>编辑器里鼠标停留在站内链接上同样显示预览卡片，与阅读模式使用同一段代码，内容来自开发服务器的 <code>/__bake/preview</code>，所以编辑器里的链接可以使用 Markdown 中的原始地址。</p>
 
 <h2>修改怎么保存</h2>
 <ol>

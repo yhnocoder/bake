@@ -96,6 +96,7 @@
 │   ├── matrix-calculus/deep-learning/neuron.6b1f.webp
 │   ├── themes/blue.D2fT0aQe.css
 │   ├── client/page.Cw7nR1xA.js
+│   ├── client/preview-static.Dk3sP0aQ.js
 │   ├── components/gradient-figure.Bq3x9LkT.js
 │   └── bake.C8kya0lP.css
 └── site.json                 全站页面列表：地址、标题和 frontmatter</code></pre>
@@ -108,23 +109,48 @@
 </ul>
 
 <h2>悬停预览的数据怎么生成</h2>
-<p>构建时为每个页面写一个 <code>sections.json</code>：</p>
+<p>构建时为每个页面写一个 <code>sections.json</code>，一次请求得到这一页任何一张预览卡片需要的全部内容：</p>
 <pre><code class="language-json">{
   "title": "深度学习中的矩阵微积分",
-  "lede": "&lt;p&gt;...&lt;/p&gt;",
+  "lede": { "html": "&lt;div class=\"lede\"&gt;...&lt;/div&gt;", "components": [] },
   "sections": {
     "chain-rule": { "kind": "heading", "html": "&lt;h2&gt;...&lt;/h2&gt;&lt;p&gt;...&lt;/p&gt;", "components": ["gradient-figure"] },
     "chain-rule-def": { "kind": "block", "html": "&lt;p&gt;...&lt;/p&gt;", "components": [] }
-  }
+  },
+  "glyphs": { "MJX-NCM-I-1D465": "M527 373C527 419 ..." },
+  "scripts": { "gradient-figure": "/assets/components/gradient-figure.Bq3x9LkT.js" }
 }</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>内容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>title</code></td><td>页面标题，纯文本</td></tr>
+    <tr><td><code>lede</code></td><td>导语块的 <code>{ html, components }</code>；没有导语时为 <code>null</code>。导语是容器块，可以包含公式和组件，所以与小节使用相同的结构</td></tr>
+    <tr><td><code>sections</code></td><td>每个标题 id 和每个 <code>^block-id</code> 一项。标题小节（<code>kind</code> 为 <code>heading</code>）的范围是从这个标题到下一个同级或更高级标题之前的正文；带 <code>^block-id</code> 的段落（<code>kind</code> 为 <code>block</code>）的范围是这个段落本身。<code>components</code> 是这段 HTML 中用到的组件名</td></tr>
+    <tr><td><code>glyphs</code></td><td><code>lede</code> 和 <code>sections</code> 的 HTML 中引用到的全部公式字形，键是字形 id，值是 <code>&lt;path&gt;</code> 的 <code>d</code></td></tr>
+    <tr><td><code>scripts</code></td><td><code>lede</code> 和 <code>sections</code> 中出现的组件名到组件入口脚本地址的映射，地址已带 <code>base</code></td></tr>
+  </tbody>
+</table>
+<p>卡片显示在另一个页面上，每一项的 HTML 写出前做三项处理，避免与当前页冲突：</p>
 <ul>
-  <li><code>lede</code> 是导语块的 HTML，没有导语时为空字符串。</li>
-  <li>标题小节（<code>kind</code> 为 <code>heading</code>）的范围是从这个标题到下一个同级或更高级标题之前的正文。</li>
-  <li>带 <code>^block-id</code> 的段落（<code>kind</code> 为 <code>block</code>）的范围是这个段落本身。</li>
-  <li><code>components</code> 是这段 HTML 中用到的组件名。</li>
-  <li>生成函数在 <code>src/build/sections.js</code>，输入是渲染得到的正文 HTML，开发服务器的悬停预览也使用它。</li>
+  <li>去掉全部 <code>id</code> 属性。理由：卡片中出现与当前页相同的 id 时，当前页的锚点、旁注脚本和公式的 <code>&lt;use&gt;</code> 会找到错误的元素。</li>
+  <li>链接的 <code>#…</code> 地址加上目标页的地址，相对地址的 <code>href</code> 和 <code>src</code> 解析成绝对路径。理由：卡片里的页内链接应该指向目标页。</li>
+  <li>去掉旁注编号和注释（包括边注），<code>:span</code> 只保留其中的文字。理由：卡片没有右侧栏，编号无处对应。</li>
 </ul>
-<p>页面上的预览脚本在鼠标停留在站内链接上 <code>300ms</code> 后请求目标页的 <code>sections.json</code>，结果按页面缓存。预览卡片中用到的组件按 <code>components</code> 列表加载。预览卡片里的链接不再弹出下一层预览。鼠标离开链接和卡片 <code>200ms</code> 后卡片关闭。</p>
+<p>公式在构建时已经是 SVG，但字形定义在目标页的字形容器里，当前页没有。MathJax 4 的字形 id 形式是 <code>MJX-NCM-&lt;变体&gt;-&lt;码位&gt;</code>，只由字体、变体和字符决定，不同页面中同一个 id 的字形完全相同，所以不同页面的字形可以按 id 合并到当前页的同一个字形容器里。</p>
+<p>生成函数在 <code>src/build/sections.js</code>，输入是页面最终输出的正文 HTML（构建中已加上 <code>base</code> 前缀、改写过图片地址），开发服务器的预览接口也使用它。</p>
+
+<h3>预览卡片怎么显示</h3>
+<ul>
+  <li>预览脚本只在有站内链接的页面加载。</li>
+  <li>鼠标停留在正文的站内链接（<code>href</code> 以 <code>/</code> 或 <code>#</code> 开头）上 <code>300ms</code> 后，预览脚本请求目标页的 <code>sections.json</code>，结果按页面缓存，同一页只请求一次。标题的 <code>#</code> 锚点、旁注编号和公式编号的 <code>\eqref</code> 链接不弹出预览。只响应鼠标，不响应键盘焦点和触屏。</li>
+  <li>链接没有 <code>#id</code> 时卡片显示页面标题和导语，有 <code>#id</code> 时显示这一小节或段落。</li>
+  <li>显示卡片前把卡片用到的字形加入当前页的字形容器，卡片里用到、当前页还没有定义的组件按 <code>scripts</code> 加载。卡片先显示，组件定义完成后由浏览器升级元素。</li>
+  <li>同一时间只有一张卡片。卡片挂在 <code>&lt;body&gt;</code> 上，不在 <code>&lt;article&gt;</code> 里，所以卡片里的链接不再弹出下一层预览。鼠标离开链接和卡片 <code>200ms</code> 后卡片关闭，期间回到链接或进入卡片则保持。</li>
+  <li>位置：对准链接中鼠标所在的那一行，下方放得下时放在下方，否则上方空间更大时放在上方，与链接间距 <code>8px</code>；左边与链接对齐，超出视口时向左移动，与视口两侧至少留 <code>16px</code>。</li>
+  <li>尺寸：宽度 <code>min(32rem, 100vw - 32px)</code>，最大高度 <code>24rem</code>，超出时卡片内纵向滚动。卡片使用当前页的样式；卡片里的图片不浮动，加宽块不超出卡片，卡片网格按一列排列。</li>
+</ul>
 
 <h2>站内链接怎么检查</h2>
 <p>构建先渲染全部页面，收集每页的标题 id 和 <code>^block-id</code>，再检查全部站内链接。链接指向不存在的页面、标题或段落时报错。同一页内出现重复的 id 时报错。<code>bake dev</code> 在页面上用状态栏提示断开的链接，不阻止页面显示。</p>
@@ -144,14 +170,15 @@ Local: http://localhost:4321/</div>
     <tr><td><code>GET /__bake/source?page=/word2vec/</code></td><td>页面地址</td><td><code>{ path, markdown, hash }</code>：文件路径、Markdown 原文、哈希</td></tr>
     <tr><td><code>POST /__bake/save</code></td><td><code>{ page, markdown, hash }</code>，<code>hash</code> 是载入时的哈希</td><td>磁盘上文件的哈希等于 <code>hash</code> 时写入，返回 <code>{ hash, url }</code>：新的哈希和页面地址；不等时不写入，返回 409 和磁盘上的版本 <code>{ markdown, hash }</code>；新内容的 <code>slug</code> 已被另一篇文章使用时不写入，返回 400</td></tr>
     <tr><td><code>POST /__bake/asset</code></td><td><code>{ page, data, ext }</code>，<code>data</code> 是 base64</td><td>写入文章所在目录的 <code>assets/&lt;哈希前 8 位&gt;.&lt;ext&gt;</code>，返回 <code>{ path: './assets/3f9a1c2e.png' }</code>；同名文件已存在时不重复写入</td></tr>
-    <tr><td><code>GET /__bake/sections</code></td><td>无</td><td>全站文章、标题、带 id 段落的列表，供链接选择器使用。由站内引用预览实现</td></tr>
-    <tr><td><code>GET /__bake/preview?href=/a/b/#id</code></td><td>站内链接</td><td>目标内容的 HTML，供编辑器里的悬停预览。由站内引用预览实现</td></tr>
+    <tr><td><code>GET /__bake/sections</code></td><td>无</td><td><code>{ pages: [{ url, title, sections: [{ id, kind, text }] }] }</code>：全站文章和每篇文章的标题、带 id 段落，按页面顺序列出，<code>kind</code> 是 <code>heading</code> 或 <code>block</code>，<code>text</code> 是文字，公式用 TeX 源码代替。供链接选择器使用。页面按文件路径排序，不含草稿，因为指向草稿的链接在构建时报错</td></tr>
+    <tr><td><code>GET /__bake/preview?href=/a/b/#id</code></td><td>站内链接的地址，以 <code>/</code> 开头，可以不带末尾 <code>/</code></td><td>一张卡片的内容 <code>{ title, html, components, glyphs, scripts }</code>：<code>title</code> 只在预览整篇文章时有值，<code>glyphs</code> 和 <code>scripts</code> 只包含这张卡片用到的字形和组件入口。页面不存在时返回 404 和 <code>No page at /a/b/</code>，id 不存在时返回 404 和 <code>No heading or paragraph #id on /a/b/</code>。草稿可以预览</td></tr>
   </tbody>
 </table>
 <ul>
   <li><code>ext</code> 只接受 <a href="content-format.html">内容格式</a> 列出的图片扩展名，其他返回 400。缺少字段或请求不是 JSON 时返回 400，页面地址不存在时返回 404。</li>
   <li>接口把 <code>page</code> 和文件路径解析成绝对路径后检查是否在 <code>content/</code> 内，不在时返回 403。</li>
   <li><code>/__bake/save</code> 写入的内容改变了 <code>slug</code> 时，开发服务器在返回之前更新地址表，返回的 <code>url</code> 是新地址，编辑器之后的请求使用它。<code>slug</code> 格式不合法时照常写入，错误由渲染报告，这篇文章继续使用原地址，返回的 <code>url</code> 也是原地址。</li>
+  <li>两个链接接口使用与页面相同的渲染缓存，<code>sections.json</code> 格式的结果也按文件内容缓存；<code>/__bake/sections</code> 第一次请求时渲染全部页面，之后只重新渲染内容变化的文件。开发服务器的页面和编辑器用 <code>/__bake/preview</code> 显示预览卡片，不在浏览器中缓存，因为文件随时会被修改。</li>
   <li>开发服务器的 Vite 插件在 <code>api</code> 字段提供 <code>renderedPage(url)</code> 和 <code>componentEntry(name)</code>，供其他功能的接口使用：前者返回这个地址使用缓存的渲染结果 <code>{ path, page, html, toc, mathDefs, components, messages }</code>，地址不存在时返回 <code>null</code>；后者返回组件入口模块的地址，与页面加载组件时使用的地址相同。</li>
 </ul>
 
@@ -167,7 +194,7 @@ Local: http://localhost:4321/</div>
 <ol>
   <li>更新状态栏，在 <code>window</code> 上派发可取消的 <code>bake:page-update</code>，<code>detail</code> 是事件内容。编辑器打开时由编辑器处理并取消这个事件。</li>
   <li><code>chrome</code> 为 <code>true</code> 时（版式、frontmatter、配置或目录改变），请求当前页面的整页 HTML，替换标题、样式表和 <code>&lt;article&gt;</code> 以外的结构，目录的结构由版式决定，所以也在这一步替换。当前的 <code>&lt;article&gt;</code> 元素放进新结构，不重新创建。理由：编辑器挂载在 <code>&lt;article&gt;</code> 上，重新创建会关闭编辑器。</li>
-  <li>事件没有被取消时替换 <code>&lt;article&gt;</code> 的内容，向页面的字形容器加入新的公式字形，已有的字形保留。</li>
+  <li>事件没有被取消时替换 <code>&lt;article&gt;</code> 的内容，向页面的字形容器加入新的公式字形，已有的字形保留。理由：正在显示的预览卡片也使用这个容器里的字形，替换容器会让卡片里的公式消失。</li>
   <li>恢复滚动位置，派发 <code>bake:page-updated</code>，旁注脚本据此重新对齐。整个过程不刷新整页。</li>
 </ol>
 </main>
