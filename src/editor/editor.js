@@ -7,6 +7,7 @@ import { directives } from './directives.js';
 import { enterRules } from './enter-rules.js';
 import { headingIds } from './heading-ids.js';
 import { html } from './html.js';
+import { emptyBlocksDropIds } from './ids.js';
 import { insertMenu } from './insert-menu.js';
 import { math } from './math.js';
 import { nodes } from './nodes.js';
@@ -16,6 +17,7 @@ import { references } from './references.js';
 import { bakeRemark, configureStringify, presets } from './remark.js';
 import { tableMenu } from './table-menu.js';
 import { taskList } from './task-list.js';
+import { trailingParagraph } from './trailing-paragraph.js';
 
 const links = $prose(
   () =>
@@ -69,6 +71,8 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(tableMenu)
     .use(taskList)
     .use(properties(registry))
+    .use(trailingParagraph)
+    .use(emptyBlocksDropIds)
     .use(links)
     .use(changes(onChange))
     .create();
