@@ -200,6 +200,11 @@ textarea.bake-math-input {
   background: var(--color-bg, #fff);
 }
 
+.bake-code-language.unknown-language {
+  text-decoration: underline wavy var(--color-accent);
+  text-underline-offset: 0.2em;
+}
+
 .milkdown .footnote-definition {
   display: flex;
   gap: 0.5rem;
