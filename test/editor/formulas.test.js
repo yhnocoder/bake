@@ -33,6 +33,10 @@ test('打开编辑器时使用页面上的公式，修改一个公式后只渲�
     await page.fill('.bake-math-input', 'x \\in \\R^m \\otimes \\aleph');
     await page.keyboard.press('Enter');
   });
+  await page.waitForFunction(() => {
+    const svg = document.querySelector('.milkdown .math[data-tex="x \\\\in \\\\R^m \\\\otimes \\\\aleph"] svg');
+    return svg && !window.loadedFormulas.has(svg);
+  });
   await site.screenshot(page, 'changed');
   assert.ok(mathjaxRequests.length > 0);
   const after = await page.evaluate(() => ({
