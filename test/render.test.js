@@ -161,6 +161,11 @@ describe('每种内容的 HTML', () => {
       '<figure class="image float-left"><img src="./assets/neuron.svg" alt="说明" style="width: 160px; height: 2em"><figcaption>说明</figcaption></figure>',
     ],
     [
+      '只写高度的图片',
+      '![说明](./assets/neuron.svg){height=100}\n',
+      '<figure class="image"><img src="./assets/neuron.svg" alt="说明" style="height: 100px; width: auto"><figcaption>说明</figcaption></figure>',
+    ],
+    [
       'float 为 none 的图片',
       '![说明](./assets/neuron.svg){float=none}\n',
       '<figure class="image"><img src="./assets/neuron.svg" alt="说明"><figcaption>说明</figcaption></figure>',
@@ -435,6 +440,14 @@ describe('站内链接和组件', () => {
     ]);
     assert.ok(html.includes('<a href="/topic/page/#x">b</a>'));
     assert.ok(html.includes('<a href="https://example.com/a">e</a>'));
+  });
+
+  test('按文档顺序收集图片地址和位置', async () => {
+    const { images } = await renderBody('![a](./a.png)\n\n文字 ![b](https://example.com/b.png){width=10}\n');
+    assert.deepEqual(images, [
+      { src: './a.png', line: headerLines + 1, column: 1 },
+      { src: 'https://example.com/b.png', line: headerLines + 3, column: 4 },
+    ]);
   });
 
   test('正文用到的组件名', async () => {
