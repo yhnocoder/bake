@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib';
 import { after, before, describe, test } from 'node:test';
 import { build } from '../../src/build/index.js';
 import { parse } from '../../src/format/index.js';
-import { startSite } from '../editor/setup.js';
+import { gotoPage, startSite } from '../editor/setup.js';
 import { articleBody, clipboardContent, emptyArticle, waitForSave } from './setup.js';
 
 const copyMarkdownLimit = 16 * 1024;
@@ -210,7 +210,7 @@ describe('从页面复制后粘贴进编辑器', () => {
       site.write(emptyArticle.path, emptyArticle.frontmatter);
       const opened = await context.newPage();
       opened.on('pageerror', (error) => errors.push(error.message));
-      await opened.goto(`${site.origin}${emptyArticle.url}`);
+      await gotoPage(opened, `${site.origin}${emptyArticle.url}`);
       await opened.click('.bake-edit-toggle');
       await opened.waitForFunction(() => document.querySelector('.bake-save-state').textContent === '已保存');
       await opened.evaluate(() => document.querySelector('.milkdown .editor').focus());
