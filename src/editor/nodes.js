@@ -34,7 +34,7 @@ const table = tableSchema.extendSchema((previous) => (ctx) => ({ ...previous(ctx
 
 const blockquote = blockquoteSchema.extendSchema((previous) => (ctx) => ({ ...previous(ctx), content: blockquoteContent }));
 
-function isEmptyDefinition(node) {
+export function isEmptyDefinition(node) {
   return node.childCount === 1 && node.firstChild.type.name === 'paragraph' && node.firstChild.content.size === 0;
 }
 
@@ -141,11 +141,12 @@ const codeBlock = codeBlockSchema.extendSchema((previous) => (ctx) => {
   };
 });
 
-const footnoteReference = footnoteReferenceSchema.extendSchema((previous) => (ctx) => {
+export const footnoteReference = footnoteReferenceSchema.extendSchema((previous) => (ctx) => {
   const base = previous(ctx);
   return {
     ...base,
-    toDOM: (node) => ['sup', { class: 'sidenote-ref' }, ['a', node.attrs.label]],
+    parseDOM: [{ tag: 'sup.sidenote-ref[data-label]', getAttrs: (dom) => ({ label: dom.dataset.label }) }],
+    toDOM: (node) => ['sup', { class: 'sidenote-ref', 'data-label': node.attrs.label }, ['a', node.attrs.label]],
     toMarkdown: {
       match: base.toMarkdown.match,
       runner: (state, node) => {
@@ -155,11 +156,12 @@ const footnoteReference = footnoteReferenceSchema.extendSchema((previous) => (ct
   };
 });
 
-const footnoteDefinition = footnoteDefinitionSchema.extendSchema((previous) => (ctx) => {
+export const footnoteDefinition = footnoteDefinitionSchema.extendSchema((previous) => (ctx) => {
   const base = previous(ctx);
   return {
     ...base,
-    toDOM: (node) => ['div', { class: 'footnote-definition' }, ['span', { class: 'footnote-label', contenteditable: 'false' }, `[^${node.attrs.label}]`], ['div', 0]],
+    parseDOM: [{ tag: 'aside.sidenote[data-label]', getAttrs: (dom) => ({ label: dom.dataset.label }), contentElement: '.sidenote-body' }],
+    toDOM: (node) => ['aside', { class: 'sidenote', 'data-label': node.attrs.label }, ['div', { class: 'sidenote-body' }, 0]],
     toMarkdown: {
       match: base.toMarkdown.match,
       runner: (state, node) => {

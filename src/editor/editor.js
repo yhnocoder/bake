@@ -12,6 +12,7 @@ import { math } from './math.js';
 import { nodes } from './nodes.js';
 import { strictParsing } from './parser.js';
 import { references } from './references.js';
+import { sidenotes } from './sidenotes/index.js';
 import { bakeRemark, configureStringify, presets } from './remark.js';
 import { tableMenu } from './table-menu.js';
 import { taskList } from './task-list.js';
@@ -65,6 +66,7 @@ export async function createEditor({ root, markdown, registry, formulas, onChang
     .use(enterRules)
     .use(tableMenu)
     .use(taskList)
+    .use(sidenotes)
     .use(trailingParagraph)
     .use(emptyBlocksDropIds)
     .use(links)

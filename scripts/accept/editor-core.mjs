@@ -26,12 +26,12 @@ async function startEditing(page) {
 
 function blockBoxes() {
   const boxes = {};
-  for (const element of document.querySelectorAll('article p, article li, article h2, article h3, article table, article pre, article figure, article blockquote, article .footnote-definition, article details')) {
-    if (element.matches('.footnote-definition, details')) {
+  for (const element of document.querySelectorAll('article p, article li, article h2, article h3, article table, article pre, article figure, article blockquote, article details')) {
+    if (element.matches('details')) {
       boxes[`${element.localName} ${element.className} ${element.textContent.slice(0, 20)}`] = null;
       continue;
     }
-    if (element.closest('td, th, .sidenote, .footnote-definition, details:not([open])') || getComputedStyle(element).display === 'contents') continue;
+    if (element.closest('td, th, .sidenote, details:not([open])') || getComputedStyle(element).display === 'contents') continue;
     const copy = element.cloneNode(true);
     for (const label of copy.querySelectorAll('.bake-heading-id, .sidenote-ref')) label.remove();
     const key = `${copy.textContent.replace(/\s+/g, '').replace(/^#/, '').slice(0, 30)}`;
@@ -52,7 +52,7 @@ async function layout() {
   await context.close();
   const common = Object.keys(read).filter((key) => read[key] && edit[key]);
   const different = common.filter((key) => Math.abs(read[key].width - edit[key].width) > 1 || Math.abs(read[key].height - edit[key].height) > 1);
-  console.log('not compared: sidenotes, which the editor shows in place as footnote definitions until the sidenote Task, and the spacing around those definitions and around folds, which the editor shows expanded; table cells; heading id labels and footnote reference labels');
+  console.log('not compared: sidenotes, which scripts/accept/sidenotes.sh compares; the spacing around folds, which the editor shows expanded; table cells; heading id labels and sidenote reference numbers');
   console.log(`blocks in read mode: ${Object.keys(read).length}, in edit mode: ${Object.keys(edit).length}, compared: ${common.length}`);
   console.log(`blocks whose size differs by more than 1px: ${different.length}`);
   for (const key of different) console.log(`  ${key}: read ${JSON.stringify(read[key])}, edit ${JSON.stringify(edit[key])}`);
