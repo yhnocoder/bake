@@ -80,9 +80,9 @@ describe('bake format', () => {
   });
 });
 
-describe('其他子命令', () => {
+describe('未知子命令', () => {
   test('输出用法说明，退出码为 1', () => {
-    const result = bake(root, 'build');
+    const result = bake(root, 'publish');
     assert.equal(result.status, 1);
     assert.match(result.stderr, /^Usage:\n[\s\S]*bake format \[path\.\.\.\]/);
   });

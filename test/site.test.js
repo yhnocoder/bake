@@ -15,7 +15,7 @@ const plot = `export default class extends HTMLElement {
 function blog(files) {
   const root = mkdtempSync(join(tmpdir(), 'bake-site-'));
   blogs.push(root);
-  for (const [path, content] of Object.entries({ 'bake.config.js': config, ...files })) {
+  for (const [path, content] of Object.entries({ 'bake.config.js': config, 'themes/plain.css': ':root {}\n', ...files })) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
   }
@@ -126,6 +126,11 @@ describe('组件和主题', () => {
   test('发现主题', async () => {
     const site = await loadSite(blog({ 'themes/plain.css': ':root {}\n', 'themes/blue.css': ':root {}\n', 'themes/readme.md': '' }));
     assert.deepEqual(site.themes, { blue: 'themes/blue.css', plain: 'themes/plain.css' });
+  });
+
+  test('配置的 theme 不在 themes 中时报错', async () => {
+    const site = await loadSite(blog({ 'bake.config.js': "export default { title: 't', theme: 'red' };\n" }));
+    assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: 'Unknown theme red' }]);
     assert.deepEqual(Object.keys(site.layouts), ['essay', 'paper', 'bento']);
   });
 });
