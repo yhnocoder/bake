@@ -7,9 +7,9 @@ export default {
   attributes: {
     kind: { label: '类型', type: 'enum', options: ['note', 'tip', 'warning'], default: 'note' },
   },
-  render: ({ attributes, children }) => [
+  render: ({ attributes, label, children }) => [
     'aside',
     { class: `callout ${attributes.kind}` },
-    [['p', { class: 'callout-label' }, [labels[attributes.kind]]], ...children],
+    [['p', { class: 'callout-label' }, label ?? [labels[attributes.kind]]], ...children],
   ],
 };
