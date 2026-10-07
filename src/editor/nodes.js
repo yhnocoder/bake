@@ -2,7 +2,7 @@ import { commandsCtx } from '@milkdown/core';
 import { markRule } from '@milkdown/prose';
 import { toggleMark } from '@milkdown/prose/commands';
 import { blockquoteSchema, codeBlockSchema, headingSchema, imageSchema, paragraphSchema } from '@milkdown/preset-commonmark';
-import { footnoteDefinitionSchema, footnoteReferenceSchema } from '@milkdown/preset-gfm';
+import { footnoteDefinitionSchema, footnoteReferenceSchema, tableSchema } from '@milkdown/preset-gfm';
 import { $command, $inputRule, $markSchema, $node, $useKeymap } from '@milkdown/utils';
 import { imageAppearance } from '../render/image.js';
 import { footnoteKey } from './footnote-labels.js';
@@ -29,6 +29,8 @@ const doc = $node('doc', () => ({
     },
   },
 }));
+
+const table = tableSchema.extendSchema((previous) => (ctx) => ({ ...previous(ctx), toDOM: () => ['div', { class: 'table-scroll' }, ['table', ['tbody', 0]]] }));
 
 const blockquote = blockquoteSchema.extendSchema((previous) => (ctx) => ({ ...previous(ctx), content: blockquoteContent }));
 
@@ -207,4 +209,4 @@ const highlightKeymap = $useKeymap('highlightKeymap', {
   },
 });
 
-export const nodes = [doc, blockquote, heading, paragraph, image, codeBlock, footnoteReference, footnoteDefinition, highlightSchema, toggleHighlight, highlightInputRule, highlightKeymap].flat();
+export const nodes = [doc, blockquote, table, heading, paragraph, image, codeBlock, footnoteReference, footnoteDefinition, highlightSchema, toggleHighlight, highlightInputRule, highlightKeymap].flat();
