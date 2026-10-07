@@ -86,7 +86,15 @@ async function devCommand(options) {
     console.error(`Invalid port ${values.port}`);
     return 1;
   }
-  const server = await createDevServer({ root: process.cwd(), port });
+  let server;
+  try {
+    server = await createDevServer({ root: process.cwd(), port });
+  } catch (error) {
+    if (!error.messages) throw error;
+    for (const message of error.messages) console.error(formatMessage(message));
+    console.error(`${error.messages.length} ${error.messages.length === 1 ? 'error' : 'errors'}, the dev server was not started`);
+    return 1;
+  }
   console.log(`Local: http://localhost:${server.httpServer.address().port}/`);
   return undefined;
 }
