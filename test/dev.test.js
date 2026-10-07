@@ -96,10 +96,14 @@ describe('页面', () => {
     assert.doesNotMatch(html, /bake:component/);
   });
 
-  test('不存在的页面返回 404 和一行说明', async () => {
+  test('不存在的页面返回 404，页面列出全部文章的链接', async () => {
     const response = await fetch(`${origin}/missing/`);
     assert.equal(response.status, 404);
-    assert.equal(await response.text(), 'No page at /missing/\n');
+    assert.match(response.headers.get('content-type'), /^text\/html/);
+    const html = await response.text();
+    assert.match(html, /<p>No page at \/missing\/<\/p>/);
+    assert.match(html, /<li><a href="\/paper\/">\/paper\/<\/a> 用梯度下降求函数的最小值 <code>content\/paper\.md<\/code><\/li>/);
+    for (const url of ['/bento/', '/features/']) assert.ok(html.includes(`<a href="${url}">`));
   });
 
   test('图片按文章所在目录的 assets/ 提供', async () => {
@@ -131,6 +135,19 @@ describe('接口', () => {
     const response = await fetch(`${origin}/__bake/source?page=/paper/`);
     const markdown = readFileSync(join(root, 'content/paper.md'), 'utf8');
     assert.deepEqual(await response.json(), { path: 'content/paper.md', markdown, hash: sha256(markdown) });
+  });
+
+  test('/__bake/source 和 /__bake/save 可以读写首页', async () => {
+    const markdown = '---\ntitle: 首页\nslug: /\n---\n\n正文。\n';
+    writeFileSync(join(root, 'content/home.md'), markdown);
+    await until(async () => (await fetch(`${origin}/`)).status === 200);
+    const response = await fetch(`${origin}/__bake/source?page=/`);
+    assert.deepEqual(await response.json(), { path: 'content/home.md', markdown, hash: sha256(markdown) });
+    const changed = markdown.replace('正文。', '首页正文。');
+    const saved = await post('/__bake/save', { page: '/', markdown: changed, hash: sha256(markdown) });
+    assert.deepEqual(saved, { status: 200, body: { hash: sha256(changed), url: '/' } });
+    rmSync(join(root, 'content/home.md'));
+    await until(async () => (await fetch(`${origin}/`)).status === 404);
   });
 
   test('/__bake/source 对不存在的页面返回 404', async () => {
@@ -407,3 +424,18 @@ describe('站点模块', () => {
     await until(async () => (await texts()).length === 0);
   });
 });
+
+describe('启动', () => {
+  test('站点有错误时不启动，抛出带 messages 的错误', async () => {
+    const empty = mkdtempSync(join(tmpdir(), 'bake-dev-empty-'));
+    try {
+      await assert.rejects(createDevServer({ root: empty, port: 0 }), (error) => {
+        assert.deepEqual(error.messages.map(({ text }) => text), [`bake.config.js not found in ${empty}`]);
+        return true;
+      });
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+});
+

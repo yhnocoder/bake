@@ -26,8 +26,12 @@ async function startEditing(page) {
 
 function blockBoxes() {
   const boxes = {};
-  for (const element of document.querySelectorAll('article p, article li, article h2, article h3, article table, article pre, article figure, article blockquote')) {
-    if (element.closest('td, th, .sidenote') || getComputedStyle(element).display === 'contents') continue;
+  for (const element of document.querySelectorAll('article p, article li, article h2, article h3, article table, article pre, article figure, article blockquote, article details')) {
+    if (element.matches('details')) {
+      boxes[`${element.localName} ${element.className} ${element.textContent.slice(0, 20)}`] = null;
+      continue;
+    }
+    if (element.closest('td, th, .sidenote, details:not([open])') || getComputedStyle(element).display === 'contents') continue;
     const copy = element.cloneNode(true);
     for (const label of copy.querySelectorAll('.bake-heading-id, .sidenote-ref')) label.remove();
     const key = `${copy.textContent.replace(/\s+/g, '').replace(/^#/, '').slice(0, 30)}`;
@@ -46,15 +50,34 @@ async function layout() {
   await page.screenshot({ path: join(output, 'edit.png'), fullPage: true, caret: 'initial' });
   const edit = await page.evaluate(blockBoxes);
   await context.close();
-  const common = Object.keys(read).filter((key) => key in edit);
+  const common = Object.keys(read).filter((key) => read[key] && edit[key]);
   const different = common.filter((key) => Math.abs(read[key].width - edit[key].width) > 1 || Math.abs(read[key].height - edit[key].height) > 1);
-  console.log('not compared: sidenotes, which scripts/accept/sidenotes.sh compares; table cells; heading id labels and sidenote reference numbers');
+  console.log('not compared: sidenotes, which scripts/accept/sidenotes.sh compares; the spacing around folds, which the editor shows expanded; table cells; heading id labels and sidenote reference numbers');
   console.log(`blocks in read mode: ${Object.keys(read).length}, in edit mode: ${Object.keys(edit).length}, compared: ${common.length}`);
   console.log(`blocks whose size differs by more than 1px: ${different.length}`);
   for (const key of different) console.log(`  ${key}: read ${JSON.stringify(read[key])}, edit ${JSON.stringify(edit[key])}`);
   console.log(`only in read mode: ${JSON.stringify(Object.keys(read).filter((key) => !(key in edit)))}`);
   console.log(`only in edit mode: ${JSON.stringify(Object.keys(edit).filter((key) => !(key in read)))}`);
   if (different.length > 0) problems.push('block sizes differ between read and edit mode');
+  const gaps = adjacentGaps(read, edit);
+  const spaced = gaps.filter(({ read: before, edit: after }) => Math.abs(before - after) > 1);
+  console.log(`adjacent block pairs compared for spacing: ${gaps.length}, differing by more than 1px: ${spaced.length}`);
+  for (const gap of spaced) console.log(`  ${gap.from} -> ${gap.to}: read ${gap.read}px, edit ${gap.edit}px`);
+  if (spaced.length > 0) problems.push('spacing between blocks differs between read and edit mode');
+}
+
+function adjacentGaps(read, edit) {
+  const readKeys = Object.keys(read);
+  const editKeys = Object.keys(edit);
+  const gaps = [];
+  for (let index = 0; index + 1 < readKeys.length; index++) {
+    const [from, to] = [readKeys[index], readKeys[index + 1]];
+    const position = editKeys.indexOf(from);
+    if (position === -1 || editKeys[position + 1] !== to || ![read[from], read[to], edit[from], edit[to]].every(Boolean)) continue;
+    const gap = (boxes) => boxes[to].top - (boxes[from].top + boxes[from].height);
+    gaps.push({ from, to, read: gap(read), edit: gap(edit) });
+  }
+  return gaps;
 }
 
 async function placeCursor(page) {

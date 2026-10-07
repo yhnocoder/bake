@@ -62,6 +62,13 @@ describe('配置', () => {
     ]);
   });
 
+  test('配置文件不存在时报告所在目录', async () => {
+    const root = blog({});
+    rmSync(join(root, 'bake.config.js'));
+    const site = await load(root);
+    assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: `bake.config.js not found in ${root}` }]);
+  });
+
   test('配置文件载入失败时报错，使用默认值', async () => {
     const site = await load(blog({ 'bake.config.js': "throw new Error('broken config');\n" }));
     assert.deepEqual(site.messages, [{ path: 'bake.config.js', line: 1, column: 1, text: 'Cannot load bake.config.js: broken config' }]);
