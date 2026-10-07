@@ -132,7 +132,7 @@
 <p>开发服务器是一组 Vite 插件，只监听 <code>localhost</code>。启动后输出一行地址：</p>
 <div class="term"><span class="prompt">$</span> bake dev
 Local: http://localhost:4321/</div>
-<p>请求页面地址时即时渲染对应的 <code>.md</code>，渲染结果按文件内容的 SHA-256 缓存。页面加载 Vite 的客户端、页面端更新脚本和正文用到的组件。草稿页面照常显示。页面不存在时返回 404 和一行说明。渲染有错误时页面照常显示，错误按 <code>文件路径:行:列 错误说明</code> 输出到终端；页面右下角的状态栏显示渲染错误数和断开的站内链接数，点击后展开列表。文章里的 <code>./assets/</code> 按文章所在目录提供。Vite 预打包依赖的缓存放在系统临时目录的 <code>bake-vite/</code> 下，按博客目录区分，开发服务器不在博客目录里写入文件。</p>
+<p>请求页面地址时即时渲染对应的 <code>.md</code>，渲染结果按文件内容的 SHA-256 缓存。页面加载 Vite 的客户端、页面端更新脚本和正文用到的组件。草稿页面照常显示。页面不存在时返回 404 和一行说明。渲染有错误时页面照常显示，错误按 <code>文件路径:行:列 错误说明</code> 输出到终端；页面右下角的状态栏显示渲染错误数和断开的站内链接数，点击后展开列表。状态栏还可以显示一条与保存状态无关的提示，例如「图片保存失败」，下一条提示出现或点击关闭时移除。文章里的 <code>./assets/</code> 按文章所在目录提供。Vite 预打包依赖的缓存放在系统临时目录的 <code>bake-vite/</code> 下，按博客目录区分，开发服务器不在博客目录里写入文件。</p>
 <p>接口的请求和返回都是 JSON，哈希是文件字节的 SHA-256 十六进制。出错时返回 <code>{ error }</code>，<code>error</code> 是英文说明。</p>
 <table>
   <thead>
@@ -140,7 +140,7 @@ Local: http://localhost:4321/</div>
   </thead>
   <tbody>
     <tr><td><code>GET /__bake/source?page=/word2vec/</code></td><td>页面地址</td><td><code>{ path, markdown, hash }</code>：文件路径、Markdown 原文、哈希</td></tr>
-    <tr><td><code>POST /__bake/save</code></td><td><code>{ page, markdown, hash }</code>，<code>hash</code> 是载入时的哈希</td><td>磁盘上文件的哈希等于 <code>hash</code> 时写入，返回新的 <code>{ hash }</code>；不等时不写入，返回 409 和磁盘上的版本 <code>{ markdown, hash }</code></td></tr>
+    <tr><td><code>POST /__bake/save</code></td><td><code>{ page, markdown, hash }</code>，<code>hash</code> 是载入时的哈希</td><td>磁盘上文件的哈希等于 <code>hash</code> 时写入，返回 <code>{ hash, url }</code>：新的哈希和页面地址；不等时不写入，返回 409 和磁盘上的版本 <code>{ markdown, hash }</code>；新内容的 <code>slug</code> 已被另一篇文章使用时不写入，返回 400</td></tr>
     <tr><td><code>POST /__bake/asset</code></td><td><code>{ page, data, ext }</code>，<code>data</code> 是 base64</td><td>写入文章所在目录的 <code>assets/&lt;哈希前 8 位&gt;.&lt;ext&gt;</code>，返回 <code>{ path: './assets/3f9a1c2e.png' }</code>；同名文件已存在时不重复写入</td></tr>
     <tr><td><code>GET /__bake/sections</code></td><td>无</td><td>全站文章、标题、带 id 段落的列表，供链接选择器使用。由站内引用预览实现</td></tr>
     <tr><td><code>GET /__bake/preview?href=/a/b/#id</code></td><td>站内链接</td><td>目标内容的 HTML，供编辑器里的悬停预览。由站内引用预览实现</td></tr>
@@ -149,6 +149,8 @@ Local: http://localhost:4321/</div>
 <ul>
   <li><code>ext</code> 只接受 <a href="content-format.html">内容格式</a> 列出的图片扩展名，其他返回 400。缺少字段或请求不是 JSON 时返回 400，页面地址不存在时返回 404。</li>
   <li>接口把 <code>page</code> 和文件路径解析成绝对路径后检查是否在 <code>content/</code> 内，不在时返回 403。</li>
+  <li><code>/__bake/save</code> 写入的内容改变了 <code>slug</code> 时，开发服务器在返回之前更新地址表，返回的 <code>url</code> 是新地址，编辑器之后的请求使用它。<code>slug</code> 格式不合法时照常写入，错误由渲染报告，<code>url</code> 是原地址。</li>
+  <li>开发服务器的 Vite 插件在 <code>api</code> 字段提供 <code>renderedPage(url)</code> 和 <code>componentEntry(name)</code>，供其他功能的接口使用：前者返回这个地址使用缓存的渲染结果 <code>{ path, page, html, toc, mathDefs, components, messages }</code>，地址不存在时返回 <code>null</code>；后者返回组件入口模块的地址，与页面加载组件时使用的地址相同。</li>
 </ul>
 
 <h3>文件变化怎么通知页面</h3>

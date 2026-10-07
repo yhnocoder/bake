@@ -3,15 +3,20 @@ import './status.css';
 const root = document.createElement('div');
 root.className = 'bake-status';
 root.dataset.bakeDev = '';
-root.innerHTML = `<div class="bake-status-bar"><div class="bake-status-controls"></div><button type="button" class="bake-status-problems" aria-expanded="false"></button></div><ol class="bake-status-list" hidden></ol>`;
+root.innerHTML = `<div class="bake-status-message" hidden><span></span><button type="button" aria-label="关闭">×</button></div><div class="bake-status-bar"><div class="bake-status-controls"></div><button type="button" class="bake-status-problems" aria-expanded="false"></button></div><ol class="bake-status-list" hidden></ol>`;
 const problems = root.querySelector('.bake-status-problems');
 const list = root.querySelector('.bake-status-list');
+const message = root.querySelector('.bake-status-message');
 document.body.append(root);
 
 problems.addEventListener('click', () => {
   const expanded = problems.getAttribute('aria-expanded') !== 'true';
   problems.setAttribute('aria-expanded', String(expanded));
   list.hidden = !expanded || list.children.length === 0;
+});
+
+message.querySelector('button').addEventListener('click', () => {
+  message.hidden = true;
 });
 
 function summary(errors, links) {
@@ -36,4 +41,9 @@ export function showStatus({ errors, links }) {
     }),
   );
   list.hidden = problems.getAttribute('aria-expanded') !== 'true' || list.children.length === 0;
+}
+
+export function showMessage(text) {
+  message.querySelector('span').textContent = text;
+  message.hidden = false;
 }

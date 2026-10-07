@@ -3,10 +3,11 @@ import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatMessage } from '../format/index.js';
+import { readFrontmatter } from '../format/frontmatter.js';
 import { imageExtensions } from '../format/validate.js';
 import { loadSite, renderArticle, renderDocumentFor } from '../site/index.js';
 import { brokenLinks, splitHref } from '../site/links.js';
-import { isPagePath, removePage, updatePage } from '../site/pages.js';
+import { isPagePath, pageUrl, removePage, updatePage } from '../site/pages.js';
 
 export const bakeRoot = fileURLToPath(new URL('../..', import.meta.url));
 const componentPrefix = '\0bake:component/';
@@ -193,17 +194,29 @@ export function bakeDev({ root }) {
     return { path: entry.path, markdown: bytes.toString('utf8'), hash: sha256(bytes) };
   }
 
+  function requireFreeSlug(entry, markdown) {
+    const { slug } = readFrontmatter(markdown).values;
+    const url = pageUrl(slug);
+    const owner = site.pages.find((page) => page.url === url && page.path !== entry.path);
+    if (url !== null && owner) throw new RequestError(400, `Slug ${slug} is already used by ${owner.path}`);
+  }
+
   async function save(body) {
     requireStrings(body, ['page', 'markdown', 'hash']);
     const { entry, file } = await pageFile(body.page);
     const current = await readFile(file);
     const currentHash = sha256(current);
     if (currentHash !== body.hash) throw Object.assign(new RequestError(409, 'File changed on disk'), { body: { markdown: current.toString('utf8'), hash: currentHash } });
+    requireFreeSlug(entry, body.markdown);
     const bytes = Buffer.from(body.markdown, 'utf8');
     const hash = sha256(bytes);
     shownHashes.set(entry.path, hash);
     await writeFile(file, bytes);
-    return { hash };
+    const { pages, messages } = await updatePage(root, site.pages, entry.path);
+    site = { ...site, pages };
+    const url = pages.find((page) => page.path === entry.path).url;
+    if (url !== entry.url) report(messages);
+    return { hash, url: url ?? entry.url };
   }
 
   async function asset(body) {
@@ -290,8 +303,16 @@ export function bakeDev({ root }) {
     return undefined;
   }
 
+  async function renderedPage(url) {
+    const entry = pageAt(url);
+    if (!entry) return null;
+    const { page, html, toc, mathDefs, components, messages } = (await renderEntry(entry)).rendered;
+    return { path: entry.path, page, html, toc, mathDefs, components, messages };
+  }
+
   return {
     name: 'bake-dev',
+    api: { renderedPage, componentEntry },
     async configureServer(devServer) {
       server = devServer;
       await reloadSite();

@@ -109,6 +109,23 @@ describe('页面', () => {
   });
 });
 
+describe('插件 api', () => {
+  const api = () => server.config.plugins.find((plugin) => plugin.name === 'bake-dev').api;
+
+  test('renderedPage 返回渲染结果，地址不存在时返回 null', async () => {
+    const rendered = await api().renderedPage('/features/');
+    assert.deepEqual(Object.keys(rendered).sort(), ['components', 'html', 'mathDefs', 'messages', 'page', 'path', 'toc']);
+    assert.equal(rendered.path, 'content/features.md');
+    assert.deepEqual(rendered.components, ['demo-plot']);
+    assert.equal(await api().renderedPage('/missing/'), null);
+  });
+
+  test('componentEntry 与页面中组件入口的地址相同', async () => {
+    const html = await (await fetch(`${origin}/features/`)).text();
+    assert.ok(html.includes(`<script type="module" src="${api().componentEntry('demo-plot')}"></script>`));
+  });
+});
+
 describe('接口', () => {
   test('/__bake/source 返回原文和哈希', async () => {
     const response = await fetch(`${origin}/__bake/source?page=/paper/`);
@@ -127,12 +144,32 @@ describe('接口', () => {
     const original = readFileSync(file, 'utf8');
     const changed = original.replace('本文从一元函数出发', '本文从一元函数开始');
     const saved = await post('/__bake/save', { page: '/paper/', markdown: changed, hash: sha256(original) });
-    assert.deepEqual(saved, { status: 200, body: { hash: sha256(changed) } });
+    assert.deepEqual(saved, { status: 200, body: { hash: sha256(changed), url: '/paper/' } });
     assert.equal(readFileSync(file, 'utf8'), changed);
 
     const conflict = await post('/__bake/save', { page: '/paper/', markdown: original, hash: sha256(original) });
     assert.deepEqual(conflict, { status: 409, body: { markdown: changed, hash: sha256(changed) } });
     assert.equal(readFileSync(file, 'utf8'), changed);
+  });
+
+  test('/__bake/save 修改 slug 后返回新地址，新地址立即可以访问，旧地址返回 404', async () => {
+    const markdown = '---\ntitle: 搬家\nslug: move-a\n---\n\n正文。\n';
+    writeFileSync(join(root, 'content/move.md'), markdown);
+    await until(async () => (await fetch(`${origin}/move-a/`)).status === 200);
+    const changed = markdown.replace('move-a', 'move-b');
+    const saved = await post('/__bake/save', { page: '/move-a/', markdown: changed, hash: sha256(markdown) });
+    assert.deepEqual(saved, { status: 200, body: { hash: sha256(changed), url: '/move-b/' } });
+    assert.equal((await fetch(`${origin}/move-b/`)).status, 200);
+    assert.equal((await fetch(`${origin}/move-a/`)).status, 404);
+  });
+
+  test('/__bake/save 遇到另一篇文章已使用的 slug 时返回 400，文件不变', async () => {
+    const file = join(root, 'content/bento.md');
+    const original = readFileSync(file, 'utf8');
+    const changed = original.replace(/^slug: .*$/m, 'slug: paper');
+    const response = await post('/__bake/save', { page: '/bento/', markdown: changed, hash: sha256(original) });
+    assert.deepEqual(response, { status: 400, body: { error: 'Slug paper is already used by content/paper.md' } });
+    assert.equal(readFileSync(file, 'utf8'), original);
   });
 
   test('/__bake/save 对缺少字段的请求返回 400', async () => {
@@ -305,6 +342,27 @@ describe('文件变化', () => {
     assert.equal(await page.evaluate(() => document.querySelectorAll('svg[style="display:none"]').length), 1);
     assert.ok(before.every((id) => after.includes(id)));
     assert.equal(new Set(after).size, after.length);
+    await page.close();
+  });
+});
+
+describe('状态栏', () => {
+  test('showMessage 显示消息，再次调用时替换，点击关闭后移除', async () => {
+    const { page, errors } = await open('/paper/');
+    const status = `/@fs${join(import.meta.dirname, '..', 'src/dev/status.js')}`;
+    const shown = () => page.evaluate(() => {
+      const message = document.querySelector('.bake-status-message');
+      return message.hidden ? null : message.querySelector('span').textContent;
+    });
+    assert.equal(await shown(), null);
+    await page.evaluate(async (url) => (await import(url)).showMessage('图片保存失败'), status);
+    assert.equal(await shown(), '图片保存失败');
+    await page.evaluate(async (url) => (await import(url)).showMessage('代码高亮加载失败'), status);
+    assert.equal(await shown(), '代码高亮加载失败');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('.bake-status-message').length), 1);
+    await page.click('.bake-status-message button');
+    assert.equal(await shown(), null);
+    assert.deepEqual(errors, []);
     await page.close();
   });
 });
