@@ -40,8 +40,8 @@ function imageFiles(data) {
   return [...data.files].filter((file) => imageExtensions[file.type]).map((file) => ({ blob: file, ext: imageExtensions[file.type] }));
 }
 
-function htmlHasOnlyImages(html) {
-  const body = new DOMParser().parseFromString(html, 'text/html').body;
+function htmlHasOnlyImages(htmlDocument) {
+  const body = htmlDocument.body.cloneNode(true);
   for (const image of body.querySelectorAll('img')) image.remove();
   return body.textContent.trim() === '';
 }
@@ -90,16 +90,17 @@ function insertMdast(ctx, view, tree, text, tr) {
 function classify(ctx, data) {
   const html = data.getData('text/html');
   const text = data.getData('text/plain');
+  const htmlDocument = html ? new DOMParser().parseFromString(html, 'text/html') : null;
   const images = imageFiles(data);
-  if (images.length > 0 && (!html || htmlHasOnlyImages(html))) return { images };
-  if (html && new DOMParser().parseFromString(html, 'text/html').body.querySelector(':scope > [data-bake-markdown]')) return { tree: parseMarkdownText(ctx, text), text };
+  if (images.length > 0 && (!htmlDocument || htmlHasOnlyImages(htmlDocument))) return { images };
+  if (htmlDocument?.body.querySelector(':scope > [data-bake-markdown]')) return { tree: parseMarkdownText(ctx, text), text };
   if (isSvgSource(text)) return { images: [{ blob: new Blob([text.trim()], { type: 'image/svg+xml' }), ext: 'svg' }] };
   const mode = vscodeMode(data);
   if (mode !== null && mode !== 'markdown') {
     if (mode === 'plaintext') return null;
     return { tree: { type: 'root', children: [{ type: 'code', lang: mode, value: text.replace(/\n+$/, '') }] }, text };
   }
-  if (html && mode === null) return { tree: htmlToMdast(html), text };
+  if (htmlDocument && mode === null) return { tree: htmlToMdast(htmlDocument), text };
   const tree = parseMarkdownText(ctx, text);
   return hasBlockSyntax(tree, text) ? { tree, text } : null;
 }

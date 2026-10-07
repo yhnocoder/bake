@@ -96,8 +96,7 @@ function normalizeMdast(node) {
   }
 }
 
-export function htmlToMdast(html) {
-  const document = new DOMParser().parseFromString(html, 'text/html');
+export function htmlToMdast(document) {
   for (const element of document.body.querySelectorAll(formulaDisplays)) element.remove();
   normalizeFormulas(document.body);
   for (const element of document.body.querySelectorAll(removed)) element.remove();

@@ -269,8 +269,8 @@ async function imageTwice(browser, origin, blog, output) {
   const before = readFileSync(join(blog, emptyArticle.path), 'utf8');
   const page = await openEditor(context, origin, emptyArticle.url);
   const screenshot = (await page.screenshot({ clip: { x: 340, y: 40, width: 320, height: 130 } })).toString('base64');
-  for (const paragraph of ['第一段。', '第二段。']) {
-    await selectInEditor(page, paragraph, paragraph, { collapse: true });
+  await selectInEditor(page, '第二段。', '第二段。', { collapse: true });
+  for (let time = 0; time < 2; time++) {
     await page.evaluate(async (base64) => {
       const blob = new Blob([Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))], { type: 'image/png' });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -286,7 +286,7 @@ async function imageTwice(browser, origin, blog, output) {
   console.log('file diff (written to image-twice/empty.diff):');
   console.log(diff(before, after, output, 'empty'));
   if (added.length !== 1) problems.push(`expected one new file in assets/, found ${added.length}`);
-  else if (body(after) !== `第一段。\n\n![](./assets/${added[0]})\n\n第二段。\n\n![](./assets/${added[0]})\n`) problems.push('the article does not reference the saved image twice');
+  else if (body(after) !== `第一段。\n\n第二段。\n\n![](./assets/${added[0]})\n\n![](./assets/${added[0]})\n`) problems.push('the article does not reference the saved image twice');
   await context.close();
 }
 
