@@ -149,7 +149,7 @@ Local: http://localhost:4321/</div>
 <ul>
   <li><code>ext</code> 只接受 <a href="content-format.html">内容格式</a> 列出的图片扩展名，其他返回 400。缺少字段或请求不是 JSON 时返回 400，页面地址不存在时返回 404。</li>
   <li>接口把 <code>page</code> 和文件路径解析成绝对路径后检查是否在 <code>content/</code> 内，不在时返回 403。</li>
-  <li><code>/__bake/save</code> 写入的内容改变了 <code>slug</code> 时，开发服务器在返回之前更新地址表，返回的 <code>url</code> 是新地址，编辑器之后的请求使用它。<code>slug</code> 格式不合法时照常写入，错误由渲染报告，<code>url</code> 是原地址。</li>
+  <li><code>/__bake/save</code> 写入的内容改变了 <code>slug</code> 时，开发服务器在返回之前更新地址表，返回的 <code>url</code> 是新地址，编辑器之后的请求使用它。<code>slug</code> 格式不合法时照常写入，错误由渲染报告，这篇文章继续使用原地址，返回的 <code>url</code> 也是原地址。</li>
   <li>开发服务器的 Vite 插件在 <code>api</code> 字段提供 <code>renderedPage(url)</code> 和 <code>componentEntry(name)</code>，供其他功能的接口使用：前者返回这个地址使用缓存的渲染结果 <code>{ path, page, html, toc, mathDefs, components, messages }</code>，地址不存在时返回 <code>null</code>；后者返回组件入口模块的地址，与页面加载组件时使用的地址相同。</li>
 </ul>
 

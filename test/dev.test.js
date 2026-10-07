@@ -172,6 +172,22 @@ describe('接口', () => {
     assert.equal(readFileSync(file, 'utf8'), original);
   });
 
+  test('/__bake/save 写入不合法的 slug 后原地址仍然可以访问，渲染报告错误，下一次保存成功', async () => {
+    const markdown = '---\ntitle: 格式\nslug: valid-slug\n---\n\n正文。\n';
+    writeFileSync(join(root, 'content/invalid.md'), markdown);
+    await until(async () => (await fetch(`${origin}/valid-slug/`)).status === 200);
+    const invalid = markdown.replace('valid-slug', 'Invalid Slug');
+    const saved = await post('/__bake/save', { page: '/valid-slug/', markdown: invalid, hash: sha256(markdown) });
+    assert.deepEqual(saved, { status: 200, body: { hash: sha256(invalid), url: '/valid-slug/' } });
+    const api = server.config.plugins.find((plugin) => plugin.name === 'bake-dev').api;
+    const rendered = await api.renderedPage('/valid-slug/');
+    assert.ok(rendered.messages.some(({ text }) => text.startsWith('Frontmatter field slug must be')));
+    assert.equal((await fetch(`${origin}/valid-slug/`)).status, 200);
+    const fixed = invalid.replace('Invalid Slug', 'fixed-slug');
+    const next = await post('/__bake/save', { page: '/valid-slug/', markdown: fixed, hash: sha256(invalid) });
+    assert.deepEqual(next, { status: 200, body: { hash: sha256(fixed), url: '/fixed-slug/' } });
+  });
+
   test('/__bake/save 对缺少字段的请求返回 400', async () => {
     const response = await post('/__bake/save', { page: '/paper/' });
     assert.deepEqual(response, { status: 400, body: { error: 'Missing string field markdown' } });

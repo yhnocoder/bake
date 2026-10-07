@@ -65,7 +65,9 @@ export async function findPages(root) {
 
 export async function updatePage(root, pages, path) {
   const others = pages.filter((page) => page.path !== path);
-  const next = [...others, await readPage(root, path)].sort(byPath);
+  const page = await readPage(root, path);
+  const previousUrl = pages.find((other) => other.path === path)?.url ?? null;
+  const next = [...others, { ...page, url: page.url ?? previousUrl }].sort(byPath);
   return { pages: next, messages: slugMessages(next) };
 }
 
