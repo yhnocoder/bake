@@ -79,7 +79,7 @@ test('有未保存修改时在外部修改文件，保留我的修改并覆盖',
   const file = site.read(path);
   assert.match(file, new RegExp(`${anchor}我的修改`));
   assert.doesNotMatch(file, /外部修改乙/);
-  assert.equal(await saveState(page), '已保存');
+  await page.waitForFunction(() => document.querySelector('.bake-save-state').textContent === '已保存');
   await site.screenshot(page, 'conflict-keep-mine-done');
   assert.deepEqual(errors, []);
   await page.close();
