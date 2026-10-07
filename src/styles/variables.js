@@ -14,3 +14,19 @@ export const themeVariables = [
   '--measure-wide',
   '--sidenote-width',
 ];
+
+export const optionalVariables = [
+  '--code-foreground',
+  '--code-token-keyword',
+  '--code-token-comment',
+  '--code-token-string',
+  '--code-token-string-expression',
+  '--code-token-constant',
+  '--code-token-parameter',
+  '--code-token-function',
+  '--code-token-punctuation',
+  '--code-token-link',
+  '--code-token-inserted',
+  '--code-token-deleted',
+  '--code-token-changed',
+];
