@@ -151,6 +151,7 @@
 <h3>标题 id 和目录短标题</h3>
 <p>标题后的 <code>{#id}</code> 设定锚点，<code>toc</code> 设定目录里显示的短标题。<code>{#id}</code> 里的 id 以字母开头，只含字母、数字、<code>-</code> 和 <code>_</code>。标题只接受 <code>id</code> 和 <code>toc</code> 两个属性，其他属性和 <code>.class</code> 报错。鼠标移到标题上时，左侧显示 <code>#</code> 链接。编辑器里标题左侧显示 id，在属性面板里修改。</p>
 <p>标题输出为 <code>&lt;h2 id="chain-rule"&gt;&lt;a class="anchor" href="#chain-rule" aria-hidden="true"&gt;#&lt;/a&gt;反向传播中的链式法则&lt;/h2&gt;</code>。没有写 <code>{#id}</code> 时，id 由 github-slugger 从标题文字生成：保留中文，字母转为小写，空格换成 <code>-</code>，去掉标点；生成 id 时不计入标题里的公式和旁注引用。同一页里重复时依次加 <code>-1</code>、<code>-2</code>。生成的 id 与页面里显式写的 id（标题的 <code>{#id}</code>、<code>^block-id</code>、公式编号）相同时，生成的 id 也加后缀。标题文字只有标点、生成的 id 为空时报错，需要写 <code>{#id}</code>。目录包含 <code>h2</code> 和 <code>h3</code>。有 <code>toc</code> 属性时目录项显示它的文字；没有时显示标题内容渲染后的 HTML，公式同样显示为 SVG，不含 <code>#</code> 链接和旁注引用。</p>
+<p>写了 <code>{#id}</code> 或 <code>toc</code> 的标题带 <code>data-md</code>，值是这个标题的原文，复制时用它还原属性。没有写属性的标题不带 <code>data-md</code>，理由：它的 id 是生成的，复制出去后不需要写 <code>{#id}</code>。</p>
 <div class="spec">
 <pre><code class="language-markdown">## 反向传播中的链式法则 {#chain-rule toc=链式法则}</code></pre>
 <div class="sp">
@@ -209,7 +210,7 @@
     <tr><td><code>float</code></td><td><code>none</code> | <code>left</code> | <code>right</code></td><td><code>none</code></td><td><code>none</code> 时图片独占一行并居中；<code>left</code> 或 <code>right</code> 时图片靠左或靠右，后面的文字环绕在另一侧</td></tr>
   </tbody>
 </table>
-<p>图片输出为 <code>&lt;figure class="image float-left"&gt;</code>，里面依次是 <code>&lt;img src="./assets/neuron.svg" alt="神经元" style="width: 160px"&gt;</code> 和 <code>&lt;figcaption&gt;神经元&lt;/figcaption&gt;</code>。<code>float</code> 为 <code>none</code> 时没有 <code>float-*</code> 类。<code>width</code> 和 <code>height</code> 写进 <code>style</code>，只写数字时加 <code>px</code>。说明文字为空时没有 <code>&lt;figcaption&gt;</code>。</p>
+<p>图片输出为 <code>&lt;figure class="image float-left"&gt;</code>，里面依次是 <code>&lt;img src="./assets/neuron.svg" alt="神经元" style="width: 160px"&gt;</code> 和 <code>&lt;figcaption&gt;神经元&lt;/figcaption&gt;</code>。<code>float</code> 为 <code>none</code> 时没有 <code>float-*</code> 类。<code>width</code> 和 <code>height</code> 写进 <code>style</code>，只写数字时加 <code>px</code>。说明文字为空时没有 <code>&lt;figcaption&gt;</code>。<code>&lt;figure class="image"&gt;</code> 带 <code>data-md</code>，值是图片在源文件中的原文，包括后面的 <code>{}</code> 属性，复制时用它还原图片。</p>
 <p>浮动图片的宽度最多是正文宽度的 <code>50%</code>，与环绕文字之间留 <code>1.5em</code> 间距。窗口宽度小于 <code>600px</code> 时浮动取消，图片独占一行。理由：窄屏上剩下的宽度放不下几个字，环绕的文字会变成一列一两个字。</p>
 <div class="spec">
 <pre><code class="language-markdown">![一个神经元的输入、权重与输出](./assets/neuron.svg){width=60%}</code></pre>
@@ -464,7 +465,7 @@
 
 <h2>公式怎么写</h2>
 <p>行内公式写 <code>$...$</code>，独立公式写 <code>$$...$$</code>，独立公式可以用 <code>\label{eq:name}</code> 编号，正文用 <code>\eqref{eq:name}</code> 引用。全站共用的宏写在 <code>bake.config.js</code> 的 <code>math.macros</code>，构建和编辑器读取同一份配置。</p>
-<p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式的元素带 <code>data-tex</code> 属性保存 TeX 源码，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
+<p>构建时公式渲染成 SVG，页面不加载 MathJax。每个公式输出的最外层元素带 <code>data-tex</code> 属性保存 TeX 源码，包括只有 <code>\eqref</code> 的公式输出的链接，用于复制，见 <a href="editor.html">编辑器</a> 的复制与粘贴一节。组件内部需要在浏览器里渲染公式时，组件类声明 <code>static runtimeMath = true</code>，bake 只在用到这个组件的页面加载 MathJax。</p>
 <p>渲染使用 MathJax 4（<code>@mathjax/src</code>）和 New Computer Modern 字体（<code>@mathjax/mathjax-newcm-font</code>）。TeX 输入加载 <code>base</code>、<code>ams</code>、<code>newcommand</code>、<code>configmacros</code> 四个包，宏取自 <code>math.macros</code>。公式的 HTML：</p>
 <table>
   <thead>
@@ -473,7 +474,7 @@
   <tbody>
     <tr><td>行内公式 <code>$...$</code></td><td><code>&lt;span class="math" data-tex="TeX 源码"&gt;&lt;svg&gt;…&lt;/svg&gt;&lt;/span&gt;</code></td></tr>
     <tr><td>独立公式 <code>$$...$$</code></td><td><code>&lt;div class="math display" data-tex="TeX 源码"&gt;&lt;svg&gt;…&lt;/svg&gt;&lt;/div&gt;</code>，带 <code>\label{eq:name}</code> 时加 <code>id="eq-name"</code>（<code>:</code> 换成 <code>-</code>）</td></tr>
-    <tr><td><code>$\eqref{eq:name}$</code></td><td><code>&lt;a class="eqref" href="#eq-name"&gt;(1)&lt;/a&gt;</code></td></tr>
+    <tr><td><code>$\eqref{eq:name}$</code></td><td><code>&lt;a class="eqref" href="#eq-name" data-tex="\eqref{eq:name}"&gt;(1)&lt;/a&gt;</code></td></tr>
   </tbody>
 </table>
 <p>编号由 bake 处理，MathJax 不保存公式之间的状态。含 <code>\label{eq:name}</code> 的独立公式按在页面中出现的顺序从 1 开始编号，渲染前把 <code>\label{eq:name}</code> 换成 <code>\tag{n}</code>。一个公式里有多个 <code>\label</code>（例如 <code>align</code> 环境）时每个都编号，外层元素的 id 取第一个 label，指向其中任一个 label 的 <code>\eqref</code> 都链接到这个 id。同一页里两个 <code>\label</code> 同名时报错。<code>\eqref{eq:name}</code> 不交给 MathJax，直接输出上表中的链接，它必须是所在公式的全部内容。理由：每个公式的渲染结果只取决于它自己的源码，可以按源码缓存。</p>

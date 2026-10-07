@@ -159,7 +159,8 @@
     <tr><th>用途</th><th>选择</th><th>理由</th></tr>
   </thead>
   <tbody>
-    <tr><td>编辑器</td><td>Milkdown（ProseMirror 加 remark）。只使用 <code>@milkdown/core</code>、<code>ctx</code>、<code>transformer</code>、<code>utils</code>、<code>prose</code>、<code>preset-commonmark</code>、<code>preset-gfm</code>、<code>plugin-history</code>，以及插入菜单需要的 <code>plugin-slash</code>；不使用 <code>plugin-block</code>、<code>plugin-clipboard</code>、Crepe 和界面组件，版本写精确值</td><td>与渲染共用 remark 解析，编辑器和页面对同一份 Markdown 的理解一致</td></tr>
+    <tr><td>编辑器</td><td>Milkdown（ProseMirror 加 remark）。只使用 <code>@milkdown/core</code>、<code>ctx</code>、<code>transformer</code>、<code>utils</code>、<code>prose</code>、<code>preset-commonmark</code>、<code>preset-gfm</code>、<code>plugin-history</code>，以及插入菜单需要的 <code>plugin-slash</code>；不使用 <code>plugin-block</code>、<code>plugin-clipboard</code>、Crepe 和界面组件，版本写精确值。复制与粘贴由 bake 自己的插件处理，<code>plugin-clipboard</code> 复制纯文字时不转义，也不处理公式、组件和图片</td><td>与渲染共用 remark 解析，编辑器和页面对同一份 Markdown 的理解一致</td></tr>
+    <tr><td>粘贴转换</td><td>hast-util-from-dom 加 hast-util-to-mdast，输出用 mdast-util-to-markdown</td><td>处理合并单元格、缺少表头等情况，可以用自定义处理器处理公式和 <code>data-md</code>；输出与 <code>bake format</code> 使用同一套扩展</td></tr>
     <tr><td>开发服务器和打包</td><td>Vite</td><td>按模块热更新，保存时不刷新整页</td></tr>
     <tr><td>公式</td><td>MathJax，构建时输出 SVG</td><td>页面不需要加载 MathJax，打开时不跳动</td></tr>
     <tr><td>组件</td><td>custom element；可以用 SolidJS（solid-element）编写</td><td>不强制框架，简单的图用纯 JS 更短</td></tr>
