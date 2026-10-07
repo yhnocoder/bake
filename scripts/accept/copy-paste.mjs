@@ -268,7 +268,7 @@ async function imageTwice(browser, origin, blog, output) {
   writeFileSync(join(blog, emptyArticle.path), `${emptyArticle.frontmatter}\n第一段。\n\n第二段。\n`);
   const before = readFileSync(join(blog, emptyArticle.path), 'utf8');
   const page = await openEditor(context, origin, emptyArticle.url);
-  const screenshot = (await page.screenshot({ clip: { x: 0, y: 0, width: 320, height: 200 } })).toString('base64');
+  const screenshot = (await page.screenshot({ clip: { x: 340, y: 40, width: 320, height: 130 } })).toString('base64');
   for (const paragraph of ['第一段。', '第二段。']) {
     await selectInEditor(page, paragraph, paragraph, { collapse: true });
     await page.evaluate(async (base64) => {
