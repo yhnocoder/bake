@@ -59,7 +59,7 @@ ReLU 在负半轴输出 0，在正半轴输出输入本身。它的导数在负�
 先看图再看公式。
 :::
 
-:::callout{kind=warning}
+:::callout[求和次序]{kind=warning}
 这里的求和不能交换次序。
 :::
 
