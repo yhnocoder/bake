@@ -182,12 +182,20 @@ describe('fixSidenotes', () => {
     assert.equal(added.length, 0);
   });
 
+  test('正文只有文末的空段落时，没有被引用的注释放在它之前', () => {
+    const start = doc(paragraph());
+    const { result } = fix(start, (tr) => tr.replaceWith(0, start.content.size, [def('x'), paragraph()]));
+    assert.deepEqual(result, ['[^x]: 注释 x', '']);
+  });
+
   test('与文末补空段落的规则交替运行时一轮后不再修改文档', () => {
     const starts = [
       doc(paragraph(text('甲'), ref('a')), def('a')),
       doc(paragraph(text('甲')), def('x')),
       doc(paragraph(text('甲'), ref('a')), def('a'), def('x')),
       doc(paragraph(text('甲')), paragraph(), def('x')),
+      doc(def('x')),
+      doc(def('x'), paragraph()),
     ];
     for (const start of starts) {
       let current = start;
