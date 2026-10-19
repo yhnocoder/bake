@@ -46,9 +46,31 @@ async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {
       api.requests.push({ path: url.pathname, headers: request.headers(), body: request.postDataJSON() });
       if (url.pathname === '/models') return route.fulfill({ status: api.models.status, headers: { ...CORS, 'content-type': 'application/json' }, body: api.models.body });
       const next = api.answers.shift() ?? { status: 500, body: '{"error":{"message":"no answer prepared"}}' };
+      if (next.offline) return route.abort('internetdisconnected');
       return route.fulfill({ status: next.status ?? 200, headers: { ...CORS, 'content-type': next.status === undefined ? 'text/event-stream' : 'application/json' }, body: next.body });
     },
   );
+  await context.addInitScript(() => {
+    window.bakeTest = { signals: [], hold: false, held: [] };
+    const signal = PublicKeyCredential.signalUnknownCredential;
+    PublicKeyCredential.signalUnknownCredential = (options) => {
+      window.bakeTest.signals.push(options.credentialId);
+      return signal.call(PublicKeyCredential, options);
+    };
+    const fetch = window.fetch;
+    window.fetch = (input, init = {}) => {
+      if (!window.bakeTest.hold || !String(input).endsWith('/chat/completions')) return fetch(input, init);
+      window.bakeTest.held.push(JSON.parse(init.body));
+      const first = { choices: [{ index: 0, delta: { content: '前半句' }, finish_reason: null }] };
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(first)}\n\n`));
+          init.signal.addEventListener('abort', () => controller.error(init.signal.reason));
+        },
+      });
+      return Promise.resolve(new Response(body, { headers: { 'content-type': 'text/event-stream' } }));
+    };
+  });
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', (error) => problems.push(error.message));
@@ -88,6 +110,7 @@ test('the AI chat on published pages', async (t) => {
     await page.goto(`${base}/2026-10/syntax/`);
     await page.locator('.bk-chat-launcher').waitFor();
     await setUpKey(page);
+    assert.equal(await page.locator('.bk-chat-view').evaluate((element) => getComputedStyle(element).animationName), 'bk-chat-view-in');
     assert.deepEqual(
       api.requests.map((request) => [request.path, request.headers.authorization]),
       [['/models', `Bearer ${API_KEY}`]],
@@ -96,7 +119,7 @@ test('the AI chat on published pages', async (t) => {
     assert.doesNotMatch(JSON.stringify(stored), new RegExp(API_KEY));
     assert.deepEqual(Object.keys(JSON.parse(stored.local['bk-chat-key'])).sort(), ['credential', 'data', 'iv', 'salt']);
 
-    api.answers.push({ body: text('标题见 [标题](#headings)。公式 $x^2$ 和\n\n$$\\frac{a}{b}$$\n\n结束。') });
+    api.answers.push({ body: text('标题见 [标题](#headings)。公式 $\\R^2$ 和\n\n$$\\frac{a}{b}$$\n\n结束。') });
     await ask(page, '这篇文章讲什么？');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '结束。' }).waitFor();
     await page.locator('.bk-chat-answer .bk-chat-math[data-state="ready"] svg').nth(1).waitFor();
@@ -188,14 +211,85 @@ test('the AI chat on published pages', async (t) => {
     api.answers.push({ status: 402, body: '{"error":{"message":"Insufficient Balance"}}' });
     await ask(page, '你好');
     await page.locator('.bk-chat-reply .bk-chat-problem').filter({ hasText: '余额不足' }).waitFor();
-    api.answers.push({ body: text('你好！') });
+    api.answers.push({ body: events([{ reasoning_content: '先想一想。' }, { content: '你好！' }]) });
     await page.locator('.bk-chat-reply .bk-chat-problem button').click();
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '你好！' }).waitFor();
     assert.equal(await page.locator('.bk-chat-reply').count(), 1);
+    const reasoning = page.locator('.bk-chat-reasoning');
+    assert.match(await reasoning.evaluate((element) => getComputedStyle(element, '::details-content').transitionProperty), /block-size/);
+    await reasoning.locator('summary').click();
+    await page.waitForFunction(() => {
+      const details = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-reasoning');
+      return getComputedStyle(details, '::details-content').blockSize !== '0px';
+    });
+    assert.equal(await reasoning.locator('p').textContent(), '先想一想。');
+
+    api.answers.push({ offline: true });
+    await ask(page, '还在吗？');
+    await page.locator('.bk-chat-reply .bk-chat-problem').filter({ hasText: '连不上 DeepSeek' }).waitFor();
+    api.answers.push({ status: 400, body: '{"error":{"message":"This model\'s maximum context length is 131072 tokens. However, you requested 140000 tokens."}}' });
+    await page.locator('.bk-chat-reply .bk-chat-problem button').click();
+    await page.locator('.bk-chat-reply .bk-chat-problem').filter({ hasText: '新对话' }).waitFor();
     await page.locator('.bk-chat-panel button[aria-label="更多"]').click();
     await page.locator('.bk-chat-menu button[data-action="clear-key"]').click();
     await page.locator('.bk-chat-setup input[name="key"]').waitFor();
     assert.equal((await storage(page)).local['bk-chat-key'], undefined);
+  });
+
+  await t.test('stopping an answer keeps the text written so far and sends it with the next question', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await page.evaluate(() => (window.bakeTest.hold = true));
+    await ask(page, '慢慢说');
+    await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
+    const stop = page.locator('.bk-chat-send[data-action="stop"]');
+    await stop.click();
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    assert.equal(await stop.count(), 0);
+    assert.equal(await page.locator('.bk-chat-reply .bk-chat-problem').count(), 0);
+    assert.equal(await page.locator('.bk-chat-answer').textContent(), '前半句');
+    await page.evaluate(() => (window.bakeTest.hold = false));
+    api.answers.push({ body: text('继续。') });
+    await ask(page, '接着说');
+    await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '继续。' }).waitFor();
+    assert.deepEqual(
+      api.requests.at(-1).body.messages.slice(1).map(({ role, content }) => [role, content]),
+      [
+        ['user', '慢慢说'],
+        ['assistant', '前半句'],
+        ['user', '接着说'],
+      ],
+    );
+  });
+
+  await t.test('changing the key replaces the stored key and asks the browser to forget the old passkey', async (t) => {
+    const { page } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    const first = JSON.parse((await storage(page)).local['bk-chat-key']);
+    await page.locator('.bk-chat-panel button[aria-label="更多"]').click();
+    await page.locator('.bk-chat-menu button', { hasText: '更换 key' }).click();
+    await page.locator('.bk-chat-setup input[name="key"]').fill('sk-test-second-key');
+    await page.locator('.bk-chat-setup .bk-chat-primary').click();
+    await page.locator('.bk-chat-composer textarea').waitFor();
+    const second = JSON.parse((await storage(page)).local['bk-chat-key']);
+    assert.notEqual(second.credential, first.credential);
+    assert.deepEqual(await page.evaluate(() => window.bakeTest.signals), [first.credential]);
+  });
+
+  await t.test('a page saved in bake dev gives the chat the new source of the article', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await page.evaluate(() => {
+      document.querySelector('script.bk-source').textContent = JSON.stringify('# Saved again\n\nThe new text.\n');
+      document.dispatchEvent(new Event('bake:content'));
+    });
+    api.answers.push({ body: text('好的。') });
+    await ask(page, '现在写了什么？');
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    assert.match(api.requests.at(-1).body.messages[0].content, /<article>\n# Saved again\n\nThe new text\.\n\n<\/article>/);
   });
 
   await t.test('a rejected key is reported before any passkey is created', async (t) => {
@@ -217,11 +311,16 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-setup .bk-chat-primary').click();
     await page.locator('.bk-chat-setup .bk-chat-problem').filter({ hasText: 'PRF' }).waitFor();
     assert.deepEqual((await storage(page)).local, {});
+    assert.equal((await page.evaluate(() => window.bakeTest.signals)).length, 1);
   });
 
-  await t.test('a browser without passkeys, and a page served from an IP address, show no chat', async (t) => {
+  await t.test('a browser without passkeys or without client capabilities, and a page served from an IP address, show no chat', async (t) => {
     const { page, context } = await openBrowser(t, base);
     await page.goto(`${base.replace('localhost', '127.0.0.1')}/2026-10/syntax/`);
+    await page.waitForLoadState('networkidle');
+    assert.equal(await page.locator('[data-bake-chat]').count(), 0);
+    await context.addInitScript(() => delete PublicKeyCredential.getClientCapabilities);
+    await page.goto(`${base}/2026-10/syntax/`);
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
     await context.addInitScript(() => delete window.PublicKeyCredential);
@@ -241,6 +340,7 @@ test('the AI chat on published pages', async (t) => {
     const box = await panel.boundingBox();
     assert.ok(box.x >= 0 && box.x + box.width <= 375 && box.y >= 0 && box.y + box.height <= 700, JSON.stringify(box));
     assert.equal(await panel.evaluate((element) => getComputedStyle(element).transform), 'none');
+    assert.equal(await page.locator('.bk-chat-view').evaluate((element) => getComputedStyle(element).animationName), 'bk-chat-fade-in');
     assert.equal(await page.locator('.bk-chat-primary').evaluate((element) => getComputedStyle(element).cursor), 'pointer');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
   });

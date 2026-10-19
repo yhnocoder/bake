@@ -35,6 +35,7 @@ mkdirSync(out, { recursive: true });
 const server = await serve(dist);
 const origin = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch();
+let count = 0;
 try {
   for (const variant of variants) {
     const context = await browser.newContext({
@@ -43,6 +44,7 @@ try {
       reducedMotion: 'reduce',
     });
     const page = await context.newPage();
+    let chatShown = false;
     for (const { path, name } of pages) {
       await page.goto(origin + path, { waitUntil: 'networkidle' });
       await page.evaluate(() => document.fonts.ready);
@@ -52,6 +54,15 @@ try {
         animations: 'disabled',
         caret: 'hide',
       });
+      count += 1;
+      if (!chatShown && (await hasArticleChat(page))) {
+        chatShown = true;
+        await page.locator('.bk-chat-launcher').click();
+        await page.locator('.bk-chat-panel.is-open .bk-chat-view').waitFor();
+        await page.evaluate(() => document.fonts.ready);
+        await page.screenshot({ path: join(out, `${name}-chat.${variant.name}.png`), animations: 'disabled', caret: 'hide' });
+        count += 1;
+      }
     }
     await context.close();
   }
@@ -59,7 +70,11 @@ try {
   await browser.close();
   server.close();
 }
-console.log(`${pages.length * variants.length} screenshots of ${pages.length} pages written to ${relative(process.cwd(), out)}`);
+console.log(`${count} screenshots of ${pages.length} pages written to ${relative(process.cwd(), out)}`);
+
+async function hasArticleChat(page) {
+  return page.evaluate(() => document.querySelector('script.bk-source') !== null && document.querySelector('[data-bake-chat]') !== null);
+}
 
 function listPages(root) {
   return htmlFiles(root)

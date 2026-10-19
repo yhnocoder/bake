@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { blogPrompt, blogTools, readArticle, READ_ARTICLE, articlePrompt } from '../src/chat/context.js';
@@ -78,6 +80,18 @@ describe('AI chat build output', () => {
     assert.match(tree['index.html'].toString(), new RegExp(`<script type="module" src="${chat}"></script>`));
     assert.doesNotMatch(tree['404.html'].toString(), /chat-/);
     assert.equal(tree['2026-09/demo/index.html'].toString(), '<p>demo</p>\n');
+  });
+
+  test('writes the preamble for the chat and copies the chat bundle that the cache lists', (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'preamble.sty': '\\newcommand{\\R}{\\mathbb{R}}\n', 'content/posts/rope/index.md': article({ body: 'In $\\R$.\n' }) });
+    assert.equal(bake(dir, 'build').stderr, '');
+    assert.deepEqual(JSON.parse(readFileSync(join(dir, 'dist/_bake/preamble.json'), 'utf8')), ['\\newcommand{\\R}{\\mathbb{R}}']);
+    const cache = join(tmpdir(), 'bake-chat');
+    const name = createHash('sha256').update(join(import.meta.dirname, '..')).digest('hex').slice(0, 16);
+    const index = JSON.parse(readFileSync(join(cache, `${name}.json`), 'utf8'));
+    assert.ok(index.inputs.some(([file]) => file.endsWith('/src/chat/entry.js')));
+    assert.ok(index.inputs.some(([file]) => file.endsWith('/src/components/math.js')));
+    assert.equal(readFileSync(join(dir, 'dist', index.entry), 'utf8'), readFileSync(join(cache, index.dir, index.entry), 'utf8'));
   });
 
   test('writes an empty catalog for a blog without articles', (t) => {

@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { build } from 'vite';
 import solid from 'vite-plugin-solid';
 import { compileProblem, outputOf, viteConfig } from '../build/vite.js';
@@ -6,9 +5,7 @@ import { errorAt, fileStart } from '../report.js';
 import { COMPONENTS_DIR } from './read.js';
 import { RUNTIME_FILE, browserModules, isMathJaxModule } from './modules.js';
 
-const CHAT_ENTRY = join(import.meta.dirname, '../chat/entry.js');
-
-export async function bundlePageModules(root, components, preamble, errors) {
+export async function bundleComponents(root, components, preamble, errors) {
   try {
     const result = await build({
       ...viteConfig([browserModules({ preamble, components }), solid()]),
@@ -19,7 +16,7 @@ export async function bundlePageModules(root, components, preamble, errors) {
         assetsInlineLimit: 0,
         modulePreload: { polyfill: false },
         rolldownOptions: {
-          input: { ...(components.length === 0 ? {} : { components: RUNTIME_FILE }), chat: CHAT_ENTRY },
+          input: { components: RUNTIME_FILE },
           output: {
             format: 'es',
             entryFileNames: 'assets/[name]-[hash].js',
@@ -31,10 +28,9 @@ export async function bundlePageModules(root, components, preamble, errors) {
       },
     });
     const outputs = outputOf(result);
-    const entry = (name) => outputs.find((output) => output.type === 'chunk' && output.isEntry && output.name === name)?.fileName;
+    const runtime = outputs.find((output) => output.type === 'chunk' && output.isEntry);
     return {
-      runtime: entry('components'),
-      chat: entry('chat'),
+      runtime: runtime.fileName,
       files: outputs.map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source })),
     };
   } catch (error) {

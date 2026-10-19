@@ -13,6 +13,7 @@ import { VaultError, clearKey, saveKey, storedKey, unlockKey } from './vault.js'
 const THINKING_KEY = 'bk-chat-thinking';
 const COPIED_TIME = 1200;
 const NEAR_BOTTOM = 48;
+const CONTEXT_LENGTH = /context length/i;
 const typeset = new Map();
 
 export function createPanel({ shadow, root, labels, launcher }) {
@@ -27,7 +28,7 @@ export function createPanel({ shadow, root, labels, launcher }) {
 
 function Panel(props) {
   const { root, labels, launcher } = props;
-  const page = currentPage(root);
+  let page = currentPage(root);
   const figure = createFigure();
   const [open, setOpen] = createSignal(false);
   const [view, setView] = createSignal(storedKey() === null ? 'setup' : 'locked');
@@ -238,8 +239,13 @@ function Panel(props) {
   const outside = (event) => {
     if (menu() && !event.composedPath().some((element) => element instanceof Element && element.classList.contains('bk-chat-menu-area'))) setMenu(false);
   };
+  const refresh = () => (page = currentPage(root));
   document.addEventListener('pointerdown', outside);
-  onCleanup(() => document.removeEventListener('pointerdown', outside));
+  document.addEventListener('bake:content', refresh);
+  onCleanup(() => {
+    document.removeEventListener('pointerdown', outside);
+    document.removeEventListener('bake:content', refresh);
+  });
 
   return (
     <section class="bk-chat-panel" classList={{ 'is-open': open() }} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={panel} onKeyDown={keydown}>
@@ -287,7 +293,7 @@ function Panel(props) {
         </button>
       </header>
       <Show when={view() === 'setup'}>
-        <form class="bk-chat-setup" onSubmit={save}>
+        <form class="bk-chat-view bk-chat-setup" onSubmit={save}>
           <h2>{labels.setupTitle}</h2>
           <p>{labels.setupText}</p>
           <p>
@@ -317,7 +323,7 @@ function Panel(props) {
         </form>
       </Show>
       <Show when={view() === 'locked'}>
-        <div class="bk-chat-setup">
+        <div class="bk-chat-view bk-chat-setup">
           <h2>{labels.lockedTitle}</h2>
           <p>{labels.lockedText}</p>
           <Show when={problem() !== null}>
@@ -336,56 +342,58 @@ function Panel(props) {
         </div>
       </Show>
       <Show when={view() === 'chat'}>
-        <div class="bk-chat-messages" ref={list} aria-live="polite">
-          <Show when={messages.length === 0}>
-            <p class="bk-chat-empty">{labels.empty[mode()]}</p>
-          </Show>
-          <For each={messages}>{(message, index) => (message.role === 'user' ? <UserMessage message={message} labels={labels} /> : <Reply message={message} root={root} labels={labels} onRetry={() => retry(index())} />)}</For>
-        </div>
-        <form class="bk-chat-composer" onSubmit={send}>
-          <Show when={quote() !== null}>
-            <div class="bk-chat-quote">
-              <span class="bk-chat-quote-text">{quote()}</span>
-              <button type="button" class="bk-chat-icon" aria-label={labels.removeQuote} onClick={() => setQuote(null)}>
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M5 5l6 6M11 5l-6 6" />
-                </svg>
-              </button>
-            </div>
-          </Show>
-          <textarea
-            ref={input}
-            rows="1"
-            value={draft()}
-            placeholder={labels.placeholder[mode()]}
-            aria-label={labels.placeholder[mode()]}
-            onInput={(event) => {
-              setDraft(event.currentTarget.value);
-              grow(event.currentTarget);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) send(event);
-            }}
-          />
-          <div class="bk-chat-tools">
-            <button type="button" class="bk-chat-toggle" aria-pressed={String(thinking())} onClick={toggleThinking}>
-              {labels.thinking}
-            </button>
-            <span class="bk-chat-grow" />
-            <Show
-              when={busy()}
-              fallback={
-                <button type="submit" class="bk-chat-send" disabled={draft().trim() === ''}>
-                  {labels.send}
-                </button>
-              }
-            >
-              <button type="button" class="bk-chat-send" data-action="stop" onClick={() => abort?.abort()}>
-                {labels.stop}
-              </button>
+        <div class="bk-chat-view bk-chat-conversation">
+          <div class="bk-chat-messages" ref={list} aria-live="polite">
+            <Show when={messages.length === 0}>
+              <p class="bk-chat-empty">{labels.empty[mode()]}</p>
             </Show>
+            <For each={messages}>{(message, index) => (message.role === 'user' ? <UserMessage message={message} labels={labels} /> : <Reply message={message} root={root} labels={labels} onRetry={() => retry(index())} />)}</For>
           </div>
-        </form>
+          <form class="bk-chat-composer" onSubmit={send}>
+            <Show when={quote() !== null}>
+              <div class="bk-chat-quote">
+                <span class="bk-chat-quote-text">{quote()}</span>
+                <button type="button" class="bk-chat-icon" aria-label={labels.removeQuote} onClick={() => setQuote(null)}>
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M5 5l6 6M11 5l-6 6" />
+                  </svg>
+                </button>
+              </div>
+            </Show>
+            <textarea
+              ref={input}
+              rows="1"
+              value={draft()}
+              placeholder={labels.placeholder[mode()]}
+              aria-label={labels.placeholder[mode()]}
+              onInput={(event) => {
+                setDraft(event.currentTarget.value);
+                grow(event.currentTarget);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) send(event);
+              }}
+            />
+            <div class="bk-chat-tools">
+              <button type="button" class="bk-chat-toggle" aria-pressed={String(thinking())} onClick={toggleThinking}>
+                {labels.thinking}
+              </button>
+              <span class="bk-chat-grow" />
+              <Show
+                when={busy()}
+                fallback={
+                  <button type="submit" class="bk-chat-send" disabled={draft().trim() === ''}>
+                    {labels.send}
+                  </button>
+                }
+              >
+                <button type="button" class="bk-chat-send" data-action="stop" onClick={() => abort?.abort()}>
+                  {labels.stop}
+                </button>
+              </Show>
+            </div>
+          </form>
+        </div>
       </Show>
     </section>
   );
@@ -501,6 +509,7 @@ function requestProblem(error, labels) {
   if (error.status === 401) return labels.errors.invalidKey;
   if (error.status === 402) return labels.errors.balance;
   if (error.status === 429) return labels.errors.rate;
+  if (error.status === 400 && CONTEXT_LENGTH.test(error.message)) return labels.errors.tooLong;
   if (error.status >= 500) return labels.errors.server;
   return labels.errors.other(error.message);
 }

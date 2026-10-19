@@ -2,6 +2,7 @@ export const FEED_PATH = 'feed.xml';
 export const SITEMAP_PATH = 'sitemap.xml';
 export const NOT_FOUND_PATH = '404.html';
 export const CHAT_CATALOG_PATH = '_bake/articles.json';
+export const CHAT_PREAMBLE_PATH = '_bake/preamble.json';
 
 export function siteLink(url) {
   return `${new URL(url).origin}${sitePath(url)}`;

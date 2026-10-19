@@ -190,6 +190,30 @@
   color: var(--accent);
 }
 
+.bk-chat-view {
+  animation: bk-chat-view-in 0.18s var(--ease-out, ease-out);
+}
+
+.bk-chat-conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@keyframes bk-chat-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes bk-chat-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 .bk-chat-setup {
   display: flex;
   flex: 1;
@@ -446,11 +470,27 @@
 }
 
 .bk-chat-reasoning {
+  interpolate-size: allow-keywords;
   margin: 0 0 8px;
   color: var(--ink-3);
   font-family: var(--font-ui, inherit);
   font-size: 12.5px;
   line-height: 1.6;
+}
+
+.bk-chat-reasoning::details-content {
+  block-size: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    block-size 0.2s var(--ease-out, ease-out),
+    opacity 0.2s,
+    content-visibility 0.2s allow-discrete;
+}
+
+.bk-chat-reasoning[open]::details-content {
+  block-size: auto;
+  opacity: 1;
 }
 
 .bk-chat-reasoning summary {
@@ -581,5 +621,15 @@
   .bk-chat-panel,
   .bk-chat-menu {
     transform: none !important;
+  }
+
+  .bk-chat-view {
+    animation-name: bk-chat-fade-in;
+  }
+
+  .bk-chat-reasoning::details-content {
+    transition:
+      opacity 0.2s,
+      content-visibility 0.2s allow-discrete;
   }
 }

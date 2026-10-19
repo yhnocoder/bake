@@ -175,11 +175,13 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
+  * {
+    translate: none !important;
+  }
+
   .bk-chat-figure,
   .bk-chat-figure * {
     animation: none !important;
-    translate: none !important;
   }
 }
 

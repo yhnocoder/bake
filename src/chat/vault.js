@@ -15,11 +15,11 @@ const IP_ADDRESS = /^(?:[\d.]+|\[.*\])$/;
 
 export async function passkeysAvailable() {
   if (!isSecureContext || IP_ADDRESS.test(location.hostname) || typeof PublicKeyCredential === 'undefined' || navigator.credentials === undefined) return false;
-  if (typeof PublicKeyCredential.getClientCapabilities !== 'function') return true;
+  if (typeof PublicKeyCredential.getClientCapabilities !== 'function') return false;
   try {
-    return (await PublicKeyCredential.getClientCapabilities())['extension:prf'] !== false;
+    return (await PublicKeyCredential.getClientCapabilities())['extension:prf'] === true;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -50,12 +50,20 @@ export async function saveKey(apiKey, { site }) {
       },
     }),
   );
-  const prf = credential.getClientExtensionResults().prf;
-  if (prf?.enabled !== true && prf?.results === undefined) throw new VaultError('unsupported');
   const id = encode(credential.rawId);
-  const secret = prf.results?.first ?? (await evaluate(id, salt));
+  const prf = credential.getClientExtensionResults().prf;
+  let secret;
+  try {
+    if (prf?.enabled !== true && prf?.results === undefined) throw new VaultError('unsupported');
+    secret = prf.results?.first ?? (await evaluate(id, salt));
+  } catch (error) {
+    forgetCredential(id);
+    throw error;
+  }
+  const previous = storedKey();
   const sealed = await sealKey(secret, apiKey);
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ credential: id, salt: encode(salt), ...sealed }));
+  if (previous !== null && previous.credential !== id) forgetCredential(previous.credential);
 }
 
 export async function unlockKey() {
@@ -72,8 +80,12 @@ export async function unlockKey() {
 export function clearKey() {
   const record = storedKey();
   localStorage.removeItem(STORAGE_KEY);
-  if (record === null || typeof globalThis.PublicKeyCredential?.signalUnknownCredential !== 'function') return;
-  PublicKeyCredential.signalUnknownCredential({ rpId: location.hostname, credentialId: record.credential }).catch(() => {});
+  if (record !== null) forgetCredential(record.credential);
+}
+
+function forgetCredential(id) {
+  if (typeof PublicKeyCredential.signalUnknownCredential !== 'function') return;
+  PublicKeyCredential.signalUnknownCredential({ rpId: location.hostname, credentialId: id }).catch(() => {});
 }
 
 export async function sealKey(secret, apiKey) {
