@@ -8,12 +8,10 @@ const EDGE = 12;
 const OFFSET = 8;
 
 export function startPreviewCard(article) {
-  const templates = new Map([...document.querySelectorAll('template.bk-preview-template')].map((template) => [template.dataset.target, template]));
   const kinds = [
-    { kind: 'reference', selector: 'a.citation', screen: matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1000px)'), read: (link) => readReference(templates, link) },
-    { kind: 'link', selector: 'a.internal-link[data-target]', screen: matchMedia('(hover: hover) and (pointer: fine)'), read: (link) => readTemplate(templates, link) },
-  ].filter(({ selector }) => article.querySelector(selector) !== null);
-  if (kinds.length === 0) return;
+    { kind: 'reference', selector: 'a.citation', screen: matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1000px)'), read: readReference },
+    { kind: 'link', selector: 'a.internal-link[data-target]', screen: matchMedia('(hover: hover) and (pointer: fine)'), read: readTemplate },
+  ];
   const [entry, setEntry] = createSignal(null);
   const [shown, setShown] = createSignal(false);
   const [placed, setPlaced] = createSignal(0);
@@ -68,6 +66,10 @@ export function startPreviewCard(article) {
   article.addEventListener('focusout', (event) => {
     if (triggerOf(event.target) !== null) hide();
   });
+  document.addEventListener('bake:content', () => {
+    clearTimeout(showTimer);
+    close();
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     clearTimeout(showTimer);
@@ -87,8 +89,8 @@ export function startPreviewCard(article) {
   render(() => <PreviewCard entry={entry()} shown={shown()} placed={placed()} onEnter={keep} onLeave={hide} />, host);
 }
 
-function readReference(templates, link) {
-  if (new URL(link.href).pathname !== location.pathname) return readTemplate(templates, link);
+function readReference(link) {
+  if (new URL(link.href).pathname !== location.pathname) return readTemplate(link);
   const item = document.getElementById(decodeURIComponent(link.hash.slice(1)));
   if (item === null) return null;
   const number = document.createElement('span');
@@ -100,9 +102,9 @@ function readReference(templates, link) {
   return { kind: 'reference', content: [number, text] };
 }
 
-function readTemplate(templates, link) {
-  const template = templates.get(link.dataset.target);
-  return template === undefined ? null : { kind: template.dataset.kind, content: [...template.content.cloneNode(true).childNodes] };
+function readTemplate(link) {
+  const template = document.querySelector(`template.bk-preview-template[data-target="${CSS.escape(link.dataset.target)}"]`);
+  return template === null ? null : { kind: template.dataset.kind, content: [...template.content.cloneNode(true).childNodes] };
 }
 
 function PreviewCard(props) {

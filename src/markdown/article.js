@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
-import { createSite } from '../build/links.js';
+import { indexPages } from '../build/links.js';
 import { addressHref, pageRoot, parseAddress } from '../build/urls.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
@@ -71,7 +71,7 @@ export async function readArticle(file, source, errors, { folder = null, preambl
 
 export async function parseArticle(file, source, errors, options = {}) {
   const article = await readArticle(file, source, errors, options);
-  article.link(createSite([{ url: article.url, title: '', draft: false, article }]));
+  article.link(indexPages([{ url: article.url, title: '', draft: false, article }]), errors);
   return article.structure();
 }
 
@@ -195,10 +195,16 @@ class ArticleParser {
     return ids;
   }
 
-  link(site) {
+  link(site, errors) {
+    this.errors = errors;
+    this.linked.clear();
+    this.borrowed.clear();
     const ids = this.pageIds();
     this.walkWithSidenotes(this.tree, (node) => {
-      if (node.type === 'link') this.checkLink(node, site, ids);
+      if (node.type === 'link') {
+        delete node.target;
+        this.checkLink(node, site, ids);
+      }
       if (node.type === 'bakeBlock' && node.name === 'embed') {
         this.readEmbed(node, site);
         return false;

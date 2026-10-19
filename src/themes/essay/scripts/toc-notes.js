@@ -17,6 +17,7 @@ export function notesColumn(nav, ctx) {
     },
     relayout: list.relayout,
     show: () => requestAnimationFrame(() => list.centre(false, true)),
+    destroy: list.destroy,
   };
 }
 
@@ -182,6 +183,7 @@ function notesList(list, ctx) {
       abort.abort();
       resize.disconnect();
       clearTimeout(followTimer);
+      marker.remove();
     },
   };
 }

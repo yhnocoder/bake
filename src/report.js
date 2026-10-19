@@ -12,8 +12,12 @@ export function sortErrors(errors) {
   return errors.toSorted((a, b) => compareText(a.file, b.file) || a.line - b.line || a.column - b.column);
 }
 
+export function errorCount(count) {
+  return `${count} ${count === 1 ? 'error' : 'errors'}`;
+}
+
 export function errorCountLine(count) {
-  return `${count} ${count === 1 ? 'error' : 'errors'}, dist/ was not written`;
+  return `${errorCount(count)}, dist/ was not written`;
 }
 
 export function describeValue(value) {

@@ -25,7 +25,7 @@ export default function Page(props) {
         ))}
       </head>
       <body class="bk-page" style={labelStyle(labels)}>
-        {article.content.glyphs === undefined ? null : <div class="bk-glyphs" innerHTML={article.content.glyphs} />}
+        {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region="glyphs" innerHTML={article.content.glyphs} />}
         <div class="bk-shell">
           <Header site={site} article={article} home={assets.root} labels={labels} />
           <main class="bk-main">

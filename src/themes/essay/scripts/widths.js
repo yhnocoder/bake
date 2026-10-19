@@ -1,25 +1,34 @@
-import { layoutChanged, oncePerFrame } from './motion.js';
+import { CONTENT_EVENT, layoutChanged, oncePerFrame } from './motion.js';
 
 const SCROLLERS = 'pre.shiki, .table-scroll, mjx-container[display]';
 const NATURAL_WIDTH_HOSTS = { math: 'mjx-container[display]', code: 'pre.shiki' };
 
 export function startWidths(article) {
-  const blocks = [...article.querySelectorAll('.bk-block[data-width]')];
-  const scrollers = [...article.querySelectorAll(SCROLLERS)];
+  let blocks = [];
+  let scrollers = [];
+  const read = () => {
+    blocks = [...article.querySelectorAll('.bk-block[data-width]')];
+    scrollers = [...article.querySelectorAll(SCROLLERS)];
+    for (const scroller of scrollers) {
+      const fades = oncePerFrame(() => updateFades(scroller));
+      scroller.addEventListener('scroll', fades, { passive: true });
+    }
+  };
   const layout = oncePerFrame(() => {
     resolveWidths(article, blocks);
     scrollers.forEach(updateFades);
     layoutChanged();
   });
+  read();
   layout();
   new ResizeObserver(layout).observe(article);
   addEventListener('resize', layout);
   document.fonts.ready.then(layout);
   article.addEventListener('toggle', layout, true);
-  for (const scroller of scrollers) {
-    const fades = oncePerFrame(() => updateFades(scroller));
-    scroller.addEventListener('scroll', fades, { passive: true });
-  }
+  document.addEventListener(CONTENT_EVENT, () => {
+    read();
+    layout();
+  });
 }
 
 function resolveWidths(article, blocks) {

@@ -9,7 +9,7 @@ export function Toc(props) {
           <span class="bk-toc-label-notes">{labels.notes}</span>
         </p>
         <div class="bk-toc-list">
-          <ol class="bk-toc-chapters">
+          <ol class="bk-toc-chapters" data-region="toc">
             {toc.map((chapter) => (
               <li class="bk-toc-chapter" data-target={chapter.id} data-state="ahead">
                 <a class="bk-toc-chapter-title" href={`#${encodeURIComponent(chapter.id)}`}>

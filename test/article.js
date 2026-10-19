@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
-import { createSite } from '../src/build/links.js';
+import { indexPages } from '../src/build/links.js';
 import { parseArticle, readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
 
@@ -25,8 +25,8 @@ export async function parseSite(pages, options = {}) {
     const article = await readArticle(`${url.split('/')[2]}.md`, frontMatter + body, errors, { ...options, folder, url });
     entries.push({ url, title, draft, article });
   }
-  const site = createSite(entries);
-  for (const { article } of entries) article.link(site);
+  const site = indexPages(entries);
+  for (const { article } of entries) article.link(site, errors);
   const articles = Object.fromEntries(entries.map(({ url, article }) => [url, article.structure()]));
   return { articles, errors: sortErrors(errors).map(formatError) };
 }

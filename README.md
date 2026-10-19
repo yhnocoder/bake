@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` theme. The `bento` theme, the homepage, the table of contents styles other than `notes` and components are not built yet. `bake dev` is not implemented yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` theme. `bake dev` serves the same pages and updates them on every save. The `bento` theme, the homepage, the table of contents styles other than `notes` and components are not built yet.
 
 ## Commands
 
@@ -18,7 +18,21 @@ Run every command from the blog root, the folder that contains `bake.config.js`.
 
 `bake build` checks `bake.config.js` and the front matter and Markdown of every article, then writes each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts, styles and fonts of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
 
-You write Markdown in the text tool of your choice. `bake dev` will show each page exactly as it will be published; after you save, the page will update in place and keep its scroll position.
+### bake dev
+
+You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, and serves it at http://localhost:4321/. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. The terminal shows the local address and the addresses of the computer on the local network, so a phone on the same network can open the pages too. `bake dev` writes nothing into the blog folder, and it stops when you press Ctrl+C.
+
+Bake watches the blog folder and rebuilds what changed each time you save a file:
+
+- Saving the Markdown of an article replaces the article text on the open page in place. The scroll position, the table of contents and the open or closed state of every fold stay as they were. Each changed block is highlighted in light yellow for one second. When no changed block is on the screen, a notice at the bottom of the page names the section of the change, and clicking the notice scrolls there. Bake checks the links of every article again after each save, so the pages of other articles that link to the changed article or embed one of its sections are updated in the same way, and a link that no longer finds its target is reported.
+- Changing the front matter of an article, `bake.config.js`, `preamble.sty` or a file in `themes/` generates the page again, and the browser reloads it at the same scroll position.
+- Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
+
+Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While an article has errors, its page keeps showing the last version without errors, and the other articles keep updating. Errors outside the articles, such as in `bake.config.js`, `preamble.sty` or a theme, stop all updates until they are fixed.
+
+Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
+
+A draft shows the label Draft, or 草稿 on a Chinese site, next to its date. An address without a page, such as http://localhost:4321/ while Bake builds no homepage yet, lists every article with a link, drafts included.
 
 ## A blog repository
 
@@ -93,7 +107,7 @@ tags: [LLM]
 | `cover` | no | Path of an image in the article folder used as the share image. |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
 | `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. |
-| `draft` | no | `true` keeps the article out of `bake build`. |
+| `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
 | `page` | no | Path of an HTML file in the article folder. Bake publishes the folder unchanged and serves this file as the article's `index.html`. An `index.md` with `page` has no text after the front matter. |
 
 Any other field is an error, and two articles cannot have the same URL.
@@ -267,4 +281,4 @@ A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake 
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands. `make example` builds the example blog in `examples/blog/` and serves it at http://127.0.0.1:8000/.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands. `make example` builds the example blog in `examples/blog/` and serves it at http://127.0.0.1:8000/, and `make dev` runs `bake dev` on the example blog.

@@ -1,7 +1,7 @@
 import { labelsFor } from '../labels.js';
 import { drawerView } from './drawer.js';
 import { followLink } from './heading-links.jsx';
-import { LAYOUT_EVENT, oncePerFrame } from './motion.js';
+import { CONTENT_EVENT, LAYOUT_EVENT, oncePerFrame } from './motion.js';
 import { SETTING_EVENT } from './settings.jsx';
 import { readOutline } from './toc-card.js';
 import { dotsView } from './toc-dots.js';
@@ -47,7 +47,7 @@ export function startToc(article) {
       );
     },
   };
-  const column = notesColumn(nav, ctx);
+  let column = notesColumn(nav, ctx);
   const notesView = () => ({
     columns: [nav.querySelector('.bk-toc-column')],
     update: (next) => column.update(next),
@@ -66,10 +66,10 @@ export function startToc(article) {
     crossing = blocksCrossing(view.columns ?? [], article);
     update();
   });
-  const mount = () => {
+  const mount = (again = false) => {
     const style = root.dataset.toc;
     const next = !mediumScreen.matches ? 'drawer' : style === 'notes' ? (wideScreen.matches ? 'notes' : 'rail') : style;
-    if (next === kind) return;
+    if (next === kind && !again) return;
     view?.destroy();
     for (const element of document.querySelectorAll('.is-yielding')) element.classList.remove('is-yielding');
     kind = next;
@@ -89,15 +89,25 @@ export function startToc(article) {
   };
   nav.addEventListener('click', onClick);
   host.addEventListener('click', onClick);
+  const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add('is-ready')));
+  const reread = () => {
+    nav.classList.remove('is-ready');
+    column.destroy();
+    ctx.outline = readOutline(nav);
+    column = notesColumn(nav, ctx);
+    mount(true);
+    settle();
+  };
   mount();
-  requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add('is-ready')));
+  settle();
   addEventListener('scroll', update, { passive: true });
   addEventListener('resize', layout);
   document.addEventListener(LAYOUT_EVENT, layout);
   document.fonts.addEventListener('loadingdone', layout);
+  document.addEventListener(CONTENT_EVENT, reread);
   new ResizeObserver(layout).observe(article);
-  wideScreen.addEventListener('change', mount);
-  mediumScreen.addEventListener('change', mount);
+  wideScreen.addEventListener('change', () => mount());
+  mediumScreen.addEventListener('change', () => mount());
   document.addEventListener(SETTING_EVENT, (event) => {
     if (event.detail.name === 'toc') mount();
   });

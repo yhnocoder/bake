@@ -1,35 +1,50 @@
 import { labelsFor } from '../labels.js';
-import { LAYOUT_EVENT, expand, flash, oncePerFrame, reducedMotion, stopAnimations } from './motion.js';
+import { CONTENT_EVENT, LAYOUT_EVENT, expand, flash, oncePerFrame, reducedMotion, stopAnimations } from './motion.js';
 
 const wideScreen = matchMedia('(min-width: 1000px)');
 const NOTE_GAP = 12;
 const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, summary, .bk-block';
 
 export function startNotes(article) {
-  const originals = [...article.querySelectorAll('.bk-sidenote')];
-  if (originals.length === 0) return;
   const labels = labelsFor(document.documentElement.lang);
-  const layer = document.createElement('div');
-  layer.className = 'bk-notes-layer';
-  const placed = originals.map((original) => {
-    const note = original.cloneNode(true);
-    for (const element of [note, ...note.querySelectorAll('[id]')]) element.removeAttribute('id');
-    note.setAttribute('aria-label', labels.sidenote(original.dataset.sidenote));
-    layer.append(note);
-    return { note, number: original.dataset.sidenote };
-  });
-  article.append(layer);
+  let layer = null;
+  let placed = [];
+  let active = null;
+  const read = () => {
+    layer?.remove();
+    active = null;
+    const originals = [...article.querySelectorAll('.bk-sidenote')];
+    layer = null;
+    placed = [];
+    if (originals.length === 0) return;
+    layer = document.createElement('div');
+    layer.className = 'bk-notes-layer';
+    placed = originals.map((original) => {
+      const note = original.cloneNode(true);
+      for (const element of [note, ...note.querySelectorAll('[id]')]) element.removeAttribute('id');
+      note.setAttribute('aria-label', labels.sidenote(original.dataset.sidenote));
+      layer.append(note);
+      return { note, number: original.dataset.sidenote };
+    });
+    article.append(layer);
+  };
 
-  const layout = oncePerFrame(() => placeNotes(article, layer, placed));
+  const layout = oncePerFrame(() => {
+    if (layer !== null) placeNotes(article, layer, placed);
+  });
+  read();
   layout();
   new ResizeObserver(layout).observe(article);
   addEventListener('resize', layout);
   document.addEventListener(LAYOUT_EVENT, layout);
+  document.addEventListener(CONTENT_EVENT, () => {
+    read();
+    layout();
+  });
   document.fonts.ready.then(layout);
   document.fonts.addEventListener('loadingdone', layout);
   wideScreen.addEventListener('change', layout);
 
-  let active = null;
   const activate = (number) => {
     if (number === active) return;
     if (active !== null) highlight(article, layer, active, false);
@@ -50,7 +65,7 @@ export function startNotes(article) {
     event.preventDefault();
     const number = link.parentElement.dataset.sidenote;
     if (wideScreen.matches) {
-      const note = layer.querySelector(`.bk-sidenote[data-sidenote="${number}"]`);
+      const note = layer?.querySelector(`.bk-sidenote[data-sidenote="${number}"]`) ?? null;
       if (note !== null) flash(note);
       return;
     }
@@ -125,7 +140,7 @@ function lineOf(ref) {
 
 function highlight(article, layer, number, on) {
   for (const element of article.querySelectorAll(`.sidenote-ref[data-sidenote="${number}"]`)) element.classList.toggle('is-active', on);
-  layer.querySelector(`.bk-sidenote[data-sidenote="${number}"]`)?.classList.toggle('is-active', on);
+  layer?.querySelector(`.bk-sidenote[data-sidenote="${number}"]`)?.classList.toggle('is-active', on);
   const container = visibleReference(article, number)?.parentElement.closest(TINTED_CONTAINER);
   if (container === null || container === undefined) return;
   if (!container.classList.contains('bk-tintable')) {
