@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, posix } from 'node:path';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import { errorAt, fileStart } from '../report.js';
 import { contentType } from './content-types.js';
 import { DIST_DIR } from './dist.js';
@@ -22,14 +23,23 @@ const DRAW_TIMEOUT = 10000;
 const HASH_LENGTH = 12;
 const CARD_TEMPLATE = readFileSync(join(import.meta.dirname, 'share-card.js'));
 const PLAYWRIGHT_VERSION = createRequire(import.meta.url)('playwright/package.json').version;
+const PNG = { extension: '.png', type: 'image/png' };
+const PUBLISHED_COVERS = {
+  png: PNG,
+  jpeg: { extension: '.jpg', type: 'image/jpeg' },
+  gif: { extension: '.gif', type: 'image/gif' },
+  webp: { extension: '.webp', type: 'image/webp' },
+};
 
 export function shareImageOf(root, article, config, assets) {
   const { fields } = article;
   const name = `${SHARE_IMAGE_DIR}${article.url.slice(0, -1)}`;
   if (fields.cover !== undefined) {
     const from = join(root, article.dir, fields.cover);
-    const path = `${name}-${digest([readFileSync(from)])}${posix.extname(fields.cover).toLowerCase()}`;
-    return { path, owner: article.file, from, width: article.cover.width, height: article.cover.height };
+    const { format, width, height } = article.cover;
+    const published = PUBLISHED_COVERS[format];
+    const image = { path: `${name}-${digest([readFileSync(from)])}${(published ?? PNG).extension}`, owner: article.file, type: (published ?? PNG).type, width, height };
+    return published === undefined ? { ...image, render: () => sharp(from).png().toBuffer() } : { ...image, from };
   }
   const category = config.categories.find((entry) => entry.id === fields.category);
   const card = {
@@ -48,6 +58,7 @@ export function shareImageOf(root, article, config, assets) {
   return {
     path: `${name}-${digest(inputs)}.png`,
     owner: article.file,
+    type: PNG.type,
     width: SHARE_IMAGE_WIDTH,
     height: SHARE_IMAGE_HEIGHT,
     card,
@@ -62,6 +73,7 @@ export async function shareImageOutputs(root, images, assets, errors) {
   for (const image of images) {
     const published = join(root, DIST_DIR, image.path);
     if (image.from !== undefined) outputs.push({ path: image.path, from: image.from, owner: image.owner });
+    else if (image.render !== undefined) outputs.push({ path: image.path, render: image.render, owner: image.owner });
     else if (existsSync(published)) outputs.push({ path: image.path, from: published, owner: image.owner });
     else pending.push(image);
   }

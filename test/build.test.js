@@ -48,7 +48,7 @@ describe('bake build', () => {
       Object.keys(tree)
         .filter((path) => path.startsWith('og/'))
         .map((path) => path.replace(/-[0-9a-f]{12}\.png$/, '')),
-      ['og/2026-08/demo', 'og/2026-09/part-1', 'og/2026-09/series', 'og/2026-10/rope'],
+      ['og/2026-09/part-1', 'og/2026-09/series', 'og/2026-10/rope'],
     );
     assert.deepEqual(articleFiles(tree), [
       'CNAME',

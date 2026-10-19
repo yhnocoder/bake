@@ -52,7 +52,7 @@ export async function updateSite(site, changedPaths = null) {
   const [themes, bundle] = await Promise.all([compileThemes(site, published, settings.config, errors), compileComponents(site, published, errors)]);
   const { config } = settings;
   const assetFiles = assetOutputs(themes, bundle);
-  const shareImages = site.shareImages && errors.length === 0 ? shareImagesOf(root, published, config, assetFiles) : new Map();
+  const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, published, config, assetFiles, errors) : new Map();
   const pageSettings = { config, themes, bundle, shareImages, mathStyles: await mathStyles() };
   const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
   const entries = published.map((article) => homeEntry(article, config)).sort(newestFirst);
@@ -95,9 +95,10 @@ async function compileThemes(site, published, config, errors) {
   return themes;
 }
 
-function shareImagesOf(root, published, config, assetFiles) {
+function shareImagesOf(root, published, config, assetFiles, errors) {
   const sources = new Map(assetFiles.map((file) => [file.path, file.render()]));
-  const listed = published.filter((article) => article.fields.draft !== true);
+  const failed = new Set(errors.map((error) => error.file));
+  const listed = published.filter((article) => article.fields.draft !== true && article.fields.page === undefined && !failed.has(article.file));
   return new Map(listed.map((article) => [article.file, shareImageOf(root, article, config, sources)]));
 }
 
@@ -225,7 +226,7 @@ async function loadArticle(root, article, { rules, preamble, components }) {
 
 async function readCover(path, cover, file, position, errors) {
   const image = await readImage(path);
-  if (image.width !== undefined) return { width: image.width, height: image.height };
+  if (image.width !== undefined) return { format: image.format, width: image.width, height: image.height };
   const problem = image.error === undefined ? `must be a ${IMAGE_FORMATS} image` : `cannot be read: ${image.error}`;
   errors.push(errorAt(file, position, `cover ${JSON.stringify(cover)} ${problem}`));
   return undefined;
@@ -300,7 +301,7 @@ function renderArticle(article, { config, themes, bundle, shareImages, mathStyle
 
 function shareImageProps(config, image) {
   if (image === undefined) return undefined;
-  return { link: absoluteLink(config, image.path), width: image.width, height: image.height };
+  return { link: absoluteLink(config, image.path), type: image.type, width: image.width, height: image.height };
 }
 
 function publicOutputs(root, outputs, errors) {

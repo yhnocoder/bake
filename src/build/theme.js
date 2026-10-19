@@ -17,7 +17,8 @@ export const THEME_STYLES_PATH = '_bake/theme.css';
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const RENDER_ENTRY = 'bake:render';
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
-const RELATIVE_IMPORT = /^(\.\.?\/.*)$/;
+const RELATIVE_IMPORT = /^\.\.?[/]/;
+const CSS_IMPORT = /(@import\s+(?:url\(\s*)?)(['"])(\.\.?\/[^'"]+)\2/g;
 const ASSET_FILE_NAMES = 'assets/[name]-[hash][extname]';
 
 export async function compileTheme(root, name, { siteTheme }, errors) {
@@ -64,13 +65,25 @@ function fileLocator(folders) {
   return (path) => folders.map((folder) => join(folder, path)).find((file) => existsSync(file)) ?? null;
 }
 
-function themeFileResolver(folders, locate) {
-  return (source, importer) => {
-    if (importer === undefined) return null;
+function themeFiles(folders, locate) {
+  const resolveThemeFile = (source, importer) => {
+    if (importer === undefined || !RELATIVE_IMPORT.test(source)) return null;
     const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
     if (folder === undefined) return null;
     const path = relative(folder, resolve(dirname(importer), source));
     return path.startsWith('..') ? null : locate(path);
+  };
+  return {
+    name: 'bake-theme-files',
+    enforce: 'pre',
+    resolveId: resolveThemeFile,
+    transform(code, id) {
+      if (!id.endsWith('.css')) return null;
+      return code.replace(CSS_IMPORT, (match, start, quote, source) => {
+        const file = resolveThemeFile(source, id);
+        return file === null ? match : `${start}${JSON.stringify(file)}`;
+      });
+    },
   };
 }
 
@@ -105,11 +118,7 @@ function renderEntry(locate, siteTheme) {
 }
 
 function sharedConfig(folders, locate, plugins) {
-  const config = viteConfig(plugins);
-  return {
-    ...config,
-    resolve: { ...config.resolve, alias: [{ find: RELATIVE_IMPORT, replacement: '$1', customResolver: themeFileResolver(folders, locate) }] },
-  };
+  return viteConfig([themeFiles(folders, locate), ...plugins]);
 }
 
 function serverConfig(folders, locate, siteTheme) {

@@ -52,31 +52,42 @@ function pixel(png, x, y) {
 }
 
 function imageTags(html) {
-  return [...html.matchAll(/<meta (?:property="og:image[^"]*"|name="twitter:image") content="[^"]*">/g)].map(([tag]) => tag);
+  return [...html.matchAll(/<meta (?:property="og:image[^"]*"|name="twitter:(?:image|card)") content="[^"]*">/g)].map(([tag]) => tag);
 }
 
 describe('share images', () => {
   let cover;
+  let photo;
   before(async () => {
     cover = await sharp({ create: { width: 300, height: 200, channels: 3, background: '#ff0000' } }).png().toBuffer();
+    photo = await sharp({ create: { width: 320, height: 180, channels: 3, background: '#00ff00' } }).jpeg().toBuffer();
   });
 
-  test('bake build draws a card for every published article and page, publishes a cover unchanged and copies unchanged cards from dist/', (t) => {
+  test('bake build draws a card for every published article, publishes covers and copies unchanged cards from dist/', async (t) => {
     const dir = createBlog(t, {
       ...blogFiles,
       'content/posts/covered/index.md': article({ title: 'Covered', slug: 'covered', date: '2026-10-01', extra: 'category: notes\ncover: cover.png\n' }),
+      'content/posts/photo/index.md': article({ title: 'Photo', slug: 'photo', date: '2026-10-02', extra: 'category: notes\ncover: photo.png\n' }),
+      'content/posts/vector/index.md': article({ title: 'Vector', slug: 'vector', date: '2026-10-03', extra: 'category: notes\ncover: cover.svg\n' }),
+      'content/posts/vector/cover.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="210"><rect width="400" height="210" fill="#0000ff"/></svg>\n',
     });
     writeFileSync(join(dir, 'content/posts/covered/cover.png'), cover);
+    writeFileSync(join(dir, 'content/posts/photo/photo.png'), photo);
     const first = bake(dir, 'build');
     assert.equal(first.stderr, '');
     const images = readdirSync(join(dir, 'dist/og'), { recursive: true }).filter((path) => path.includes('.')).sort();
-    assert.equal(images.length, 4);
-    const [demo, plain, covered, rope] = images;
-    assert.match(covered, /^2026-10\/covered-[0-9a-f]{12}\.png$/);
-    assert.match(rope, /^2026-10\/rope-[0-9a-f]{12}\.png$/);
-    assert.match(demo, /^2026-09\/demo-[0-9a-f]{12}\.png$/);
+    assert.equal(images.length, 5);
+    const [plain, covered, photoImage, rope, vector] = images;
     assert.match(plain, /^2026-09\/plain-[0-9a-f]{12}\.png$/);
+    assert.match(covered, /^2026-10\/covered-[0-9a-f]{12}\.png$/);
+    assert.match(photoImage, /^2026-10\/photo-[0-9a-f]{12}\.jpg$/);
+    assert.match(rope, /^2026-10\/rope-[0-9a-f]{12}\.png$/);
+    assert.match(vector, /^2026-10\/vector-[0-9a-f]{12}\.png$/);
     assert.deepEqual(readFileSync(join(dir, 'dist/og', covered)), cover);
+    assert.deepEqual(readFileSync(join(dir, 'dist/og', photoImage)), photo);
+    const raster = PNG.sync.read(readFileSync(join(dir, 'dist/og', vector)));
+    assert.deepEqual([raster.width, raster.height], [400, 210]);
+    assert.deepEqual(pixel(raster, 200, 105), [0, 0, 255]);
 
     const card = PNG.sync.read(readFileSync(join(dir, 'dist/og', rope)));
     assert.deepEqual([card.width, card.height], [1200, 630]);
@@ -88,18 +99,19 @@ describe('share images', () => {
     assert.deepEqual(pixel(withoutPreview, 10, 315), [0x1b, 0xaf, 0x7a]);
 
     const page = (path) => readFileSync(join(dir, 'dist', path), 'utf8');
-    assert.deepEqual(imageTags(page('2026-10/rope/index.html')), [
-      `<meta property="og:image" content="https://x.github.io/bake/og/${rope}">`,
-      '<meta property="og:image:width" content="1200">',
-      '<meta property="og:image:height" content="630">',
-      `<meta name="twitter:image" content="https://x.github.io/bake/og/${rope}">`,
-    ]);
-    assert.deepEqual(imageTags(page('2026-10/covered/index.html')), [
-      `<meta property="og:image" content="https://x.github.io/bake/og/${covered}">`,
-      '<meta property="og:image:width" content="300">',
-      '<meta property="og:image:height" content="200">',
-      `<meta name="twitter:image" content="https://x.github.io/bake/og/${covered}">`,
-    ]);
+    const tags = (image, type, width, height) => [
+      '<meta name="twitter:card" content="summary_large_image">',
+      `<meta property="og:image" content="https://x.github.io/bake/og/${image}">`,
+      `<meta property="og:image:type" content="${type}">`,
+      `<meta property="og:image:width" content="${width}">`,
+      `<meta property="og:image:height" content="${height}">`,
+      `<meta name="twitter:image" content="https://x.github.io/bake/og/${image}">`,
+    ];
+    assert.deepEqual(imageTags(page('2026-10/rope/index.html')), tags(rope, 'image/png', 1200, 630));
+    assert.deepEqual(imageTags(page('2026-10/covered/index.html')), tags(covered, 'image/png', 300, 200));
+    assert.deepEqual(imageTags(page('2026-10/photo/index.html')), tags(photoImage, 'image/jpeg', 320, 180));
+    assert.deepEqual(imageTags(page('2026-10/vector/index.html')), tags(vector, 'image/png', 400, 210));
+    assert.deepEqual(imageTags(page('index.html')), ['<meta name="twitter:card" content="summary">']);
     assert.equal(page('2026-09/demo/index.html'), '<!doctype html>\n<p>demo</p>\n');
 
     const published = readTree(join(dir, 'dist'));
@@ -135,17 +147,26 @@ describe('share images', () => {
     assert.deepEqual(result.shareImages, []);
     const rope = result.pages.find((page) => page.article.file === ROPE);
     const html = rope.outputs.find((output) => output.path === '2026-10/rope/index.html').render();
-    assert.deepEqual(imageTags(html), []);
+    assert.deepEqual(imageTags(html), ['<meta name="twitter:card" content="summary">']);
     assert.ok(result.pages.every((page) => page.outputs.every((output) => !output.path.startsWith('og/'))));
   });
 
-  test('reports a preview that throws at its front matter field and leaves dist/ unchanged', (t) => {
+  test('reports a preview that throws at its front matter field together with the errors of other articles and leaves dist/ unchanged', (t) => {
     const dir = createBlog(t, {
       ...blogFiles,
+      'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-09-02', extra: 'category: notes\nauthor: me\n' }),
       'content/posts/rope/preview.js': "export default function preview() {\n  throw new Error('no frame');\n}\n",
       'dist/marker.txt': 'old\n',
     });
-    assert.equal(bake(dir, 'build').stderr, `${ROPE}:6:10 the preview cannot be drawn on the share image: no frame\n1 error, dist/ was not written\n`);
+    assert.equal(
+      bake(dir, 'build').stderr,
+      [
+        'content/posts/plain/index.md:6:1 unknown front matter field "author"',
+        `${ROPE}:6:10 the preview cannot be drawn on the share image: no frame`,
+        '2 errors, dist/ was not written',
+        '',
+      ].join('\n'),
+    );
     assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), ['marker.txt']);
   });
 
@@ -154,7 +175,7 @@ describe('share images', () => {
     const result = bakeWithoutChromium(t, dir);
     assert.match(
       result.stderr,
-      /^content\/posts\/demo\/index\.md:1:1 the share image needs Chromium, which cannot be launched \(.+\); install it with npx playwright install chromium\n1 error, dist\/ was not written\n$/,
+      /^content\/posts\/plain\/index\.md:1:1 the share image needs Chromium, which cannot be launched \(.+\); install it with npx playwright install chromium\n1 error, dist\/ was not written\n$/,
     );
     assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), ['marker.txt']);
   });

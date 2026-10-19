@@ -5,10 +5,11 @@ import { createSite, updateSite } from './site.js';
 
 export async function build(root) {
   const site = await updateSite(createSite(root, { shareImages: true }));
-  if (site.errors.length > 0) return { errors: site.errors };
-  const errors = [];
+  const failed = new Set(site.errors.map((error) => error.file));
+  const errors = [...site.errors];
   const assets = new Map(site.assetFiles.map((output) => [output.path, output.render()]));
-  const shareImages = await shareImageOutputs(root, site.shareImages, assets, errors);
+  const images = site.shareImages.filter((image) => !failed.has(image.owner));
+  const shareImages = await shareImageOutputs(root, images, assets, errors);
   if (errors.length > 0) return { errors: sortErrors(errors) };
   await writeDist(root, [...site.pages.flatMap((page) => page.outputs), site.home, ...site.siteFiles, ...site.assetFiles, ...shareImages, ...site.publicFiles]);
   return { errors: [], pages: site.pages.length };
