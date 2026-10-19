@@ -410,6 +410,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready', otherSelector);
     await otherControl('range').locator('.number').fill('7');
     await watchFrames();
+    await bar.locator('.write').scrollIntoViewIfNeeded();
     const before = await top();
     await bar.locator('.write').click();
     await message.filter({ hasText: `Wrote line ${line} of ${SYNTAX}` }).waitFor();
