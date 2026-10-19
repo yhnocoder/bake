@@ -14,6 +14,8 @@ const CHINESE = {
   sidenote: (number) => `旁注 ${number}`,
   componentNeedsScript: '交互图需要 JavaScript 才能显示',
   componentFailed: '交互图未能加载',
+  openOriginal: '点击跳转到原文',
+  embedSource: { before: '出自《', after: '》' },
 };
 
 const ENGLISH = {
@@ -32,6 +34,8 @@ const ENGLISH = {
   sidenote: (number) => `Sidenote ${number}`,
   componentNeedsScript: 'This interactive figure needs JavaScript',
   componentFailed: 'This interactive figure could not be loaded',
+  openOriginal: 'Click to open the original',
+  embedSource: { before: 'From “', after: '”' },
 };
 
 export function labelsFor(language) {

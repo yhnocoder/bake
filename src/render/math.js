@@ -18,6 +18,10 @@ const LABEL_NAME = /\\label\s*\{([^{}]*)\}/g;
 const REFERENCE = /\\(?:eq)?ref\s*\{([^{}]*)\}/g;
 const ID_ATTRIBUTE = / id="([^"]*)"/g;
 const LATEX_ATTRIBUTE = / data-latex(?:-item)?="[^"]*"/g;
+const GLYPH_PATH = /<path id="([^"]+)"[^>]*><\/path>/g;
+const GLYPH_USE = /xlink:href="#([^"]+)"/g;
+const IN_PAGE_HREF = / href="#/g;
+const GLYPH_DEFS_END = '</defs>';
 
 export const EQUATION_ID_PREFIX = 'eq-';
 
@@ -99,4 +103,23 @@ export async function mathStyles() {
 
 export function equationHref(id) {
   return `#${encodeURIComponent(id)}`;
+}
+
+export function relocateMath(html, base) {
+  return html.replace(ID_ATTRIBUTE, '').replace(IN_PAGE_HREF, () => ` href="${base}#`);
+}
+
+export function addGlyphs(own, borrowed, html) {
+  const known = new Set(own === undefined ? [] : [...own.matchAll(GLYPH_PATH)].map(([, id]) => id));
+  const used = new Set(html.flatMap((fragment) => [...fragment.matchAll(GLYPH_USE)].map(([, id]) => id)));
+  const added = new Map();
+  for (const fragment of borrowed) {
+    for (const [path, id] of fragment?.matchAll(GLYPH_PATH) ?? []) {
+      if (used.has(id) && !known.has(id)) added.set(id, path);
+    }
+  }
+  if (added.size === 0) return own;
+  const paths = [...added.values()].join('');
+  if (own !== undefined) return own.replace(GLYPH_DEFS_END, () => `${paths}${GLYPH_DEFS_END}`);
+  return `<svg style="display: none;" xmlns="http://www.w3.org/2000/svg" id="MJX-SVG-global-cache"><defs>${paths}${GLYPH_DEFS_END}</svg>`;
 }

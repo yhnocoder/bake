@@ -479,6 +479,73 @@ h4 + .bk-references {
   color: var(--ink-3);
 }
 
+.bk-article .embed:where(:not(.component-box *)) {
+  clear: both;
+  margin: 0 0 16px;
+  padding-left: 20px;
+  border-left: 1px solid var(--line-2);
+}
+
+.bk-block > .embed:where(:not(.component-box *)) {
+  margin: 0;
+}
+
+.bk-article .embed-part + .embed-part:where(:not(.component-box *)) {
+  margin-top: 16px;
+}
+
+.bk-article .embed :is(h2, h3, h4, h5, h6):where(:not(.component-box *)) {
+  margin: 0 0 8px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.bk-article .embed h2:where(:not(.component-box *)) {
+  font-size: 21px;
+  line-height: 1.4;
+}
+
+.bk-article .embed-part > :nth-last-child(2):where(:not(.component-box *)) {
+  margin-bottom: 4px;
+}
+
+.bk-article .embed-source:where(:not(.component-box *)) {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.bk-article .embed-source a:where(:not(.component-box *)) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bk-article .embed-source a:hover:where(:not(.component-box *)) {
+  color: var(--accent);
+}
+
+.bk-article .embed-source a:where(:not(.component-box *))::after {
+  content: ' ↗';
+}
+
+.bk-article .embed-source cite:where(:not(.component-box *)) {
+  font-style: normal;
+}
+
+.bk-article .embed-source cite:where(:not(.component-box *))::before {
+  content: var(--bk-embed-source-before);
+}
+
+.bk-article .embed-source cite:where(:not(.component-box *))::after {
+  content: var(--bk-embed-source-after);
+}
+
+.bk-article .embed-number:where(:not(.component-box *)) {
+  margin-left: 0.2em;
+}
+
 .bk-article .recap:where(:not(.component-box *)) {
   margin: 0 0 16px;
   padding-left: 12px;

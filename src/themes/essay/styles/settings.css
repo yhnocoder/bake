@@ -226,6 +226,129 @@
   margin: 0;
 }
 
+.bk-preview[data-kind='link'] {
+  display: block;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  font-size: 13.5px;
+  line-height: 1.75;
+  cursor: pointer;
+}
+
+.bk-preview :is(.bk-preview-source, .bk-preview-hint) {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.bk-preview-title {
+  margin: 2px 0 4px;
+  font-family: var(--font-heading);
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.bk-preview-title:first-child {
+  margin-top: 0;
+}
+
+.bk-preview-body {
+  max-height: 240px;
+  overflow: hidden;
+}
+
+.bk-preview-body[data-clipped] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+}
+
+.bk-preview-body > :first-child {
+  margin-top: 0;
+}
+
+.bk-preview-body > :last-child {
+  margin-bottom: 0;
+}
+
+.bk-preview-body :is(p, ul, ol, blockquote, .table-scroll, .figure, .aside, .component-caption) {
+  margin: 0 0 8px;
+}
+
+.bk-preview-body :is(ul, ol) {
+  padding-left: 20px;
+}
+
+.bk-preview-body :is(h3, h4, h5, h6) {
+  margin: 8px 0 4px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+}
+
+.bk-preview-body a {
+  color: var(--accent);
+}
+
+.bk-preview-body mark {
+  background: linear-gradient(transparent 58%, var(--mark) 58%);
+  color: inherit;
+}
+
+.bk-preview-body code {
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+}
+
+.bk-preview-body mjx-container[display] {
+  display: flex;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.bk-preview-body mjx-container[display] > svg {
+  margin: 0 auto;
+}
+
+.bk-preview-body mjx-container[display][width='full'] > svg {
+  flex: 1 0 auto;
+}
+
+.bk-preview-body pre.shiki {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--code-background);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.bk-preview-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+.bk-preview-body .component-caption {
+  padding: 10px 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.bk-preview-body .component-caption > :last-child {
+  margin-bottom: 0;
+}
+
+.bk-preview .bk-preview-hint {
+  margin-top: 6px;
+}
+
 @media (max-width: 1339.98px) {
   :root {
     --ui-bottom: 24px;
@@ -272,5 +395,10 @@
   .bk-toast,
   .bk-preview {
     translate: 0 0;
+  }
+
+  .bk-preview,
+  .bk-preview.is-on {
+    transition: none;
   }
 }
