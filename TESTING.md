@@ -36,7 +36,7 @@ Today CI runs `make check`, then installs Playwright's Chromium and runs `npm ru
 
 ## Browsers
 
-Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On macOS, `make browser` downloads Playwright's Chromium; run it once before the first `make screenshots`.
+Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. A browser test builds its blog into a temporary directory and serves `dist/` over HTTP on a free port with `test/browser/server.js`, so the page loads its scripts and fonts the way a published site does. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On macOS, `make browser` downloads Playwright's Chromium; run it once before the first `make screenshots`.
 
 ## Screenshots in pull requests
 

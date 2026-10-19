@@ -162,7 +162,7 @@ toc: notes
 
 ## 参考文献 {#citations}
 
-正文里写 `[@名字]`，页面上按第一次出现的顺序编号为 [1]、[2]。列表写在 `:::references` 里，引用了列表中没有的名字时构建报错。
+正文里写 `[@名字]`，页面上按第一次出现的顺序编号为 [1]、[2]。列表写在 `:::references` 里，引用了列表中没有的名字时构建报错。正文没有引用的条目排在编号条目后面，不编号。`:::references` 紧跟在标题后面时，页面不再显示「参考文献」这个标签。
 
 ::::example
 门控形式能在同参数量下压低 loss [@shazeer2020]，GELU 的定义见 [@gelu]。
@@ -170,6 +170,7 @@ toc: notes
 :::references
 - [@shazeer2020] Shazeer. *GLU Variants Improve Transformer*. 2020.
 - [@gelu] Hendrycks, Gimpel. *Gaussian Error Linear Units*. 2016.
+- [@vaswani2017] Vaswani et al. *Attention Is All You Need*. 2017.
 :::
 ::::
 
@@ -235,7 +236,7 @@ def swiglu(x, w_gate, w_up, w_down):
 
 ## 表格与 list-table {#tables}
 
-单元格里只有单行内容时用竖线表格，单元格里可以写行内公式、图片和链接。表格的自然宽度超过正文时扩展到 wide。
+单元格里只有单行内容时用竖线表格，单元格里可以写行内公式、图片和链接。竖线表格的单元格不换行，表格的自然宽度超过正文时扩展到 wide。
 
 :::example
 | 模型 | 激活函数 | 上界 | $d_{ff} / d$ | 参数量 | 发布 |
@@ -304,7 +305,7 @@ GELU 用标准正态分布的累积分布函数给输入加权，曲线在 0 附
 
 ## 宽度写法 {#width width=wide}
 
-公式、代码、表格、图片和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。这一章的标题写了 `{width=wide}`，在 bento 主题里占两列。
+公式、代码、表格和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。图片不写尺寸时不超过正文宽度，图片文件再宽也不会自动扩展；写了比正文宽的像素宽度时，图片按这个宽度扩展到 wide。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。这一章的标题写了 `{width=wide}`，在 bento 主题里占两列。
 
 ::::example
 :::{width=page}

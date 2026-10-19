@@ -136,9 +136,9 @@ describe('images', () => {
       'index.md:23:1 image huge.png cannot be read: Input image exceeds pixel limit',
     ]);
   });
-  test('gives a figure its pixel width as the natural width and none for a percentage', async (t) => {
+  test('gives a figure its written pixel width as the natural width and none without a size or with a percentage', async (t) => {
     const options = { folder: await imageFolder(t, { 'plot.svg': svg }) };
     const blocks = (await parsed('![](plot.svg)\n\n![](plot.svg){width=560px}\n\n![](plot.svg){width=70%}\n', options)).intro;
-    assert.deepEqual(blocks.map((block) => block.naturalWidth), ['320px', '560px', undefined]);
+    assert.deepEqual(blocks.map((block) => block.naturalWidth), [undefined, '560px', undefined]);
   });
 });

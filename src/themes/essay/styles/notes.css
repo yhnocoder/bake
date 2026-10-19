@@ -1,0 +1,144 @@
+.sidenote-ref {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 0;
+  vertical-align: super;
+  margin: 0 1px;
+}
+
+.sidenote-ref a {
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: background-color 0.3s ease-out;
+}
+
+.sidenote-ref.is-active a {
+  background-color: var(--mark);
+  transition-duration: 0.15s;
+}
+
+.bk-sidenote {
+  display: none;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  transition:
+    color 0.3s ease-out,
+    background-color 0.3s ease-out;
+}
+
+html:not([data-script]) .bk-article .bk-sidenote {
+  display: block;
+  margin: 4px 0 14px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--line-2);
+}
+
+.bk-sidenote-number {
+  margin-right: 6px;
+  border-radius: 3px;
+  padding: 0 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  transition: background-color 0.3s ease-out;
+}
+
+.bk-sidenote-body,
+.bk-sidenote-body > :first-child {
+  display: inline;
+}
+
+.bk-sidenote-body p {
+  margin: 0 0 6px;
+}
+
+.bk-sidenote-body > :last-child {
+  margin-bottom: 0;
+}
+
+.bk-sidenote.is-active {
+  color: var(--ink);
+  transition-duration: 0.15s;
+}
+
+.bk-sidenote.is-active .bk-sidenote-number {
+  background-color: var(--mark);
+  transition-duration: 0.15s;
+}
+
+.bk-tintable {
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px transparent;
+  transition:
+    background-color 0.3s ease-out,
+    box-shadow 0.3s ease-out;
+}
+
+.bk-tintable.bk-tinted {
+  background-color: color-mix(in srgb, var(--mark) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mark) 60%, transparent);
+  transition-duration: 0.15s;
+}
+
+.bk-notes-layer {
+  position: absolute;
+  top: 0;
+  left: calc(var(--body-width) + var(--column-gap));
+  width: var(--notes-width);
+  height: 0;
+}
+
+.bk-notes-layer .bk-sidenote {
+  display: block;
+  position: absolute;
+  left: 0;
+  width: 100%;
+}
+
+.bk-notes-layer .bk-sidenote[hidden] {
+  display: none;
+}
+
+@media (max-width: 999.98px) {
+  .bk-notes-layer {
+    display: none;
+  }
+
+  .sidenote-ref a {
+    padding: 2px 4px;
+  }
+
+  .bk-article .bk-sidenote.is-open {
+    display: block;
+    margin: 6px 0 14px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
+    font-size: 14px;
+  }
+}
+
+@media print {
+  .bk-notes-layer {
+    display: none;
+  }
+
+  .bk-article .bk-sidenote {
+    display: block;
+    margin: 4px 0 12px;
+    padding: 6px 10px;
+    border-left: 2px solid var(--line-2);
+    background: none;
+    font-size: 9.5pt;
+    break-inside: avoid;
+  }
+
+  .sidenote-ref a {
+    padding: 0;
+  }
+}

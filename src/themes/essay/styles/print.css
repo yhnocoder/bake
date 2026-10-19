@@ -1,0 +1,69 @@
+@media print {
+  :root {
+    --body-width: 100%;
+    --wide-width: 100%;
+    --page-width: 100%;
+    --body-left: 0px;
+    --page-shift: 0px;
+  }
+
+  body {
+    background: none;
+    font-size: 11.5pt;
+  }
+
+  .bk-shell {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .bk-toc,
+  .bk-settings,
+  .bk-toast,
+  .bk-heading-link {
+    display: none !important;
+  }
+
+  .bk-header {
+    padding-top: 0;
+  }
+
+  .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]) {
+    overflow: visible;
+    mask-image: none !important;
+  }
+
+  .bk-article pre.shiki {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .bk-article :is(th, td) {
+    white-space: normal;
+  }
+
+  .bk-article details.fold::details-content {
+    content-visibility: visible;
+    height: auto;
+    opacity: 1;
+  }
+
+  .bk-article details.fold > summary::after {
+    display: none;
+  }
+
+  .bk-article .example {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bk-block,
+  .bk-article :is(.figure, .aside, .quote, blockquote, .example) {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .bk-article a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
