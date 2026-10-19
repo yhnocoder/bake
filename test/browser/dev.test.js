@@ -332,13 +332,6 @@ test('bake dev shows a parameter bar on each component of the article that chang
       window.openedUrls = [...(window.openedUrls ?? []), [url, target]];
       return null;
     };
-    const Source = window.EventSource;
-    window.EventSource = class extends Source {
-      constructor(...args) {
-        super(...args);
-        window.devEvents = this;
-      }
-    };
   });
   const page = await context.newPage();
   const url = `${server.url}2026-10/syntax/`;
@@ -366,7 +359,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
         ['beta', 'β 初始值', ['range', 'number']],
       ],
     );
-    assert.deepEqual(await bar.locator('button').allTextContents(), ['Write to file', 'Copy', 'Reset']);
+    assert.deepEqual(await bar.locator('button').allTextContents(), ['Reset', 'Copy', 'Write to file']);
     assert.equal(await frame.locator('.component-box').evaluate((box) => box.getBoundingClientRect().height), 340);
     assert.ok(await page.evaluate((selector) => document.querySelector(selector).querySelector('bake-param-bar').nextElementSibling.matches('.component-box'), frameSelector));
     assert.equal(await page.locator('figure.component bake-param-bar').count(), await page.locator('[data-region] figure.component[data-line]').count());
@@ -390,25 +383,75 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal(await bar.locator('.write').isDisabled(), false);
   });
 
-  await t.test('Write to file rewrites the directive line, and the page updates in place with one highlight', async () => {
-    await page.evaluate(() => {
+  const otherSelector = `figure.component[data-line="${lineOf(original, ':::act-fn-plot{fn=gelu}')}"]`;
+  const otherControl = (param) => page.locator(`${otherSelector} bake-param-bar .control[data-param="${param}"]`);
+  const watchFrames = () =>
+    page.evaluate(() => {
       window.highlighted = [];
-      window.keptAcrossUpdates = true;
+      window.states = [];
+      window.shifts = [];
+      for (const element of document.querySelectorAll('figure.component .component-box > *')) element.bakeMarker = true;
+      for (const frame of document.querySelectorAll('figure.component')) {
+        new MutationObserver(() => window.states.push(frame.dataset.state)).observe(frame, { attributes: true, attributeFilter: ['data-state'] });
+      }
+      if (window.animatePatched) return;
+      window.animatePatched = true;
       const animate = Element.prototype.animate;
       Element.prototype.animate = function (keyframes, options) {
         if (options?.id === 'bake-changed') window.highlighted.push(this.className);
         return animate.call(this, keyframes, options);
       };
     });
+  const unmarked = () => page.evaluate(() => [...document.querySelectorAll('figure.component[data-state="ready"] .component-box > *')].filter((element) => !element.bakeMarker).map((element) => element.localName));
+  const top = () => frame.evaluate((element) => element.getBoundingClientRect().top);
+  const edit = (from, to) => writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
+
+  await t.test('Write to file rewrites the line, and the update keeps every component running without a highlight', async () => {
+    await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready', otherSelector);
+    await otherControl('range').locator('.number').fill('7');
+    await watchFrames();
+    const before = await top();
     await bar.locator('.write').click();
     await message.filter({ hasText: `Wrote line ${line} of ${SYNTAX}` }).waitFor();
     assert.equal(readFileSync(file, 'utf8'), original.replace(directive, `:::act-fn-plot{fn=silu range=6 beta=${beta} width=body}`));
     await page.waitForFunction(([selector, expected]) => JSON.parse(document.querySelector(selector).dataset.params).beta === expected, [frameSelector, beta]);
-    await page.waitForFunction((selector) => document.querySelector(selector).dataset.state === 'ready', frameSelector);
-    assert.deepEqual(await page.evaluate(() => [window.keptAcrossUpdates, window.highlighted]), [true, ['bk-block']]);
+    await page.waitForTimeout(300);
+    assert.deepEqual(await page.evaluate(() => [window.highlighted, window.states]), [[], []]);
+    assert.deepEqual(await unmarked(), []);
+    assert.equal(await top(), before);
+    assert.equal(await message.isVisible(), true);
     assert.equal(await control('beta').getAttribute('data-changed'), null);
+    assert.equal(await bar.locator('.write').isDisabled(), true);
     assert.equal(Number(await control('beta').locator('.number').inputValue()), beta);
     assert.deepEqual(await liveParams(), { fn: 'silu', range: 6, beta });
+    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+  });
+
+  await t.test('an unrelated save keeps the components running and the unsaved values of the bars', async () => {
+    await watchFrames();
+    edit('这篇文章列出 Bake 的全部写法。', '这篇文章列出 Bake 的全部写法，第一次改。');
+    await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('第一次改'));
+    await page.waitForTimeout(300);
+    assert.deepEqual(await page.evaluate(() => window.states), []);
+    assert.deepEqual(await unmarked(), []);
+    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+  });
+
+  await t.test('a bar that a save replaces keeps its unsaved values and gives them to the restarted component', async () => {
+    edit('实线是精确 GELU', '实线是精确的 GELU');
+    await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('实线是精确的 GELU'), otherSelector);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 7, otherSelector);
+    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+    await page.locator(`${otherSelector} bake-param-bar .reset`).click();
+  });
+
+  await t.test('a parameter changed in the editor restarts the component and highlights its block once', async () => {
+    await watchFrames();
+    edit(`fn=silu range=6 beta=${beta}`, `fn=silu range=5 beta=${beta}`);
+    await page.waitForFunction((selector) => JSON.parse(document.querySelector(selector).dataset.params).range === 5, frameSelector);
+    await page.waitForFunction((selector) => document.querySelector(selector).dataset.state === 'ready', frameSelector);
+    assert.deepEqual(await page.evaluate(() => window.highlighted), ['bk-block']);
+    assert.deepEqual(await liveParams(), { fn: 'silu', range: 5, beta });
   });
 
   await t.test('Reset goes back to the values in the Markdown', async () => {
@@ -454,17 +497,37 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.click('#bake-dev .close');
   });
 
-  await t.test('Write refuses when the file changed after the page was built and keeps the message', async () => {
-    await page.evaluate(() => window.devEvents.close());
-    const edited = readFileSync(file, 'utf8').replace('这篇文章列出 Bake 的全部写法。', '这篇文章列出 Bake 的全部写法，已经改过。');
-    writeFileSync(file, edited);
-    await control('range').locator('.number').fill('9');
+  const refused = `${SYNTAX} changed after this page was built; save it in your editor and try again`;
+  const refuseThenWrite = async (range, text, waitForRefresh) => {
+    await control('range').locator('.number').fill(String(range));
+    let edited = null;
+    await page.route('**/__bake/params', async (route) => {
+      edit('全部写法，', `全部写法，${text}，`);
+      edited = readFileSync(file, 'utf8');
+      const response = await route.fetch();
+      if (waitForRefresh) await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
+      await route.fulfill({ response });
+    });
     await bar.locator('.write').click();
-    await message.filter({ hasText: `${SYNTAX} changed after this page was built; save it in your editor and try again` }).waitFor();
-    assert.equal(await message.getAttribute('data-kind'), 'error');
-    await page.waitForTimeout(4500);
-    assert.equal(await message.isVisible(), true);
+    await message.filter({ hasText: refused }).waitFor();
+    await page.unroute('**/__bake/params');
+    await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
+    await page.waitForTimeout(300);
+    assert.deepEqual([await message.isVisible(), await message.getAttribute('data-kind'), await message.textContent()], [true, 'error', refused]);
+    assert.deepEqual([await control('range').locator('.number').inputValue(), await control('range').getAttribute('data-changed')], [String(range), '']);
+    assert.equal((await liveParams()).range, range);
     assert.equal(readFileSync(file, 'utf8'), edited);
+    await bar.locator('.write').click();
+    await message.filter({ hasText: `Wrote line ${line}` }).waitFor();
+    assert.match(readFileSync(file, 'utf8'), new RegExp(`\\{fn=silu range=${range} beta`));
+  };
+
+  await t.test('Write refuses when the file changed before the page updated, keeps the message and values, and a second Write succeeds', async () => {
+    await refuseThenWrite(9, '第二次改', false);
+  });
+
+  await t.test('Write refuses when the page updated before the refusal arrived, and a second Write succeeds', async () => {
+    await refuseThenWrite(3, '第三次改', true);
   });
 
   await page.close();

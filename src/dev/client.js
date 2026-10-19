@@ -4,6 +4,7 @@
   const scrollKey = `bake-dev-scroll:${location.pathname}`;
   const pagePath = location.pathname.replace(/index\.html$/, '');
   const BLOCKS = '[data-region] [data-line]';
+  const FRAME = 'figure.component[data-line]';
   const HIGHLIGHT = 'rgb(250 204 21 / 0.3)';
   const HIGHLIGHT_END = 'rgb(250 204 21 / 0)';
   const HIGHLIGHT_DURATION = 1000;
@@ -20,6 +21,7 @@
   let refreshAgain = false;
 
   const ui = createInterface();
+  let barControls = null;
   const bars = file === undefined ? null : startBars();
   restoreScroll();
   const loaded =
@@ -67,6 +69,9 @@
         components: () => components,
         copyText,
         shown,
+      }).then((controls) => {
+        barControls = controls;
+        return controls;
       }),
     );
   }
@@ -110,7 +115,7 @@
     const lines = changedLines(pristine, next);
     const anchor = findAnchor(pristine, next);
     const details = detailsState();
-    const replaced = replaceRegions(pristine, next);
+    const { replaced, kept } = replaceRegions(pristine, next);
     pristine = next;
     const data = next.querySelector('script[data-bake-dev]')?.dataset ?? {};
     outline = JSON.parse(data.outline ?? '[]');
@@ -123,7 +128,7 @@
       anchor.align();
       requestAnimationFrame(() => requestAnimationFrame(anchor.align));
     }
-    showChanges(lines);
+    showChanges(lines, kept);
   }
 
   function skeleton(doc) {
@@ -139,15 +144,93 @@
 
   function replaceRegions(old, next) {
     let replaced = false;
+    const kept = [];
     for (const region of next.querySelectorAll('[data-region]')) {
       const selector = regionSelector(region.dataset.region);
-      if (old.querySelector(selector)?.innerHTML === region.innerHTML) continue;
+      const before = old.querySelector(selector);
+      if (before?.innerHTML === region.innerHTML) continue;
       for (const live of document.querySelectorAll(selector)) {
-        live.replaceChildren(...[...region.childNodes].map((node) => document.importNode(node, true)));
+        const plan = [];
+        if (before !== null && planChildren(before, region, live, plan)) {
+          for (const step of plan) {
+            if (step.frame === undefined) step.live.replaceWith(document.importNode(step.next, true));
+            else kept.push(keepFrame(step));
+          }
+        } else {
+          live.replaceChildren(...[...region.childNodes].map((node) => document.importNode(node, true)));
+        }
       }
       replaced = true;
     }
-    return replaced;
+    return { replaced, kept };
+  }
+
+  function planChildren(old, next, live, plan) {
+    const oldNodes = [...old.childNodes];
+    const nextNodes = [...next.childNodes];
+    const liveNodes = [...live.childNodes].filter((node) => !(node instanceof Element && node.hasAttribute('data-bake-dev')));
+    if (oldNodes.length !== nextNodes.length || liveNodes.length < oldNodes.length) return false;
+    const steps = [];
+    for (const [index, node] of oldNodes.entries()) {
+      if (!sameNode(node, liveNodes[index])) return false;
+      planNode(node, nextNodes[index], liveNodes[index], steps);
+    }
+    plan.push(...steps);
+    return true;
+  }
+
+  function sameNode(a, b) {
+    if (a.nodeType !== b.nodeType) return false;
+    return !(a instanceof Element) || (a.tagName === b.tagName && a.getAttribute('data-line') === b.getAttribute('data-line'));
+  }
+
+  function planNode(old, next, live, plan) {
+    if (nodeHtml(old) === nodeHtml(next)) return;
+    if (old instanceof Element && next instanceof Element) {
+      const frame = frameChange(old, next, live);
+      if (frame !== null) {
+        plan.push(frame);
+        return;
+      }
+      if (!next.matches(FRAME) && old.tagName === next.tagName && sameAttributes(old, next) && planChildren(old, next, live, plan)) return;
+    }
+    plan.push({ live, next });
+  }
+
+  function nodeHtml(node) {
+    return node instanceof Element ? node.outerHTML : node.textContent;
+  }
+
+  function sameAttributes(a, b) {
+    return a.attributes.length === b.attributes.length && [...a.attributes].every((attribute) => b.getAttribute(attribute.name) === attribute.value);
+  }
+
+  function frameChange(old, next, live) {
+    if (!old.matches(FRAME) || !next.matches(FRAME) || old.dataset.component !== next.dataset.component) return null;
+    const strip = (frame) => {
+      const copy = frame.cloneNode(true);
+      copy.removeAttribute('data-params');
+      copy.querySelector(':scope > .component-box')?.removeAttribute('style');
+      return copy.outerHTML;
+    };
+    if (strip(old) !== strip(next)) return null;
+    const params = JSON.parse(next.dataset.params);
+    const shown = barControls?.shown(live) ?? JSON.parse(old.dataset.params);
+    if (!sameValues(shown, params)) return null;
+    return { frame: live, params: next.dataset.params, boxStyle: next.querySelector(':scope > .component-box')?.getAttribute('style') ?? null };
+  }
+
+  function sameValues(a, b) {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key]);
+  }
+
+  function keepFrame({ frame, params, boxStyle }) {
+    frame.dataset.params = params;
+    const box = frame.querySelector(':scope > .component-box');
+    if (box !== null && boxStyle !== null) box.setAttribute('style', boxStyle);
+    barControls?.rebase(frame);
+    return frame;
   }
 
   function blocksOf(doc) {
@@ -219,9 +302,9 @@
     }
   }
 
-  function showChanges(lines) {
+  function showChanges(lines, kept) {
     const changed = new Set(lines);
-    const lineElements = [...document.querySelectorAll(BLOCKS)].filter((element) => changed.has(element.dataset.line));
+    const lineElements = [...document.querySelectorAll(BLOCKS)].filter((element) => changed.has(element.dataset.line) && !kept.some((frame) => element.contains(frame)));
     const elements = lineElements.filter((element) => !lineElements.some((other) => other !== element && other.contains(element)));
     elements.forEach(highlight);
     const shown = elements.filter(isShown);

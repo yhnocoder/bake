@@ -121,11 +121,11 @@ describe('the parameter endpoint of bake dev', () => {
     t.after(() => server.close());
     const page = await (await fetch(new URL('2026-10/live/', server.url))).text();
     const version = /data-version="([0-9a-f]+)"/.exec(page)[1];
-    const post = async (body) => {
-      const response = await fetch(new URL('/__bake/params', server.url), { method: 'POST', body: JSON.stringify(body) });
+    const post = async (body, headers = {}) => {
+      const response = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
       return [response.status, await response.json()];
     };
-    const request = (fields) => post({ file: FILE, version, line: 9, name: 'label-view', params: { text: 'first', size: 2 }, write: false, ...fields });
+    const request = (fields, headers) => post({ file: FILE, version, line: 9, name: 'label-view', params: { text: 'first', size: 2 }, write: false, ...fields }, headers);
     return { dir, server, page, version, post, request, read: () => readFileSync(join(dir, FILE), 'utf8') };
   }
 
@@ -169,7 +169,20 @@ describe('the parameter endpoint of bake dev', () => {
     assert.deepEqual(await request({ line: 7 }), [400, { error: `${FILE}:7 the line does not start a :::label-view block: Before.` }]);
     const response = await fetch(new URL('/__bake/params', server.url));
     assert.deepEqual([response.status, await response.json()], [405, { error: 'send the parameters with POST' }]);
-    const broken = await fetch(new URL('/__bake/params', server.url), { method: 'POST', body: '{' });
+    const broken = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' });
     assert.equal(broken.status, 400);
+  });
+
+  test('refuses requests from another origin and requests that are not JSON', async (t) => {
+    const { server, request, read } = await start(t);
+    const before = read();
+    const write = { params: { text: 'first', size: 5 }, write: true };
+    const forbidden = [403, { error: 'parameters can only be sent from a page that bake dev serves' }];
+    assert.deepEqual(await request(write, { origin: 'http://attacker.example' }), forbidden);
+    assert.deepEqual(await request(write, { origin: `http://localhost:${server.port + 1}` }), forbidden);
+    assert.deepEqual(await request(write, { origin: 'null' }), forbidden);
+    assert.deepEqual(await request(write, { 'content-type': 'text/plain' }), [415, { error: 'send the parameters as application/json' }]);
+    assert.equal(read(), before);
+    assert.deepEqual((await request({}, { origin: new URL(server.url).origin }))[0], 200);
   });
 });

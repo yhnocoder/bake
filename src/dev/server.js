@@ -114,6 +114,8 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
 
   async function answerParams(request, response) {
     if (request.method !== 'POST') return sendJson(response, 405, { error: 'send the parameters with POST' });
+    if (!sameOrigin(request)) return sendJson(response, 403, { error: 'parameters can only be sent from a page that bake dev serves' });
+    if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) return sendJson(response, 415, { error: 'send the parameters as application/json' });
     let body;
     try {
       body = JSON.parse(await readBody(request));
@@ -227,6 +229,16 @@ function changeParams(root, preview, body) {
   if (result.error !== undefined) return [400, { error: `${file}:${line} ${result.error}` }];
   if (write === true && result.source !== source) writeFileSync(join(root, file), result.source);
   return [200, { line: result.line, version: sourceVersion(write === true ? result.source : source) }];
+}
+
+function sameOrigin(request) {
+  const { origin, host } = request.headers;
+  if (origin === undefined) return true;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
 }
 
 function readBody(request) {

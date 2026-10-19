@@ -1,10 +1,15 @@
 const FRAMES = '[data-region] figure.component[data-line]';
 const BAR = 'bake-param-bar';
-const MESSAGE_DURATION = 4000;
+const MESSAGE_DURATION = 8000;
 
-export function startParamBars({ file, version, setVersion, components, copyText, shown }) {
+export async function startParamBars({ file, version, setVersion, components, copyText, shown }) {
+  const styles = new CSSStyleSheet();
+  styles.replaceSync(await (await fetch('/__bake/param-bar.css', { cache: 'no-store' })).text());
+  const server = { file, version, setVersion, copyText, styles };
+  const states = new Map();
+  const bars = new Map();
+  const controllers = new WeakMap();
   let visible = shown;
-  const server = { file, version, setVersion, copyText };
 
   function scan() {
     const declared = components();
@@ -12,9 +17,10 @@ export function startParamBars({ file, version, setVersion, components, copyText
       const box = frame.querySelector(':scope > .component-box');
       const params = declared[frame.dataset.component];
       if (box === null || frame.querySelector(`:scope > ${BAR}`) !== null || params === undefined || Object.keys(params).length === 0) continue;
-      const bar = createBar(frame, params, server);
-      bar.hidden = !visible;
-      box.before(bar);
+      const controller = createBar(frame, params, server, { states, bars });
+      controllers.set(frame, controller);
+      controller.host.hidden = !visible;
+      box.before(controller.host);
     }
   }
 
@@ -25,32 +31,33 @@ export function startParamBars({ file, version, setVersion, components, copyText
       visible = value;
       for (const bar of document.querySelectorAll(BAR)) bar.hidden = !value;
     },
+    shown: (frame) => controllers.get(frame)?.values() ?? null,
+    rebase: (frame) => controllers.get(frame)?.rebase(),
   };
 }
 
-function createBar(frame, declarations, server) {
+function createBar(frame, declarations, server, { states, bars }) {
   const name = frame.dataset.component;
+  const key = `${frame.dataset.line} ${name}`;
   const host = document.createElement(BAR);
   host.dataset.bakeDev = '';
   const shadow = host.attachShadow({ mode: 'open' });
-  const stylesheet = element('link');
-  stylesheet.rel = 'stylesheet';
-  stylesheet.href = '/__bake/param-bar.css';
+  shadow.adoptedStyleSheets = [server.styles];
   const bar = element('div', 'bar');
   const message = element('p', 'message');
   message.hidden = true;
   message.setAttribute('role', 'status');
-  shadow.append(stylesheet, bar);
+  shadow.append(bar);
 
-  const markdown = { ...JSON.parse(frame.dataset.params) };
-  const current = { ...markdown };
+  const markdown = JSON.parse(frame.dataset.params);
+  const current = { ...markdown, ...(states.get(key)?.changes ?? {}) };
   let waiting = false;
   let messageTimer;
 
   const controls = Object.entries(declarations).map(([param, declaration]) =>
     createControl(param, declaration, current[param], (value) => {
       current[param] = value;
-      clearMessage();
+      report(null);
       refreshMarks();
       apply();
     }),
@@ -59,28 +66,45 @@ function createBar(frame, declarations, server) {
   const copy = button('Copy', 'copy');
   const reset = button('Reset', 'reset');
   const actions = element('div', 'actions');
-  actions.append(write, copy, reset);
+  actions.append(reset, copy, write);
   const title = element('code', 'name');
   title.textContent = name;
   bar.append(title, ...controls.map((control) => control.element), actions, message);
+
+  const controller = {
+    host,
+    values: () => ({ ...current }),
+    rebase() {
+      Object.assign(markdown, JSON.parse(frame.dataset.params));
+      refreshMarks();
+    },
+    written(values) {
+      Object.assign(markdown, values);
+      refreshMarks();
+    },
+    showMessage,
+  };
+  bars.set(key, controller);
   refreshMarks();
+  showMessage();
+  if (controls.some((control) => current[control.param] !== markdown[control.param])) apply();
 
   new MutationObserver(() => {
     if (waiting && frame.dataset.state === 'ready') apply();
   }).observe(frame, { attributes: true, attributeFilter: ['data-state'] });
 
-  write.addEventListener('click', () =>
-    run(true, (data) => {
+  write.addEventListener('click', () => {
+    const values = { ...current };
+    run(values, true, (data) => {
       server.setVersion(data.version);
-      Object.assign(markdown, current);
-      refreshMarks();
-      showMessage(`Wrote line ${frame.dataset.line} of ${server.file}`, 'done');
-    }),
-  );
+      bars.get(key)?.written(values);
+      report({ text: `Wrote line ${frame.dataset.line} of ${server.file}`, kind: 'done' });
+    });
+  });
   copy.addEventListener('click', () =>
-    run(false, async (data) => {
+    run({ ...current }, false, async (data) => {
       await server.copyText(data.line);
-      showMessage(`Copied line ${frame.dataset.line} with these values`, 'done');
+      report({ text: `Copied line ${frame.dataset.line} with these values`, kind: 'done' });
     }),
   );
   reset.addEventListener('click', () => {
@@ -88,7 +112,7 @@ function createBar(frame, declarations, server) {
     for (const control of controls) control.set(current[control.param]);
     refreshMarks();
     apply();
-    showMessage('Reset to the values in the Markdown', 'done');
+    report({ text: 'Reset to the values in the Markdown', kind: 'done' });
   });
 
   function apply() {
@@ -100,47 +124,57 @@ function createBar(frame, declarations, server) {
   }
 
   function refreshMarks() {
-    let changed = false;
+    const changes = {};
     for (const control of controls) {
       const differs = current[control.param] !== markdown[control.param];
       control.element.toggleAttribute('data-changed', differs);
       control.element.title = differs ? `Not written yet; the Markdown gives ${JSON.stringify(markdown[control.param])}` : '';
-      changed ||= differs;
+      if (differs) changes[control.param] = current[control.param];
     }
+    const changed = Object.keys(changes).length > 0;
     write.disabled = !changed;
     reset.disabled = !changed;
+    state().changes = changes;
   }
 
-  async function run(writeFile, done) {
-    clearMessage();
+  function state() {
+    if (!states.has(key)) states.set(key, { changes: {}, message: null });
+    return states.get(key);
+  }
+
+  function report(next) {
+    state().message = next === null ? null : { ...next, until: next.kind === 'done' ? Date.now() + MESSAGE_DURATION : Infinity };
+    bars.get(key)?.showMessage();
+  }
+
+  async function run(values, writeFile, done) {
+    report(null);
     try {
       const response = await fetch('/__bake/params', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ file: server.file, version: server.version(), line: Number(frame.dataset.line), name, params: { ...current }, write: writeFile }),
+        body: JSON.stringify({ file: server.file, version: server.version(), line: Number(frame.dataset.line), name, params: values, write: writeFile }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       await done(data);
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : String(error), 'error');
+      report({ text: error instanceof Error ? error.message : String(error), kind: 'error' });
     }
   }
 
-  function showMessage(text, kind) {
+  function showMessage() {
     clearTimeout(messageTimer);
-    message.textContent = text;
-    message.dataset.kind = kind;
-    message.hidden = false;
-    if (kind === 'done') messageTimer = setTimeout(clearMessage, MESSAGE_DURATION);
+    const shown = state().message;
+    const left = shown === null ? 0 : shown.until - Date.now();
+    message.hidden = left <= 0;
+    if (left <= 0) return;
+    message.textContent = shown.text;
+    message.dataset.kind = shown.kind;
+    if (Number.isFinite(left)) messageTimer = setTimeout(showMessage, left);
   }
 
-  function clearMessage() {
-    clearTimeout(messageTimer);
-    message.hidden = true;
-  }
-
-  return host;
+  return controller;
 }
 
 function createControl(param, declaration, value, change) {

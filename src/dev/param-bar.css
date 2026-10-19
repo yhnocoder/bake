@@ -10,6 +10,7 @@
   --dev-error: #cf222e;
   --dev-accent: #0969da;
   --dev-changed: #b45309;
+  --dev-strong-hover: #424a53;
   --dev-shift: 0 4px;
   font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--dev-text);
@@ -29,6 +30,7 @@
     --dev-error: #ff7b72;
     --dev-accent: #4493f8;
     --dev-changed: #f0a050;
+    --dev-strong-hover: #c9d1d9;
   }
 }
 
@@ -104,6 +106,11 @@ button {
 
 .number {
   width: 72px;
+  font-variant-numeric: tabular-nums;
+}
+
+.select {
+  cursor: pointer;
 }
 
 .text {
@@ -186,6 +193,20 @@ button {
 
 button:hover:not(:disabled) {
   background: var(--dev-hover);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.write {
+  border-color: var(--dev-text);
+  background: var(--dev-text);
+  color: var(--dev-bg);
+}
+
+.write:hover:not(:disabled) {
+  background: var(--dev-strong-hover);
 }
 
 button:disabled {
