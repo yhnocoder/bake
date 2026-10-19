@@ -1214,7 +1214,7 @@ $$
 
 $$
 \begin{aligned}
-\frac{\partial \mathbf{h}}{\partial \mathbf{x}}
+\frac{\partial L}{\partial \mathbf{x}}
 &= \underbrace{\dfrac{\partial L}{\partial \mathbf{h}}}_{1 \times d} \underbrace{\dfrac{\partial \mathbf{h}}{\partial \mathbf{x}}}_{d \times d}\\
 &= \underbrace{\mathbf{g}}_{1 \times d}
 \underbrace{W_{down}^{T}}_{d \times d_{ff}}\,\Big(\underbrace{\mathrm{diag}(\mathbf{b})}_{d_{ff} \times d_{ff}}\,\underbrace{\mathrm{diag}\big(\mathrm{Swish}'(\mathbf{a})\big)}_{d_{ff} \times d_{ff}}\,\underbrace{W_{gate}^{T}}_{d_{ff} \times d}
@@ -1228,7 +1228,7 @@ $$
 
 **从右往左**
 
-先从右往左分别计算 gate 和 up 两条路径，再合并得到完整 Jacobian，然后计算最终的 $\frac{\partial \mathbf{h}}{\partial \mathbf{x}}$。
+先从右往左分别计算 gate 和 up 两条路径，再合并得到完整 Jacobian，然后计算最终的 $\frac{\partial L}{\partial \mathbf{x}}$。
 
 ==gate 路径==：
 
