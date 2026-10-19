@@ -5,7 +5,8 @@
 | Command | What it runs |
 |---|---|
 | `make check` | Comment check, shellcheck on shell scripts (when installed), unit tests |
-| `npm test` | Unit tests only (`node --test`, files in `test/` ending in `.test.js`) |
+| `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
+| `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://127.0.0.1:8000/ |
 | `python3 scripts/check_comment.py [file...]` | Comment check on the given files, or on every tracked file |
 
 ## Tiers and time limits

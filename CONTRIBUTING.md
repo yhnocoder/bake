@@ -8,11 +8,12 @@ This repository contains only the tool: the CLI, the Markdown pipeline, the buil
 
 ## Planned layout
 
-The layout grows task by task. Only `src/cli.js` exists today.
+The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/`, `src/build/` and `src/render/` exist. `src/config/` reads `bake.config.js` and front matter, `src/build/` writes `dist/`, and `src/render/` holds only a placeholder article page until Markdown rendering is added.
 
 | Path | Contents |
 |---|---|
 | `src/cli.js` | Command entry: `bake new`, `bake dev`, `bake build` |
+| `src/report.js` | Error records and the `file:line:col message` lines printed for them |
 | `src/config/` | Reading `bake.config.js`, front matter and `preamble.sty` |
 | `src/markdown/` | Parsing Markdown into the article structure: sections, blocks, sidenotes, table of contents |
 | `src/render/` | Math, code highlighting and static HTML output |
@@ -35,7 +36,7 @@ Every problem Bake finds in a blog is reported as one line:
 content/posts/llm/rope/index.md:3:7 URL /2026-10/rope/ is already used by content/posts/2026-10/rope/index.md
 ```
 
-The format is `file:line:col message`, with the path relative to the blog root and the message in English. Bake runs every check before it reports, so one run lists all problems, followed by a count such as `1 error, dist/ was not written`. A build with errors writes nothing. `bake dev` shows the same lines in the terminal and on the page.
+The format is `file:line:col message`, with the path relative to the blog root and the message in English. Bake runs every check before it reports, so one run lists all problems, sorted by file, line and column, followed by a count such as `1 error, dist/ was not written`. Articles are checked against the settings in `bake.config.js`, so when `bake.config.js` has errors, Bake reports those and does not check the articles. A build with errors writes nothing and leaves an existing `dist/` unchanged. A build without errors writes into a staging folder in the blog root and then replaces `dist/` with it, so `dist/` never holds a partly written site or files from an earlier build. `bake dev` shows the same lines in the terminal and on the page.
 
 ## Libraries
 
@@ -56,3 +57,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 |---|---|
 | No comments except `why: <reason>` | `scripts/check_comment.py`, tested by `test/check-comment.test.js` |
 | CLI output is English and lists the commands | `test/cli.test.js` |
+| Errors are reported as `file:line:col message`, all in one run, sorted, with the count line, and a build with errors leaves `dist/` unchanged | `test/build.test.js` |
+| Every `bake.config.js` and front matter error states its exact position | `test/config.test.js`, `test/front-matter.test.js` |
+| The front matter fixtures in `test/fixtures/syntax-errors/` report the lines in `expected.json` | `test/front-matter.test.js` |
+| The example blog in `examples/blog/` builds without errors | `test/build.test.js` |
