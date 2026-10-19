@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { cli, createBlog, validConfig } from './blog.js';
 
@@ -44,15 +45,19 @@ describe('bake cli', () => {
     assert.equal(code, 0);
   });
 
-  test('dev reports a blog folder it can no longer watch and exits 1', { timeout: 30000 }, async (t) => {
+  async function removeWhileServing(t, remove) {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const child = spawn(process.execPath, [cli, 'dev', '--port', '0'], { cwd: dir });
     t.after(() => child.kill());
     let output = '';
     let errors = '';
+    let removed = false;
     child.stdout.on('data', (chunk) => {
       output += chunk;
-      if (/Serving the blog at /.test(output)) rmSync(dir, { recursive: true, force: true });
+      if (!removed && /Serving the blog at /.test(output)) {
+        removed = true;
+        remove(dir);
+      }
     });
     child.stderr.on('data', (chunk) => {
       errors += chunk;
@@ -60,7 +65,18 @@ describe('bake cli', () => {
     const [code] = await once(child, 'exit');
     assert.equal(errors, `bake dev: cannot watch ${dir}: the folder no longer exists\n`);
     assert.equal(code, 1);
-  });
+  }
+
+  test('dev reports a blog folder it can no longer watch and exits 1', { timeout: 30000 }, (t) =>
+    removeWhileServing(t, (dir) => rmSync(dir, { recursive: true, force: true })),
+  );
+
+  test('dev reports a blog folder that is removed after its files and exits 1', { timeout: 30000 }, (t) =>
+    removeWhileServing(t, (dir) => {
+      rmSync(join(dir, 'bake.config.js'));
+      setTimeout(() => rmSync(dir, { recursive: true, force: true }), 100);
+    }),
+  );
 
   test('no command prints usage to stderr and exits 1', () => {
     const result = bake();

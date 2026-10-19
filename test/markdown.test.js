@@ -79,12 +79,35 @@ describe('markdown fixtures', () => {
         '12 width 宽度写法',
         '13 components 交互组件',
         '14 links 站内链接与嵌入',
-        '15 errors 附录：构建报错的写法',
+        '15 copy 复制',
+        '16 errors 附录：构建报错的写法',
       ],
     );
-    assert.deepEqual(article.toc[1].children, [{ id: 'recap', title: '小节要点', recap: undefined }]);
+    assert.deepEqual(article.toc[1].children, [{ id: 'recap', title: '小节要点', recap: '<p><code>:::recap</code> 写在标题后面，不显示在正文里，读过这一节后出现在目录和章节卡片里。</p>' }]);
+    assert.match(article.toc[7].recap, /^<p>公式在生成时排版，例如 <mjx-container/);
+    assert.deepEqual(
+      article.toc[7].children.map(({ id, recap }) => [id, recap === undefined ? 'no recap' : 'recap']),
+      [
+        ['multiline', 'no recap'],
+        ['macros', 'recap'],
+      ],
+    );
+    assert.deepEqual(
+      article.toc[10].children.map(({ id, title, recap }) => [id, title, recap]),
+      [
+        ['image-size', '尺寸', undefined],
+        ['float', '浮动', undefined],
+      ],
+    );
     assert.equal(article.sections[11].width, 'wide');
-    assert.deepEqual(article.sidenotes.map((note) => note.number), [1, 2]);
+    assert.deepEqual(
+      article.sidenotes.map((note) => [note.number, note.label]),
+      [
+        [1, 'gemm'],
+        [2, 'cap'],
+        [3, 'copy-notes'],
+      ],
+    );
     assert.deepEqual(article.references.map((entry) => `${entry.number} ${entry.key}`), ['1 shazeer2020', '2 gelu', 'undefined vaswani2017']);
   });
 });
@@ -106,6 +129,29 @@ describe('headings and anchors', () => {
       { id: 'one', number: '01', title: '1st', recap: undefined, children: [{ id: 'inner', title: 'Inner', recap: undefined }] },
       { id: 'second', number: '02', title: 'Second', recap: undefined, children: [] },
     ]);
+  });
+
+  test('keeps the source text and the lines of each heading, counted from the first line of the file', async () => {
+    const body = 'Intro.\n\n## First\n\nA.\n\nSecond\n------\n\n### Inner\n';
+    const article = await parsed(body);
+    assert.equal(article.source, frontMatter + body);
+    assert.deepEqual(
+      article.sections.map(({ line, endLine }) => [line, endLine]),
+      [
+        [9, 9],
+        [13, 14],
+      ],
+    );
+    assert.deepEqual(article.sections[1].subsections.map(({ line, endLine }) => [line, endLine]), [[16, 16]]);
+    assert.equal(article.source.split('\n')[article.sections[1].line - 1], 'Second');
+  });
+
+  test('publishes the attributes of a heading as written in data-attributes', async () => {
+    const article = await parsed('Intro.\n\n:::aside\n### Inner {#own toc="Short"}\n\n### Plain\n:::\n');
+    assert.equal(
+      article.intro[1].html,
+      '<aside class="aside">\n<h3 id="own" data-attributes="{&#x22;id&#x22;:&#x22;own&#x22;,&#x22;toc&#x22;:&#x22;Short&#x22;}">Inner</h3>\n<h3 id="plain">Plain</h3>\n</aside>',
+    );
   });
 
   test('keeps inline markup in section titles', async () => {
@@ -263,7 +309,7 @@ describe(':::recap', () => {
 
 describe('sidenotes', () => {
   test('numbers footnotes by first reference and renders their definitions as sidenotes', async () => {
-    const article = await parsed('B[^b] and A[^a], B again[^b].\n\n[^a]: Note *a* with $x$.\n[^b]: Note b.\n');
+    const article = await parsed('B[^b] and A[^a], B again[^b].\n\n[^a]: Note *a* with $x$.\n[^b]: Note b,\n    continued.\n');
     assert.equal(
       article.intro[0].html,
       '<p>B<sup class="sidenote-ref" data-sidenote="1"><a href="#sidenote-1">1</a></sup> and A<sup class="sidenote-ref" data-sidenote="2"><a href="#sidenote-2">2</a></sup>, B again<sup class="sidenote-ref" data-sidenote="1"><a href="#sidenote-1">1</a></sup>.</p>',
@@ -272,8 +318,8 @@ describe('sidenotes', () => {
     assert.deepEqual(
       article.sidenotes.map((note) => ({ ...note, html: outline(note.html) })),
       [
-        { number: 1, id: 'sidenote-1', line: 10, html: '<p>Note b.</p>' },
-        { number: 2, id: 'sidenote-2', line: 9, html: '<p>Note <em>a</em> with $x$.</p>' },
+        { number: 1, id: 'sidenote-1', label: 'b', line: 10, endLine: 11, html: '<p>Note b,\ncontinued.</p>' },
+        { number: 2, id: 'sidenote-2', label: 'a', line: 9, endLine: 9, html: '<p>Note <em>a</em> with $x$.</p>' },
       ],
     );
   });

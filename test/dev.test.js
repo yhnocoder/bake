@@ -72,7 +72,7 @@ describe('bake dev', () => {
       html.endsWith(`<script src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}"></script></body></html>\n`),
       html.slice(-400),
     );
-    assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7">/);
+    assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7" data-end-line="7">/);
     assert.match(await (await get('/2026-10/gelu/')).text(), /<span class="bk-draft">Draft<\/span>/);
     assert.equal(await (await get('/robots.txt')).text(), 'User-agent: *\n');
     assert.equal((await get('/__bake/client.js')).status, 200);
@@ -102,6 +102,35 @@ describe('bake dev', () => {
     assert.match(html, /<title>Test Blog<\/title>/);
     assert.match(html, /href="2026-10\/rope\/"/);
     assert.match(html, /href="2026-10\/gelu\/"[\s\S]*<span class="bk-card-draft">Draft<\/span>/);
+    assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
+  });
+
+  test('serves the feed, the sitemap, the theme stylesheet and the 404 page with assets from the root and without drafts', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig.replace("url: 'https://example.com'", "url: 'https://x.github.io/bake'"),
+      'content/posts/rope/index.md': article(),
+      'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', date: '2026-10-20', extra: 'draft: true\n' }),
+    });
+    const { get } = await start(t, dir);
+    const feed = await get('/feed.xml');
+    assert.equal(feed.headers.get('content-type'), 'application/xml');
+    const feedText = await feed.text();
+    assert.match(feedText, /<link>https:\/\/x.github.io\/bake\/2026-10\/rope\/<\/link>/);
+    assert.doesNotMatch(feedText, /GELU/);
+    const sitemap = await (await get('/sitemap.xml')).text();
+    assert.match(sitemap, /<loc>https:\/\/x.github.io\/bake\/2026-10\/rope\/<\/loc>/);
+    assert.doesNotMatch(sitemap, /gelu/);
+    const styles = await get('/_bake/theme.css');
+    assert.equal(styles.status, 200);
+    assert.match(await styles.text(), /font-family:LXGW WenKai/);
+    const notFound = await get('/404.html');
+    assert.equal(notFound.status, 200);
+    const html = await notFound.text();
+    const stylesheet = /<link rel="stylesheet" href="(\/assets\/essay-[\w-]+\.css)">/.exec(html);
+    assert.ok(stylesheet, html.slice(0, 1000));
+    assert.equal((await get(stylesheet[1])).status, 200);
+    assert.match(html, /<li data-url="2026-10\/rope\/" hidden><a href="\/2026-10\/rope\/">Rope<\/a>/);
+    assert.doesNotMatch(html, /GELU/);
     assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
   });
 
@@ -175,7 +204,7 @@ describe('preview updates', () => {
     assert.match(third.pages[0].outputs[0].render(), /<header class="custom-header">/);
   });
 
-  test('compiles the site theme again with home.jsx when an article theme becomes the site theme', async (t) => {
+  test('compiles the site theme again with the site files when an article theme becomes the site theme', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
@@ -186,7 +215,11 @@ describe('preview updates', () => {
     assert.deepEqual((await updateSite(site)).errors, []);
     writeFiles(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" });
     const result = await updateSite(site, ['bake.config.js']);
-    assert.deepEqual(result.errors.map(formatError), ['themes/plain:1:1 theme "plain" has no home.jsx']);
+    assert.deepEqual(result.errors.map(formatError), [
+      'themes/plain:1:1 theme "plain" has no home.jsx',
+      'themes/plain:1:1 theme "plain" has no not-found.jsx',
+      'themes/plain:1:1 theme "plain" has no theme.css',
+    ]);
   });
 
   test('the homepage reloads when the front matter of an article changes or an article is added', async (t) => {

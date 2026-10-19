@@ -62,7 +62,26 @@ test('reader settings', async (t) => {
     assert.equal(await panel.isVisible(), false);
     await page.getByRole('button', { name: '设置' }).click();
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
-    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['主题', '正文']);
+    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '按钮']);
+    const styles = await panel.locator('[role="radiogroup"]').evaluate((group) => ({
+      label: document.getElementById(group.getAttribute('aria-labelledby')).textContent,
+      choices: [...group.querySelectorAll('[role="radio"]')].map((choice) => [choice.querySelector('svg').getBoundingClientRect().width, choice.querySelector('b').textContent, choice.querySelector('small').textContent, choice.getAttribute('aria-checked')]),
+    }));
+    assert.deepEqual(styles, {
+      label: '目录样式',
+      choices: [
+        [28, '前文笔记', 'T1 · 默认', 'true'],
+        [28, '书签索引', 'T2', 'false'],
+        [28, '圆点胶囊', 'T3', 'false'],
+        [28, '刻度线', 'T4', 'false'],
+      ],
+    });
+    assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="theme"] button').allTextContents(), ['跟随系统', '浅', '深']);
+    const heights = await panel.evaluate((element) => {
+      const height = (selector) => Math.round(element.querySelector(selector).getBoundingClientRect().height * 100) / 100;
+      return { label: height('.bk-settings-label'), choice: height('.bk-settings-choice'), option: height('.bk-settings-options button') };
+    });
+    assert.deepEqual(heights, { label: 17.25, choice: 48.75, option: 26.75 });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).visibility === 'hidden');
     await page.getByRole('button', { name: '设置' }).click();
@@ -71,12 +90,43 @@ test('reader settings', async (t) => {
     await page.close();
   });
 
+  await t.test('the settings button is a round gear from 1000 pixels up and a tab on the left edge of a phone, labelled without visible text', async () => {
+    const page = await browser.newPage();
+    const read = () =>
+      page.evaluate(() => {
+        const button = document.querySelector('.bk-settings-toggle');
+        const box = button.getBoundingClientRect();
+        const style = getComputedStyle(button);
+        return {
+          box: [box.left, innerHeight - box.bottom, box.width, box.height],
+          radius: style.borderRadius,
+          text: button.textContent.trim(),
+          label: [button.getAttribute('aria-label'), button.title],
+          icon: button.querySelector('svg').getBoundingClientRect().width,
+        };
+      });
+    const expected = { text: '', label: ['设置', '设置'], icon: 17 };
+    for (const width of [1440, 1024]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(url);
+      assert.deepEqual(await read(), { box: [16, 16, 34, 34], radius: '17px', ...expected }, `at ${width} pixels`);
+    }
+    await page.setViewportSize({ width: 375, height: 700 });
+    await page.goto(url);
+    assert.deepEqual(await read(), { box: [0, 24, 40, 38], radius: '0px 11px 11px 0px', ...expected });
+    const color = () => page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
+    assert.equal(await color(), 'rgb(22, 26, 29)');
+    await page.hover('.bk-settings-toggle');
+    assert.equal(await color(), 'rgb(22, 26, 29)');
+    await page.close();
+  });
+
   await t.test('theme and body font change the page at once, survive a reload and are applied before the page script runs', async () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(url);
     const initial = await readSettledPage(page);
-    assert.deepEqual([initial.theme, initial.font, initial.stored], [null, null, [null, null]]);
+    assert.deepEqual([initial.theme, initial.font, initial.stored], ['system', 'sans', [null, null]]);
     assert.doesNotMatch(initial.bodyFont, /LXGW WenKai/);
 
     await page.getByRole('button', { name: '设置' }).click();
@@ -105,7 +155,7 @@ test('reader settings', async (t) => {
     await page.getByRole('button', { name: '跟随系统' }).click();
     await page.getByRole('button', { name: '黑体' }).click();
     const reset = await readSettledPage(page);
-    assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], [null, null, [null, null], initial.background]);
+    assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], ['system', 'sans', ['system', 'sans'], initial.background]);
     await context.close();
   });
 

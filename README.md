@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme and the homepage. `bake dev` serves the same pages and the homepage and updates them on every save. The table of contents styles other than `notes` are not built yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
 
 ## Commands
 
@@ -16,7 +16,7 @@ Run every command from the blog root, the folder that contains `bake.config.js`.
 
 `bake new <path>` creates `content/posts/<path>/index.md` with front matter for a draft dated today. The last folder name of the path becomes the slug.
 
-`bake build` checks `bake.config.js` and the front matter and Markdown of every article, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts, styles and fonts of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
+`bake build` checks `bake.config.js` and the front matter and Markdown of every article, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts, styles and fonts of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. It also writes `dist/404.html`, the RSS feed `dist/feed.xml`, the sitemap `dist/sitemap.xml`, the theme stylesheet `dist/_bake/theme.css` and one share image per Markdown article to `dist/og/`, see [Share images](#share-images). Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
 
 ### bake dev
 
@@ -107,7 +107,7 @@ tags: [LLM]
 | `tags` | no | List of tags for filtering on the homepage. |
 | `category` | when `categories` is set | The `id` of one of the categories in `bake.config.js`. |
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
-| `cover` | no | Path of an image in the article folder used as the share image. |
+| `cover` | no | Path of a PNG, JPEG, GIF, WebP, AVIF or SVG image in the article folder that becomes the share image in place of the card Bake draws, see [Share images](#share-images). |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
 | `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. It has no effect in the `bento` theme, which has no table of contents. |
 | `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
@@ -157,7 +157,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 |---|---|
 | `:::aside{title="Notation"}` | A callout. The title is optional. |
 | `:::fold{title="Derivation"}` | A collapsed part that opens when the reader clicks its title. The title is required. |
-| `:::recap` | The summary of the current `##` or `###` section. In the `essay` theme it is not shown in the text; the `notes` table of contents shows it under the section once the reader has read it. The `bento` theme shows it under the title of the card or under the `###` heading. A section has at most one. |
+| `:::recap` | The summary of the current `##` or `###` section. In the `essay` theme it is not shown in the text. The `notes` table of contents shows it under the section once the reader has read it, and the cards of the other styles and the phone drawer show it under the section title. A section without a recap shows the first sentence of its first paragraph there instead. The `bento` theme has no table of contents and shows the recap under the title of the card or under the `###` heading. A section has at most one. |
 | `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
 | `:::list-table` | A table written as a nested list, see below. |
 | `:::example` | Shows the Markdown source of its content next to the result, see below. |
@@ -290,13 +290,51 @@ export default function preview(element) {
 
 The homepage loads a preview when its card comes near the screen. The animation runs while the pointer rests on the card or the card has keyboard focus, and on a phone while the card is in the middle of the screen. It stops whenever the card is off the screen. When the reader asks for reduced motion, only the first frame is shown. A preview that fails to load or throws is logged to the console and the card keeps its image or colour block. Colours should come from the theme's CSS variables such as `var(--ink)` and `var(--series-1)`, so the preview follows dark mode.
 
+## Share images
+
+When a link to an article is shared on a social network or in a chat, the preview shows the article's share image. `bake build` draws one for every published Markdown article: a 1200 by 630 pixel PNG with a strip in the category colour, the site title and the category name, the title, the summary and, on the right, the first frame of the article's `preview` script. It uses the fonts and the light colours of the site theme. The article page names the image in its `og:image` and `twitter:image` tags with an absolute address built from `url` in `bake.config.js`, and sets `twitter:card` to `summary_large_image`. A plain HTML page is published unchanged, so no tag could name an image, and Bake draws none for it.
+
+With `cover` in the front matter, that image becomes the share image instead. Bake reads the image to find its format, whatever its file name says: a PNG, JPEG, GIF or WebP image is published unchanged, and an SVG or AVIF image, which social networks do not show, is converted to a PNG of the same size.
+
+Bake draws the cards with Chromium through Playwright, which is installed with Bake. Install Playwright's Chromium once with:
+
+```bash
+npx playwright install chromium
+```
+
+When Chromium is missing, `bake build` reports it with this command and writes nothing. The name of each image contains a hash of everything that goes into the card, including the preview script and every other file in the article folder. When `dist/` already holds an image with that name, `bake build` copies it instead of drawing the card again, so a build in which no card changed does not start Chromium. A preview script that throws or does not draw within 10 seconds is reported at the `preview` field, together with every other problem of the build. `bake dev` draws no share images.
+
+A blog that deploys with GitHub Actions installs Chromium and the system libraries it needs in the deploy job, before `bake build`:
+
+```yaml
+- uses: actions/cache@v4
+  with:
+    path: ~/.cache/ms-playwright
+    key: playwright-${{ hashFiles('package-lock.json') }}
+- run: npx playwright install --with-deps chromium
+- run: npx bake build
+```
+
+The cache step is optional: it keeps the Chromium download between runs, and `npx playwright install` skips the download when the cached browser is already there. A fresh checkout has no `dist/`, so every deploy draws every card again; only local builds reuse the cards in `dist/`.
+
 ## Themes
 
-A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1340 pixels the table of contents opens from a button, and below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
+A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number.
 
-The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours, fonts and settings of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 2 from 600 to 1339 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. Cards keep the order of the article, so a row ends with a gap when the next card does not fit into it, and each card is as tall as its content. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it.
+The `essay` theme has four table of contents styles, which `toc` selects:
 
-A settings button at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. The browser remembers these choices, and the page applies them before it is first shown.
+| Style | From 1340 pixels | From 1000 to 1339 pixels |
+|---|---|---|
+| `notes` | The list of chapters and sections in the left column, with the current entry marked, the chapters ahead faded, and the recap of each section shown once the reader has read it | One tick per heading at the left edge; pointing at the ticks or clicking them opens the list in a panel |
+| `tabs` | One tab per chapter with its number and a vertical title; pointing at a tab opens a card of the chapter joined to the tab | The same |
+| `dots` | One dot per chapter; the current chapter grows into a capsule that fills as the reader moves through it, and pointing at a dot shows a card of the chapter | The same |
+| `ticks` | One tick per heading; pointing at the ticks shows a card of the chapter | The same |
+
+A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
+
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 2 from 600 to 1339 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. Cards keep the order of the article, so a row ends with a gap when the next card does not fit into it, and each card is as tall as its content. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it.
+
+A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
 A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, plus a `home.jsx` for the homepage when `bake.config.js` selects it as the site theme, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
 

@@ -82,6 +82,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
       window.devTransitions = [];
     });
   const fades = (name) => page.waitForFunction((expected) => window.devTransitions.includes(expected), `${name} opacity`);
+  const settled = (name) => page.waitForFunction((selector) => document.querySelector('#bake-dev').shadowRoot.querySelector(selector).getAnimations().length === 0, `.${name}`);
   const dot = page.locator('#bake-dev .dot');
   const panel = page.locator('#bake-dev .problems');
 
@@ -107,6 +108,16 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.equal(await scrollPosition(), before);
     assert.equal(await page.evaluate(() => document.querySelector('details.fold').open), true);
     assert.equal(await page.locator('#bake-dev .notice').isVisible(), false);
+  });
+
+  await t.test('a save that adds lines highlights only the added block and updates the source of the page', async () => {
+    await page.evaluate(() => {
+      window.highlighted = [];
+    });
+    edit('Paragraph 1 about folds.', 'An added paragraph.\n\nParagraph 1 about folds.');
+    await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('An added paragraph.'));
+    assert.deepEqual(await page.evaluate(() => window.highlighted), ['An added paragraph.']);
+    assert.equal(await page.evaluate(() => JSON.parse(document.querySelector('script.bk-source').textContent)), readFileSync(file, 'utf8'));
   });
 
   await t.test('the page scripts work on the replaced article', async () => {
@@ -179,6 +190,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   await t.test('closing the problems list leaves a dot with the count that opens it again', async () => {
     edit('says goodbye again.', 'says goodbye again[^missing].');
     await panel.waitFor();
+    await settled('problems');
     await clearTransitions();
     await page.click('#bake-dev .close');
     await fades('problems');
@@ -217,6 +229,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await notice.waitFor();
     assert.equal(await notice.textContent(), 'Changed below in 03 Far away');
     assert.equal(await scrollPosition(), before);
+    await settled('notice');
     await clearTransitions();
     await notice.click();
     await fades('notice');
@@ -309,4 +322,124 @@ export default class LabelView extends HTMLElement {
     [true, 'ready'],
   );
   await page.close();
+});
+
+const labelView = `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };
+export const layout = { height: 80 };
+
+export default class LabelView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = this.params.text;
+  }
+}
+`;
+
+const tocBody = [
+  filler('the introduction', 2),
+  '',
+  '## First {#first}',
+  '',
+  filler('the first chapter'),
+  '',
+  '## Second {#second}',
+  '',
+  filler('the second chapter'),
+  '',
+  ':::label-view{text=start}',
+  ':::',
+  '',
+  '### Inside {#inside}',
+  '',
+  filler('the subsection'),
+  '',
+  '## Third {#third}',
+  '',
+  filler('the third chapter', 8),
+  '',
+].join('\n');
+
+const TOC_VIEWS = [
+  { style: 'notes', width: 1440, parts: ['.bk-toc-marker', '.bk-toc-chapter[data-state="current"]'], titles: '.bk-toc-chapters' },
+  { style: 'notes', width: 1024, parts: ['.bk-ticks', '.bk-toc-panel', '.bk-toc-panel .bk-toc-marker', '.bk-tick.is-current'], titles: '.bk-toc-panel .bk-toc-chapters' },
+  { style: 'tabs', width: 1440, parts: ['.bk-tabs', '.bk-tab.is-current'], titles: '.bk-tabs' },
+  { style: 'dots', width: 1024, parts: ['.bk-dots', '.bk-dot-item.is-current'], titles: '.bk-dots' },
+  { style: 'ticks', width: 1440, parts: ['.bk-ticks', '.bk-popover.is-ticks', '.bk-tick.is-current'], titles: null },
+  { style: 'dots', width: 375, parts: ['.bk-toc-handle', '.bk-drawer', '.bk-drawer-scrim', '.bk-drawer-dot.is-current'], titles: '.bk-drawer-index' },
+  { style: 'tabs', width: 375, parts: ['.bk-toc-handle', '.bk-drawer', '.bk-drawer-scrim', '.bk-drawer-tab.is-current'], titles: '.bk-drawer-index' },
+];
+
+test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async (t) => {
+  const dir = createBlog(t, { 'bake.config.js': validConfig, 'components/label-view.js': labelView, [ARTICLE]: article({ title: 'Live', slug: 'live', body: tocBody }) });
+  const file = join(dir, ARTICLE);
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  const url = `${server.url}2026-10/live/`;
+  const snapshot = (view) =>
+    page.evaluate(({ parts, titles }) => {
+      const ui = document.querySelector('.bk-toc-ui');
+      return {
+        parts: parts.map((selector) => document.querySelectorAll(selector).length),
+        children: ui.children.length,
+        entries: document.querySelectorAll('.bk-toc [data-target]').length,
+        ticks: document.querySelectorAll('.bk-tick').length,
+        titles: titles === null ? null : [...document.querySelectorAll(titles)].flatMap((element) => [element.textContent, ...[...element.querySelectorAll('[aria-label]')].map((labelled) => labelled.getAttribute('aria-label'))]).join(' '),
+      };
+    }, view);
+
+  for (const [round, view] of TOC_VIEWS.entries()) {
+    await t.test(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once next to a restarted component`, async () => {
+      await page.setViewportSize({ width: view.width, height: view.width < 1000 ? 360 : 800 });
+      await page.goto(url);
+      await page.evaluate((style) => {
+        localStorage.setItem('bk-toc', style);
+        localStorage.setItem('bk-buttons', 'always');
+      }, view.style);
+      await page.reload();
+      await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+      await page.evaluate(() => scrollTo(0, document.getElementById('inside').getBoundingClientRect().top + scrollY - 100));
+      await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
+      const before = await snapshot(view);
+      const drawer = () =>
+        page.evaluate(() => ({
+          open: document.querySelector('.bk-drawer').classList.contains('is-open'),
+          selected: [...document.querySelectorAll('.bk-drawer-index button')].findIndex((button) => button.classList.contains('is-selected')),
+          title: document.querySelector('.bk-drawer-detail .bk-toc-card-title').textContent,
+          scroll: document.querySelector('.bk-drawer-detail').scrollTop,
+        }));
+      let drawerBefore = null;
+      if (view.width < 1000) {
+        await page.click('.bk-toc-handle');
+        await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
+        await page.locator('.bk-drawer-index button').nth(1).click();
+        await page.evaluate(() => {
+          document.querySelector('.bk-drawer-detail').scrollTop = 30;
+        });
+        drawerBefore = await drawer();
+        assert.ok(drawerBefore.scroll > 0, `the drawer of the ${view.style} style does not scroll`);
+      }
+      const name = `Renamed ${round}`;
+      writeFileSync(file, readFileSync(file, 'utf8').replace(/## \S.* \{#second\}/, `## ${name} {#second}`).replace('### Inside {#inside}', `### Added ${round} {#added-${round}}\n\nText.\n\n### Inside {#inside}`).replace(/text=\w+\}/, `text=round${round}}`));
+      await page.waitForFunction((text) => document.querySelector('.bk-toc .bk-toc-chapters').textContent.includes(text), name);
+
+      await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await page.waitForFunction((text) => document.querySelector('label-view')?.textContent === text && document.querySelector('figure.component').dataset.state === 'ready', `round${round}`);
+      assert.equal(await page.locator('label-view').count(), 1);
+      if (drawerBefore !== null) assert.deepEqual(await drawer(), { ...drawerBefore, title: name }, `the drawer of the ${view.style} style after the save`);
+      const after = await snapshot(view);
+      assert.deepEqual(after.parts, view.parts.map(() => 1), `parts of the ${view.style} style after the save`);
+      assert.deepEqual(before.parts, after.parts);
+      assert.equal(after.children, before.children);
+      assert.equal(after.entries, before.entries + 1);
+      if (before.ticks > 0) assert.equal(after.ticks, before.ticks + 1);
+      if (view.titles !== null) {
+        const old = round === 0 ? 'Second' : `Renamed ${round - 1}`;
+        assert.ok(before.titles.includes(old), `the ${view.style} style showed ${old} before the save`);
+        assert.ok(after.titles.includes(name) && !after.titles.includes(old), `the ${view.style} style shows ${name} after the save`);
+      }
+    });
+  }
 });

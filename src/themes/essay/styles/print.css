@@ -18,8 +18,10 @@
   }
 
   .bk-toc,
+  .bk-toc-ui,
   .bk-settings,
   .bk-toast,
+  .bk-copy,
   .bk-heading-link {
     display: none !important;
   }

@@ -82,13 +82,18 @@ test('the bento theme renders each ## section as a card whose span follows its w
   );
   assert.ok(cards(html)[0].notesLast);
   assert.match(html, /<div class="bt-grid" data-columns="5" style="--bt-columns:5;--bt-columns-narrow:2">/);
-  assert.match(html, /<div class="bt-intro"><div class="bk-block" data-type="paragraph" data-line="7">.*?<\/div><div class="bt-notes"><aside class="bk-sidenote" id="sidenote-1" data-sidenote="1" data-line="9">/s);
+  assert.match(html, /<div class="bt-intro"><div class="bk-block" data-type="paragraph" data-line="7" data-end-line="7">.*?<\/div><div class="bt-notes"><aside class="bk-sidenote" id="sidenote-1" data-sidenote="1" data-label="intro" data-line="9" data-end-line="9">/s);
   assert.doesNotMatch(html, /bk-toc/);
-  for (const region of ['article', 'words', 'glyphs', 'previews']) assert.equal(html.split(`data-region="${region}"`).length, 2, region);
-  assert.match(html, /<h2 id="plain" data-line="11">/);
+  for (const region of ['article', 'words', 'glyphs', 'previews', 'source']) assert.equal(html.split(`data-region="${region}"`).length, 2, region);
+  assert.match(html, /<h2 id="plain" data-line="11" data-end-line="11"><span class="bk-chapter-number" data-ui(?:="")?>01<\/span><a class="bk-heading-link" [^>]*data-ui/);
+  assert.match(html, /<script type="application\/json" class="bk-source" data-region="source">"---\\ntitle: Cards/);
+  assert.match(html, /^<!doctype html>\n?<html lang="en" data-theme="system" data-font="sans"><head>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/example.com\/2026-10\/cards\/">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/example.com\/og\/2026-10\/cards-\w+\.png">/);
+  assert.match(html, /<button type="button" class="bk-copy-source">/);
 });
 
-test('the bento theme writes the homepage when it is the site theme and reads the column count from bake.config.js', (t) => {
+test('the bento theme writes the homepage, the 404 page and the theme stylesheet when it is the site theme and reads the column count from bake.config.js', (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: '## One\n\nText.\n' }),
@@ -96,6 +101,9 @@ test('the bento theme writes the homepage when it is the site theme and reads th
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.match(readFileSync(join(dir, 'dist/index.html'), 'utf8'), /<h3 class="bk-card-title">Cards<\/h3>/);
+  assert.match(readFileSync(join(dir, 'dist/404.html'), 'utf8'), /<li data-url="2026-10\/cards\/" hidden>/);
+  assert.match(readFileSync(join(dir, 'dist/feed.xml'), 'utf8'), /<link>https:\/\/example.com\/2026-10\/cards\/<\/link>/);
+  assert.match(readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8'), /--bg:/);
   assert.match(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'), /<div class="bt-grid" data-columns="4" style="--bt-columns:4;--bt-columns-narrow:2">/);
 });
 
@@ -111,6 +119,6 @@ test('the bento theme shows the recap of a section under the card title and the 
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
-  assert.match(html, /<span class="bk-heading-text">One<\/span><\/h2><div class="recap bt-recap"><p>The section in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="13">/);
-  assert.match(html, /<span class="bk-heading-text">Part<\/span><\/h3><div class="recap bt-recap"><p>The part in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="21">/);
+  assert.match(html, /<span class="bk-heading-text">One<\/span><\/h2><div class="recap bt-recap"><p>The section in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="13" data-end-line="13">/);
+  assert.match(html, /<span class="bk-heading-text">Part<\/span><\/h3><div class="recap bt-recap"><p>The part in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="21" data-end-line="21">/);
 });

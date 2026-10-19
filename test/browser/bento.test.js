@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -9,6 +9,7 @@ import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const widths = [1440, 1100, 375];
+const activationsSource = readFileSync(join(exampleBlog, 'content/posts/activations/index.md'), 'utf8');
 
 const cardsArticle = article({
   title: 'Bento cards',
@@ -236,6 +237,68 @@ test('the bento theme lays out sections as cards', async (t) => {
     await settle(page);
     assert.deepEqual((await page.evaluate(gridLayout)).spans, { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 4, Component: 2, 'Body three': 1, 'Body four': 1 });
     await page.close();
+  });
+
+  await t.test('the settings panel offers the theme and the body font and no table of contents style', async () => {
+    for (const width of [1440, 375]) {
+      const page = await open('activations', { viewport: { width, height: 900 } });
+      await page.locator('.bk-settings-toggle').click();
+      const rows = await page.locator('.bk-settings-row').evaluateAll((elements) => elements.filter((row) => row.checkVisibility()).map((row) => row.dataset.setting));
+      assert.deepEqual(rows, ['theme', 'font'], `${width}px`);
+      await page.locator('.bk-settings-row[data-setting="theme"] button[data-value="dark"]').click();
+      assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)', `${width}px`);
+      await page.close();
+    }
+  });
+
+  await t.test('copying a selection or the whole article gives its Markdown', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
+    const page = await context.newPage();
+    await page.goto(`${origin}/2026-10/activations/`);
+    await settle(page);
+    const lines = activationsSource.split('\n');
+    const between = (first, last) => {
+      const start = lines.findIndex((line) => line.startsWith(first));
+      const end = lines.findIndex((line, index) => index > start && line.startsWith(last));
+      return lines.slice(start, end + 1).join('\n');
+    };
+    const copy = async (start, end) => {
+      await page.evaluate(
+        ([start, end]) => {
+          const point = ({ selector, text, after }) => {
+            const element = document.querySelector(selector);
+            if (text === undefined) return [element, after ? element.childNodes.length : 0];
+            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+            while (walker.nextNode()) {
+              const index = walker.currentNode.data.indexOf(text);
+              if (index !== -1) return [walker.currentNode, index + (after ? text.length : 0)];
+            }
+            throw new Error(`"${text}" is not in ${selector}`);
+          };
+          const range = document.createRange();
+          range.setStart(...point(start));
+          range.setEnd(...point(end));
+          getSelection().removeAllRanges();
+          getSelection().addRange(range);
+        },
+        [start, end],
+      );
+      await page.evaluate(() => navigator.clipboard.writeText(''));
+      await page.keyboard.press('Control+C');
+      return page.evaluate(() => navigator.clipboard.readText());
+    };
+    const block = (start) => `.bt-card > .bk-block[data-line="${lines.findIndex((line) => line.startsWith(start)) + 1}"]`;
+    assert.equal(
+      await copy({ selector: block('它在 0 附近'), text: '它在' }, { selector: block('它在 0 附近'), text: 'GELU。', after: true }),
+      `${lines.find((line) => line.startsWith('它在 0 附近'))}\n\n${lines.find((line) => line.startsWith('[^gelu-min]:'))}`,
+    );
+    assert.equal(await copy({ selector: '.bt-card > h2#gelu' }, { selector: block('GELU 用标准正态分布'), after: true }), between('## GELU', 'GELU 用标准正态分布'));
+    await page.waitForFunction(() => document.querySelector('.bk-toast').classList.contains('is-on'));
+    assert.equal(await page.locator('.bk-toast').count(), 1);
+    await page.evaluate(() => getSelection().removeAllRanges());
+    await page.locator('.bk-header .bk-copy-source').click();
+    await page.waitForFunction((expected) => navigator.clipboard.readText().then((text) => text === expected), activationsSource);
+    await context.close();
   });
 
   await t.test('screenshots of the bento article at 1440, 1100 and 375 pixels', async () => {
