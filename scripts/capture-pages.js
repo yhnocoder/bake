@@ -2,13 +2,7 @@ import { createReadStream, existsSync, mkdirSync, readdirSync, statSync } from '
 import { createServer } from 'node:http';
 import { extname, join, relative, resolve, sep } from 'node:path';
 import { chromium } from 'playwright';
-
-const variants = [
-  { name: 'desktop-light', width: 1440, height: 900, colorScheme: 'light' },
-  { name: 'desktop-dark', width: 1440, height: 900, colorScheme: 'dark' },
-  { name: 'mobile-light', width: 375, height: 812, colorScheme: 'light' },
-  { name: 'mobile-dark', width: 375, height: 812, colorScheme: 'dark' },
-];
+import { variants } from './screenshot-variants.js';
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
