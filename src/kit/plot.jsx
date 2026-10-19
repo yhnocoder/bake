@@ -2,6 +2,7 @@ import { createContext, createMemo, createSignal, createUniqueId, For, onCleanup
 import { Swatch } from './legend.jsx';
 import { formatNumber, linearScale, niceTicks, samplePath } from './numbers.js';
 import { createElementSize } from './size.js';
+import './plot.css';
 
 const MARGIN = { left: 34, right: 8, top: 8, bottom: 22 };
 const X_TICK_SPACING = 44;
@@ -143,12 +144,13 @@ export function Curve(props) {
 export function Crosshair(props) {
   const plot = usePlot();
   let readout;
-  const values = () => plot.series().map((item) => ({ item, value: item.f(plot.pointer()) }));
+  const shownX = () => Number(plot.pointer().toFixed(props.xDigits ?? 2));
+  const values = () => plot.series().map((item) => ({ item, value: item.f(shownX()) }));
   const visible = () => plot.inside() && plot.pointer() !== null;
   const inRange = (value) => Number.isFinite(value) && value >= plot.yDomain()[0] && value <= plot.yDomain()[1];
   const left = () => {
     if (!visible()) return 0;
-    const at = plot.x()(plot.pointer());
+    const at = plot.x()(shownX());
     const width = readout.offsetWidth;
     const right = at + READOUT_OFFSET;
     const chosen = right + width > plot.width() ? at - READOUT_OFFSET - width : right;
@@ -157,15 +159,15 @@ export function Crosshair(props) {
   return (
     <>
       <Show when={plot.pointer() !== null}>
-        <line class="bk-kit-crosshair" x1={plot.x()(plot.pointer())} x2={plot.x()(plot.pointer())} y1={plot.area().top} y2={plot.area().bottom} />
-        <For each={values().filter(({ value }) => inRange(value))}>{({ item, value }) => <circle class="bk-kit-dot" cx={plot.x()(plot.pointer())} cy={plot.y()(value)} r="3.5" fill={item.color} />}</For>
+        <line class="bk-kit-crosshair" x1={plot.x()(shownX())} x2={plot.x()(shownX())} y1={plot.area().top} y2={plot.area().bottom} />
+        <For each={values().filter(({ value }) => inRange(value))}>{({ item, value }) => <circle class="bk-kit-dot" cx={plot.x()(shownX())} cy={plot.y()(value)} r="3.5" fill={item.color} />}</For>
       </Show>
       <foreignObject class="bk-kit-readout-layer" x="0" y="0" width={plot.width()} height={plot.height()} aria-hidden="true">
         <div ref={readout} class="bk-kit-readout" classList={{ 'bk-kit-readout-visible': visible() }} style={{ left: `${left()}px`, top: `${plot.area().top + READOUT_TOP}px` }}>
           <Show when={plot.pointer() !== null}>
             <div class="bk-kit-readout-row">
               <span>{props.xLabel ?? 'x'}</span>
-              <span class="bk-kit-readout-number">{formatNumber(plot.pointer(), props.xDigits ?? 2)}</span>
+              <span class="bk-kit-readout-number">{formatNumber(shownX(), props.xDigits ?? 2)}</span>
             </div>
             <For each={values().filter(({ item }) => item.label !== undefined)}>
               {({ item, value }) => (

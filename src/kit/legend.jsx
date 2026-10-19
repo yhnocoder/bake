@@ -1,5 +1,6 @@
 import { For } from 'solid-js';
 import { Tex } from './tex.jsx';
+import './legend.css';
 
 export function Swatch(props) {
   return <i class="bk-kit-swatch" classList={{ 'bk-kit-dashed': props.dashed }} style={{ '--bk-kit-color': props.color }} />;

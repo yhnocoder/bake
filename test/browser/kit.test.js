@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -15,7 +15,7 @@ const kitBlog = {
   'bake.config.js': validConfig,
   'preamble.sty': '\\ProvidesPackage{preamble}\n\n\\newcommand{\\R}{\\mathbb{R}}\n',
   'components/kit-demo.jsx': `import { createSignal } from 'solid-js';
-import { Axes, Button, Controls, Curve, Plot, SvgTex } from 'bake/kit';
+import { Axes, Button, Controls, Crosshair, Curve, Plot, SvgTex } from 'bake/kit';
 
 export const layout = { height: 300 };
 
@@ -31,6 +31,8 @@ export default function KitDemo() {
         <Plot x={[-2, 2]} y={[-4, 4]} label="Line">
           <Axes />
           <Curve f={(x) => slope() * x} color="var(--series-1)" label="line" />
+          <Curve f={(x) => 1000 * x} color="var(--series-2)" label="steep" />
+          <Crosshair />
           <SvgTex tex="\\R^{n}" x={120} y={30} anchor="middle" baseline="middle" />
         </Plot>
       </div>
@@ -48,6 +50,24 @@ export default class TickList extends HTMLElement {
   }
 }
 `,
+  'components/plain-view.js': `export const layout = { height: 80 };
+
+export default class PlainView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = 'plain';
+  }
+}
+`,
+  'components/broken-tex.jsx': `import { Tex } from 'bake/kit';
+
+export const layout = { height: 80 };
+
+export default function BrokenTex() {
+  return <p class="broken-tex">Label <Tex tex="\\frac{" /></p>;
+}
+`,
+  'content/posts/plain/index.md': article({ slug: 'plain', body: ':::plain-view\n:::\n' }),
+  'content/posts/broken-tex/index.md': article({ slug: 'broken-tex', body: ':::broken-tex\n:::\n' }),
   'content/posts/demo/index.md': article({ slug: 'demo', body: ':::kit-demo\n:::\n' }),
   'content/posts/ticks/index.md': article({ slug: 'ticks', body: ':::tick-list\n:::\n' }),
 };
@@ -272,6 +292,22 @@ test('the kit draws the example function plot', async (t) => {
     assert.ok(moving.transitions > 0 && moving.tweening, JSON.stringify(moving));
   });
 
+  await t.test('the controls and the TeX labels have accessible names, and the segments are at least 24 pixels tall', async () => {
+    const { page, problems } = await open();
+    const frame = page.locator(PLOT).first();
+    await frame.scrollIntoViewIfNeeded();
+    assert.equal(await frame.getByRole('slider', { name: '横轴范围', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('slider', { name: '横轴范围', exact: true }).getAttribute('aria-valuetext'), '±4.0');
+    assert.equal(await frame.getByRole('radio', { name: 'SiLU', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('switch', { name: '近似', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('img', { name: '\\mathrm{GELU}(x)', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('img', { name: "f'(x)", exact: true }).count(), 1);
+    const heights = await frame.locator('.bk-kit-segment').evaluateAll((segments) => segments.map((segment) => segment.getBoundingClientRect().height));
+    assert.ok(heights.every((height) => height >= 24), heights.join(', '));
+    assert.deepEqual(problems, []);
+    await page.close();
+  });
+
   await t.test('controls show the pointer cursor and a focus outline', async () => {
     const { page, problems } = await open();
     const frame = page.locator(PLOT).first();
@@ -364,6 +400,11 @@ test('the kit works for any component that imports it', async (t) => {
     assert.ok(before.doubleStruck, 'the label uses the \\R macro of preamble.sty');
     assert.ok(Math.abs(before.centre[0] - 120) < 1 && Math.abs(before.centre[1] - 30) < 1, `the formula is centred at ${before.centre}`);
     assert.equal(before.cursor, 'pointer');
+    const svg = await page.locator('.bk-kit-plot-svg').boundingBox();
+    await page.mouse.move(svg.x + svg.width * 0.613, svg.y + svg.height / 2);
+    const rows = await page.evaluate(() => [...document.querySelectorAll('.bk-kit-readout-row')].map((row) => row.lastElementChild.textContent));
+    const shown = Number(rows[0].replace('−', '-'));
+    assert.equal(rows[2], (1000 * shown).toFixed(3).replace('-', '−'), 'the readout computes y at the x it shows');
     await page.click('.bk-kit-button');
     const after = await read();
     assert.equal(after.slope, '2');
@@ -372,15 +413,45 @@ test('the kit works for any component that imports it', async (t) => {
     await page.close();
   });
 
-  await t.test('a component that only uses the plain helpers loads no MathJax', async () => {
+  const assetsOf = async (slug) => {
     const page = await browser.newPage();
     const requested = [];
-    page.on('request', (request) => requested.push(new URL(request.url()).pathname.split('/').pop()));
-    await page.goto(`${origin}/2026-10/ticks/`);
+    page.on('request', (request) => requested.push(new URL(request.url()).pathname));
+    await page.goto(`${origin}/2026-10/${slug}/`);
     await waitForComponents(page);
-    assert.equal(await page.evaluate(() => document.querySelector('tick-list').textContent), '0.0 0.2 0.4 0.6 0.8 1.0');
-    assert.ok(requested.some((name) => name.startsWith('kit-')), requested.join(', '));
-    assert.ok(!requested.some((name) => name.startsWith('mathjax-')), requested.join(', '));
+    const text = await page.evaluate(() => document.querySelector('figure.component .component-box').textContent);
+    await page.close();
+    const assets = requested.filter((path) => path.startsWith('/assets/') && /\.(js|css)$/.test(path));
+    return { text, assets, kit: assets.filter((path) => readFileSync(join(dir, 'dist', path), 'utf8').includes('bk-kit-')) };
+  };
+
+  await t.test('a component that only uses the plain helpers loads none of the kit parts, their styles or MathJax', async () => {
+    const { text, assets, kit } = await assetsOf('ticks');
+    assert.equal(text, '0.0 0.2 0.4 0.6 0.8 1.0');
+    assert.deepEqual(kit, []);
+    assert.ok(!assets.some((path) => path.includes('/mathjax-')), assets.join(', '));
+  });
+
+  await t.test('a component that does not import the kit loads no kit code, also when another component of the blog uses it', async () => {
+    const { text, assets, kit } = await assetsOf('plain');
+    assert.equal(text, 'plain');
+    assert.deepEqual(kit, []);
+    assert.ok(assets.some((path) => path.includes('/plain-view-')), assets.join(', '));
+  });
+
+  await t.test('a TeX label that cannot be typeset is reported with the name of its component and shows its source', async () => {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    await page.goto(`${origin}/2026-10/broken-tex/`);
+    await waitForComponents(page);
+    await page.waitForFunction(() => document.querySelector('.bk-kit-tex').textContent !== '');
+    assert.equal(await page.evaluate(() => document.querySelector('figure.component').dataset.state), 'ready');
+    assert.equal(await page.evaluate(() => document.querySelector('.bk-kit-tex').textContent), '\\frac{');
+    assert.equal(errors.length, 1, errors.join('\n'));
+    assert.match(errors[0], /^broken-tex: the TeX label "\\frac\{" cannot be typeset: /);
     await page.close();
   });
 });

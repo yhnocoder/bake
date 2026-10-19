@@ -1,5 +1,3 @@
-import './kit.css';
-
 export { Button, Controls, Segmented, Slider, Toggle } from './controls.jsx';
 export { Legend, Swatch } from './legend.jsx';
 export { createTween, prefersReducedMotion } from './motion.js';

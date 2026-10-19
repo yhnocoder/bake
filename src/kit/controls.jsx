@@ -1,5 +1,6 @@
 import { createUniqueId, For } from 'solid-js';
 import { formatNumber, stepDigits } from './numbers.js';
+import './controls.css';
 
 const optionOf = (option) => (typeof option === 'string' ? { value: option, label: option } : option);
 
@@ -20,10 +21,13 @@ export function Slider(props) {
         max={props.max}
         step={step()}
         value={props.value}
+        aria-valuetext={format(props.value)}
         style={{ '--bk-kit-fill': fill() }}
         onInput={(event) => props.onInput(Number(event.currentTarget.value))}
       />
-      <span class="bk-kit-value">{format(props.value)}</span>
+      <span class="bk-kit-value" aria-hidden="true">
+        {format(props.value)}
+      </span>
     </label>
   );
 }
