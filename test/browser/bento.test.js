@@ -82,18 +82,18 @@ test('the bento theme lays out sections as cards', async (t) => {
     await settle(page);
   };
 
-  await t.test('cards span the columns their sections ask for, every row is filled and the column count drops on narrow screens', async () => {
+  await t.test('cards span the columns their sections ask for, the cards keep the order of the article and the column count drops on narrow screens', async () => {
     const page = await open('bento-cards');
     const expected = {
       1440: { columns: 4, spans: { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 4, Component: 2, 'Body three': 1, 'Body four': 1 } },
-      1100: { columns: 3, spans: { 'Wide section': 2, 'Body one': 1, 'Body two': 3, 'Page section': 3, Component: 2, 'Body three': 1, 'Body four': 3 } },
+      1100: { columns: 2, spans: { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 2, Component: 2, 'Body three': 1, 'Body four': 1 } },
       375: { columns: 1, spans: { 'Wide section': 1, 'Body one': 1, 'Body two': 1, 'Page section': 1, Component: 1, 'Body three': 1, 'Body four': 1 } },
     };
     for (const width of widths) {
       await resize(page, width);
       const grid = await page.evaluate(gridLayout);
       assert.deepEqual({ columns: grid.columns, spans: grid.spans }, expected[width], `${width}px`);
-      assert.deepEqual(grid.unfilledRows, [], `${width}px`);
+      assert.ok(grid.inOrder, `${width}px`);
     }
     await page.close();
   });
@@ -102,7 +102,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);
-    assert.deepEqual(await page.evaluate(gridLayout), { columns: 2, spans: { One: 1, Two: 1, Three: 2 }, unfilledRows: [] });
+    assert.deepEqual(await page.evaluate(gridLayout), { columns: 2, spans: { One: 1, Two: 1, Three: 2 }, inOrder: true });
     await page.close();
   });
 
@@ -125,6 +125,29 @@ test('the bento theme lays out sections as cards', async (t) => {
       await page.close();
     }
     assert.deepEqual(covered, []);
+  });
+
+  await t.test('a card is as tall as its content and its sidenotes follow its last block', async () => {
+    const page = await open('activations');
+    for (const width of widths) {
+      await resize(page, width);
+      const cards = await page.evaluate(() =>
+        [...document.querySelectorAll('.bt-card')].map((card) => {
+          const style = getComputedStyle(card);
+          const contentBottom = card.getBoundingClientRect().bottom - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth);
+          const notes = card.querySelector(':scope > .bt-notes');
+          const gapAfterContent = Math.round(contentBottom - card.lastElementChild.getBoundingClientRect().bottom);
+          const gapBeforeNotes = notes === null ? 0 : Math.round(notes.getBoundingClientRect().top - notes.previousElementSibling.getBoundingClientRect().bottom);
+          return { title: card.querySelector('h2 .bk-heading-text').textContent, gapAfterContent, gapBeforeNotes };
+        }),
+      );
+      assert.deepEqual(
+        cards.filter(({ gapAfterContent, gapBeforeNotes }) => gapAfterContent > 1 || gapBeforeNotes > 1),
+        [],
+        `${width}px`,
+      );
+    }
+    await page.close();
   });
 
   await t.test('no page scrolls horizontally', async () => {
@@ -238,11 +261,12 @@ function gridLayout() {
   const gap = parseFloat(style.columnGap);
   const cards = [...grid.querySelectorAll(':scope > .bt-card')].map((card) => ({ title: card.querySelector('h2 .bk-heading-text').textContent, box: card.getBoundingClientRect() }));
   const spans = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.width + gap) / (tracks[0] + gap))]));
-  const rows = new Map();
-  for (const { box } of cards) rows.set(Math.round(box.top), (rows.get(Math.round(box.top)) ?? 0) + box.width + gap);
-  const width = grid.getBoundingClientRect().width;
-  const unfilledRows = [...rows].filter(([, used]) => Math.abs(used - gap - width) > 1).map(([top]) => top);
-  return { columns: tracks.length, spans, unfilledRows };
+  const inOrder = cards.every(({ box }, index) => {
+    if (index === 0) return true;
+    const previous = cards[index - 1].box;
+    return Math.abs(box.top - previous.top) < 0.5 ? box.left > previous.right : box.top > previous.top;
+  });
+  return { columns: tracks.length, spans, inOrder };
 }
 
 async function settle(page) {

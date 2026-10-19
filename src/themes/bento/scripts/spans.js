@@ -30,7 +30,6 @@ function placeCards(grid) {
     const declared = declaredSpan(card, columns);
     return card.dataset.span === 'auto' && declared < columns && needsWide(card) ? Math.min(WIDE_SPAN, columns) : declared;
   });
-  fillRows(spans, columns);
   cards.forEach((card, index) => {
     card.style.gridColumn = `span ${spans[index]}`;
   });
@@ -52,16 +51,4 @@ function needsWide(card) {
 function horizontalPadding(element) {
   const style = getComputedStyle(element);
   return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-}
-
-function fillRows(spans, columns) {
-  let used = 0;
-  spans.forEach((span, index) => {
-    if (used > 0 && used + span > columns) {
-      spans[index - 1] += columns - used;
-      used = 0;
-    }
-    used = (used + span) % columns;
-  });
-  if (used > 0) spans[spans.length - 1] += columns - used;
 }

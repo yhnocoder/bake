@@ -1,7 +1,6 @@
 import { Block, HeadingLink, Sidenotes, arrange } from '../essay/article.jsx';
 
 const SPAN_OF_WIDTH = { body: '1', wide: '2', page: 'page' };
-const MEDIUM_COLUMNS = 3;
 const NARROW_COLUMNS = 2;
 
 export function Article(props) {
@@ -27,9 +26,11 @@ export function Article(props) {
                 <HeadingLink id={section.id} labels={labels} />
                 <span class="bk-heading-text" innerHTML={section.title} />
               </h2>
-              {entries.map(({ block, afterHeading }) => (
-                <Block block={block} afterHeading={afterHeading} labels={labels} />
-              ))}
+              <Recap html={section.recap} />
+              {entries.map(({ block, afterHeading }) => [
+                <Block block={block} afterHeading={afterHeading} labels={labels} />,
+                <Recap html={block.type === 'heading' ? recapOf(section, block.id) : undefined} />,
+              ])}
               <Notes notes={[...notes, ...entries.flatMap((entry) => entry.notes)]} labels={labels} />
             </section>
           ))}
@@ -38,6 +39,15 @@ export function Article(props) {
       <Notes notes={rest} labels={labels} />
     </article>
   );
+}
+
+function Recap(props) {
+  if (props.html === undefined) return null;
+  return <div class="recap bt-recap" innerHTML={props.html} />;
+}
+
+function recapOf(section, id) {
+  return section.subsections.find((subsection) => subsection.id === id)?.recap;
 }
 
 function Notes(props) {
@@ -58,7 +68,7 @@ function spanOf(section) {
 }
 
 function columnStyle(columns) {
-  const counts = { columns, 'columns-medium': Math.min(columns, MEDIUM_COLUMNS), 'columns-narrow': Math.min(columns, NARROW_COLUMNS) };
+  const counts = { columns, 'columns-narrow': Math.min(columns, NARROW_COLUMNS) };
   return Object.entries(counts)
     .map(([name, count]) => `--bt-${name}:${count}`)
     .join(';');

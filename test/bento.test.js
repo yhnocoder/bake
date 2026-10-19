@@ -81,7 +81,7 @@ test('the bento theme renders each ## section as a card whose span follows its w
     ],
   );
   assert.ok(cards(html)[0].notesLast);
-  assert.match(html, /<div class="bt-grid" data-columns="5" style="--bt-columns:5;--bt-columns-medium:3;--bt-columns-narrow:2">/);
+  assert.match(html, /<div class="bt-grid" data-columns="5" style="--bt-columns:5;--bt-columns-narrow:2">/);
   assert.match(html, /<div class="bt-intro"><div class="bk-block" data-type="paragraph" data-line="7">.*?<\/div><div class="bt-notes"><aside class="bk-sidenote" id="sidenote-1" data-sidenote="1" data-line="9">/s);
   assert.doesNotMatch(html, /bk-toc/);
   for (const region of ['article', 'words', 'glyphs', 'previews']) assert.equal(html.split(`data-region="${region}"`).length, 2, region);
@@ -96,5 +96,21 @@ test('the bento theme writes the homepage when it is the site theme and reads th
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.match(readFileSync(join(dir, 'dist/index.html'), 'utf8'), /<h3 class="bk-card-title">Cards<\/h3>/);
-  assert.match(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'), /<div class="bt-grid" data-columns="4" style="--bt-columns:4;--bt-columns-medium:3;--bt-columns-narrow:2">/);
+  assert.match(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'), /<div class="bt-grid" data-columns="4" style="--bt-columns:4;--bt-columns-narrow:2">/);
+});
+
+test('the bento theme shows the recap of a section under the card title and the recap of a subsection under its heading', (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': config(''),
+    'content/posts/cards/index.md': article({
+      title: 'Cards',
+      slug: 'cards',
+      body: '## One\n\n:::recap\nThe section in short.\n:::\n\nText.\n\n### Part\n\n:::recap\nThe part in short.\n:::\n\nMore text.\n',
+    }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  assert.match(html, /<span class="bk-heading-text">One<\/span><\/h2><div class="recap bt-recap"><p>The section in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="13">/);
+  assert.match(html, /<span class="bk-heading-text">Part<\/span><\/h3><div class="recap bt-recap"><p>The part in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="21">/);
 });

@@ -38,12 +38,11 @@
   display: grid;
   grid-template-columns: repeat(var(--bt-cols), minmax(0, 1fr));
   gap: var(--bt-gap);
-  align-items: stretch;
+  align-items: start;
 }
 
 .bt-card {
-  display: flex;
-  flex-direction: column;
+  display: flow-root;
   min-width: 0;
   padding: var(--bt-card-padding);
   border: 1px solid var(--line);
@@ -82,6 +81,30 @@
   font-size: 18px;
 }
 
+.bt-card > h3:where(:not(.component-box *)) {
+  margin: 26px 0 8px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.bt-card > :is(h4, h5, h6):where(:not(.component-box *)) {
+  margin: 22px 0 6px;
+  font-size: 15.5px;
+}
+
+.bt-card > .bt-recap:where(:not(.component-box *)) {
+  margin: -4px 0 16px;
+}
+
+.bt-card > .bt-recap > :last-child:where(:not(.component-box *)) {
+  margin-bottom: 0;
+}
+
+.bt-card .embed h2:where(:not(.component-box *)) {
+  font-size: 18px;
+  line-height: 1.5;
+}
+
 .bt-card .bk-block[data-width]:where(:not(.component-box *)) {
   margin: 18px 0 20px;
 }
@@ -98,13 +121,13 @@
   margin-top: 8px;
 }
 
-.bt-card > :last-child:where(:not(.component-box *)),
-.bt-card > :nth-last-child(2):has(+ .bt-notes):where(:not(.component-box *)) {
+.bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)):where(:not(.component-box *)),
+.bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)) > :last-child:where(:not(.component-box *)),
+.bt-card > .bk-references:is(:last-child, :nth-last-child(2):has(+ .bt-notes)) .bk-references-list > :last-child > li:last-child {
   margin-bottom: 0;
 }
 
 .bt-notes {
-  margin-top: auto;
   padding-top: 18px;
 }
 
@@ -114,10 +137,6 @@
   width: 32px;
   margin-bottom: 10px;
   border-top: 1px solid var(--line-2);
-}
-
-.bt-intro > .bt-notes {
-  margin-top: 0;
 }
 
 .sidenote-ref {
@@ -204,7 +223,7 @@
   }
 
   .bt-grid {
-    --bt-cols: var(--bt-columns-medium);
+    --bt-cols: var(--bt-columns-narrow);
   }
 }
 
@@ -212,10 +231,6 @@
   .bt-page {
     --bt-gutter: 24px;
     --bt-gap: 16px;
-  }
-
-  .bt-grid {
-    --bt-cols: var(--bt-columns-narrow);
   }
 
   .bt-page .bk-header {

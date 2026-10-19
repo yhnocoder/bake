@@ -78,7 +78,7 @@ export default {
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
 | `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
-| `bento` | no | `{ columns }`: number of card columns in the `bento` theme, a positive integer. The default is 4. |
+| `bento` | no | `{ columns }`: number of card columns in the `bento` theme on wide screens, an integer from 1 to 6. The default is 4. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
 
@@ -109,7 +109,7 @@ tags: [LLM]
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of an image in the article folder used as the share image. |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
-| `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. |
+| `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. It has no effect in the `bento` theme, which has no table of contents. |
 | `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
 | `page` | no | Path of an HTML file in the article folder. Bake publishes the folder unchanged and serves this file as the article's `index.html`. An `index.md` with `page` has no text after the front matter. |
 
@@ -132,7 +132,7 @@ Braces at the end of a heading set its attributes:
 | Attribute | Meaning |
 |---|---|
 | `#id` | The anchor of the heading. Without it, the anchor is made from the heading text. |
-| `toc` | A shorter title for the table of contents. |
+| `toc` | A shorter title for the table of contents. It has no effect in the `bento` theme. |
 | `width` | Only for `##` headings: the card width of the section in the `bento` theme, `body`, `wide` or `page`. |
 
 A paragraph that ends with `^name` gets the anchor `name`; the marker is not shown. Two anchors with the same name in one article are an error.
@@ -157,7 +157,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 |---|---|
 | `:::aside{title="Notation"}` | A callout. The title is optional. |
 | `:::fold{title="Derivation"}` | A collapsed part that opens when the reader clicks its title. The title is required. |
-| `:::recap` | The summary of the current `##` or `###` section. It is not shown in the text; the `notes` table of contents shows it under the section once the reader has read it. A section has at most one. |
+| `:::recap` | The summary of the current `##` or `###` section. In the `essay` theme it is not shown in the text; the `notes` table of contents shows it under the section once the reader has read it. The `bento` theme shows it under the title of the card or under the `###` heading. A section has at most one. |
 | `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
 | `:::list-table` | A table written as a nested list, see below. |
 | `:::example` | Shows the Markdown source of its content next to the result, see below. |
@@ -294,7 +294,7 @@ The homepage loads a preview when its card comes near the screen. The animation 
 
 A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1340 pixels the table of contents opens from a button, and below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
-The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours, fonts and settings of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 3 from 1000 to 1339 pixels, at most 2 from 600 to 999 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. When the next card does not fit into the rest of a row, the last card of the row is widened to fill it. The sidenotes of a section are listed at the bottom of its card, and the page has no table of contents. Without scripts, every card keeps the span its width gives it.
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours, fonts and settings of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 2 from 600 to 1339 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. Cards keep the order of the article, so a row ends with a gap when the next card does not fit into it, and each card is as tall as its content. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it.
 
 A settings button at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. The browser remembers these choices, and the page applies them before it is first shown.
 
