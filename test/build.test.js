@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
@@ -223,5 +223,43 @@ describe('bake build', () => {
     assert.match(readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8'), /<h1>Bake 写法一览<\/h1>/);
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));
+  });
+  test('removes staging folders left by an interrupted build', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      '.dist-staging/2026-10/rope/index.html': 'half written\n',
+      '.dist-previous/old.html': 'old\n',
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    assert.deepEqual(stagingFolders(dir), []);
+  });
+
+  test('skips dotfiles in article folders, keeps dotfiles in public/ except .DS_Store, and does not follow symlinked folders', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'content/posts/rope/.DS_Store': 'finder\n',
+      'content/posts/rope/.cache/data.json': '{}\n',
+      'content/posts/rope/figure.svg': '<svg/>\n',
+      'public/.DS_Store': 'finder\n',
+      'public/.nojekyll': '',
+      'public/.well-known/security.txt': 'Contact: mailto:a@example.com\n',
+      'outside.txt': 'outside\n',
+    });
+    symlinkSync('..', join(dir, 'content/posts/rope/loop'));
+    symlinkSync('../outside.txt', join(dir, 'public/linked.txt'));
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    assert.equal(result.status, 0);
+    assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), [
+      '.nojekyll',
+      '.well-known/security.txt',
+      '2026-10/rope/figure.svg',
+      '2026-10/rope/index.html',
+      'linked.txt',
+    ].sort());
+    assert.equal(readFileSync(join(dir, 'dist/linked.txt'), 'utf8'), 'outside\n');
   });
 });

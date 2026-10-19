@@ -4,7 +4,7 @@ import { listFiles } from './files.js';
 export const POSTS_DIR = 'content/posts';
 
 export function findArticles(root) {
-  const files = listFiles(join(root, POSTS_DIR));
+  const files = listFiles(join(root, POSTS_DIR), (name) => !name.startsWith('.'));
   const dirs = files.filter((file) => posix.basename(file) === 'index.md').map((file) => posix.dirname(file));
   return dirs.map((dir) => {
     const prefix = dir === '.' ? '' : `${dir}/`;

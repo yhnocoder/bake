@@ -1,25 +1,35 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export const DIST_DIR = 'dist';
+const STAGING_DIR = '.dist-staging';
+const PREVIOUS_DIR = '.dist-previous';
 
 export function writeDist(root, outputs) {
-  const staging = mkdtempSync(join(root, '.dist-staging-'));
+  const staging = join(root, STAGING_DIR);
+  const previous = join(root, PREVIOUS_DIR);
+  const dist = join(root, DIST_DIR);
+  removeFolder(staging);
+  removeFolder(previous);
   try {
-    chmodSync(staging, 0o755); // why: mkdtemp creates the folder with mode 0700, dist/ keeps the mode of an ordinary folder
+    mkdirSync(staging);
     for (const output of outputs) {
       const target = join(staging, output.path);
       mkdirSync(dirname(target), { recursive: true });
       if (output.from === undefined) writeFileSync(target, output.render());
       else copyFileSync(output.from, target);
     }
+    if (existsSync(dist)) renameSync(dist, previous);
+    renameSync(staging, dist);
   } catch (error) {
-    rmSync(staging, { recursive: true, force: true });
+    if (existsSync(previous) && !existsSync(dist)) renameSync(previous, dist);
     throw error;
+  } finally {
+    removeFolder(staging);
+    removeFolder(previous);
   }
-  const dist = join(root, DIST_DIR);
-  const previous = `${staging}-previous`;
-  if (existsSync(dist)) renameSync(dist, previous);
-  renameSync(staging, dist);
-  rmSync(previous, { recursive: true, force: true });
+}
+
+function removeFolder(folder) {
+  rmSync(folder, { recursive: true, force: true });
 }

@@ -54,7 +54,7 @@ function articleOutputs(root, article, config, errors) {
 
 function publicOutputs(root, articleOutputs, errors) {
   const owners = new Map(articleOutputs.map((output) => [output.path, output.owner]));
-  return listFiles(join(root, PUBLIC_DIR)).map((path) => {
+  return listFiles(join(root, PUBLIC_DIR), (name) => name !== '.DS_Store').map((path) => {
     const message = publicConflict(path, owners);
     if (message) errors.push(errorAt(posix.join(PUBLIC_DIR, path), fileStart, message));
     return { path, from: join(root, PUBLIC_DIR, path) };

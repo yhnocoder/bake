@@ -68,4 +68,13 @@ describe('bake new', () => {
     assert.equal(result.status, 1);
     assert.equal(existsSync(join(dir, 'content')), false);
   });
+  for (const slug of ['2026', 'true', 'null', '1e3']) {
+    test(`writes the slug ${slug} so that bake build reads it as text`, (t) => {
+      const dir = createBlog(t, { 'bake.config.js': validConfig });
+      assert.equal(bake(dir, 'new', `notes/${slug}`).status, 0);
+      const result = bake(dir, 'build');
+      assert.equal(result.stderr, '');
+      assert.equal(result.status, 0);
+    });
+  }
 });

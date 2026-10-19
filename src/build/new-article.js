@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { stringify } from 'yaml';
 import { configNotFoundError, hasConfig } from '../config/bake-config.js';
 import { slugProblem } from '../config/rules.js';
 import { errorAt, fileStart, formatError } from '../report.js';
@@ -18,6 +19,7 @@ export function newArticle(root, path, date) {
   const file = [POSTS_DIR, ...segments, 'index.md'].join('/');
   if (existsSync(join(root, file))) return { error: formatError(errorAt(file, fileStart, 'already exists')) };
   mkdirSync(dirname(join(root, file)), { recursive: true });
-  writeFileSync(join(root, file), `---\ntitle: ${slug}\nslug: ${slug}\ndate: ${date}\ndraft: true\n---\n\n`, { flag: 'wx' });
+  const frontMatter = stringify({ title: slug, slug, date, draft: true });
+  writeFileSync(join(root, file), `---\n${frontMatter}---\n\n`, { flag: 'wx' });
   return { file, url: articleUrl(date, slug) };
 }
