@@ -148,11 +148,11 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Code, tables, `:::list-table`, `:::example` and images render as described above, with their errors | `test/code.test.js`, `test/blocks.test.js`, `test/images.test.js` |
 | Raster images are published as WebP, originals only when linked, and `preamble.sty` errors stop the build | `test/build.test.js` |
 | A blog can add a theme or replace files of the essay theme, theme errors are reported at their position, and a build leaves no cache in the blog | `test/theme.test.js` |
-| Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph | `test/browser/math.test.js` |
-| Figures with a pixel or percent width have that width, stay inside the screen and are centred | `test/browser/images.test.js` |
+| Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph, including the formulas of sidenotes in the margin and in a sidenote opened on a phone | `test/browser/math.test.js` |
+| Figures with a pixel or percent width have that width, stay inside the screen and are centred, and figures without a size stay inside the text column | `test/browser/images.test.js` |
 | The essay theme keeps articles inside the screen at every breakpoint, gives body, wide and page blocks their widths, resolves blocks without a width, follows dark mode and the theme setting, and downloads LXGW WenKai only for the characters of the masthead, title and headings | `test/browser/layout.test.js` |
-| Sidenotes sit next to their numbers without overlapping each other or wide blocks, highlight together with their numbers and open under their block on phones | `test/browser/sidenotes.test.js` |
+| Sidenotes sit next to their numbers without overlapping each other or wide blocks, highlight together with their numbers, open under their block on phones and are shown under their block when the page runs no scripts | `test/browser/sidenotes.test.js` |
 | The settings panel changes the theme and the body font at once, the choice is kept after a reload and applied before the page script runs, and LXGW WenKai for the body is downloaded only when chosen | `test/browser/reader-settings.test.js` |
-| Folds, in-page links, heading links, citation previews, the table of contents and its drawer work as described above | `test/browser/navigation.test.js` |
+| Folds, in-page links, heading links, citation previews, the table of contents and its drawer work as described above, and the settings button covers no entry of the table of contents | `test/browser/navigation.test.js` |
 | The screenshots section replaces only the marked part of a pull request description, gives the same result when written twice and keeps `$` literally | `test/screenshot-section.test.js` |
 | Every screenshot image in a pull request description is at most 880 pixels wide, changes are cropped to the changed area, and identical light and dark images are drawn once | `test/compare-screenshots.test.js` |
