@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -257,5 +257,21 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
         ['/2026-10/sketch/', 'Sketch2026-10-19Draftcontent/posts/sketch/index.md'],
       ],
     );
+  });
+
+  await t.test('the homepage lists drafts and reloads when an article title changes or an article is added', async () => {
+    const response = await page.goto(server.url);
+    assert.equal(response.status(), 200);
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    const titles = () => page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-card-title')].map((title) => title.textContent))].sort());
+    assert.deepEqual(await titles(), ['Live again', 'Sketch']);
+    assert.equal(await page.locator('.bk-card-draft').first().textContent(), 'Draft');
+    edit('title: Live again', 'title: Live on the homepage');
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Live on the homepage'));
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    mkdirSync(join(dir, 'content/posts/added'));
+    writeFileSync(join(dir, 'content/posts/added/index.md'), article({ title: 'Added', slug: 'added' }));
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Added'));
+    assert.deepEqual(await titles(), ['Added', 'Live on the homepage', 'Sketch']);
   });
 });

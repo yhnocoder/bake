@@ -20,6 +20,7 @@ describe('bake.config.js', () => {
     assert.deepEqual(lines, []);
     assert.deepEqual(config, {
       title: 'Test',
+      description: undefined,
       url: 'https://example.com',
       language: 'en',
       theme: 'essay',
@@ -75,6 +76,8 @@ describe('bake.config.js', () => {
 
   const valueCases = [
     ["title: @''", 'title must be a non-empty string, got ""'],
+    ["description: @''", 'description must be a non-empty string, got ""'],
+    ['description: @3', 'description must be a non-empty string, got 3'],
     ['title: @3', 'title must be a non-empty string, got 3'],
     ["language: @' '", 'language must be a non-empty string, got " "'],
     ["url: @'example.com'", 'url must be an absolute http or https URL, got "example.com"'],

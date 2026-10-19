@@ -107,6 +107,14 @@ describe('images', () => {
     );
   });
 
+  test('records the published path of the first image in document order, inside sidenotes too', async (t) => {
+    const options = { folder: await imageFolder(t, { 'plot.svg': svg, 'photo.png': png(40, 20), 'note.png': png(40, 20) }) };
+    assert.equal((await parsed('Text.\n\n![](photo.png)\n\n![](plot.svg)\n', options)).image, 'photo.webp');
+    assert.equal((await parsed('Text.\n\n![](plot.svg)\n\n![](photo.png)\n', options)).image, 'plot.svg');
+    assert.equal((await parsed('A note[^n].\n\n![](photo.png)\n\n[^n]: ![](note.png)\n', options)).image, 'note.webp');
+    assert.equal((await parsed('No images.\n', options)).image, undefined);
+  });
+
   test('reports wrong image attributes at their opening brace', async (t) => {
     const options = { folder: await imageFolder(t, { 'plot.svg': svg }) };
     const { errors } = await parse('![](plot.svg){width=wide}\n\n![](plot.svg){height=10em size=2}\n\n![](plot.svg){width=10px height=10%}\n\n![](plot.svg){float=center}\n\nText ![](plot.svg){float=left}\n\n![](plot.svg){width=0px}\n\n![](plot.svg){height=0%}\n', options);

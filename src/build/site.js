@@ -46,9 +46,10 @@ export async function updateSite(site, changedPaths = null) {
   const themes = await compileThemes(site, published, settings.config, errors);
   const pageSettings = { config: settings.config, themes, mathStyles: await mathStyles() };
   const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
+  const home = homeOutput(published, pageSettings, errors);
   const themeFiles = themeOutputs(themes);
-  const publicFiles = publicOutputs(root, pages.flatMap((page) => page.outputs), errors);
-  return { errors: sortErrors(errors), articles, pages, themeFiles, publicFiles };
+  const publicFiles = publicOutputs(root, [...pages.flatMap((page) => page.outputs), home], errors);
+  return { errors: sortErrors(errors), articles, pages, home, themeFiles, publicFiles };
 }
 
 async function readSettings(root) {
@@ -61,18 +62,67 @@ async function readSettings(root) {
 }
 
 async function compileThemes(site, published, config, errors) {
-  const names = new Set(published.filter((article) => article.content !== null).map((article) => themeOf(article, config)));
+  const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
   const themes = new Map();
   for (const name of [...names].sort()) {
-    if (!site.themes.has(name)) {
+    const home = name === config.theme;
+    if (site.themes.get(name)?.home !== home) {
       const themeErrors = [];
-      site.themes.set(name, { theme: await compileTheme(site.root, name, themeErrors), errors: themeErrors });
+      site.themes.set(name, { theme: await compileTheme(site.root, name, { home }, themeErrors), home, errors: themeErrors });
     }
     const { theme, errors: themeErrors } = site.themes.get(name);
     errors.push(...themeErrors);
     themes.set(name, theme);
   }
   return themes;
+}
+
+function siteProps(config) {
+  return { title: config.title, url: config.url, language: config.language, description: config.description };
+}
+
+function homeOutput(published, { config, themes }, errors) {
+  const theme = themes.get(config.theme);
+  const html = theme === null ? '' : renderHome(theme, published, config, errors);
+  return { path: 'index.html', render: () => html, owner: 'the homepage' };
+}
+
+function renderHome(theme, published, config, errors) {
+  const props = {
+    site: siteProps(config),
+    home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
+    articles: published.map((article) => homeEntry(article, config)).sort(newestFirst),
+    assets: { root: './', styles: theme.styles, scripts: theme.scripts },
+  };
+  try {
+    return `<!doctype html>\n${theme.renderHome(props)}\n`;
+  } catch (error) {
+    const folder = posix.join(THEMES_DIR, config.theme);
+    errors.push(errorAt(folder, fileStart, `the ${config.theme} theme cannot render the homepage: ${error instanceof Error ? error.message : String(error)}`));
+    return '';
+  }
+}
+
+function homeEntry(article, config) {
+  const base = article.url.slice(1);
+  const { fields, content } = article;
+  return {
+    title: fields.title,
+    summary: fields.summary,
+    date: fields.date,
+    tags: fields.tags ?? [],
+    category: config.categories.find((category) => category.id === fields.category),
+    draft: fields.draft === true,
+    url: base,
+    preview: fields.preview === undefined ? undefined : `${base}${fields.preview}`,
+    image: content?.image === undefined ? undefined : `${base}${content.image}`,
+  };
+}
+
+function newestFirst(a, b) {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  if (a.title === b.title) return 0;
+  return a.title < b.title ? -1 : 1;
 }
 
 function themeOf(article, config) {
@@ -154,7 +204,7 @@ function renderArticle(article, { config, themes, mathStyles }, errors) {
   const { fields, content } = article;
   const root = pageRoot(article.url);
   const props = {
-    site: { title: config.title, url: config.url, language: config.language },
+    site: siteProps(config),
     article: {
       title: fields.title,
       summary: fields.summary,

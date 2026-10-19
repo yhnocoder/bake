@@ -15,6 +15,7 @@ const longNote = (name) => `Note ${name} is long on purpose: it explains a detai
 const stressArticle = article({
   title: 'Stress',
   slug: 'stress',
+  extra: 'category: writing\n',
   body: [
     'The opening paragraph has no notes.',
     '',
