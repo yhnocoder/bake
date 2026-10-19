@@ -1,0 +1,21 @@
+{
+  "missing-slug.md": "missing-slug.md:1:1 front matter is missing \"slug\"",
+  "invalid-slug.md": "invalid-slug.md:3:7 slug \"LLM_Act\" may only contain lowercase letters, digits and \"-\"",
+  "unknown-front-matter-field.md": "unknown-front-matter-field.md:5:1 unknown front matter field \"layout\"",
+  "invalid-toc.md": "invalid-toc.md:5:6 toc must be notes, tabs, dots or ticks, got \"sidebar\"",
+  "duplicate-anchor.md": "duplicate-anchor.md:11:7 duplicate anchor \"intro\", first defined at 7:7",
+  "unknown-heading-attribute.md": "unknown-heading-attribute.md:7:7 unknown attribute \"color\" on heading",
+  "unknown-block.md": "unknown-block.md:7:1 unknown block \":::warning\"",
+  "invalid-width.md": "invalid-width.md:7:1 width must be body, wide or page, got \"full\"",
+  "undefined-footnote.md": "undefined-footnote.md:7:20 footnote \"gemm\" has no definition",
+  "missing-citation.md": "missing-citation.md:7:3 citation \"vaswani2017\" is not in :::references",
+  "unknown-eqref.md": "unknown-eqref.md:11:4 \\eqref{eq:fnn} refers to an unknown \\label",
+  "list-table-cell-count.md": "list-table-cell-count.md:11:1 list-table row 2 has 2 cells, the header row has 3",
+  "image-width-tier.md": "image-width-tier.md:7:18 image width must be pixels or a percentage, got \"wide\"; use :::{width=wide} around the image",
+  "unknown-component-parameter.md": "unknown-component-parameter.md:7:16 unknown parameter \"bta\" for act-fn-plot",
+  "component-parameter-range.md": "component-parameter-range.md:7:16 parameter \"range\" of act-fn-plot must be between 1 and 10, got 20",
+  "missing-link-target.md": "missing-link-target.md:7:2 link target /2026-10/syntax-linked/#chain does not exist",
+  "embed-self.md": "embed-self.md:8:1 :::embed cannot embed the article itself",
+  "embed-duplicate.md": "embed-duplicate.md:9:1 :::embed lists /2026-10/syntax-linked/#vjp twice",
+  "embed-overlap.md": "embed-overlap.md:9:1 :::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad"
+}
