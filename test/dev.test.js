@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
@@ -118,6 +118,14 @@ describe('bake dev', () => {
     writeFileSync(join(dir, 'content/posts/rope/index.md'), article({ body: '![Dot](dot.png)\n\nMore.\n' }));
     await eventually(async () => (await (await get('/2026-10/rope/')).text()).includes('More.'), 'the page was not updated');
     assert.deepEqual(Object.keys(readTree(dir)), before);
+  });
+
+  test('stops with a message when the blog folder can no longer be watched', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const { server } = await start(t, dir);
+    rmSync(dir, { recursive: true });
+    assert.equal(await server.stopped, `bake dev: cannot watch ${dir}: the folder no longer exists`);
+    await assert.rejects(fetch(server.url));
   });
 
   test('watches the blog except dist/, node_modules/ and dot files', () => {

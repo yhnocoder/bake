@@ -6,8 +6,11 @@
   --dev-line: #d1d9e0;
   --dev-hover: #f3f4f6;
   --dev-error: #cf222e;
+  --dev-on-error: #ffffff;
+  --dev-quiet: #8c959f;
   --dev-notice-bg: #1f2328;
   --dev-notice-text: #ffffff;
+  --dev-shift: 0 8px;
   font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--dev-text);
 }
@@ -20,13 +23,17 @@
     --dev-line: #3d444d;
     --dev-hover: #2a3038;
     --dev-error: #ff7b72;
+    --dev-on-error: #1f2328;
+    --dev-quiet: #6e7681;
     --dev-notice-bg: #e6edf3;
     --dev-notice-text: #1f2328;
   }
 }
 
-[hidden] {
-  display: none !important;
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    --dev-shift: 0 0;
+  }
 }
 
 button {
@@ -73,6 +80,11 @@ header {
   color: var(--dev-error);
 }
 
+.problems[data-state='clear'] header {
+  border-bottom: 0;
+  color: var(--dev-muted);
+}
+
 .close {
   width: 28px;
   height: 28px;
@@ -94,6 +106,10 @@ header {
   padding: 4px 0;
   overflow-y: auto;
   list-style: none;
+}
+
+.list:empty {
+  display: none;
 }
 
 .problem {
@@ -118,7 +134,7 @@ header {
 }
 
 .notice {
-  max-width: 100%;
+  max-width: calc(100% - 64px);
   padding: 8px 16px;
   border: 0;
   border-radius: 999px;
@@ -129,4 +145,68 @@ header {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+}
+
+.dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dev-quiet);
+  font: 600 11px/20px system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: transparent;
+  scale: 0.5;
+  cursor: pointer;
+}
+
+.dot::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+
+.dot[data-state='problems'] {
+  background: var(--dev-error);
+  color: var(--dev-on-error);
+  scale: 1;
+}
+
+.notice,
+.dot,
+.problems {
+  transition-property: opacity, translate, scale, background-color, color, display;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+.notice[hidden],
+.dot[hidden],
+.problems[hidden] {
+  display: none;
+  opacity: 0;
+  translate: var(--dev-shift);
+  pointer-events: none;
+}
+
+@starting-style {
+  .notice,
+  .dot,
+  .problems {
+    opacity: 0;
+    translate: var(--dev-shift);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice,
+  .dot,
+  .problems {
+    transition-property: opacity, background-color, color, display;
+  }
 }

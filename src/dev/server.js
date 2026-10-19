@@ -126,7 +126,20 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
   };
 
   const listenedPort = await listen(server, port);
-  const stopWatching = watchBlog(root, changed);
+  let stop;
+  const stopped = new Promise((done) => {
+    stop = done;
+  });
+  const close = () => {
+    stopWatching();
+    for (const client of clients) client.end();
+    clients.clear();
+    server.closeAllConnections();
+    return new Promise((done) => server.close(() => done()));
+  };
+  const stopWatching = watchBlog(root, changed, (error) => {
+    close().then(() => stop(`bake dev: cannot watch ${root}: ${error.message}`));
+  });
   const url = `http://localhost:${listenedPort}/`;
   if (listenedPort !== port && port !== 0) print(`Port ${port} is in use, using port ${listenedPort}`);
   print([`Serving the blog at ${url}`, ...networkAddresses().map((address) => `On the local network: http://${address}:${listenedPort}/`)].join('\n'));
@@ -134,13 +147,8 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
   return {
     port: listenedPort,
     url,
-    close: () => {
-      stopWatching();
-      for (const client of clients) client.end();
-      clients.clear();
-      server.closeAllConnections();
-      return new Promise((done) => server.close(done));
-    },
+    stopped,
+    close,
   };
 }
 

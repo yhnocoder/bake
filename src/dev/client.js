@@ -271,8 +271,9 @@
       '<link rel="stylesheet" href="/__bake/client.css">',
       '<div class="bar">',
       '<button type="button" class="notice" hidden></button>',
-      '<section class="problems" hidden aria-label="Problems">',
-      '<header><span class="title"></span><button type="button" class="close" aria-label="Close the problems list">×</button></header>',
+      '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',
+      '<section class="problems" data-state="clear" hidden aria-label="Problems">',
+      '<header><span class="title">No problems</span><button type="button" class="close" aria-label="Close the problems list">×</button></header>',
       '<ol class="list"></ol>',
       '</section>',
       '</div>',
@@ -281,15 +282,26 @@
     const panel = shadow.querySelector('.problems');
     const title = shadow.querySelector('.title');
     const list = shadow.querySelector('.list');
+    const dot = shadow.querySelector('.dot');
     const notice = shadow.querySelector('.notice');
     let shownProblems = '';
     let closedProblems = null;
+    let problemCount = 0;
     let noticeTimer;
     let noticeAction = null;
 
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      dot.hidden = open;
+    };
+
     shadow.querySelector('.close').addEventListener('click', () => {
       closedProblems = shownProblems;
-      panel.hidden = true;
+      setOpen(false);
+    });
+    dot.addEventListener('click', () => {
+      closedProblems = null;
+      setOpen(true);
     });
     notice.addEventListener('click', () => {
       notice.hidden = true;
@@ -301,8 +313,15 @@
         host.dataset.ready = '';
       },
       showProblems(problems) {
+        const previousCount = problemCount;
+        problemCount = problems.length;
         shownProblems = problems.map((problem) => problem.text).join('\n');
-        title.textContent = problems.length === 1 ? '1 problem' : `${problems.length} problems`;
+        const count = problems.length === 1 ? '1 problem' : `${problems.length} problems`;
+        title.textContent = problems.length === 0 ? 'No problems' : count;
+        panel.dataset.state = problems.length === 0 ? 'clear' : 'problems';
+        dot.title = problems.length === 0 ? 'No problems' : count;
+        dot.dataset.state = panel.dataset.state;
+        if (problems.length > 0) dot.textContent = String(problems.length);
         list.replaceChildren(
           ...problems.map((problem) => {
             const item = document.createElement('li');
@@ -321,8 +340,11 @@
             return item;
           }),
         );
-        panel.hidden = problems.length === 0 || closedProblems === shownProblems;
-        if (problems.length === 0) closedProblems = null;
+        if (problems.length > 0 && closedProblems !== shownProblems) setOpen(true);
+        if (problems.length === 0 && previousCount > 0) {
+          closedProblems = null;
+          setOpen(false);
+        }
       },
       hideNotice() {
         clearTimeout(noticeTimer);

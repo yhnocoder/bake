@@ -11,7 +11,7 @@ export function isWatched(path) {
   return segments.every((segment) => segment !== '' && !segment.startsWith('.') && !IGNORED_FOLDERS.has(segment));
 }
 
-export function watchBlog(root, onChange) {
+export function watchBlog(root, onChange, onError) {
   const known = new Set(listWatchedFiles(root));
   let pending = new Set();
   let timer;
@@ -28,7 +28,20 @@ export function watchBlog(root, onChange) {
     }
     if (changed.length > 0) onChange(changed.sort());
   };
+  let stopped = false;
+  const stop = () => {
+    stopped = true;
+    clearTimeout(timer);
+    watcher.close();
+  };
+  const fail = (error) => {
+    if (stopped) return;
+    stop();
+    onError(error);
+  };
   const watcher = watch(root, { recursive: true }, (_event, filename) => {
+    if (stopped) return;
+    if (statSync(root, { throwIfNoEntry: false }) === undefined) return fail(new Error('the folder no longer exists'));
     if (filename === null) return;
     const path = filename.toString().split(sep).join('/');
     if (!isWatched(path)) return;
@@ -36,10 +49,8 @@ export function watchBlog(root, onChange) {
     clearTimeout(timer);
     timer = setTimeout(flush, SETTLE_TIME);
   });
-  return () => {
-    clearTimeout(timer);
-    watcher.close();
-  };
+  watcher.on('error', fail);
+  return stop;
 }
 
 function listWatchedFiles(path, prefix = '') {

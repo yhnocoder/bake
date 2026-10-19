@@ -71,6 +71,19 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   await page.goto(url);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
   const scrollPosition = () => page.evaluate(() => scrollY);
+  await page.evaluate(() => {
+    window.devTransitions = [];
+    document.querySelector('#bake-dev').shadowRoot.addEventListener('transitionrun', (event) => {
+      window.devTransitions.push(`${event.target.className} ${event.propertyName}`);
+    });
+  });
+  const clearTransitions = () =>
+    page.evaluate(() => {
+      window.devTransitions = [];
+    });
+  const fades = (name) => page.waitForFunction((expected) => window.devTransitions.includes(expected), `${name} opacity`);
+  const dot = page.locator('#bake-dev .dot');
+  const panel = page.locator('#bake-dev .problems');
 
   await t.test('saving the Markdown replaces the changed block in place and keeps the scroll position and open folds', async () => {
     await page.click('details.fold > summary');
@@ -115,19 +128,28 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
     const top = () => page.evaluate(() => document.getElementById('editing').getBoundingClientRect().top);
     const before = await top();
+    await clearTransitions();
     edit('Paragraph 1 about the introduction.', `Paragraph 1 about the introduction. ${'It grows. '.repeat(200)}`);
     const notice = page.locator('#bake-dev .notice', { hasText: 'introduction' });
     await notice.waitFor();
+    await fades('notice');
     assert.equal(await notice.textContent(), 'Changed above in the introduction');
     await page.waitForTimeout(100);
     const after = await top();
     assert.ok(Math.abs(after - before) <= 1, `the heading moved from ${before}px to ${after}px`);
   });
 
-  await t.test('an error shows the problems list and keeps the last good page, and fixing it clears the list', async () => {
+  await t.test('an error opens the problems list and keeps the last good page, and fixing it leaves a dot', async () => {
+    assert.equal(await dot.isVisible(), true);
+    assert.equal(await dot.getAttribute('data-state'), 'clear');
+    assert.equal(await panel.isVisible(), false);
+    await clearTransitions();
     edit('The edited paragraph says goodbye.', 'The edited paragraph says goodbye[^missing].');
     const problem = page.locator('#bake-dev .problem');
     await problem.waitFor();
+    await fades('problems');
+    await fades('dot');
+    await dot.waitFor({ state: 'hidden' });
     const line = lineOf(readFileSync(file, 'utf8'), 'The edited paragraph');
     const text = await problem.textContent();
     assert.match(text, new RegExp(`^${ARTICLE.replaceAll('.', '\\.')}:${line}:\\d+ \\S`));
@@ -135,18 +157,48 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await problem.click();
     await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.problem[data-copied]') !== null);
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), text.split(' ')[0]);
+    await clearTransitions();
     edit('[^missing]', ' again');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('says goodbye again'));
-    assert.equal(await page.locator('#bake-dev .problems').isVisible(), false);
+    await fades('problems');
+    await fades('dot');
+    await panel.waitFor({ state: 'hidden' });
+    await dot.waitFor();
+    assert.equal(await dot.getAttribute('data-state'), 'clear');
   });
 
-  await t.test('the problems list can be closed', async () => {
+  await t.test('closing the problems list leaves a dot with the count that opens it again', async () => {
     edit('says goodbye again.', 'says goodbye again[^missing].');
-    await page.locator('#bake-dev .problems').waitFor();
+    await panel.waitFor();
+    await clearTransitions();
     await page.click('#bake-dev .close');
-    assert.equal(await page.locator('#bake-dev .problems').isVisible(), false);
+    await fades('problems');
+    await panel.waitFor({ state: 'hidden' });
+    await dot.waitFor();
+    assert.deepEqual([await dot.getAttribute('data-state'), await dot.textContent()], ['problems', '1']);
+    await dot.click();
+    await panel.waitFor();
+    await dot.waitFor({ state: 'hidden' });
+    await page.click('#bake-dev .close');
+    await panel.waitFor({ state: 'hidden' });
     edit('[^missing]', '');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('says goodbye again.'));
+    await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.dot').dataset.state === 'clear');
+    assert.equal(await panel.isVisible(), false);
+    await dot.click();
+    await panel.waitFor();
+    assert.equal(await panel.locator('.title').textContent(), 'No problems');
+    await page.click('#bake-dev .close');
+    await panel.waitFor({ state: 'hidden' });
+    await dot.waitFor();
+  });
+
+  await t.test('the problems list and the dot only fade when the reader prefers reduced motion', async () => {
+    const transitions = () => page.evaluate(() => [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => getComputedStyle(element).transitionProperty));
+    assert.ok((await transitions()).every((property) => property.includes('translate')));
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.deepEqual(await transitions(), Array(3).fill('opacity, background-color, color, display'));
+    await page.emulateMedia({ reducedMotion: null });
   });
 
   await t.test('a change outside the screen shows a notice that names its section and scrolls there when clicked', async () => {
@@ -156,12 +208,14 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await notice.waitFor();
     assert.equal(await notice.textContent(), 'Changed below in 03 Far away');
     assert.equal(await scrollPosition(), before);
+    await clearTransitions();
     await notice.click();
+    await fades('notice');
     await page.waitForFunction(() => {
       const box = [...document.querySelectorAll('.bk-block')].find((block) => block.textContent.includes('changed at the end')).getBoundingClientRect();
       return box.top >= 0 && box.bottom <= innerHeight;
     });
-    assert.equal(await notice.isVisible(), false);
+    await notice.waitFor({ state: 'hidden' });
   });
 
   await t.test('double-clicking a block opens its line in VS Code', async () => {

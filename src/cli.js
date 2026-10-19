@@ -57,6 +57,7 @@ async function runDev(args) {
     return fail(error instanceof Error ? error.message : String(error));
   }
   process.once('SIGINT', () => server.close().then(() => process.exit(0)));
+  server.stopped.then(fail);
 }
 
 function devPort(args) {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
+import { rmSync } from 'node:fs';
 import { describe, test } from 'node:test';
 import { cli, createBlog, validConfig } from './blog.js';
 
@@ -40,6 +41,23 @@ describe('bake cli', () => {
     const [code] = await once(child, 'exit');
     assert.match(output, /^Serving the blog at http:\/\/localhost:\d+\/\n/);
     assert.equal(code, 0);
+  });
+
+  test('dev reports a blog folder it can no longer watch and exits 1', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const child = spawn(process.execPath, [cli, 'dev', '--port', '0'], { cwd: dir });
+    let output = '';
+    let errors = '';
+    child.stdout.on('data', (chunk) => {
+      output += chunk;
+      if (/Serving the blog at /.test(output)) rmSync(dir, { recursive: true, force: true });
+    });
+    child.stderr.on('data', (chunk) => {
+      errors += chunk;
+    });
+    const [code] = await once(child, 'exit');
+    assert.equal(errors, `bake dev: cannot watch ${dir}: the folder no longer exists\n`);
+    assert.equal(code, 1);
   });
 
   test('no command prints usage to stderr and exits 1', () => {
