@@ -9,6 +9,7 @@ import { serve } from './server.js';
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const lines = source.split('\n');
+const linkedLines = readFileSync(join(exampleBlog, 'content/posts/syntax-linked/index.md'), 'utf8').split('\n');
 
 function sourceLines(first, last) {
   const start = lines.findIndex((line) => line.startsWith(first));
@@ -155,6 +156,14 @@ test('copying from an article gives the Markdown source of the selection', async
   await t.test('a whole sidenote in the margin is copied as its text without its number', async () => {
     await select(page, { selector: '.bk-notes-layer .bk-sidenote-body', text: '每个脚注' }, { selector: '.bk-notes-layer .bk-sidenote-body', text: '原文复制。', after: true });
     assert.equal((await copied(page)).text, sourceLine('[^copy-notes]:').replace('[^copy-notes]: ', ''));
+  });
+
+  await t.test('headings and a component in embedded content are copied as the lines of the embedded article', async () => {
+    const embed = '.embed-part';
+    await select(page, { selector: `${embed} h2`, contains: '向量与雅可比矩阵的乘积' }, { selector: `${embed} figcaption`, contains: 'SiLU', after: true });
+    const start = linkedLines.findIndex((line) => line.startsWith('## 向量与雅可比矩阵的乘积'));
+    const end = linkedLines.findIndex((line, index) => index > start && line === ':::');
+    assert.equal((await copied(page)).text, linkedLines.slice(start, end + 1).join('\n'));
   });
 
   await t.test('copying shows one toast with the Markdown message', async () => {
