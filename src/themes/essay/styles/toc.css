@@ -1095,6 +1095,10 @@ html[data-script] .bk-toc-chapters {
 }
 
 @media (max-width: 999.98px) {
+  html:is(.bk-drawer-open, .bk-buttons-hidden) {
+    --chat-hidden: 1;
+  }
+
   html:is(.bk-drawer-open, .bk-buttons-hidden) :is(.bk-toc-handle, .bk-settings) {
     opacity: 0;
     pointer-events: none;

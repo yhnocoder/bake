@@ -42,11 +42,14 @@ button:focus-visible {
   backdrop-filter: blur(8px);
   user-select: none;
   -webkit-user-select: none;
+  opacity: calc(1 - var(--chat-hidden, 0));
+  transform: translateX(calc(var(--chat-hidden, 0) * (100% + var(--chat-right, 16px) + 8px)));
   transition:
     color 0.15s,
     scale 0.12s,
-    opacity 0.15s,
+    opacity 0.2s,
     translate 0.15s var(--ease-out, ease-out),
+    transform 0.25s var(--ease-out, ease-out),
     visibility 0s;
 }
 
@@ -177,6 +180,13 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   * {
     translate: none !important;
+  }
+
+  .bk-chat-launcher {
+    transition:
+      color 0.15s,
+      opacity 0.2s,
+      visibility 0s;
   }
 
   .bk-chat-figure,
