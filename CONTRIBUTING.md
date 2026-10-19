@@ -86,7 +86,19 @@ The page component receives these props:
 
 ### The essay theme
 
-`page.jsx` writes the document head, `header.jsx` the masthead, `toc.jsx` the table of contents and `article.jsx` the body. Every block of the article structure is wrapped in `<div class="bk-block" data-type="…">`; blocks that can be wider than the text also have `data-width` (`body`, `wide`, `page`, or `auto` when the article sets no width) and the natural width as `--natural-width`. Each sidenote is rendered once, after the top-level block that first refers to it, as `<aside class="bk-sidenote" data-sidenote="1">`; the page script places it in the margin on wide screens and opens it under the block on narrow ones. UI text comes from `labels.js`, in Chinese when the site language starts with `zh` and in English otherwise.
+`page.jsx` writes the document head, `header.jsx` the masthead, `toc.jsx` the table of contents and `article.jsx` the body. Every block of the article structure is wrapped in `<div class="bk-block" data-type="…">`; blocks that can be wider than the text also have `data-width` (`body`, `wide`, `page`, or `auto` when the article sets no width) and the natural width as `--natural-width`. Each sidenote is rendered once, after the top-level block that first refers to it, as `<aside class="bk-sidenote" data-sidenote="1">`. UI text comes from `labels.js`, in Chinese when the site language starts with `zh` and in English otherwise.
+
+The styles are in `styles/`. `tokens.css` defines every colour as a CSS variable, for the light and the dark theme, and `page.css` defines the column widths as variables for each breakpoint: 1340 pixels and up, 1000 to 1339 pixels, and below 1000 pixels. The page scripts are in `scripts/`, and `client.jsx` starts them:
+
+| Script | What it does |
+|---|---|
+| `widths.js` | Gives every block with `data-width="auto"` the width `body`, `wide` or `page` that fits its content, and writes the result to `data-resolved` on every block with `data-width`. |
+| `notes.js` | From 1000 pixels up, copies each sidenote into the notes column next to the line of its number and moves it below any block that reaches into the column. Below 1000 pixels, a tap on a number opens the sidenote under its block. Hovering a number or a note highlights both. |
+| `folds.js` | Animates opening and closing `:::fold` blocks, and opens every fold for printing. |
+| `heading-links.jsx` | Copies the link of a heading when its `#` is clicked, and scrolls to the target of an in-page link after opening the folds around it. |
+| `citations.jsx` | Shows the reference entry in a card while the pointer rests on a citation, on devices with a fine pointer and a screen of 1000 pixels or more. |
+| `toc.js`, `drawer.jsx` | Marks the read, current and following entries of the table of contents from 1340 pixels up, and shows the table of contents in a drawer below that width. |
+| `settings.jsx` | The settings panel. Its rows come from `settingRows`; `chooseSetting(name, value)` applies and stores a choice and dispatches `bk:setting` on `document`. |
 
 The reader settings are defined in `settings.js`: each setting has its values and its initial value, the choice is stored in `localStorage` as `bk-<name>`, and an inline script in the head sets `data-<name>` on `<html>` before the first paint. Page scripts that change the layout dispatch the `bk:layout` event on `document`, and the scripts that measure the layout listen to it.
 
@@ -139,5 +151,8 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph | `test/browser/math.test.js` |
 | Figures with a pixel or percent width have that width, stay inside the screen and are centred | `test/browser/images.test.js` |
 | The essay theme keeps articles inside the screen at every breakpoint, gives body, wide and page blocks their widths, resolves blocks without a width, follows dark mode and the theme setting, and downloads LXGW WenKai only for the characters of the masthead, title and headings | `test/browser/layout.test.js` |
+| Sidenotes sit next to their numbers without overlapping each other or wide blocks, highlight together with their numbers and open under their block on phones | `test/browser/sidenotes.test.js` |
+| The settings panel changes the theme and the body font at once, the choice is kept after a reload and applied before the page script runs, and LXGW WenKai for the body is downloaded only when chosen | `test/browser/reader-settings.test.js` |
+| Folds, in-page links, heading links, citation previews, the table of contents and its drawer work as described above | `test/browser/navigation.test.js` |
 | The screenshots section replaces only the marked part of a pull request description, gives the same result when written twice and keeps `$` literally | `test/screenshot-section.test.js` |
 | Every screenshot image in a pull request description is at most 880 pixels wide, changes are cropped to the changed area, and identical light and dark images are drawn once | `test/compare-screenshots.test.js` |
