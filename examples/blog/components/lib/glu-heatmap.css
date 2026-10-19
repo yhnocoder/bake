@@ -15,8 +15,8 @@
 
 .glu-heat-tex {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  min-width: 0.6em;
   min-height: 1.4em;
   color: var(--ink);
 }
@@ -79,6 +79,41 @@
   border-radius: 3px;
   touch-action: pan-y;
   cursor: crosshair;
+}
+
+.glu-heat-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.glu-heat-mark {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: 0 0 -4.5px -4.5px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.glu-heat-mark-label {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  font-size: 11.5px;
+  line-height: 18px;
+  white-space: nowrap;
+  color: var(--ink);
+  transform: translateY(-50%);
+}
+
+.glu-heat-mark-left .glu-heat-mark-label {
+  right: 12px;
+  left: auto;
 }
 
 .glu-heat-readout {

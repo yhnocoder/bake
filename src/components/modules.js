@@ -12,6 +12,10 @@ const LOADERS_MODULE = 'bake:component-loaders';
 const FONT_DIR = join(dirname(fileURLToPath(import.meta.resolve('@mathjax/mathjax-newcm-font/js/svg.js'))), 'svg/dynamic');
 const NODE_MATH_MODULE = ["export async function texToSvg() {", "  throw new Error('texToSvg typesets formulas in the browser, inside the component code');", '}', ''].join('\n');
 
+export function isMathJaxModule(id) {
+  return id.includes('/node_modules/@mathjax/') && !id.startsWith(FONT_DIR);
+}
+
 export function nodeModules() {
   return virtualModules('bake-node-modules', { [MATH_MODULE]: () => NODE_MATH_MODULE });
 }

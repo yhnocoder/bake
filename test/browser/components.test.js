@@ -9,7 +9,6 @@ import { article, bake, createBlog, validConfig } from '../blog.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
-const screenshotDir = join(import.meta.dirname, '../../test-out/syntax-sections');
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
 
 const blog = {
@@ -70,6 +69,20 @@ export default class TextView extends HTMLElement {
   }
 }
 `,
+  'components/broken-view.js': `export const layout = { height: 120 };
+
+export default class BrokenView extends HTMLElement {
+  connectedCallback() {
+    throw new Error('broken-view has no data');
+  }
+}
+`,
+  'components/broken-solid.jsx': `export const layout = { height: 120 };
+
+export default function BrokenSolid() {
+  throw new Error('broken-solid has no data');
+}
+`,
   'content/posts/rope/index.md': article({
     body: `:::count-view{label=hello count=3}
 Counted *caption*.
@@ -97,6 +110,7 @@ ${spacer}
 `,
   }),
   'content/posts/gelu/index.md': article({ slug: 'gelu', body: ':::grid-view\n:::\n' }),
+  'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
   'content/posts/text/index.md': article({ slug: 'text', body: 'An article paragraph.\n\n### An article heading\n\n:::text-view\n:::\n' }),
 };
 
@@ -216,6 +230,33 @@ test('components run in the browser', async (t) => {
     }
   });
 
+  await t.test('a component that throws while it connects is marked failed and the frame says that it could not be loaded', async () => {
+    const page = await open('broken');
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => ['ready', 'failed'].includes(frame.dataset.state)));
+    const frames = await page.evaluate(() =>
+      [...document.querySelectorAll('figure.component')].map((frame) => {
+        const box = frame.querySelector('.component-box');
+        return { name: frame.dataset.component, state: frame.dataset.state, elements: box.children.length, message: getComputedStyle(box, '::before').content };
+      }),
+    );
+    const failed = { state: 'failed', elements: 0, message: '"This interactive figure could not be loaded"' };
+    assert.deepEqual(frames, [
+      { name: 'broken-view', ...failed },
+      { name: 'broken-solid', ...failed },
+      { name: 'grid-view', state: 'ready', elements: 1, message: 'none' },
+    ]);
+    assert.deepEqual(page.problems.map((problem) => problem.split(' ').slice(0, 3).join(' ')).sort(), ['broken-solid cannot start', 'broken-view cannot start']);
+    await page.close();
+  });
+
+  await t.test('without scripts every frame says that the interactive figure needs JavaScript', async () => {
+    const page = await open('rope', { javaScriptEnabled: false });
+    const messages = await page.evaluate(() => [...document.querySelectorAll('.component-box')].map((box) => getComputedStyle(box, '::before').content));
+    assert.equal(messages.length, 7);
+    assert.ok(messages.every((message) => message === '"This interactive figure needs JavaScript"'), messages.join(', '));
+    await page.close();
+  });
+
   await t.test('pixel and percent widths measure their width, are centred and never exceed the screen', async () => {
     for (const width of [1440, 1100, 375]) {
       const page = await open('rope', { viewport: { width, height: 800 } });
@@ -250,7 +291,7 @@ test('components run in the browser', async (t) => {
     await waitForReady(other);
     const scripts = requested.filter((path) => path.endsWith('.js')).map((path) => path.split('/').pop().replace(/-[\w-]{8}\.js$/, ''));
     assert.ok(scripts.includes('grid-view'), scripts.join(', '));
-    assert.ok(!scripts.some((name) => ['count-view', 'tex-view', 'solid-element'].includes(name)), scripts.join(', '));
+    assert.ok(!scripts.some((name) => ['count-view', 'tex-view', 'solid-element', 'mathjax'].includes(name)), scripts.join(', '));
     await other.close();
   });
 
@@ -308,6 +349,26 @@ test('components run in the browser', async (t) => {
   });
 });
 
+function formulaShifts() {
+  const shifts = [];
+  for (const box of document.querySelectorAll('.component-box')) {
+    const formulas = [...box.querySelectorAll('svg')].filter((svg) => svg.querySelector(':scope > g > g[data-mml-node="math"]') !== null);
+    const others = [...box.querySelectorAll('*')].filter((element) => !formulas.some((formula) => formula.contains(element) || element.contains(formula)));
+    const rects = () => others.map((element) => element.getBoundingClientRect());
+    const typeset = rects();
+    formulas.forEach((formula) => formula.style.setProperty('display', 'none'));
+    const pending = rects();
+    formulas.forEach((formula) => formula.style.removeProperty('display'));
+    others.forEach((element, index) => {
+      const [before, after] = [pending[index], typeset[index]];
+      if (['left', 'top', 'width', 'height'].some((side) => Math.abs(before[side] - after[side]) > 1)) {
+        shifts.push(`${box.parentElement.dataset.component}: <${element.tagName.toLowerCase()} class="${element.getAttribute('class') ?? ''}"> moves from ${Math.round(before.left)},${Math.round(before.top)} to ${Math.round(after.left)},${Math.round(after.top)}`);
+      }
+    });
+  }
+  return shifts;
+}
+
 function distinctColors({ data }) {
   const colors = new Set();
   for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
@@ -361,12 +422,13 @@ test('the example components run on the syntax page', async (t) => {
     return { page, problems };
   };
 
-  await t.test('every component stays inside its box at 1440 and 375 pixels, in the light and the dark scheme, without console errors or warnings', async () => {
+  await t.test('every component stays inside its box at 1440 and 375 pixels, in the light and the dark scheme, its formulas move nothing when they arrive, and the page logs no console errors or warnings', async () => {
     for (const width of [1440, 375]) {
       for (const colorScheme of ['light', 'dark']) {
         const { page, problems } = await start({ viewport: { width, height: 900 }, colorScheme });
         assert.ok((await page.evaluate(() => document.querySelectorAll('.example-result figure.component').length)) > 0);
         assert.deepEqual(await page.evaluate(componentOverflow), [], `${width}px ${colorScheme}`);
+        assert.deepEqual(await page.evaluate(formulaShifts), [], `${width}px ${colorScheme}: formulas from texToSvg move nothing when they arrive`);
         assert.deepEqual(problems, [], `${width}px ${colorScheme}`);
         await page.close();
       }
@@ -374,6 +436,7 @@ test('the example components run on the syntax page', async (t) => {
   });
 
   await t.test('every chapter of the syntax article renders a screenshot with content at 1440 and 375 pixels', async () => {
+    const screenshotDir = process.env.BAKE_SECTION_SCREENSHOTS ?? join(dir, 'section-screenshots');
     mkdirSync(screenshotDir, { recursive: true });
     for (const width of [1440, 375]) {
       const { page, problems } = await start({ viewport: { width, height: 900 } });

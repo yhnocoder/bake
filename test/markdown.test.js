@@ -21,6 +21,14 @@ const markdownFixtures = [
   'image-width-tier.md',
   'unknown-component-parameter.md',
   'component-parameter-range.md',
+  'unknown-component.md',
+  'component-width.md',
+  'component-width-percent.md',
+  'component-height.md',
+  'component-float.md',
+  'component-width-block.md',
+  'component-file-outside.md',
+  'component-id.md',
 ];
 const exampleBlog = fileURLToPath(new URL('../examples/blog/', import.meta.url));
 describe('markdown fixtures', () => {

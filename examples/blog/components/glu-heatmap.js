@@ -6,6 +6,7 @@ import './lib/glu-heatmap.css';
 export const params = {
   cells: { label: '网格数', type: 'number', min: 40, max: 400, step: 20, default: 160 },
   range: { label: '坐标范围 ±', type: 'number', min: 1, max: 10, step: 1, default: 4 },
+  points: { label: '标注点', type: 'file', default: '' },
 };
 
 export const layout = { width: 'body', height: 360, narrowHeight: 400, frame: false };
@@ -28,8 +29,9 @@ function element(tag, className, children = []) {
   return node;
 }
 
-function texSlot(className, text, tex) {
+function texSlot(className, text, tex, width) {
   const slot = element('span', 'glu-heat-tex');
+  slot.style.width = width;
   texToSvg(tex).then((svg) => slot.replaceChildren(svg));
   return element('span', className, text ? [text, slot] : [slot]);
 }
@@ -77,6 +79,37 @@ export default class GluHeatmap extends HTMLElement {
     this.canvas.setAttribute('aria-label', `GLU 输出热图，横轴门控分支 g 和纵轴线性分支 u 的范围都是 ±${range}，颜色范围是 ±${bound}`);
     this.limit = limit;
     this.draw();
+    this.loadPoints();
+  }
+
+  async loadPoints() {
+    const source = this.params.points;
+    if (source === this.pointsSource) {
+      this.placePoints();
+      return;
+    }
+    this.pointsSource = source;
+    this.points = [];
+    if (source !== '') {
+      const response = await fetch(source);
+      if (source !== this.pointsSource) return;
+      this.points = response.ok ? await response.json() : [];
+    }
+    this.placePoints();
+  }
+
+  placePoints() {
+    const range = this.params.range;
+    const position = (value) => ((value + range) / (2 * range)) * 100 + '%';
+    const inside = this.points.filter((point) => Math.abs(point.g) <= range && Math.abs(point.u) <= range);
+    this.marks.replaceChildren(
+      ...inside.map((point) => {
+        const mark = element('span', point.g > 0 ? 'glu-heat-mark glu-heat-mark-left' : 'glu-heat-mark', [element('span', 'glu-heat-mark-label', [point.label])]);
+        mark.style.left = position(point.g);
+        mark.style.bottom = position(point.u);
+        return mark;
+      }),
+    );
   }
 
   build() {
@@ -88,17 +121,19 @@ export default class GluHeatmap extends HTMLElement {
     this.yTicks = element('div', 'glu-heat-y-ticks');
     this.legendLabels = element('div', 'glu-heat-legend-labels');
     this.legend = element('div', 'glu-heat-legend', [
-      texSlot('glu-heat-legend-title', '', '\\mathrm{SiLU}(g)\\,u'),
+      texSlot('glu-heat-legend-title', '', '\\mathrm{SiLU}(g)\\,u', '5.4em'),
       element('div', 'glu-heat-legend-bar'),
       this.legendLabels,
     ]);
-    this.plot = element('div', 'glu-heat-plot', [this.canvas, this.readout]);
+    this.marks = element('div', 'glu-heat-marks');
+    this.marks.setAttribute('aria-hidden', 'true');
+    this.plot = element('div', 'glu-heat-plot', [this.canvas, this.marks, this.readout]);
     this.chart = element('div', 'glu-heat-chart', [
-      texSlot('glu-heat-y-title', '线性分支 ', 'u'),
+      texSlot('glu-heat-y-title', '线性分支 ', 'u', '0.8em'),
       this.yTicks,
       this.plot,
       this.xTicks,
-      texSlot('glu-heat-x-title', '门控分支 ', 'g'),
+      texSlot('glu-heat-x-title', '门控分支 ', 'g', '0.8em'),
       this.legend,
     ]);
     this.append(element('div', 'glu-heat', [this.chart]));

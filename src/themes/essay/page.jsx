@@ -26,7 +26,7 @@ export default function Page(props) {
           <script type="module" src={src} />
         ))}
       </head>
-      <body class="bk-page">
+      <body class="bk-page" style={componentMessages(labels)}>
         {article.content.glyphs === undefined ? null : <div class="bk-glyphs" innerHTML={article.content.glyphs} />}
         <div class="bk-shell">
           <Header site={site} article={article} home={assets.root} labels={labels} />
@@ -36,4 +36,8 @@ export default function Page(props) {
       </body>
     </html>
   );
+}
+
+function componentMessages(labels) {
+  return `--bk-component-needs-script: ${JSON.stringify(labels.componentNeedsScript)}; --bk-component-failed: ${JSON.stringify(labels.componentFailed)}`;
 }

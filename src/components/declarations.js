@@ -3,7 +3,8 @@ import { WIDTHS, parseSize } from '../config/rules.js';
 import { describeValue, listChoices } from '../report.js';
 
 export const PARAM_TYPES = Object.freeze(['number', 'text', 'boolean', 'enum', 'file']);
-export const RESERVED_PARAMS = Object.freeze(['width', 'height']);
+export const SIZE_ATTRIBUTES = Object.freeze(['width', 'height']);
+export const RESERVED_PARAMS = Object.freeze([...SIZE_ATTRIBUTES, 'id', 'class']);
 
 const PARAM_NAME = /^[A-Za-z_][\w-]*$/;
 const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
@@ -28,7 +29,7 @@ export function checkDeclarations(module) {
 
 function paramProblems(name, declaration) {
   const subject = `parameter "${name}"`;
-  if (RESERVED_PARAMS.includes(name)) return [`${subject} uses a name reserved for Bake; ${listAll(RESERVED_PARAMS)} set the size of the frame in Markdown`];
+  if (RESERVED_PARAMS.includes(name)) return [`${subject} uses a name reserved for Bake; a component cannot declare ${listChoices(RESERVED_PARAMS)}`];
   if (!PARAM_NAME.test(name)) return [`${subject} cannot be written as a Markdown attribute; use letters, digits, "_" and "-", starting with a letter or "_"`];
   if (!isPlainObject(declaration)) return [`${subject} must be declared as an object such as { label: 'Range', type: 'number', default: 4 }, got ${describeValue(declaration)}`];
   if (!PARAM_TYPES.includes(declaration.type)) return [`${subject} has the type ${describeValue(declaration.type)}; use ${listChoices(PARAM_TYPES)}`];
@@ -81,7 +82,11 @@ export function resolveComponent(name, component, attributes, files) {
   const params = {};
   for (const [param, declaration] of Object.entries(component.params)) params[param] = declaration.default;
   for (const [attribute, raw] of Object.entries(attributes)) {
-    if (RESERVED_PARAMS.includes(attribute)) continue;
+    if (SIZE_ATTRIBUTES.includes(attribute)) continue;
+    if (attribute === 'id' || attribute === 'class') {
+      report(attribute, `components take no id or class; remove the ${attribute} from :::${name}`);
+      continue;
+    }
     const declaration = component.params[attribute];
     if (declaration === undefined) {
       report(attribute, attribute === 'float' ? `float does not apply to components; ${name} is centred in its column` : `unknown parameter "${attribute}" for ${name}`);

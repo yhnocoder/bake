@@ -3,7 +3,7 @@ import solid from 'vite-plugin-solid';
 import { compileProblem, outputOf, viteConfig } from '../build/vite.js';
 import { errorAt, fileStart } from '../report.js';
 import { COMPONENTS_DIR } from './read.js';
-import { RUNTIME_FILE, browserModules } from './modules.js';
+import { RUNTIME_FILE, browserModules, isMathJaxModule } from './modules.js';
 
 export async function bundleComponents(root, components, preamble, errors) {
   try {
@@ -22,6 +22,7 @@ export async function bundleComponents(root, components, preamble, errors) {
             entryFileNames: 'assets/[name]-[hash].js',
             chunkFileNames: 'assets/[name]-[hash].js',
             assetFileNames: 'assets/[name]-[hash][extname]',
+            codeSplitting: { groups: [{ name: 'mathjax', test: isMathJaxModule }] },
           },
         },
       },

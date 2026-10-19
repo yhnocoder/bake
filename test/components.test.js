@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
 import { readComponents } from '../src/components/read.js';
@@ -78,6 +79,14 @@ describe('reading components', () => {
     assert.equal(typeof navigator, 'object');
   });
 
+  test('the browser API fixture in test/fixtures/syntax-errors/ reports the line in expected.json', async () => {
+    const fixtures = new URL('./fixtures/syntax-errors/', import.meta.url);
+    const expected = JSON.parse(readFileSync(new URL('expected.json', fixtures), 'utf8'));
+    const errors = [];
+    await readComponents(fileURLToPath(new URL('component-browser-api/', fixtures)), { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors);
+    assert.deepEqual(errors.map(formatError), [expected['component-browser-api']]);
+  });
+
   test('reports syntax errors, failing imports and errors thrown at the top level', async (t) => {
     const { errors } = await read(t, {
       'components/syntax-plot.jsx': `${height}export default function SyntaxPlot() {\n  return <div>{</div>;\n}\n`,
@@ -124,7 +133,7 @@ describe('reading components', () => {
       'components/no-default-export.js:1:1 no-default-export: the default export must be a SolidJS component or a class that extends HTMLElement',
       'components/no-height.js:1:1 no-height: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "120%"',
       'components/no-height.js:1:1 no-height: layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 16 / 9 }',
-      'components/reserved-name.js:1:1 reserved-name: parameter "width" uses a name reserved for Bake; width and height set the size of the frame in Markdown',
+      'components/reserved-name.js:1:1 reserved-name: parameter "width" uses a name reserved for Bake; a component cannot declare width, height, id or class',
     ]);
     assert.equal(read_.get('bad-type').valid, false);
   });

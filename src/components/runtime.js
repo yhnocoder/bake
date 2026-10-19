@@ -20,15 +20,39 @@ function define(name) {
   return definitions.get(name);
 }
 
+function reportedErrors(action) {
+  const errors = [];
+  const record = (event) => {
+    errors.push(event.error);
+    event.preventDefault();
+  };
+  // why: the browser reports an exception thrown by a custom element constructor or connectedCallback as an error event on window, and createElement and append return normally
+  addEventListener('error', record);
+  try {
+    action();
+  } finally {
+    removeEventListener('error', record);
+  }
+  return errors;
+}
+
 async function start(frame) {
   if (frame.dataset.state !== undefined) return;
   frame.dataset.state = 'loading';
   const name = frame.dataset.component;
   try {
     await define(name);
-    const element = document.createElement(name);
-    element.params = JSON.parse(frame.dataset.params);
-    frame.querySelector(BOX).append(element);
+    const box = frame.querySelector(BOX);
+    let element = null;
+    const errors = reportedErrors(() => {
+      element = document.createElement(name);
+      element.params = JSON.parse(frame.dataset.params);
+      box.append(element);
+    });
+    if (errors.length > 0) {
+      reportedErrors(() => element?.remove());
+      throw errors[0];
+    }
     frame.dataset.state = 'ready';
   } catch (error) {
     frame.dataset.state = 'failed';

@@ -12,6 +12,8 @@ const CHINESE = {
   copyLink: '复制本节链接',
   linkCopied: '已复制本节链接',
   sidenote: (number) => `旁注 ${number}`,
+  componentNeedsScript: '交互图需要 JavaScript 才能显示',
+  componentFailed: '交互图未能加载',
 };
 
 const ENGLISH = {
@@ -28,6 +30,8 @@ const ENGLISH = {
   copyLink: 'Copy the link to this section',
   linkCopied: 'Link copied',
   sidenote: (number) => `Sidenote ${number}`,
+  componentNeedsScript: 'This interactive figure needs JavaScript',
+  componentFailed: 'This interactive figure could not be loaded',
 };
 
 export function labelsFor(language) {
