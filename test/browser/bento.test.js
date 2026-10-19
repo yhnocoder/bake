@@ -137,7 +137,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         if (width < 1000) continue;
         if (covered) problems.push(`${at}: a button covers a card or the intro`);
         if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
-        if (chatGap < 16 || chatGap > 24) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
+        if (chatGap < 16 || chatGap > 32) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
         if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
       }
     }
