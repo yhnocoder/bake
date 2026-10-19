@@ -8,6 +8,7 @@ const LEFT_BRACE = 123;
 const RIGHT_BRACE = 125;
 const QUOTE = 34;
 const APOSTROPHE = 39;
+const CODE_FENCE_LINE = /^\s*(`{3,}|~{3,})(.*)$/;
 
 const blockConstruct = { tokenize: tokenizeBlock, concrete: true };
 const nonLazyLine = { tokenize: tokenizeNonLazyLine, partial: true };
@@ -25,8 +26,14 @@ const blockFromMarkdown = {
     },
   },
   exit: {
+    bakeBlockSequence(token) {
+      this.stack.at(-1).colons ??= this.sliceSerialize(token).length;
+    },
     bakeBlockInfo(token) {
       this.stack.at(-1).info = this.sliceSerialize(token);
+    },
+    bakeBlockClosingFence() {
+      this.stack.at(-1).closed = true;
     },
     bakeBlock(token) {
       this.exit(token);
@@ -41,6 +48,8 @@ function tokenizeBlock(effects, ok, nok) {
   let sizeOpen = 0;
   let previous;
   let quote;
+  let line = '';
+  let codeFence = null;
   return start;
 
   function start(code) {
@@ -117,8 +126,21 @@ function tokenizeBlock(effects, ok, nok) {
   }
 
   function lineStart(code) {
-    const closing = { tokenize: tokenizeClosingFence, partial: true };
-    return effects.attempt(closing, afterContent, initialSize ? factorySpace(effects, chunkStart, 'linePrefix', initialSize + 1) : chunkStart)(code);
+    const content = initialSize ? factorySpace(effects, chunkStart, 'linePrefix', initialSize + 1) : chunkStart;
+    if (codeFence !== null) return content(code);
+    return effects.attempt({ tokenize: tokenizeClosingFence, partial: true }, afterContent, content)(code);
+  }
+
+  function trackCodeFence() {
+    const match = CODE_FENCE_LINE.exec(line);
+    line = '';
+    if (!match) return;
+    const [, fence, rest] = match;
+    if (codeFence === null) {
+      if (!(fence[0] === '`' && rest.includes('`'))) codeFence = fence;
+    } else if (fence[0] === codeFence[0] && fence.length >= codeFence.length && rest.trim() === '') {
+      codeFence = null;
+    }
   }
 
   function chunkStart(code) {
@@ -133,7 +155,11 @@ function tokenizeBlock(effects, ok, nok) {
       self.parser.lazy[token.start.line] = false;
       return afterContent(code);
     }
-    if (markdownLineEnding(code)) return effects.check(nonLazyLine, nonLazyLineAfter, lineAfter)(code);
+    if (markdownLineEnding(code)) {
+      trackCodeFence();
+      return effects.check(nonLazyLine, nonLazyLineAfter, lineAfter)(code);
+    }
+    line += code < 0 ? ' ' : String.fromCodePoint(code);
     effects.consume(code);
     return contentContinue;
   }
@@ -179,7 +205,7 @@ function tokenizeBlock(effects, ok, nok) {
     return factorySpace(effects, closingPrefixAfter, 'linePrefix', indentLimit);
 
     function closingPrefixAfter(code) {
-      effects.enter('bakeBlockFence');
+      effects.enter('bakeBlockClosingFence');
       effects.enter('bakeBlockSequence');
       return closingSequence(code);
     }
@@ -197,7 +223,7 @@ function tokenizeBlock(effects, ok, nok) {
 
     function closingSequenceEnd(code) {
       if (code === null || markdownLineEnding(code)) {
-        effects.exit('bakeBlockFence');
+        effects.exit('bakeBlockClosingFence');
         return ok(code);
       }
       return nok(code);

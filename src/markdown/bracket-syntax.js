@@ -5,6 +5,7 @@ const LEFT_BRACKET = 91;
 const RIGHT_BRACKET = 93;
 const AT_SIGN = 64;
 const CARET = 94;
+const LEFT_PARENTHESIS = 40;
 const CITATION_KEY = /^[\w:.#$%&+?<>~/-]$/;
 
 export function citationsAndMissingFootnotes() {
@@ -41,12 +42,17 @@ const bracketFromMarkdown = {
 };
 
 function tokenizeCitation(effects, ok, nok) {
+  const self = this;
   return bracketed(effects, ok, nok, {
     type: 'citation',
     marker: AT_SIGN,
     accepts: (code) => code !== null && CITATION_KEY.test(String.fromCodePoint(code)),
-    complete: () => true,
+    complete: (token) => !isLinkLabel(self, `@${self.sliceSerialize(token)}`),
   });
+}
+
+function isLinkLabel(context, label) {
+  return context.parser.defined.includes(normalizeIdentifier(label));
 }
 
 function tokenizeMissingFootnote(effects, ok, nok) {
@@ -56,7 +62,7 @@ function tokenizeMissingFootnote(effects, ok, nok) {
     type: 'missingFootnote',
     marker: CARET,
     accepts: (code) => code !== null && code !== LEFT_BRACKET && !markdownLineEndingOrSpace(code),
-    complete: (token) => !defined.includes(normalizeIdentifier(self.sliceSerialize(token))),
+    complete: (token) => !defined.includes(normalizeIdentifier(self.sliceSerialize(token))) && !isLinkLabel(self, `^${self.sliceSerialize(token)}`),
   });
 }
 
@@ -89,11 +95,15 @@ function bracketed(effects, ok, nok, { type, marker, accepts, complete }) {
       effects.consume(code);
       effects.exit(`${type}Marker`);
       effects.exit(type);
-      return ok;
+      return afterClose;
     }
     if (size > 999 || !accepts(code)) return nok(code);
     effects.consume(code);
     size++;
     return inside;
+  }
+
+  function afterClose(code) {
+    return code === LEFT_PARENTHESIS || code === LEFT_BRACKET ? nok(code) : ok(code);
   }
 }

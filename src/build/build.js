@@ -34,7 +34,7 @@ function readArticle(root, article, rules, errors) {
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
-  const content = fields !== null && fields.page === undefined ? parseArticle(article.file, source, errors) : null;
+  const content = fields?.page === undefined ? parseArticle(article.file, source, errors) : null;
   return { ...article, fields, positions: frontMatter?.positions ?? {}, url, content };
 }
 

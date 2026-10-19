@@ -102,6 +102,17 @@ describe('headings and anchors', () => {
     ]);
   });
 
+  test('reports an anchor that is also the id of a sidenote or a reference', () => {
+    assert.deepEqual(parse('## A {#sidenote-1}\n\nText[^a] [@k]. ^reference-k\n\n[^a]: Note.\n\n:::references\n- [@k] K.\n:::\n').errors, [
+      'index.md:7:6 anchor "sidenote-1" is also the id of sidenote 1',
+      'index.md:9:16 anchor "reference-k" is also the id of the reference "k"',
+    ]);
+  });
+
+  test('gives a heading another id when its text makes the id of a sidenote', () => {
+    assert.equal(parsed('## Sidenote 1\n\nText[^a].\n\n[^a]: Note.\n').sections[0].id, 'sidenote-1-1');
+  });
+
   test('reports a duplicate anchor between a heading and a paragraph at the later one', () => {
     assert.deepEqual(parse('## A {#chain}\n\nText. ^chain\n').errors, ['index.md:9:7 duplicate anchor "chain", first defined at 7:6']);
   });
@@ -109,7 +120,7 @@ describe('headings and anchors', () => {
   const headingErrors = [
     ['## A {width=full}', 'index.md:7:6 width must be body, wide or page, got "full"'],
     ['### A {width=wide}', 'index.md:7:7 width only applies to ## headings'],
-    ['## A {toc}', 'index.md:7:6 toc must be a short title, for example toc="短标题"'],
+    ['## A {toc}', 'index.md:7:6 toc must be a short title in quotes, for example toc="Short title"'],
     ['## A {.red}', 'index.md:7:6 unknown attribute "class" on heading'],
     ['## A {toc="a" toc="b"}', 'index.md:7:6 attribute "toc" is written twice'],
     ['## A {toc="unclosed}', 'index.md:7:6 cannot read the attributes {toc="unclosed}; write them as {#id key=value key="text with spaces"}'],
@@ -173,6 +184,25 @@ describe('aside and fold', () => {
     const article = parsed('::::fold{title="实现细节"}\n:::aside{title="注意"}\n融合。\n:::\n::::\n');
     assert.deepEqual(article.intro.map((block) => [block.type, block.line, block.endLine]), [['fold', 7, 11]]);
     assert.equal(article.intro[0].html, '<details class="fold"><summary>实现细节</summary>\n<aside class="aside"><p class="aside-title">注意</p>\n<p>融合。</p>\n</aside>\n</details>');
+  });
+
+  test('reports a block without a closing line and keeps the sections after it', () => {
+    const { article, errors } = parse('## A\n\n:::aside\nText.\n\n## B\n');
+    assert.deepEqual(errors, ['index.md:9:1 :::aside is not closed; end it with a line of 3 or more colons']);
+    assert.equal(article.sections.length, 1);
+  });
+
+  test('reports a nested block with as many colons as its outer block and the ::: line left over', () => {
+    assert.deepEqual(parse(':::aside\n:::fold{title=x}\nhi\n:::\n:::\n').errors, [
+      'index.md:8:1 :::fold is not closed; end it with a line of 3 or more colons',
+      'index.md:11:1 this ::: line closes no block; a block inside another block needs fewer colons than the outer block',
+    ]);
+  });
+
+  test('keeps ::: lines inside a fenced code block from closing the block around it', () => {
+    const article = parsed(':::aside\n```markdown\n:::\n```\n~~~~\n:::\n~~~\n:::\n~~~~\n:::\n\n## After\n');
+    assert.equal(article.intro[0].html, '<aside class="aside">\n<pre><code class="language-markdown">:::\n</code></pre>\n<pre><code>:::\n~~~\n:::\n</code></pre>\n</aside>');
+    assert.deepEqual(article.sections.map((section) => section.id), ['after']);
   });
 
   test('treats a line that starts with ::: followed by prose as text', () => {
@@ -263,6 +293,17 @@ describe('citations', () => {
       'index.md:10:3 reference "a" is listed twice, first at 8:3',
       'index.md:13:1 an article has one :::references block, the first is at 7:1',
     ]);
+  });
+
+  test('keeps links whose text starts with @ or ^ as links', () => {
+    assert.equal(
+      html('By [@yhnocoder](https://github.com/yhnocoder), see [@ref][r] and [^x](https://example.com).\n\n[r]: https://example.org\n'),
+      '<p>By <a href="https://github.com/yhnocoder">@yhnocoder</a>, see <a href="https://example.org">@ref</a> and <a href="https://example.com">^x</a>.</p>',
+    );
+  });
+
+  test('keeps a shortcut reference link whose label starts with @ as a link', () => {
+    assert.equal(html('See [@home].\n\n[@home]: https://example.com\n'), '<p>See <a href="https://example.com">@home</a>.</p>');
   });
 
   test('keeps an escaped citation as text', () => {

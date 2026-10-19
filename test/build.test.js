@@ -130,8 +130,9 @@ describe('bake build', () => {
         'content/posts/b/index.md:5:6 toc must be notes, tabs, dots or ticks, got "sidebar"',
         'content/posts/b/index.md:6:1 unknown front matter field "layout"',
         'content/posts/c/index.md:1:1 index.md must start with front matter between two --- lines',
+        'content/posts/c/index.md:1:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##',
         'public/2026-10/d/index.html:1:1 dist/2026-10/d/index.html is also written by content/posts/d/index.md',
-        '7 errors, dist/ was not written',
+        '8 errors, dist/ was not written',
         '',
       ].join('\n'),
     );

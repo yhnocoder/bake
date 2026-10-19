@@ -134,7 +134,7 @@ A quote whose last paragraph starts with `— ` shows that paragraph as its sour
 
 ### Blocks
 
-A block starts with a line of three or more colons and a name, and ends with a line of at least as many colons. A block inside another block uses fewer colons than the block around it.
+A block starts with a line of three or more colons and a name, and ends with a line of at least as many colons. A block inside another block uses fewer colons than the block around it. Lines inside a fenced code block never close a block. A block without a closing line and a colon line that closes no block are errors.
 
 | Block | Meaning |
 |---|---|

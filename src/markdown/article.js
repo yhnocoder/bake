@@ -39,6 +39,7 @@ const BUILT_IN_BLOCKS = {
 const HEADING_ATTRIBUTES = ['id', 'toc', 'width'];
 const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
 const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
+const STRAY_CLOSING_LINE = /^([\s>]*):{3,}\s*$/;
 const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
 
 export function parseArticle(file, source, errors) {
@@ -74,11 +75,16 @@ class ArticleParser {
     walk(tree, (node) => {
       if (node.type === 'bakeBlock') this.readBlock(node);
       if (node.type === 'heading') this.readHeading(node);
-      if (node.type === 'paragraph') this.readParagraphAnchor(node);
+      if (node.type === 'paragraph') {
+        this.readStrayClosingLines(node);
+        this.readParagraphAnchor(node);
+      }
     });
-    this.assignHeadingIds(tree);
+    this.resolveLinkReferences(tree);
     this.readFootnotes(tree);
     this.readCitations(tree);
+    this.checkGeneratedIds();
+    this.assignHeadingIds(tree);
     return this.buildStructure(tree);
   }
 
@@ -93,6 +99,7 @@ class ArticleParser {
       if (error) this.report(start, error);
     }
     const label = node.name === '' ? ':::{width=…}' : `:::${node.name}`;
+    if (!node.closed) this.report(start, `${label} is not closed; end it with a line of ${node.colons} or more colons`);
     if (node.name === '') {
       this.checkKnownAttributes(node.attributes, ['width'], label, start);
       if (node.attributes.width === undefined) this.report(start, 'a block without a name must set width, for example :::{width=wide}');
@@ -120,12 +127,22 @@ class ArticleParser {
       node.attributes = attributes;
       if (error) this.report(position, error);
       this.checkKnownAttributes(attributes, HEADING_ATTRIBUTES, 'heading', position);
-      if (attributes.toc !== undefined && typeof attributes.toc !== 'string') this.report(position, 'toc must be a short title, for example toc="短标题"');
+      if (attributes.toc !== undefined && typeof attributes.toc !== 'string') this.report(position, 'toc must be a short title in quotes, for example toc="Short title"');
       if (attributes.width !== undefined) {
         if (node.depth !== 2) this.report(position, 'width only applies to ## headings');
         else this.checkWidth(attributes.width, position);
       }
       if (attributes.id !== undefined) this.addAnchor(String(attributes.id), position);
+    }
+  }
+
+  readStrayClosingLines(node) {
+    const raw = this.source.slice(node.position.start.offset, node.position.end.offset);
+    let offset = node.position.start.offset;
+    for (const line of raw.split('\n')) {
+      const colons = STRAY_CLOSING_LINE.exec(line);
+      if (colons) this.report(this.positionAt(offset + colons[1].length), 'this ::: line closes no block; a block inside another block needs fewer colons than the outer block');
+      offset += line.length + 1;
     }
   }
 
@@ -159,14 +176,44 @@ class ArticleParser {
     else this.anchors.set(id, position);
   }
 
+  generatedIds() {
+    const ids = new Map();
+    for (const { number } of this.sidenotes.values()) ids.set(`sidenote-${number}`, `sidenote ${number}`);
+    for (const { key } of this.references) ids.set(`reference-${key}`, `the reference "${key}"`);
+    return ids;
+  }
+
+  checkGeneratedIds() {
+    const generated = this.generatedIds();
+    for (const [id, position] of this.anchors) {
+      if (generated.has(id)) this.report(position, `anchor "${id}" is also the id of ${generated.get(id)}`);
+    }
+  }
+
   assignHeadingIds(tree) {
+    const generated = this.generatedIds();
+    const taken = (id) => this.anchors.has(id) || generated.has(id);
     const slugger = new GithubSlugger();
     walk(tree, (node) => {
       if (node.type !== 'heading') return;
       let id = node.attributes.id === undefined ? undefined : String(node.attributes.id);
-      while (id === undefined || (node.attributes.id === undefined && this.anchors.has(id))) id = slugger.slug(toString(node));
+      while (id === undefined || (node.attributes.id === undefined && taken(id))) id = slugger.slug(toString(node));
       node.id = id;
       node.data = { hProperties: { id } };
+    });
+  }
+
+  resolveLinkReferences(tree) {
+    const definitions = new Map();
+    walk(tree, (node, parent) => {
+      if (node.type !== 'definition') return;
+      if (!definitions.has(node.identifier)) definitions.set(node.identifier, node);
+      parent.children = parent.children.filter((child) => child !== node);
+    });
+    walk(tree, (node) => {
+      if (node.type !== 'linkReference' && node.type !== 'imageReference') return;
+      const { url, title } = definitions.get(node.identifier);
+      Object.assign(node, node.type === 'linkReference' ? { type: 'link', url, title } : { type: 'image', url, title });
     });
   }
 
