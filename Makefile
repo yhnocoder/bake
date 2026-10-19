@@ -1,10 +1,14 @@
-.PHONY: check example
+.PHONY: check browser example
 
 check:
 	scripts/test.sh
 
 node_modules: package.json package-lock.json
 	npm ci
+
+browser: node_modules
+	npx playwright install chromium
+	npm run test:browser
 
 example: node_modules
 	cd examples/blog && node ../../src/cli.js build

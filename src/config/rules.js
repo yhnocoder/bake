@@ -7,6 +7,7 @@ export const TOC_STYLES = Object.freeze(['notes', 'tabs', 'dots', 'ticks']);
 export const WIDTHS = Object.freeze(['body', 'wide', 'page']);
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
+const SIZE_PATTERN = /^(\d+(?:\.\d+)?)(px|%)$/;
 
 export function slugProblem(label, value) {
   if (typeof value !== 'string') return `${label} must be a string, got ${describeValue(value)}`;
@@ -16,6 +17,18 @@ export function slugProblem(label, value) {
 
 export function choiceProblem(label, choices, value) {
   return choices.includes(value) ? null : `${label} must be ${listChoices(choices)}, got ${describeValue(value)}`;
+}
+
+export function parseSize(value) {
+  const match = SIZE_PATTERN.exec(typeof value === 'string' ? value : '');
+  if (match === null || Number(match[1]) === 0) return null;
+  return { number: Number(match[1]), unit: match[2] };
+}
+
+export function sizeProblem(label, value, subject) {
+  if (parseSize(value) !== null) return null;
+  const hint = WIDTHS.includes(value) ? `; use :::{width=${value}} around the ${subject}` : ', for example 560px or 70%';
+  return `${label} must be a positive number of pixels or a percentage, got ${describeValue(value)}${hint}`;
 }
 
 export function availableThemes(root) {
