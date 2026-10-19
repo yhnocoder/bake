@@ -1,0 +1,10 @@
+.bk-kit-tex {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5em;
+}
+
+.bk-kit-svg-tex {
+  font-size: 13px;
+  color: var(--ink-2);
+}
