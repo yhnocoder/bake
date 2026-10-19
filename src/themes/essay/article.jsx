@@ -1,5 +1,3 @@
-import { Dynamic } from 'solid-js/web';
-
 const SIDENOTE_REFERENCE = /data-sidenote="(\d+)"/g;
 const PLACED_BLOCKS = new Set(['math', 'code', 'table', 'list-table', 'example', 'figure', 'component', 'embed']);
 const FLOATED_FIGURE = /^<figure[^>]*\sdata-float=/;
@@ -57,14 +55,7 @@ function Flow(props) {
 
 function Block(props) {
   const { block, afterHeading, labels } = props;
-  if (block.type === 'heading') {
-    return (
-      <Dynamic component={`h${Math.min(block.depth, 6)}`} id={block.id}>
-        <HeadingLink id={block.id} labels={labels} />
-        <span class="bk-heading-text" innerHTML={block.title} />
-      </Dynamic>
-    );
-  }
+  if (block.type === 'heading') return <Heading block={block} labels={labels} />;
   if (block.type === 'references') {
     return (
       <div class="bk-block bk-references" data-type="references">
@@ -73,14 +64,24 @@ function Block(props) {
       </div>
     );
   }
-  const style = block.naturalWidth === undefined ? {} : { style: `--natural-width:${block.naturalWidth}` };
-  return <div class="bk-block" data-type={block.type} data-width={blockWidth(block)} {...style} innerHTML={block.html} />;
+  const width = blockWidth(block);
+  if (block.naturalWidth === undefined) return <div class="bk-block" data-type={block.type} data-width={width} innerHTML={block.html} />;
+  return <div class="bk-block" data-type={block.type} data-width={width} style={`--natural-width:${block.naturalWidth}`} innerHTML={block.html} />;
 }
 
 function blockWidth(block) {
   if (block.width !== undefined) return block.width;
   if (!PLACED_BLOCKS.has(block.type) || FLOATED_FIGURE.test(block.html)) return undefined;
   return 'auto';
+}
+
+function Heading(props) {
+  const { block, labels } = props;
+  const content = [<HeadingLink id={block.id} labels={labels} />, <span class="bk-heading-text" innerHTML={block.title} />];
+  if (block.depth <= 3) return <h3 id={block.id}>{content}</h3>;
+  if (block.depth === 4) return <h4 id={block.id}>{content}</h4>;
+  if (block.depth === 5) return <h5 id={block.id}>{content}</h5>;
+  return <h6 id={block.id}>{content}</h6>;
 }
 
 function HeadingLink(props) {
