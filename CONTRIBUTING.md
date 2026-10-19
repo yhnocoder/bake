@@ -138,5 +138,6 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | A blog can add a theme or replace files of the essay theme, theme errors are reported at their position, and a build leaves no cache in the blog | `test/theme.test.js` |
 | Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph | `test/browser/math.test.js` |
 | Figures with a pixel or percent width have that width, stay inside the screen and are centred | `test/browser/images.test.js` |
+| The essay theme keeps articles inside the screen at every breakpoint, gives body, wide and page blocks their widths, resolves blocks without a width, follows dark mode and the theme setting, and downloads LXGW WenKai only for the characters of the masthead, title and headings | `test/browser/layout.test.js` |
 | The screenshots section replaces only the marked part of a pull request description, gives the same result when written twice and keeps `$` literally | `test/screenshot-section.test.js` |
 | Every screenshot image in a pull request description is at most 880 pixels wide, changes are cropped to the changed area, and identical light and dark images are drawn once | `test/compare-screenshots.test.js` |
