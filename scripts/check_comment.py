@@ -6,7 +6,7 @@ import sys
 import tokenize
 from pathlib import Path
 
-WHY = re.compile(r"(?://|#)\s*why\(#\d+\): \S")
+WHY = re.compile(r"(?://|#)\s*why: \S")
 SLASH_DIRECTIVE = re.compile(
     r"(?:///?|/\*)\s*(?:eslint-|@ts-|prettier-ignore|biome-ignore|deno-lint-ignore|deno-fmt-ignore"
     r"|istanbul ignore|c8 ignore|NOLINT|clang-format |swiftlint:|go:|\+build|nolint|<reference )"
@@ -257,7 +257,7 @@ def main():
     for violation in violations:
         print(violation)
     if violations:
-        print("comments are not allowed; see CLAUDE.md, the only exception is why(#N): reason")
+        print("comments are not allowed; see CLAUDE.md, the only exception is a one-line why: reason")
     sys.exit(1 if violations else 0)
 
 

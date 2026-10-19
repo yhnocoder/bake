@@ -1,16 +1,51 @@
-# bake
+# Bake
 
-bake 是一个面向技术博客的静态网站生成器，自带所见即所得的编辑器。它不仅支持 Markdown 基础语法与自定义扩展语法，还能在文章中嵌入交互组件，并在编辑器里直接调整组件的参数。
+Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-- 文章用 Markdown 书写。公式、折叠、提示框、旁注、站内引用等内容都有对应的 Markdown 写法。
-- `bake dev` 打开的页面可以直接编辑。编辑器里看到的排版与发布后的页面相同，修改保存回 Markdown 文件。
-- 交互组件用 Web Components 标准的 custom element 编写，编辑器根据组件声明的属性生成属性面板。
-- `bake build` 输出静态网站。公式在构建时渲染成 SVG，站内链接在构建时检查，悬停站内链接时显示目标内容的预览。
+> Bake is being rebuilt from scratch to follow its new design. The commands below are planned; today they print `not implemented yet`.
+
+## Commands
 
 ```bash
-bake new matrix-calculus/jacobian   # 新建 content/matrix-calculus/jacobian.md
-bake dev                            # 启动开发服务器，在页面上编辑文章
-bake build                          # 生成静态网站到 dist/
+bake new 2026-10/rope   # create content/posts/2026-10/rope/index.md as a draft
+bake dev                # serve the blog at http://localhost:4321/ and update pages on save
+bake build              # generate the static site into dist/
 ```
 
-设计文档从 `docs/design/index.html` 开始读。
+You write Markdown in the text tool of your choice. `bake dev` shows each page exactly as it will be published; after you save, the page updates in place and keeps its scroll position. Problems are listed in the terminal and on the page as `file:line:col message`.
+
+## A blog repository
+
+A blog is an ordinary repository. Bake reads it from the blog root:
+
+```
+my-blog/
+  bake.config.js        site title, URL, language, default theme and table of contents style
+  preamble.sty          math macros shared by every article
+  package.json          npm packages used by components
+  content/
+    posts/
+      2026-10/
+        llm-act-fns/
+          index.md      one article per folder, with its images and data next to it
+  components/           interactive components, one file each
+  themes/               optional: new themes or overrides of the built-in ones
+  public/               copied unchanged to the site root (favicon, CNAME)
+  dist/                 build output, not committed
+```
+
+Folders under `content/posts/` only organize files. Each article's URL is `/YYYY-MM/slug/`, taken from the `date` and `slug` fields of its front matter, so moving a folder does not change the URL.
+
+```markdown
+---
+title: Activation functions in LLMs
+slug: llm-act-fns
+date: 2026-09-14
+summary: From ReLU to SwiGLU.
+tags: [LLM]
+---
+```
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands.
