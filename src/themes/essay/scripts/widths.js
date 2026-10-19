@@ -11,6 +11,7 @@ export function startWidths(article) {
   });
   layout();
   new ResizeObserver(layout).observe(article);
+  addEventListener('resize', layout);
   document.fonts.ready.then(layout);
   article.addEventListener('toggle', layout, true);
   for (const scroller of scrollers) {
