@@ -54,3 +54,23 @@ test('figures with a pixel or percent width have that width, stay inside the scr
     });
   }
 });
+
+test('a figure without a size stays inside the body column however wide its image is, and only a written pixel width makes it wider', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body: '![](wide.svg)\n\n![](wide.svg){width=1000px}\n' }),
+    'content/posts/rope/wide.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400"><rect width="1600" height="400" fill="#985b57"/></svg>',
+  });
+  assert.equal(bake(dir, 'build').stderr, '');
+  const origin = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 800 } });
+  await page.goto(`${origin}/2026-10/rope/`);
+  const { column, figures } = await page.evaluate(() => ({
+    column: document.querySelector('.bk-article').getBoundingClientRect().width,
+    figures: [...document.querySelectorAll('figure')].map((figure) => Math.round(figure.getBoundingClientRect().width)),
+  }));
+  assert.equal(Math.round(column), 820);
+  assert.deepEqual(figures, [820, 1000]);
+});

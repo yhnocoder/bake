@@ -1,13 +1,15 @@
+import { layoutChanged, oncePerFrame } from './motion.js';
+
 const SCROLLERS = 'pre.shiki, .table-scroll, mjx-container[display]';
 const NATURAL_WIDTH_HOSTS = { math: 'mjx-container[display]', code: 'pre.shiki' };
 
 export function startWidths(article) {
   const blocks = [...article.querySelectorAll('.bk-block[data-width]')];
   const scrollers = [...article.querySelectorAll(SCROLLERS)];
-  const layout = onFrame(() => {
+  const layout = oncePerFrame(() => {
     resolveWidths(article, blocks);
     scrollers.forEach(updateFades);
-    document.dispatchEvent(new CustomEvent('bk:layout'));
+    layoutChanged();
   });
   layout();
   new ResizeObserver(layout).observe(article);
@@ -15,21 +17,9 @@ export function startWidths(article) {
   document.fonts.ready.then(layout);
   article.addEventListener('toggle', layout, true);
   for (const scroller of scrollers) {
-    const fades = onFrame(() => updateFades(scroller));
+    const fades = oncePerFrame(() => updateFades(scroller));
     scroller.addEventListener('scroll', fades, { passive: true });
   }
-}
-
-function onFrame(callback) {
-  let pending = false;
-  return () => {
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(() => {
-      pending = false;
-      callback();
-    });
-  };
 }
 
 function resolveWidths(article, blocks) {

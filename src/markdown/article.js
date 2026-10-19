@@ -636,9 +636,8 @@ function naturalWidth(node) {
   if (node.type === 'math') return (MATH_MIN_WIDTH.exec(node.rendered) ?? MATH_WIDTH.exec(node.rendered))?.[1];
   if (node.type === 'code') return `${Math.max(...node.value.split('\n').map(textColumns))}ch`;
   if (node.type === 'figure') {
-    const { boxWidth, width } = node.children[0].published;
-    if (boxWidth === undefined) return width === undefined ? undefined : `${width}px`;
-    return boxWidth.endsWith('px') ? boxWidth : undefined;
+    const { boxWidth } = node.children[0].published;
+    return boxWidth?.endsWith('px') ? boxWidth : undefined;
   }
   return undefined;
 }

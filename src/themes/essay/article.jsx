@@ -71,7 +71,8 @@ function Block(props) {
 
 function blockWidth(block) {
   if (block.width !== undefined) return block.width;
-  if (!PLACED_BLOCKS.has(block.type) || FLOATED_FIGURE.test(block.html)) return undefined;
+  if (!PLACED_BLOCKS.has(block.type)) return undefined;
+  if (block.type === 'figure' && (block.naturalWidth === undefined || FLOATED_FIGURE.test(block.html))) return undefined;
   return 'auto';
 }
 
