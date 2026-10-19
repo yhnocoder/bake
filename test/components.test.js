@@ -61,6 +61,15 @@ describe('reading components', () => {
     assert.equal(globalThis.HTMLElement, undefined);
   });
 
+  test('reads a component that imports bake/kit in Node', async (t) => {
+    const { components: read_, errors } = await read(t, {
+      'components/kit-plot.jsx':
+        "import { Axes, Curve, Plot, niceTicks } from 'bake/kit';\n\nexport const layout = { height: niceTicks(0, 4, 4).length * 100 };\n\nexport default function KitPlot() {\n  return <Plot x={[0, 1]} y={[0, 1]}><Axes /><Curve f={(x) => x} color=\"var(--series-1)\" /></Plot>;\n}\n",
+    });
+    assert.deepEqual(errors, []);
+    assert.deepEqual([read_.get('kit-plot').valid, read_.get('kit-plot').layout], [true, { height: 500 }]);
+  });
+
   test('reports a browser API used at the top level at its position, also inside components/lib/', async (t) => {
     const { errors } = await read(t, {
       'components/lib/size.js': 'export const unit = 8;\n\nexport const screen = window.innerWidth;\n',
@@ -288,6 +297,28 @@ describe('building components', () => {
     assert.doesNotMatch(runtimeSource, /unused-view/);
     const scripts = assets.filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
     assert.ok(!scripts.some((source) => source.includes('computations created outside')), 'no script contains the development build of Solid');
+    assert.ok(!assets.some((name) => name.startsWith('kit-')), assets.join(', '));
+    const sources = assets.filter((name) => /\.(js|css)$/.test(name)).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
+    assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no asset contains code of bake/kit');
+  });
+
+  test('bundles bake/kit in its own chunk with its stylesheet when a component imports it', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/line-plot.jsx':
+        "import { Axes, Plot, Slider } from 'bake/kit';\n\nexport const layout = { height: 300 };\n\nexport default function LinePlot() {\n  return <><Slider label=\"a\" min={0} max={1} value={0} onInput={() => {}} /><Plot x={[0, 1]} y={[0, 1]}><Axes /></Plot></>;\n}\n",
+      'components/tick-list.js': "import { niceTicks } from 'bake/kit';\n\nexport const layout = { height: 100 };\n\nexport default class TickList extends HTMLElement {\n  connectedCallback() {\n    this.textContent = niceTicks(0, 1, 2).length;\n  }\n}\n",
+      'content/posts/rope/index.md': article({ body: ':::line-plot\n:::\n\n:::tick-list\n:::\n' }),
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const assets = readdirSync(join(dir, 'dist/assets'));
+    const kit = assets.filter((name) => name.startsWith('kit-')).map((name) => name.replace(/-[\w-]{8}\./, '.'));
+    assert.deepEqual(kit.sort(), ['kit.css', 'kit.js']);
+    const source = (pattern) => readFileSync(join(dir, 'dist/assets', assets.find((name) => pattern.test(name))), 'utf8');
+    assert.match(source(/^kit-[\w-]+\.css$/), /\.bk-kit-slider/);
+    assert.match(source(/^line-plot-[\w-]+\.js$/), /\.\/kit-[\w-]+\.js/);
+    assert.match(source(/^tick-list-[\w-]+\.js$/), /\.\/kit-[\w-]+\.js/);
   });
 
   test('reports component errors with the article errors and writes nothing', (t) => {
