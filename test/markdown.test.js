@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import { readPreamble } from '../src/config/preamble.js';
-import { createSite } from '../src/build/links.js';
+import { indexPages } from '../src/build/links.js';
 import { parseArticle, readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
 import { folder, frontMatter, html, outline, parse, parsed } from './article.js';
@@ -40,8 +40,8 @@ describe('markdown fixtures', () => {
       const url = `/2026-10/${slug}/`;
       entries.push({ url, title: slug, draft: false, article: await readArticle(`${slug}/index.md`, source, errors, { folder: folder(`${exampleBlog}content/posts/${slug}`), preamble, url }) });
     }
-    const site = createSite(entries);
-    for (const entry of entries) entry.article.link(site);
+    const site = indexPages(entries);
+    for (const entry of entries) entry.article.link(site, errors);
     const article = entries[0].article.structure();
     assert.deepEqual(errors.map(formatError), []);
     assert.deepEqual(

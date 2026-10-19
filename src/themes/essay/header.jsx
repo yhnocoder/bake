@@ -9,7 +9,7 @@ export function Header(props) {
       {article.summary === undefined ? null : <p class="bk-summary">{article.summary}</p>}
       <div class="bk-meta">
         <time datetime={article.date}>{article.date}</time>
-        <span class="bk-words">{labels.words(article.words)}</span>
+        <span class="bk-words" data-region="words">{labels.words(article.words)}</span>
         {article.draft ? <span class="bk-draft">{labels.draft}</span> : null}
         {article.tags.length === 0 ? null : (
           <span class="bk-tags">

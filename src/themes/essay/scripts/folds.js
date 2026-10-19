@@ -5,16 +5,16 @@ const CLOSE_DURATION = 180;
 const targets = new WeakMap();
 
 export function startFolds(article) {
-  const folds = [...article.querySelectorAll('details.fold')];
-  for (const fold of folds) {
-    fold.querySelector(':scope > summary')?.addEventListener('click', (event) => {
-      event.preventDefault();
-      toggleFold(fold);
-    });
-  }
+  article.addEventListener('click', (event) => {
+    const summary = event.target.closest('summary');
+    const fold = summary?.parentElement;
+    if (fold === null || fold === undefined || !fold.matches('details.fold') || !article.contains(fold)) return;
+    event.preventDefault();
+    toggleFold(fold);
+  });
   const openedForPrint = [];
   addEventListener('beforeprint', () => {
-    for (const fold of folds) {
+    for (const fold of article.querySelectorAll('details.fold')) {
       const wasOpen = targets.get(fold) ?? fold.open;
       settle(fold, true);
       if (!wasOpen) openedForPrint.push(fold);
