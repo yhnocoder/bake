@@ -77,7 +77,7 @@ function measureNotes() {
       top: box.top,
       bottom: box.bottom,
       left: box.left,
-      textRight: ref.parentElement.closest('p, li, td, th, .bk-block').getBoundingClientRect().right,
+      text: (({ top, bottom, left, right }) => ({ top, bottom, left, right }))(ref.parentElement.closest('p, li, td, th, .bk-block').getBoundingClientRect()),
       offset: center(firstLine.getBoundingClientRect()) - center(caret.getBoundingClientRect()),
     };
   });
@@ -90,7 +90,8 @@ function checkNotes({ blocks, notes }, label) {
   const reasons = [];
   shown.forEach((note, index) => {
     const name = `${label}, sidenote ${note.number}`;
-    assert.ok(note.left >= note.textRight, `${name}: starts at ${note.left}px, inside the text that ends at ${note.textRight}px`);
+    const besideText = note.left >= note.text.right || note.top >= note.text.bottom || note.bottom <= note.text.top;
+    assert.ok(besideText, `${name}: covers the text that holds its number`);
     const previous = shown[index - 1];
     if (previous !== undefined) assert.ok(note.top >= previous.bottom + NOTE_GAP - 1, `${name}: top ${note.top} overlaps sidenote ${previous.number} that ends at ${previous.bottom}`);
     for (const block of blocks) assert.ok(note.bottom <= block.top || note.top >= block.bottom, `${name}: ${note.top}–${note.bottom} overlaps a block at ${block.top}–${block.bottom}`);

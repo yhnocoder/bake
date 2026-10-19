@@ -1,7 +1,7 @@
 .bk-toc {
   position: absolute;
   top: 0;
-  left: calc(var(--body-left) - var(--column-gap) - var(--toc-width));
+  left: var(--toc-left);
   z-index: 20;
   width: var(--toc-width);
   opacity: 0;
@@ -170,7 +170,7 @@
 
 .bk-toc-ready :is(.bk-toc-sections, .bk-toc-recap) {
   transition:
-    grid-template-rows 0.3s var(--ui-easing),
+    grid-template-rows 0.3s var(--ease-out),
     opacity 0.3s;
 }
 
@@ -244,7 +244,7 @@
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition:
-      translate 0.25s var(--ui-easing),
+      translate 0.25s var(--ease-out),
       color 0.15s,
       scale 0.12s;
   }
@@ -297,14 +297,14 @@
     translate: -102% 0;
     visibility: hidden;
     transition:
-      translate 0.28s var(--ui-easing),
+      translate 0.28s var(--ease-out),
       visibility 0s 0.28s;
   }
 
   .bk-drawer.is-open {
     translate: 0 0;
     visibility: visible;
-    transition: translate 0.28s var(--ui-easing);
+    transition: translate 0.28s var(--ease-out);
   }
 
   .bk-drawer .bk-toc-label {

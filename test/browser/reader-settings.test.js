@@ -18,6 +18,11 @@ function readPage() {
   };
 }
 
+async function readSettledPage(page) {
+  await page.waitForFunction(() => document.body.getAnimations().length === 0);
+  return page.evaluate(readPage);
+}
+
 function wenkaiFaces() {
   const family = (value) => value.replaceAll('"', '').trim();
   const covers = (range, code) =>
@@ -70,21 +75,21 @@ test('reader settings', async (t) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(url);
-    const initial = await page.evaluate(readPage);
+    const initial = await readSettledPage(page);
     assert.deepEqual([initial.theme, initial.font, initial.stored], [null, null, [null, null]]);
     assert.doesNotMatch(initial.bodyFont, /LXGW WenKai/);
 
     await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '深' }).click();
     await page.getByRole('button', { name: '霞鹜文楷' }).click();
-    const chosen = await page.evaluate(readPage);
+    const chosen = await readSettledPage(page);
     assert.deepEqual([chosen.theme, chosen.font, chosen.stored], ['dark', 'wenkai', ['dark', 'wenkai']]);
     assert.notEqual(chosen.background, initial.background);
     assert.match(chosen.bodyFont, /^"?LXGW WenKai/);
     assert.equal(await page.getByRole('button', { name: '深' }).getAttribute('aria-pressed'), 'true');
 
     await page.reload();
-    const reloaded = await page.evaluate(readPage);
+    const reloaded = await readSettledPage(page);
     assert.deepEqual(reloaded, chosen);
 
     await page.route('**/assets/*.js', (route) => route.abort());
@@ -99,7 +104,7 @@ test('reader settings', async (t) => {
     await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '跟随系统' }).click();
     await page.getByRole('button', { name: '黑体' }).click();
-    const reset = await page.evaluate(readPage);
+    const reset = await readSettledPage(page);
     assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], [null, null, [null, null], initial.background]);
     await context.close();
   });

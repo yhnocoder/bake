@@ -40,14 +40,7 @@ export function startCitations(article) {
     const link = event.target.closest('a.citation');
     if (link !== null && !link.contains(event.relatedTarget)) hide();
   });
-  addEventListener(
-    'scroll',
-    () => {
-      clearTimeout(showTimer);
-      setShown(false);
-    },
-    { passive: true },
-  );
+  addEventListener('scroll', () => setShown(false), { passive: true });
 
   const host = document.createElement('div');
   document.body.append(host);

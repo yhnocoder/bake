@@ -1,7 +1,3 @@
-.bk-article {
-  position: relative;
-}
-
 .sidenote-ref {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -17,19 +13,12 @@
   text-decoration: none;
   border-radius: 3px;
   padding: 0 2px;
-  cursor: pointer;
   transition: background-color 0.3s ease-out;
 }
 
 .sidenote-ref.is-active a {
   background-color: var(--mark);
   transition-duration: 0.15s;
-}
-
-.sidenote-ref::selection,
-.sidenote-ref *::selection,
-.bk-sidenote-number::selection {
-  background-color: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .bk-sidenote {

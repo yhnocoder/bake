@@ -2,13 +2,9 @@
   --ui-bottom: 16px;
   --ui-button-height: 34px;
   --ui-stack-gap: 8px;
-  --ui-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ui-shadow:
     0 0 0 0.5px color-mix(in srgb, var(--ink) 16%, transparent),
     0 2px 8px rgba(0, 0, 0, 0.08);
-  --card-shadow:
-    0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent),
-    0 6px 24px rgba(0, 0, 0, 0.12);
 }
 
 .bk-settings {
@@ -79,7 +75,7 @@
   visibility: hidden;
   transition:
     opacity 0.15s,
-    translate 0.15s var(--ui-easing),
+    translate 0.15s var(--ease-out),
     visibility 0s 0.15s;
 }
 
@@ -89,7 +85,7 @@
   visibility: visible;
   transition:
     opacity 0.18s,
-    translate 0.18s var(--ui-easing);
+    translate 0.18s var(--ease-out);
 }
 
 .bk-settings-row {
@@ -143,14 +139,6 @@
     0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-.bk-heading-link {
-  cursor: pointer;
-}
-
-.bk-heading-link::selection {
-  background-color: color-mix(in srgb, var(--accent) 9%, transparent);
-}
-
 .bk-toast {
   position: fixed;
   right: 20px;
@@ -166,7 +154,7 @@
   pointer-events: none;
   transition:
     opacity 0.2s,
-    translate 0.2s var(--ui-easing);
+    translate 0.2s var(--ease-out);
 }
 
 .bk-toast.is-on {
@@ -181,8 +169,8 @@
 @keyframes bk-flash {
   0%,
   30% {
-    background-color: color-mix(in srgb, var(--accent) 14%, transparent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+    background-color: var(--flash);
+    box-shadow: 0 0 0 4px var(--flash);
   }
 }
 
@@ -218,8 +206,8 @@
   translate: 0 0;
   visibility: visible;
   transition:
-    opacity 0.14s var(--ui-easing),
-    translate 0.16s var(--ui-easing);
+    opacity 0.14s var(--ease-out),
+    translate 0.16s var(--ease-out);
 }
 
 .bk-preview-number {
