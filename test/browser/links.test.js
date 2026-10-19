@@ -11,11 +11,15 @@ const host = [
   '',
   '## Links {#links}',
   '',
-  'The [chain rule](/2026-10/target/#chain-rule) and [the local gradient](/2026-10/target/#local-grad) come from another article, the [home page](https://example.com/) does not.',
+  'The [chain rule](/2026-10/target/#chain-rule) and [the local gradient](/2026-10/target/#local-grad) come from another article, the [home page](https://example.com/) does not [@k].',
   '',
   ':::embed',
   '/2026-10/target/#chain-rule',
   '/2026-10/target/#order',
+  ':::',
+  '',
+  ':::references',
+  '- [@k] The host entry.',
   ':::',
   '',
   filler('the end'),
@@ -37,9 +41,28 @@ const target = [
   '',
   '## Order {#order}',
   '',
-  'Visit the nodes in reverse topological order.',
+  'Visit the nodes in reverse topological order [@k].',
+  '',
+  ':::references',
+  '- [@k] The target entry.',
+  ':::',
   '',
 ].join('\n');
+
+function recordCard() {
+  window.cardLog = [];
+  const card = document.querySelector('.bk-preview');
+  new MutationObserver(() => cardLog.push({ on: card.classList.contains('is-on'), text: card.textContent, time: performance.now() })).observe(card, {
+    attributes: true,
+    attributeFilter: ['class'],
+    childList: true,
+    subtree: true,
+  });
+  window.pointerLog = [];
+  for (const type of ['pointerover', 'pointerout']) {
+    document.addEventListener(type, (event) => pointerLog.push({ type, target: event.target.closest('a')?.dataset.target ?? null, inCard: event.target.closest('.bk-preview') !== null, time: event.timeStamp }), true);
+  }
+}
 
 const isOn = () => document.querySelector('.bk-preview')?.classList.contains('is-on') === true;
 
@@ -66,13 +89,15 @@ test('internal links, preview cards and embeds', async (t) => {
 
   await t.test('a card appears 300 ms after the pointer rests on a link, below the link and inside the viewport', async () => {
     const page = await desktop();
+    await page.evaluate(recordCard);
     const link = page.locator('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
-    const started = Date.now();
     await link.hover();
-    await page.waitForTimeout(150);
-    assert.equal(await page.evaluate(isOn), false, 'the card shows before the delay');
     await page.waitForFunction(isOn);
-    assert.ok(Date.now() - started >= 280, `the card showed after ${Date.now() - started} ms`);
+    const delay = await page.evaluate(() => {
+      const over = pointerLog.find((entry) => entry.type === 'pointerover' && entry.target === '/2026-10/target/#chain-rule');
+      return cardLog.find((entry) => entry.on).time - over.time;
+    });
+    assert.ok(delay >= 290, `the card showed ${delay} ms after the pointer reached the link`);
     const card = page.locator('.bk-preview');
     await page.waitForFunction(() => document.querySelector('.bk-preview').getAnimations().length === 0);
     assert.deepEqual(
@@ -94,24 +119,63 @@ test('internal links, preview cards and embeds', async (t) => {
     await page.close();
   });
 
-  await t.test('the card switches to another link at once, stays while the pointer is in it and hides after the pointer leaves', async () => {
+  await t.test('the card switches to another link at once, stays while the pointer is in it and hides 200 ms after the pointer leaves', async () => {
     const page = await desktop();
     await page.hover('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
     await page.waitForFunction(isOn);
+    await page.evaluate(recordCard);
     await page.hover('a.internal-link[data-target="/2026-10/target/#local-grad"]');
-    await page.waitForTimeout(80);
-    assert.match(await page.locator('.bk-preview-body').textContent(), /^Each layer multiplies/);
+    await page.waitForFunction(() => /Each layer multiplies/.test(document.querySelector('.bk-preview-body')?.textContent));
+    const switched = await page.evaluate(() => {
+      const over = pointerLog.find((entry) => entry.type === 'pointerover' && entry.target === '/2026-10/target/#local-grad');
+      return cardLog.find((entry) => /Each layer multiplies/.test(entry.text)).time - over.time;
+    });
+    assert.ok(switched < 300, `the card switched ${switched} ms after the pointer reached the second link`);
     const box = await page.locator('.bk-preview').boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
     await page.waitForTimeout(400);
     assert.equal(await page.evaluate(isOn), true, 'the card hides while the pointer is in it');
     await page.mouse.move(5, 450);
-    await page.waitForTimeout(100);
-    assert.equal(await page.evaluate(isOn), true, 'the card hides before the delay');
+    await page.waitForFunction(() => !document.querySelector('.bk-preview').classList.contains('is-on'));
+    const hidden = await page.evaluate(() => {
+      const left = pointerLog.findLast((entry) => entry.type === 'pointerout' && entry.inCard);
+      return cardLog.findLast((entry) => !entry.on).time - left.time;
+    });
+    assert.ok(hidden >= 190, `the card hid ${hidden} ms after the pointer left it`);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-preview')).visibility === 'hidden');
     await page.hover('a[href="https://example.com/"]');
     await page.waitForTimeout(800);
     assert.equal(await page.evaluate(isOn), false, 'an external link shows a card');
+    await page.close();
+  });
+
+  await t.test('a citation shows the entry of its own article, also inside an embed', async () => {
+    const page = await desktop();
+    const entries = [];
+    for (const selector of ['.bk-block[data-type="paragraph"] a.citation', '.embed a.citation']) {
+      await page.locator(selector).evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(100);
+      await page.hover(selector);
+      await page.waitForFunction(isOn);
+      entries.push(await page.locator('.bk-preview').textContent());
+      await page.mouse.move(5, 450);
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-preview')).visibility === 'hidden');
+    }
+    assert.deepEqual(entries, ['[1]The host entry.', '[1]The target entry.']);
+    await page.close();
+  });
+
+  await t.test('keyboard focus on an internal link shows its card and Escape hides it', async () => {
+    const page = await desktop();
+    await page.locator('#links .bk-heading-link').focus();
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.target), '/2026-10/target/#chain-rule');
+    await page.waitForFunction(isOn);
+    assert.equal(await page.locator('.bk-preview-title').textContent(), 'Chain rule');
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(() => /Each layer multiplies/.test(document.querySelector('.bk-preview-body')?.textContent));
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('.bk-preview').classList.contains('is-on'));
     await page.close();
   });
 
@@ -152,12 +216,14 @@ test('internal links, preview cards and embeds', async (t) => {
         hrefs: [...embed.querySelectorAll('.embed-source a')].map((link) => link.href),
         formulas: [...embed.querySelectorAll('mjx-container')].filter((container) => container.querySelector('svg').getBoundingClientRect().width > 0).length,
         border: getComputedStyle(embed).borderLeftWidth,
+        citations: [...embed.querySelectorAll('a.citation')].map((link) => link.getAttribute('href')),
         missingGlyphs: [...embed.querySelectorAll('use')].map((use) => use.getAttribute('xlink:href')).filter((href) => document.getElementById(href.slice(1)) === null),
         duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
         toc: [...document.querySelectorAll('.bk-toc .bk-toc-entry')].map((entry) => entry.dataset.target),
       };
     });
     assert.deepEqual(report.parts, ['Chain rule', 'Order']);
+    assert.deepEqual(report.citations, ['../../2026-10/target/#reference-k']);
     assert.deepEqual(report.sources, ['"From “"Target1"”"" ↗"', '"From “"Target2"”"" ↗"']);
     assert.deepEqual(report.hrefs, [`${base}/dist/2026-10/target/#chain-rule`, `${base}/dist/2026-10/target/#order`]);
     assert.equal(report.formulas, 3);

@@ -5,6 +5,7 @@ import { highlightCode } from './code.js';
 import { equationHref, relocateMath } from './math.js';
 
 const ATTRIBUTION_PREFIX = '— ';
+const ID_ATTRIBUTE = /\sid\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const RELATIVE_URL = /^(?![A-Za-z][A-Za-z0-9+.-]*:|\/|\?)/;
 
 export function renderHtml(node, context) {
@@ -38,14 +39,16 @@ function handlers(context) {
       if (excerpt === undefined) return defaultHandlers.paragraph(state, node);
       return element('p', {}, state.all(node));
     },
+    html: (state, node) => raw(excerpt === undefined ? node.value : node.value.replace(ID_ATTRIBUTE, '')),
     link(state, node) {
       const result = defaultHandlers.link(state, node);
-      if (node.target !== undefined) {
-        const { address, page } = node.target;
-        result.properties = { className: ['internal-link'], ...result.properties, href: addressHref(context.root, address.path, address.anchor) };
+      const target = node.target ?? (excerpt !== undefined && node.url.startsWith('#') ? excerpt.target(decodeAnchor(node.url.slice(1))) : undefined);
+      if (target !== undefined) {
+        const { address, page } = target;
+        result.properties = { className: ['internal-link'], ...result.properties, href: addressHref(context.root, address.path, address.anchor, address.query) };
         if (page.article !== null) {
           result.properties.dataTarget = address.text;
-          context.linked(node.target);
+          context.linked(target);
         }
       } else if (excerpt !== undefined && RELATIVE_URL.test(node.url)) {
         result.properties.href = relocate(result.properties.href);
@@ -62,7 +65,9 @@ function handlers(context) {
     citation(state, node) {
       const number = context.citationNumber(node.key);
       if (number === undefined) return text(`[@${node.key}]`);
-      return element('a', { className: ['citation'], href: relocate(`#reference-${node.key}`) }, [text(`[${number}]`)]);
+      const target = excerpt?.target(`reference-${node.key}`);
+      const properties = target === undefined ? {} : { dataTarget: target.address.text };
+      return element('a', { className: ['citation'], href: relocate(`#reference-${node.key}`), ...properties }, [text(`[${number}]`)]);
     },
     eqref(state, node) {
       const equation = context.equation(node.label);
@@ -111,7 +116,8 @@ function blockElement(state, node, context) {
     case 'recap':
       return element('div', { className: ['recap'] }, children());
     case 'references': {
-      const item = (entry) => element('li', { id: `reference-${entry.key}`, value: entry.number }, state.all({ type: 'paragraph', children: entry.children }));
+      const id = (entry) => (context.excerpt === undefined ? { id: `reference-${entry.key}` } : {});
+      const item = (entry) => element('li', { ...id(entry), value: entry.number }, state.all({ type: 'paragraph', children: entry.children }));
       const cited = context.references().filter((entry) => entry.number !== undefined);
       const uncited = context.references().filter((entry) => entry.number === undefined);
       return [
@@ -184,4 +190,12 @@ function text(value) {
 
 function raw(value) {
   return { type: 'raw', value };
+}
+
+function decodeAnchor(anchor) {
+  try {
+    return decodeURIComponent(anchor);
+  } catch {
+    return anchor;
+  }
 }

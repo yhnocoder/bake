@@ -60,6 +60,7 @@ const HAN_CHARACTER = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
 const WORD = /[\p{L}\p{N}]+/gu;
 const HTML_ID = /\sid=["']([^"']+)["']/g;
 const PREVIEW_BLOCKS = 3;
+const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
 
 export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null } = {}) {
@@ -162,11 +163,23 @@ class ArticleParser {
       walk(
         top,
         (node, parent) => {
-          const id = node.type === 'heading' ? node.id : node.type === 'paragraph' ? node.anchor : undefined;
-          if (id !== undefined && !this.targets.has(id)) this.targets.set(id, { node, parent, top });
+          const add = (id, kind, target = node) => {
+            if (!this.targets.has(id)) this.targets.set(id, { kind, node: target, parent, top });
+          };
+          if (node.type === 'heading') add(node.id, 'heading');
+          if (node.type === 'paragraph' && node.anchor !== undefined) add(node.anchor, 'paragraph');
+          if (node.type === 'math') for (const id of node.ids ?? []) add(id, 'equation');
+          const sidenote = node.type === 'footnoteReference' ? this.sidenotes.get(node.identifier) : undefined;
+          if (sidenote?.definition !== undefined) add(`sidenote-${sidenote.number}`, 'sidenote', sidenote.definition);
+          if (node.type === 'bakeBlock' && node.name === 'references') {
+            for (const entry of this.references) add(`reference-${entry.key}`, 'reference', entry);
+          }
         },
         tree,
       );
+    }
+    for (const { number, definition } of this.sidenotes.values()) {
+      if (definition !== undefined && !this.targets.has(`sidenote-${number}`)) this.targets.set(`sidenote-${number}`, { kind: 'sidenote', node: definition, parent: null, top: null });
     }
   }
 
@@ -208,7 +221,7 @@ class ArticleParser {
     const address = parseAddress(node.url);
     if (address === null) return;
     const found = site.find(address, this);
-    if (found.problem !== undefined) this.report(node.position.start, `link target ${address.text} ${found.problem}`);
+    if (found.problem !== undefined) this.report(node.position.start, `link target ${address.written} ${found.problem}`);
     else node.target = { address, page: found.page };
   }
 
@@ -234,12 +247,16 @@ class ArticleParser {
       }
       seen.add(address.text);
       if (address.anchor === undefined) {
-        this.report(position, `:::embed address ${address.text} has no anchor; it must point to a heading or a paragraph ${EMBED_EXAMPLE}`);
+        this.report(position, `:::embed address ${address.written} has no anchor; it must point to a heading or a paragraph ${EMBED_EXAMPLE}`);
         continue;
       }
       const found = site.find(address, this);
       if (found.problem !== undefined) {
-        this.report(position, `:::embed target ${address.text} ${found.problem}`);
+        this.report(position, `:::embed target ${address.written} ${found.problem}`);
+        continue;
+      }
+      if (!EMBEDDABLE.has(found.page.article.targets.get(address.anchor).kind)) {
+        this.report(position, `:::embed target ${address.written} is not a heading or a paragraph`);
         continue;
       }
       parts.forEach((earlier) => {
@@ -290,12 +307,14 @@ class ArticleParser {
     return [node, ...this.followingNodes(parent.children, node, (next) => next.type === 'heading' && next.depth <= node.depth)];
   }
 
-  previewNodes(anchor) {
+  previewHtml(anchor, context) {
     const atHeading = (next) => next.type === 'heading';
-    if (anchor === undefined) return this.followingNodes(this.tree.children, null, atHeading).slice(0, PREVIEW_BLOCKS);
-    const { node, parent } = this.targets.get(anchor);
-    if (node.type === 'paragraph') return [node];
-    return this.followingNodes(parent.children, node, atHeading).slice(0, PREVIEW_BLOCKS);
+    if (anchor === undefined) return renderChildrenHtml(this.followingNodes(this.tree.children, null, atHeading).slice(0, PREVIEW_BLOCKS), context);
+    const { kind, node, parent } = this.targets.get(anchor);
+    if (kind === 'heading') return renderChildrenHtml(this.followingNodes(parent.children, node, atHeading).slice(0, PREVIEW_BLOCKS), context);
+    if (kind === 'sidenote') return renderChildrenHtml(node.children, context);
+    if (kind === 'reference') return renderInlineHtml(node.children, context);
+    return renderChildrenHtml([node], context);
   }
 
   followingNodes(siblings, start, ends) {
@@ -310,19 +329,29 @@ class ArticleParser {
 
   targetHeading(anchor, context) {
     if (anchor === undefined) return {};
-    const { node, top } = this.targets.get(anchor);
+    const { kind, node, top } = this.targets.get(anchor);
     const place = this.places.get(top);
-    const heading = node.type === 'heading' ? node : place?.heading;
+    const heading = kind === 'heading' ? node : place?.heading;
     return { number: place?.number, title: heading === undefined ? undefined : renderInlineHtml(heading.children, context), text: heading === undefined ? undefined : toString(heading) };
   }
 
-  excerptContext(mode, host) {
+  excerptContext(mode, host, page) {
     const { root } = host.context;
+    const linked = mode === 'embed' ? host.context.linked : () => {};
     return {
       ...this.context,
       root,
-      excerpt: { mode, base: addressHref(root, this.url) },
-      linked: mode === 'embed' ? host.context.linked : () => {},
+      excerpt: {
+        mode,
+        base: addressHref(root, this.url),
+        target: (anchor) => {
+          if (!this.targets.has(anchor)) return undefined;
+          const target = { address: { path: this.url, anchor, query: '', text: `${this.url}#${anchor}` }, page };
+          linked(target);
+          return target;
+        },
+      },
+      linked,
       embedLinks: (node) => this.embedLinks(node, root, mode === 'embed' ? host.context.linked : null),
     };
   }
@@ -330,7 +359,7 @@ class ArticleParser {
   embedParts(node) {
     return (node.parts ?? []).map(({ address, page }) => {
       const source = page.article;
-      const context = source.excerptContext('embed', this);
+      const context = source.excerptContext('embed', this, page);
       this.borrowed.add(source);
       return {
         children: renderHast(source.embedNodes(address.anchor), context).children,
@@ -351,10 +380,13 @@ class ArticleParser {
 
   preview(target, host) {
     const { address, page } = target;
-    const context = this.excerptContext('preview', host);
+    const context = this.excerptContext('preview', host, page);
     host.borrowed.add(this);
+    const shared = { target: address.text, href: addressHref(host.context.root, address.path, address.anchor), article: page.title, html: this.previewHtml(address.anchor, context) };
+    const found = address.anchor === undefined ? undefined : this.targets.get(address.anchor);
+    if (found?.kind === 'reference') return { ...shared, kind: 'reference', number: found.node.number === undefined ? undefined : String(found.node.number) };
     const { number, title } = this.targetHeading(address.anchor, context);
-    return { target: address.text, href: addressHref(host.context.root, address.path, address.anchor), article: page.title, number, title, html: renderChildrenHtml(this.previewNodes(address.anchor), context) };
+    return { ...shared, kind: 'section', number, title };
   }
 
   readBlock(node) {
@@ -514,6 +546,7 @@ class ArticleParser {
     formulas.forEach((node, index) => {
       const result = results[index];
       node.rendered = result.html;
+      node.ids = result.ids;
       const position = node.position.start;
       if (result.error !== undefined) this.report(position, `MathJax cannot typeset this formula: ${result.error}`);
       for (const label of result.labels) {

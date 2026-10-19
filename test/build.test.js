@@ -224,7 +224,7 @@ describe('bake build', () => {
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
     assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
     assert.match(page, /<a class="internal-link" href="\.\.\/\.\.\/2026-10\/syntax-linked\/#chain-rule" data-target="\/2026-10\/syntax-linked\/#chain-rule">/);
-    assert.match(page, /<template class="bk-preview-template" data-target="\/2026-10\/syntax-linked\/#chain-rule">/);
+    assert.match(page, /<template class="bk-preview-template" data-target="\/2026-10\/syntax-linked\/#chain-rule" data-kind="link">/);
     assert.match(page, /<div class="embed"><div class="embed-part"><h2>链式法则<\/h2>/);
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));

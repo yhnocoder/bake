@@ -98,6 +98,42 @@ describe('internal links', () => {
     await host('## A {#a}\n\nText[^n] [@k]. ^para\n\n$$\nx \\label{eq:x}\n$$\n\n[1](#a) [2](#para) [3](#sidenote-1) [4](#reference-k) [5](#eq:x) [6](#)\n\n[^n]: Note.\n\n:::references\n- [@k] K.\n:::\n');
   });
 
+  test('checks addresses without the trailing slash, with index.html or with a query and gives the article address', async () => {
+    const { articles, errors } = await site('[a](/2026-10/target) [b](/2026-10/target/index.html#chain-rule) [c](/2026-10/target#missing) [d](/2026-10/target/?view=1#chain-rule)\n');
+    assert.deepEqual(errors, [
+      'host.md:7:1 link target /2026-10/target does not exist; the address of the article is /2026-10/target/',
+      'host.md:7:22 link target /2026-10/target/index.html#chain-rule does not exist; the address of the article is /2026-10/target/#chain-rule',
+      'host.md:7:65 link target /2026-10/target#missing does not exist; the address of the article is /2026-10/target/',
+    ]);
+    assert.match(articles['/2026-10/host/'].intro[0].html, /<a class="internal-link" href="\.\.\/\.\.\/2026-10\/target\/\?view=1#chain-rule" data-target="\/2026-10\/target\/#chain-rule">d<\/a>/);
+  });
+
+  test('accepts sidenotes, references and equations of another article as link targets and previews them', async () => {
+    const article = await host('[note](/2026-10/target/#sidenote-1) [entry](/2026-10/target/#reference-griewank) [formula](/2026-10/target/#eq:chain)\n');
+    assert.deepEqual(
+      article.previews.map(({ target, kind, number, title }) => ({ target, kind, number, title })),
+      [
+        { target: '/2026-10/target/#sidenote-1', kind: 'section', number: '1', title: 'Chain rule' },
+        { target: '/2026-10/target/#reference-griewank', kind: 'reference', number: '1', title: undefined },
+        { target: '/2026-10/target/#eq:chain', kind: 'section', number: '1', title: 'Chain rule' },
+      ],
+    );
+    assert.deepEqual(
+      article.previews.map((preview) => outline(preview.html)),
+      [
+        '<p>A sidenote that embeds do not show.</p>',
+        'Griewank. <em>Evaluating Derivatives</em>. 2008.',
+        '$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$',
+      ],
+    );
+    assert.deepEqual(ids(article.previews.map((preview) => preview.html).join('')), []);
+  });
+
+  test('never gives the address of a draft as the current address of an article', async () => {
+    const { errors } = await site('[old](/2026-09/plan/)\n', [{ url: '/2026-10/plan/', draft: true, body: 'Draft.\n' }]);
+    assert.deepEqual(errors, ['host.md:7:1 link target /2026-09/plan/ does not exist']);
+  });
+
   test('gives the current address of an article whose date changed', async () => {
     const { errors } = await site('[old](/2026-09/target/#chain-rule)\n');
     assert.deepEqual(errors, ['host.md:7:1 link target /2026-09/target/#chain-rule does not exist; the article with slug "target" is at /2026-10/target/']);
@@ -126,7 +162,7 @@ describe('preview content', () => {
     const [section, paragraph, start, inside] = article.previews.map((preview) => outline(preview.html));
     assert.equal(
       section,
-      '<p>Let $y = f(u)$ and $u = g(x)$, then</p>\n$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$\n<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank">[1]</a>, see <a href="../../2026-10/target/#order">the order</a>.</p>',
+      '<p>Let $y = f(u)$ and $u = g(x)$, then</p>\n$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$\n<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
     );
     assert.equal(paragraph, section.slice(section.lastIndexOf('<p>')));
     assert.equal(start, '<p>Intro paragraph.</p>');
@@ -170,7 +206,7 @@ describe(':::embed', () => {
         '<div class="embed"><div class="embed-part"><h2>Chain rule</h2>',
         '<p>Let $y = f(u)$ and $u = g(x)$, then</p>',
         '$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$',
-        '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank">[1]</a>, see <a href="../../2026-10/target/#order">the order</a>.</p>',
+        '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
         '<p>A fourth block.</p>',
         '<h3>Inside</h3>',
         '<p>Text inside.</p><p class="embed-source"><a href="../../2026-10/target/#chain-rule"><cite>Target</cite><span class="embed-number">1</span></a></p></div><div class="embed-part"><p>Intro paragraph.</p><p class="embed-source"><a href="../../2026-10/target/#opening"><cite>Target</cite></a></p></div></div>',
@@ -207,6 +243,29 @@ describe(':::embed', () => {
       article.previews.map((preview) => preview.target),
       ['/2026-10/other/#far'],
     );
+  });
+
+  test('repeats no id of the page when the embedded content holds references and raw HTML, and points its citations to the source entries', async () => {
+    const source = { url: '/2026-10/cited/', title: 'Cited', body: '## Part {#part}\n\nA claim [@k].\n\n<span id="marker">raw</span>\n\n:::references\n- [@k] The source entry.\n:::\n' };
+    const article = await host('<span id="marker">mine</span> and [@k].\n\n:::embed\n/2026-10/cited/#part\n:::\n\n:::references\n- [@k] The host entry.\n:::\n', [source]);
+    const html = [...article.intro, ...article.previews].map((entry) => entry.html).join('');
+    const all = ids(html);
+    assert.deepEqual(all.filter((id, index) => all.indexOf(id) !== index), []);
+    assert.deepEqual(all.sort(), ['marker', 'reference-k']);
+    assert.match(article.intro[1].html, /<a class="citation" href="\.\.\/\.\.\/2026-10\/cited\/#reference-k" data-target="\/2026-10\/cited\/#reference-k">\[1\]<\/a>/);
+    assert.deepEqual(
+      article.previews.map(({ target, kind, number, html: text }) => ({ target, kind, number, text })),
+      [{ target: '/2026-10/cited/#reference-k', kind: 'reference', number: '1', text: 'The source entry.' }],
+    );
+  });
+
+  test('reports an embed of an equation, a sidenote or a reference', async () => {
+    const { errors } = await site(':::embed\n/2026-10/target/#eq:chain\n/2026-10/target/#sidenote-1\n/2026-10/target/#reference-griewank\n:::\n');
+    assert.deepEqual(errors, [
+      'host.md:8:1 :::embed target /2026-10/target/#eq:chain is not a heading or a paragraph',
+      'host.md:9:1 :::embed target /2026-10/target/#sidenote-1 is not a heading or a paragraph',
+      'host.md:10:1 :::embed target /2026-10/target/#reference-griewank is not a heading or a paragraph',
+    ]);
   });
 
   test('reports the article itself, a missing target, an address twice, overlapping addresses and lines that are no address', async () => {
