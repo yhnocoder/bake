@@ -1,4 +1,4 @@
-export function createSite(pages) {
+export function indexPages(pages) {
   const byUrl = new Map();
   for (const page of pages) {
     if (page.url !== null && !byUrl.has(page.url)) byUrl.set(page.url, page);
