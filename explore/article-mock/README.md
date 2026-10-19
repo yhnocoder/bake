@@ -155,14 +155,16 @@ replace the four TOC styles.
   `$…$` and `$$…$$`, and a fully selected component, table or `:::` block is copied as its Markdown source.
   Numbers, anchor links and buttons are left out and get a lighter selection colour.
 
-## Open questions for Linda
+## Content added for the mock
 
-- Text written for the mock that is not in the originals: the `:::recap` notes of llm-act-fns (one sentence
-  per section), one internal link from llm-act-fns chapter 07 to matrix-calculus `#ffn-jac`, and `[@key]`
-  citation markers placed where the text names a work. Sidenotes are existing parenthetical remarks with
-  unchanged wording.
-- A possible error in the original matrix-calculus, kept as written: in section `vjp-order` the left side of
-  the aligned equation is ∂h/∂x where ∂L/∂x seems intended.
+Linda approved keeping the text written for the mock that is not in the originals: the `:::recap` notes of
+llm-act-fns (one sentence per section), one internal link from llm-act-fns chapter 07 to matrix-calculus
+`#ffn-jac`, and `[@key]` citation markers placed where the text names a work. Sidenotes are existing
+parenthetical remarks with unchanged wording. In matrix-calculus section `vjp-order`, the left side of the
+aligned equation and the last step of the right-to-left order read ∂L/∂x; the original wrote ∂h/∂x there.
+
+## Open questions
+
 - The old-site address `https://yhnocoder.github.io/learn_by_visualization/` used for unmigrated links is
   inferred from the repository name and not checked. `transformer-backward.html` does not exist in the old
   repository, so that link is plain text.
