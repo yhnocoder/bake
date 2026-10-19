@@ -51,6 +51,8 @@ ${wideTable('Example cell', 8)}
 `,
 });
 
+const tocBody = '## First\n\nText.\n\n## Second\n\nText.\n';
+
 const widthsArticle = article({
   title: 'Width levels',
   slug: 'widths',
@@ -88,7 +90,12 @@ test('the essay theme lays out articles', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bake-layout-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  writeFiles(dir, { 'content/posts/stress/index.md': stressArticle, 'content/posts/widths/index.md': widthsArticle });
+  writeFiles(dir, {
+    'content/posts/stress/index.md': stressArticle,
+    'content/posts/widths/index.md': widthsArticle,
+    'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\n', body: tocBody }),
+    'content/posts/tabs/index.md': article({ title: 'Tabs', slug: 'tabs', extra: 'toc: tabs\n', body: tocBody }),
+  });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.equal(result.status, 0);
@@ -146,6 +153,21 @@ test('the essay theme lays out articles', async (t) => {
     for (const [width, box] of Object.entries(narrow.blocks)) assert.equal(Math.round(box.width), Math.round(narrow.column), `${width} block at 900px`);
     assert.deepEqual(narrow.auto, [{ resolved: 'body', width: narrow.column }]);
     await page.close();
+  });
+
+  await t.test('every table of contents style places the table of contents and the body where the notes style does', async () => {
+    const positions = async (path) => {
+      const page = await open(path);
+      const result = await page.evaluate(() => ({
+        toc: Math.round(document.querySelector('.bk-toc-list').getBoundingClientRect().width),
+        body: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
+      }));
+      await page.close();
+      return result;
+    };
+    const notes = await positions('notes');
+    assert.ok(notes.toc >= 180, `the notes table of contents is ${notes.toc}px wide`);
+    assert.deepEqual(await positions('tabs'), notes);
   });
 
   await t.test('examples show the source beside the result where there is room and above it on phones', async () => {

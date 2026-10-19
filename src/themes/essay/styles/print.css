@@ -1,6 +1,5 @@
 @media print {
-  :root,
-  :root:not([data-toc='notes']) {
+  :root {
     --body-width: 100%;
     --wide-width: 100%;
     --page-width: 100%;

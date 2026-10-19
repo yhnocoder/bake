@@ -12,16 +12,8 @@
   --page-shift: calc(var(--toc-left) - var(--body-left));
 }
 
-:root:not([data-toc='notes']) {
-  --toc-width: var(--rail-width);
-  --toc-left: 0px;
-  --body-left: calc(var(--rail-width) + (100cqw - var(--rail-width) - var(--wide-width)) / 2);
-  --page-shift: calc((100cqw - var(--frame-width)) / 2 - var(--body-left));
-}
-
 @media (max-width: 1339.98px) {
-  :root,
-  :root:not([data-toc='notes']) {
+  :root {
     --notes-width: 200px;
     --toc-width: var(--rail-width);
     --toc-left: 0px;
@@ -33,8 +25,7 @@
 }
 
 @media (max-width: 999.98px) {
-  :root,
-  :root:not([data-toc='notes']) {
+  :root {
     --body-width: min(820px, 100cqw - 32px);
     --body-left: calc((100cqw - var(--body-width)) / 2);
     --wide-width: var(--body-width);
