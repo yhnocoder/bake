@@ -6,6 +6,8 @@
 |---|---|
 | `make check` | Comment check, shellcheck on shell scripts (when installed), unit tests |
 | `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
+| `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`) |
+| `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
 | `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://127.0.0.1:8000/ |
 | `make screenshots [BASE=ref]` | Screenshots of every page of `examples/blog/` built from the working tree, compared with the same pages built from `BASE` (default `origin/main`); the report is `test-out/screenshots/report/summary.md` |
 | `python3 scripts/check_comment.py [file...]` | Comment check on the given files, or on every tracked file |
@@ -20,7 +22,7 @@
 
 During development, run the unit tests plus the tests the change affects. CI runs the full PR tier; watch it and fix it when it turns red. Run the full suite locally only for large or risky changes, or for what CI cannot cover, such as performance measurements or screenshot comparisons at a milestone. Small gaps between tiers are acceptable; a large regression, and whatever is being fixed right now, must be tested in every tier.
 
-Today CI runs `make check`, and on pull requests it also runs the screenshots job described below. Browser tests and nightly jobs are added by the tasks that need them. Performance jobs run alone, never in parallel with other heavy jobs.
+Today CI runs `make check`, then installs Playwright's Chromium and runs `npm run test:browser`. On pull requests it also runs the two screenshots jobs described below. Nightly jobs are added by the tasks that need them. Performance jobs run alone, never in parallel with other heavy jobs.
 
 ## Rules for tests
 
@@ -34,9 +36,7 @@ Today CI runs `make check`, and on pull requests it also runs the screenshots jo
 
 ## Browsers
 
-Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On a Mac, run `npx playwright install chromium` once before the first `make screenshots`.
-
-`playwright` is pinned to 1.56.1 because that version uses Chromium build 1194, the build installed in `/opt/pw-browsers`. Move the pin only together with the browser in the cloud environment.
+Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On macOS, `make browser` downloads Playwright's Chromium; run it once before the first `make screenshots`.
 
 ## Screenshots in pull requests
 

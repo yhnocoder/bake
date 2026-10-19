@@ -5,7 +5,7 @@ export const DIST_DIR = 'dist';
 const STAGING_DIR = '.dist-staging';
 const PREVIOUS_DIR = '.dist-previous';
 
-export function writeDist(root, outputs) {
+export async function writeDist(root, outputs) {
   const staging = join(root, STAGING_DIR);
   const previous = join(root, PREVIOUS_DIR);
   const dist = join(root, DIST_DIR);
@@ -16,7 +16,7 @@ export function writeDist(root, outputs) {
     for (const output of outputs) {
       const target = join(staging, output.path);
       mkdirSync(dirname(target), { recursive: true });
-      if (output.from === undefined) writeFileSync(target, output.render());
+      if (output.from === undefined) writeFileSync(target, await output.render());
       else copyFileSync(output.from, target);
     }
     if (existsSync(dist)) renameSync(dist, previous);

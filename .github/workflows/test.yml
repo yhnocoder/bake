@@ -22,6 +22,8 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: make check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
 
   screenshots:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
