@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -258,7 +258,68 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
       ],
     );
   });
+
+  await t.test('the homepage lists drafts and reloads when an article title changes or an article is added', async () => {
+    const response = await page.goto(server.url);
+    assert.equal(response.status(), 200);
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    const titles = () => page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-card-title')].map((title) => title.textContent))].sort());
+    assert.deepEqual(await titles(), ['Live again', 'Sketch']);
+    assert.equal(await page.locator('.bk-card-draft').first().textContent(), 'Draft');
+    edit('title: Live again', 'title: Live on the homepage');
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Live on the homepage'));
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    mkdirSync(join(dir, 'content/posts/added'));
+    writeFileSync(join(dir, 'content/posts/added/index.md'), article({ title: 'Added', slug: 'added' }));
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Added'));
+    assert.deepEqual(await titles(), ['Added', 'Live on the homepage', 'Sketch']);
+  });
 });
+
+test('bake dev starts the components of an article that it updates in place', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'components/label-view.js': `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };
+export const layout = { height: 80 };
+
+export default class LabelView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = this.params.text;
+  }
+}
+`,
+    [ARTICLE]: article({ title: 'Live', slug: 'live', body: 'A paragraph before the component.\n\n:::label-view{text=first}\n:::\n' }),
+  });
+  const file = join(dir, ARTICLE);
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(`${server.url}2026-10/live/`);
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('label-view')?.textContent === 'first');
+  await page.evaluate(() => {
+    window.keptAcrossUpdates = true;
+  });
+  writeFileSync(file, readFileSync(file, 'utf8').replace('text=first', 'text=second'));
+  await page.waitForFunction(() => document.querySelector('label-view')?.textContent === 'second');
+  assert.deepEqual(
+    await page.evaluate(() => [window.keptAcrossUpdates, document.querySelector('figure.component').dataset.state]),
+    [true, 'ready'],
+  );
+  await page.close();
+});
+
+const labelView = `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };
+export const layout = { height: 80 };
+
+export default class LabelView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = this.params.text;
+  }
+}
+`;
 
 const tocBody = [
   filler('the introduction', 2),
@@ -270,6 +331,9 @@ const tocBody = [
   '## Second {#second}',
   '',
   filler('the second chapter'),
+  '',
+  ':::label-view{text=start}',
+  ':::',
   '',
   '### Inside {#inside}',
   '',
@@ -291,8 +355,8 @@ const TOC_VIEWS = [
   { style: 'tabs', width: 375, parts: ['.bk-toc-handle', '.bk-drawer', '.bk-drawer-scrim', '.bk-drawer-tab.is-current'], titles: '.bk-drawer-index' },
 ];
 
-test('bake dev rebuilds every table of contents style from the saved headings', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body: tocBody }) });
+test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async (t) => {
+  const dir = createBlog(t, { 'bake.config.js': validConfig, 'components/label-view.js': labelView, [ARTICLE]: article({ title: 'Live', slug: 'live', body: tocBody }) });
   const file = join(dir, ARTICLE);
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
@@ -313,7 +377,7 @@ test('bake dev rebuilds every table of contents style from the saved headings', 
     }, view);
 
   for (const [round, view] of TOC_VIEWS.entries()) {
-    await t.test(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once`, async () => {
+    await t.test(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once next to a restarted component`, async () => {
       await page.setViewportSize({ width: view.width, height: 800 });
       await page.goto(url);
       await page.evaluate((style) => localStorage.setItem('bk-toc', style), view.style);
@@ -323,11 +387,13 @@ test('bake dev rebuilds every table of contents style from the saved headings', 
       await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
       const before = await snapshot(view);
       const name = `Renamed ${round}`;
-      writeFileSync(file, readFileSync(file, 'utf8').replace(/## \S.* \{#second\}/, `## ${name} {#second}`).replace('### Inside {#inside}', `### Added ${round} {#added-${round}}\n\nText.\n\n### Inside {#inside}`));
+      writeFileSync(file, readFileSync(file, 'utf8').replace(/## \S.* \{#second\}/, `## ${name} {#second}`).replace('### Inside {#inside}', `### Added ${round} {#added-${round}}\n\nText.\n\n### Inside {#inside}`).replace(/text=\w+\}/, `text=round${round}}`));
       await page.waitForFunction((text) => document.querySelector('.bk-toc .bk-toc-chapters').textContent.includes(text), name);
 
       await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
       await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await page.waitForFunction((text) => document.querySelector('label-view')?.textContent === text && document.querySelector('figure.component').dataset.state === 'ready', `round${round}`);
+      assert.equal(await page.locator('label-view').count(), 1);
       const after = await snapshot(view);
       assert.deepEqual(after.parts, view.parts.map(() => 1), `parts of the ${view.style} style after the save`);
       assert.deepEqual(before.parts, after.parts);

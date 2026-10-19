@@ -4,6 +4,7 @@ slug: syntax
 date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
+category: writing
 toc: notes
 ---
 
@@ -30,6 +31,7 @@ slug: syntax
 date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
+category: writing
 toc: notes
 ---
 ```
@@ -50,6 +52,29 @@ toc: notes
 | `toc` | 否 | 目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用站点默认值。 |
 | `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。 |
 | `page` | 否 | 纯 HTML 页面要原样发布的文件，写了它的 `index.md` 没有正文。 |
+
+`preview` 指向的脚本是一个 ES 模块。它的默认导出是一个函数：函数收到一个覆盖卡片预览区的空元素，在里面画出第一帧，然后返回带 `start` 和 `stop` 两个方法的对象。首页在卡片接近屏幕时加载这个脚本；指针停在卡片上时调用 `start`，指针离开时调用 `stop`；手机上卡片滚到屏幕中间时开始，离开中间时停止；读者要求减少动画时只显示第一帧。颜色用主题的 CSS 变量，深色模式下随之改变。
+
+```js
+export default function preview(element) {
+  element.innerHTML = '<svg viewBox="0 0 320 180"><circle cx="160" cy="90" r="40" fill="var(--series-1)"/></svg>';
+  let frame = 0;
+  return {
+    start() {
+      const step = (time) => {
+        element.querySelector('circle').setAttribute('cx', 160 + 100 * Math.sin(time / 600));
+        frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    },
+    stop() {
+      cancelAnimationFrame(frame);
+    },
+  };
+}
+```
+
+没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章没有 `preview`，卡片显示它的第一张图片。
 
 ## 标题与锚点 {#headings toc="标题"}
 
@@ -388,7 +413,34 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
-`height` 覆盖组件声明的占位高度：
+宽度也可以写成像素数或百分比。百分比按正文栏的宽度计算，不能超过 100%，组件框在正文栏里居中。像素宽度不超过正文栏时，组件框同样在正文栏里居中。无论写多宽，组件框都不会超出屏幕。
+
+::::example
+:::glu-heatmap{width=560px}
+:::
+::::
+
+::::example
+:::act-fn-plot{fn=relu width=70%}
+:::
+::::
+
+像素宽度超过正文栏时，组件框放进宽栏，在宽栏里居中。屏幕放不下宽栏时，组件框缩到屏幕能放下的宽度：
+
+::::example
+:::glu-heatmap{width=1000px}
+:::
+::::
+
+参数的类型是文件时，值写文章目录里的文件路径。构建检查这个文件是否存在，组件在浏览器里读取它。下面的热图从 `glu-points.json` 读取两个标注点：
+
+::::example
+:::glu-heatmap{points=glu-points.json}
+左边的点门控关闭，输出接近 0；右边的点门控打开，输出接近 $g \cdot u$。
+:::
+::::
+
+组件在代码里声明加载前的占位高度：`layout.height` 用于宽度 600 像素以上的屏幕，`layout.narrowHeight` 用于更窄的屏幕。组件加载前后，占位框的高度不变，页面不会跳动。在花括号里写 `height` 时，两种屏幕都用这个高度：
 
 ::::example
 :::glu-heatmap{height=420}
@@ -421,7 +473,7 @@ SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-r
 
 ## 附录：构建报错的写法 {#errors}
 
-下面的写法会让 `bake build` 报错并且不写出 `dist/`。报错格式是 `文件:行:列 说明`，全部检查完后一起报告。每一行在 `test/fixtures/syntax-errors/` 里有对应的测试文件。
+下面的写法会让 `bake build` 报错并且不写出 `dist/`。报错格式是 `文件:行:列 说明`，全部检查完后一起报告。每一行在 `test/fixtures/syntax-errors/` 里有对应的测试文件或文件夹。
 
 | 写错的地方 | 原文 | 报错 |
 |---|---|---|
@@ -440,6 +492,15 @@ SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-r
 | 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
 | 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |
 | 组件参数超出范围 | `:::act-fn-plot{range=20}` | `parameter "range" of act-fn-plot must be between 1 and 10, got 20` |
+| 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; components/ has no fn-plot.js or fn-plot.jsx` |
+| 组件宽度取值不对 | `:::glu-heatmap{width=full}` | `width of glu-heatmap must be body, wide, page, auto, a size in pixels such as 560px or a percentage such as 70%, got "full"` |
+| 组件的百分比宽度超过 100% | `:::glu-heatmap{width=120%}` | `width of glu-heatmap is 120%; a percentage width is at most 100% of the body column` |
+| 组件高度带了单位 | `:::glu-heatmap{height=420px}` | `height of glu-heatmap must be a positive number of pixels such as 420, got "420px"` |
+| 组件写了浮动 | `:::glu-heatmap{float=left}` | `float does not apply to components; glu-heatmap is centred in its column` |
+| 用宽度块包住组件 | `::::{width=wide}` 里面写 `:::glu-heatmap` | `write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it` |
+| 文件参数指向文章文件夹以外 | `:::glu-heatmap{points=../glu-points.json}` | `parameter "points" of glu-heatmap must be a file in the article folder, got "../glu-points.json"` |
+| 组件写了锚点或类名 | `:::act-fn-plot{#plot}` | `components take no id or class; remove the id from :::act-fn-plot` |
+| 组件文件在顶层使用浏览器 API | `components/window-plot.js` 顶层写 `window.matchMedia(…)` | `window-plot: components/window-plot.js uses the browser API window at the top level; the build reads params and layout in Node, so use it inside the component code` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |
 | 嵌入本文自己 | `:::embed` 里写本文的地址 | `:::embed cannot embed the article itself` |
 | 同一个地址写两次 | `:::embed` 里两行相同 | `:::embed lists /2026-10/syntax-linked/#vjp twice` |

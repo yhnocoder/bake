@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` theme. `bake dev` serves the same pages and updates them on every save. The `bento` theme, the homepage, the table of contents styles other than `notes` and components are not built yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article and the homepage in the `essay` theme. `bake dev` serves the same pages and the homepage and updates them on every save. The `bento` theme, the table of contents styles other than `notes` and components are not built yet.
 
 ## Commands
 
@@ -16,7 +16,7 @@ Run every command from the blog root, the folder that contains `bake.config.js`.
 
 `bake new <path>` creates `content/posts/<path>/index.md` with front matter for a draft dated today. The last folder name of the path becomes the slug.
 
-`bake build` checks `bake.config.js` and the front matter and Markdown of every article, then writes each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts, styles and fonts of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
+`bake build` checks `bake.config.js` and the front matter and Markdown of every article, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts, styles and fonts of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
 
 ### bake dev
 
@@ -27,12 +27,13 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 - Saving the Markdown of an article replaces the article text on the open page in place. The scroll position, the table of contents and the open or closed state of every fold stay as they were. Each changed block is highlighted in light yellow for one second. When no changed block is on the screen, a notice at the bottom of the page names the section of the change, and clicking the notice scrolls there. Bake checks the links of every article again after each save, so the pages of other articles that link to the changed article or embed one of its sections are updated in the same way, and a link that no longer finds its target is reported.
 - Changing the front matter of an article, `bake.config.js`, `preamble.sty` or a file in `themes/` generates the page again, and the browser reloads it at the same scroll position.
 - Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
+- The homepage at http://localhost:4321/ shows every article, drafts included, and reloads when the front matter of an article changes or an article is added or removed.
 
 Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While an article has errors, its page keeps showing the last version without errors, and the other articles keep updating. Errors outside the articles, such as in `bake.config.js`, `preamble.sty` or a theme, stop all updates until they are fixed.
 
 Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
 
-A draft shows the label Draft, or 草稿 on a Chinese site, next to its date. An address without a page, such as http://localhost:4321/ while Bake builds no homepage yet, lists every article with a link, drafts included.
+A draft shows the label Draft, or 草稿 on a Chinese site, next to its date on its page and on its card on the homepage. An address without a page lists every article with a link, drafts included.
 
 ## A blog repository
 
@@ -61,6 +62,7 @@ my-blog/
 ```js
 export default {
   title: 'My Blog',
+  description: 'Notes on how language models are trained.',
   url: 'https://example.github.io',
   language: 'en',
   theme: 'essay',
@@ -71,6 +73,7 @@ export default {
 | Field | Required | Meaning |
 |---|---|---|
 | `title` | yes | Site name. |
+| `description` | no | One sentence under the site name on the homepage and in the homepage's page description. |
 | `url` | yes | Absolute `http` or `https` address of the published site. |
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
@@ -103,7 +106,7 @@ tags: [LLM]
 | `summary` | no | One sentence for the page header, the homepage card, the page description and RSS. |
 | `tags` | no | List of tags for filtering on the homepage. |
 | `category` | when `categories` is set | The `id` of one of the categories in `bake.config.js`. |
-| `preview` | no | Path of a script in the article folder that animates the homepage card. |
+| `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of an image in the article folder used as the share image. |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
 | `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. |
@@ -260,6 +263,33 @@ In the `essay` theme, when the reader rests the pointer on an internal link or m
 
 The address of a heading embeds its section up to the next heading of the same or a higher level, and the address of a paragraph anchor embeds that paragraph. All parts of one `:::embed` form one block, and each part ends with a line that names its article and section and links to them. Embedded content keeps its layout, its equation numbers and its components. Its headings do not enter the table of contents or the section numbering of this article, its sidenotes are not shown, and an `:::embed` inside it is shown as a link. Bake reads the embedded content on every build, so a change in the source article reaches every article that embeds it. Embedding the article itself, an address without an anchor, a target that does not exist or is not a heading or a paragraph, the same address twice and an address whose section contains another address of the same block are errors.
 
+## The homepage
+
+`dist/index.html` lists every published article as a card: a 16:9 preview, the title, the summary, the date and the tags. Plain HTML pages get the same card as Markdown articles. A bar at the top of the screen switches between two groupings. Grouped by category, the articles are listed under each category in the order of `categories`, with its colour, description and number of articles, and the bar holds a chip for every category that jumps to its group and is highlighted while that group is on screen; categories without published articles are left out. Grouped by month, the newest month comes first, and the bar holds a chip for every tag that shows only the articles with that tag. Without `categories` the homepage is grouped by month only. On screens of 1000 pixels and up the reader can choose 3, 4 or 5 columns; narrower screens fit as many columns as the width allows. `home.groupBy` and `home.columns` set the defaults, and the browser remembers the reader's choice. Without scripts the default grouping is shown and the category chips still jump to their groups. A blog without published articles gets a homepage with one line that says there are no posts yet.
+
+The card shows the article's first image when the article has no `preview` script, and a block in the category colour with the title when it has no image either. A `preview` script is an ES module in the article folder whose default export receives an empty element that covers the card's frame, draws the first frame into it and returns an object with `start` and `stop`:
+
+```js
+export default function preview(element) {
+  element.innerHTML = '<svg viewBox="0 0 320 180"><circle cx="160" cy="90" r="40" fill="var(--series-1)"/></svg>';
+  let frame = 0;
+  return {
+    start() {
+      const step = (time) => {
+        element.querySelector('circle').setAttribute('cx', 160 + 100 * Math.sin(time / 600));
+        frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    },
+    stop() {
+      cancelAnimationFrame(frame);
+    },
+  };
+}
+```
+
+The homepage loads a preview when its card comes near the screen. The animation runs while the pointer rests on the card or the card has keyboard focus, and on a phone while the card is in the middle of the screen. It stops whenever the card is off the screen. When the reader asks for reduced motion, only the first frame is shown. A preview that fails to load or throws is logged to the console and the card keeps its image or colour block. Colours should come from the theme's CSS variables such as `var(--ink)` and `var(--series-1)`, so the preview follows dark mode.
+
 ## Themes
 
 A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number.
@@ -275,9 +305,9 @@ The `essay` theme has four table of contents styles, which `toc` selects:
 
 A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
-A round settings button with a gear icon at the bottom left of the page, on the left edge below the table of contents handle on a phone, lets the reader choose the table of contents style, which then replaces the style of every article, choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. Below 1000 pixels the settings button and the table of contents handle slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The browser remembers these choices, and the page applies them before it is first shown.
+A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style, which then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The browser remembers these choices, and the page applies them before it is first shown.
 
-A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
+A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, plus a `home.jsx` for the homepage when `bake.config.js` selects it as the site theme, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
 
 ## Development
 

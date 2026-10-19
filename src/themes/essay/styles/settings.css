@@ -420,8 +420,11 @@
   }
 
   .bk-settings-panel {
-    bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
     left: 10px;
+  }
+
+  :root:has(.bk-toc-handle) .bk-settings-panel {
+    bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
   }
 }
 

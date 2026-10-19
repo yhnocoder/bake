@@ -5,6 +5,7 @@ import { SETTINGS, storageKey } from '../settings.js';
 import { layoutChanged } from './motion.js';
 
 export const SETTING_EVENT = 'bk:setting';
+export const THEME_EVENT = 'bake:theme';
 
 export const settingRows = [
   { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], changesLayout: true },
@@ -26,6 +27,7 @@ export function chooseSetting(name, value) {
   } catch {}
   values[name][1](value);
   document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
+  if (name === 'theme') document.dispatchEvent(new CustomEvent(THEME_EVENT));
   if (settingRows.find((row) => row.name === name)?.changesLayout) layoutChanged();
 }
 
@@ -34,6 +36,9 @@ export function startSettings() {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <Settings labels={labels} />, host);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (settingValue('theme') === 'system') document.dispatchEvent(new CustomEvent(THEME_EVENT));
+  });
 }
 
 function Settings(props) {
@@ -73,7 +78,7 @@ function Settings(props) {
         </svg>
       </button>
       <div class="bk-settings-panel" id="bk-settings-panel" role="group" aria-label={labels.settings}>
-        <For each={settingRows}>{(row) => (row.toggle === undefined ? <OptionsRow row={row} labels={labels} /> : <ToggleRow row={row} labels={labels} />)}</For>
+        <For each={settingRows.filter((row) => settingValue(row.name) !== undefined)}>{(row) => (row.toggle === undefined ? <OptionsRow row={row} labels={labels} /> : <ToggleRow row={row} labels={labels} />)}</For>
       </div>
     </div>
   );

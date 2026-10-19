@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, test } from 'node:test';
+import { before, describe, test } from 'node:test';
+import { readComponents } from '../src/components/read.js';
 import { readPreamble } from '../src/config/preamble.js';
 import { indexPages } from '../src/build/links.js';
-import { parseArticle, readArticle } from '../src/markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES, parseArticle, readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
 import { folder, frontMatter, html, outline, parse, parsed } from './article.js';
 
@@ -19,14 +20,31 @@ const markdownFixtures = [
   'unknown-eqref.md',
   'list-table-cell-count.md',
   'image-width-tier.md',
+  'unknown-component-parameter.md',
+  'component-parameter-range.md',
+  'unknown-component.md',
+  'component-width.md',
+  'component-width-percent.md',
+  'component-height.md',
+  'component-float.md',
+  'component-width-block.md',
+  'component-file-outside.md',
+  'component-id.md',
 ];
 const exampleBlog = fileURLToPath(new URL('../examples/blog/', import.meta.url));
 describe('markdown fixtures', () => {
-  test('syntax error fixtures for text syntax report the lines in expected.json', async () => {
+  let components;
+  before(async () => {
+    const errors = [];
+    components = await readComponents(exampleBlog, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors);
+    assert.deepEqual(errors.map(formatError), []);
+  });
+
+  test('syntax error fixtures for text syntax and components report the lines in expected.json', async () => {
     const expected = JSON.parse(readFileSync(new URL('expected.json', fixturesDir), 'utf8'));
     for (const name of markdownFixtures) {
       const errors = [];
-      await parseArticle(name, readFileSync(new URL(name, fixturesDir), 'utf8'), errors, { folder: folder(fileURLToPath(fixturesDir)) });
+      await parseArticle(name, readFileSync(new URL(name, fixturesDir), 'utf8'), errors, { folder: folder(fileURLToPath(fixturesDir)), components });
       assert.deepEqual(errors.map(formatError), [expected[name]], name);
     }
   });
@@ -38,7 +56,7 @@ describe('markdown fixtures', () => {
     for (const slug of ['syntax', 'syntax-linked']) {
       const source = readFileSync(`${exampleBlog}content/posts/${slug}/index.md`, 'utf8');
       const url = `/2026-10/${slug}/`;
-      entries.push({ url, title: slug, draft: false, article: await readArticle(`${slug}/index.md`, source, errors, { folder: folder(`${exampleBlog}content/posts/${slug}`), preamble, url }) });
+      entries.push({ url, title: slug, draft: false, article: await readArticle(`${slug}/index.md`, source, errors, { folder: folder(`${exampleBlog}content/posts/${slug}`), preamble, url, components }) });
     }
     const site = indexPages(entries);
     for (const entry of entries) entry.article.link(site, errors);
@@ -347,8 +365,16 @@ describe('citations', () => {
 describe('blocks', () => {
   test('reports an unknown block and keeps components with their attributes', async () => {
     assert.deepEqual((await parse(':::warning\nText.\n:::\n')).errors, ['index.md:7:1 unknown block ":::warning"']);
-    const [block] = (await parsed(':::act-fn-plot{fn=gelu range=6}\nCaption.\n:::\n')).intro;
-    assert.deepEqual({ type: block.type, name: block.name, attributes: block.attributes }, { type: 'component', name: 'act-fn-plot', attributes: { fn: 'gelu', range: '6' } });
+    const params = {
+      fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'silu' },
+      range: { label: 'Range', type: 'number', min: 1, max: 10, default: 4 },
+    };
+    const components = new Map([['act-fn-plot', { name: 'act-fn-plot', valid: true, params, layout: { height: 360 } }]]);
+    const [block] = (await parsed(':::act-fn-plot{fn=gelu range=6}\nCaption.\n:::\n', { components })).intro;
+    assert.deepEqual(
+      { type: block.type, name: block.name, attributes: block.attributes, params: block.params },
+      { type: 'component', name: 'act-fn-plot', attributes: { fn: 'gelu', range: '6' }, params: { fn: 'gelu', range: 6 } },
+    );
   });
 
   test('gives the block inside :::{width=…} that width', async () => {

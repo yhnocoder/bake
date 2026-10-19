@@ -52,8 +52,17 @@ const body = [
 
 const longBody = Array.from(
   { length: 18 },
-  (_, index) => `## Chapter ${index + 1} {#chapter-${index + 1}}\n\n${'A paragraph of the chapter. '.repeat(30)}\n\n### Part ${index + 1}.1\n\n${'A paragraph of the part. '.repeat(20)}\n\n### Part ${index + 1}.2\n\n${'A paragraph of the part. '.repeat(20)}\n`,
+  (_, index) => `## Chapter ${index + 1} {#chapter-${index + 1}}\n\n${'A paragraph of the chapter. '.repeat(30)}\n\n:::page-box{width=page}\n:::\n\n### Part ${index + 1}.1\n\n${'A paragraph of the part. '.repeat(20)}\n\n### Part ${index + 1}.2\n\n${'A paragraph of the part. '.repeat(20)}\n`,
 ).join('\n');
+
+const pageBox = `export const layout = { width: 'page', height: 160 };
+
+export default class PageBox extends HTMLElement {
+  connectedCallback() {
+    this.textContent = 'A component as wide as the page.';
+  }
+}
+`;
 
 const VISIBLE_ENTRIES = {
   notes: '.bk-toc .bk-toc-chapter-title, .bk-toc .bk-toc-section-title',
@@ -126,6 +135,7 @@ test('the table of contents', async (t) => {
     'content/posts/toc/index.md': article({ title: '目录', slug: 'toc', body }),
     'content/posts/dots/index.md': article({ title: '圆点', slug: 'dots', extra: 'toc: dots\n', body }),
     'content/posts/long/index.md': article({ title: 'Long', slug: 'long', body: longBody }),
+    'components/page-box.js': pageBox,
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
@@ -397,7 +407,7 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('the settings button covers no entry of the table of contents at short and tall viewports', async () => {
+  await t.test('the settings button covers no entry of the table of contents at short and tall viewports in an article with page-wide components', async () => {
     for (const style of STYLES) {
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -410,6 +420,7 @@ test('the table of contents', async (t) => {
         assert.ok((await page.locator(selector).count()) > 0, `${style} shows no entries at ${viewport.width}×${viewport.height}`);
         assert.deepEqual(await page.evaluate(coveredEntries, selector), [], `${style} at the top of the page, ${viewport.width}×${viewport.height}`);
         await scrollToHeading(page, 'chapter-9');
+        await page.waitForFunction(() => document.querySelector('#chapter-9').closest('.bk-section').querySelector('figure.component').dataset.state === 'ready');
         await page.waitForTimeout(100);
         assert.deepEqual(await page.evaluate(coveredEntries, selector), [], `${style} in the middle of the page, ${viewport.width}×${viewport.height}`);
         const box = await page.evaluate((entries) => {

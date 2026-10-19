@@ -20,7 +20,7 @@ const wideFormula = Array.from({ length: 30 }, (_, index) => `x_{${index}}^2`).j
 const stressArticle = article({
   title: 'Layout stress',
   slug: 'stress',
-  extra: 'tags: [layout, stress]\n',
+  extra: 'tags: [layout, stress]\ncategory: writing\n',
   body: `A paragraph with a long URL https://example.com/${longToken} and long inline code \`${longToken}\`.
 
 \`\`\`text
@@ -56,6 +56,7 @@ const tocBody = '## First\n\nText.\n\n## Second\n\nText.\n';
 const widthsArticle = article({
   title: 'Width levels',
   slug: 'widths',
+  extra: 'category: writing\n',
   body: `A paragraph before the blocks.
 
 :::{width=body}
@@ -93,8 +94,8 @@ test('the essay theme lays out articles', async (t) => {
   writeFiles(dir, {
     'content/posts/stress/index.md': stressArticle,
     'content/posts/widths/index.md': widthsArticle,
-    'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\n', body: tocBody }),
-    'content/posts/tabs/index.md': article({ title: 'Tabs', slug: 'tabs', extra: 'toc: tabs\n', body: tocBody }),
+    'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\ncategory: writing\n', body: tocBody }),
+    'content/posts/tabs/index.md': article({ title: 'Tabs', slug: 'tabs', extra: 'toc: tabs\ncategory: writing\n', body: tocBody }),
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');

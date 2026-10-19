@@ -9,7 +9,7 @@ export default function Page(props) {
   const { site, article, assets } = props;
   const labels = labelsFor(site.language);
   return (
-    <html lang={site.language} {...settingAttributes(article)}>
+    <html lang={site.language} {...settingAttributes('article', article)}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -22,6 +22,9 @@ export default function Page(props) {
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
           <script defer src={src} />
+        ))}
+        {assets.modules.map((src) => (
+          <script type="module" src={src} />
         ))}
       </head>
       <body class="bk-page" style={labelStyle(labels)}>
@@ -41,5 +44,13 @@ export default function Page(props) {
 
 function labelStyle(labels) {
   const { before, after } = labels.embedSource;
-  return `--bk-embed-source-before:${JSON.stringify(before)};--bk-embed-source-after:${JSON.stringify(after)}`;
+  const variables = {
+    'embed-source-before': before,
+    'embed-source-after': after,
+    'component-needs-script': labels.componentNeedsScript,
+    'component-failed': labels.componentFailed,
+  };
+  return Object.entries(variables)
+    .map(([name, value]) => `--bk-${name}:${JSON.stringify(value)}`)
+    .join(';');
 }

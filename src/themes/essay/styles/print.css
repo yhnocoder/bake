@@ -29,41 +29,41 @@
     padding-top: 0;
   }
 
-  .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]) {
+  .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
     overflow: visible;
     mask-image: none !important;
   }
 
-  .bk-article pre.shiki {
+  .bk-article pre.shiki:where(:not(.component-box *)) {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
-  .bk-article :is(th, td) {
+  .bk-article :is(th, td):where(:not(.component-box *)) {
     white-space: normal;
   }
 
-  .bk-article details.fold::details-content {
+  .bk-article details.fold:where(:not(.component-box *))::details-content {
     content-visibility: visible;
     height: auto;
     opacity: 1;
   }
 
-  .bk-article details.fold > summary::after {
+  .bk-article details.fold > summary:where(:not(.component-box *))::after {
     display: none;
   }
 
-  .bk-article .example {
+  .bk-article .example:where(:not(.component-box *)) {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .bk-block,
-  .bk-article :is(.figure, .aside, .quote, blockquote, .example) {
+  .bk-article :is(.figure, .component, .aside, .quote, blockquote, .example):where(:not(.component-box *)) {
     break-inside: avoid;
     box-shadow: none;
   }
 
-  .bk-article a {
+  .bk-article a:where(:not(.component-box *)) {
     color: inherit;
     text-decoration: none;
   }
