@@ -8,12 +8,13 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
 import { indexPages } from '../build/links.js';
 import { addressHref, pageRoot, parseAddress } from '../build/urls.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
-import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml } from '../render/html.js';
+import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, addGlyphs, typesetMath } from '../render/math.js';
 import { parseAttributes } from './attributes.js';
@@ -45,6 +46,7 @@ const BUILT_IN_BLOCKS = {
   'list-table': [],
   embed: [],
 };
+export const BUILT_IN_BLOCK_NAMES = Object.freeze(Object.keys(BUILT_IN_BLOCKS));
 const HEADING_ATTRIBUTES = ['id', 'toc', 'width'];
 const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
 const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
@@ -63,8 +65,8 @@ const PREVIEW_BLOCKS = 3;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
 
-export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null } = {}) {
-  const article = new ArticleParser(file, source, errors, folder, preamble, url);
+export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null, components = new Map() } = {}) {
+  const article = new ArticleParser(file, source, errors, folder, preamble, url, components);
   await article.parse();
   return article;
 }
@@ -76,12 +78,13 @@ export async function parseArticle(file, source, errors, options = {}) {
 }
 
 class ArticleParser {
-  constructor(file, source, errors, folder, preamble, url) {
+  constructor(file, source, errors, folder, preamble, url, components) {
     this.file = file;
     this.source = source;
     this.errors = errors;
     this.folder = folder;
     this.preamble = preamble;
+    this.components = components;
     this.url = url;
     this.tree = null;
     this.targets = new Map();
@@ -401,10 +404,12 @@ class ArticleParser {
     const [, name, attributeText] = BLOCK_LINE.exec(node.info);
     node.name = name ?? '';
     node.attributes = {};
+    let offsets = {};
     if (attributeText !== undefined) {
-      const { attributes, error } = parseAttributes(attributeText);
-      node.attributes = attributes;
-      if (error) this.report(start, error);
+      const parsed = parseAttributes(attributeText);
+      node.attributes = parsed.attributes;
+      offsets = parsed.offsets;
+      if (parsed.error) this.report(start, parsed.error);
     }
     const label = node.name === '' ? ':::{width=…}' : `:::${node.name}`;
     if (!node.closed) this.report(start, `${label} is not closed; end it with a line of ${node.colons} or more colons`);
@@ -413,12 +418,32 @@ class ArticleParser {
       if (node.attributes.width === undefined) this.report(start, 'a block without a name must set width, for example :::{width=wide}');
       else this.checkWidth(node.attributes.width, start);
       if (node.children.length !== 1) this.report(start, ':::{width=…} must contain exactly one block');
+      const [child] = node.children;
+      const childName = child?.type === 'bakeBlock' ? BLOCK_LINE.exec(child.info)?.[1] : undefined;
+      if (childName?.includes('-') && !Object.hasOwn(BUILT_IN_BLOCKS, childName)) {
+        this.report(start, `write the width of a component in its own braces, such as :::${childName}{width=wide}, instead of :::{width=…} around it`);
+      }
     } else if (Object.hasOwn(BUILT_IN_BLOCKS, node.name)) {
       this.checkKnownAttributes(node.attributes, BUILT_IN_BLOCKS[node.name], label, start);
       if (node.name === 'fold' && typeof node.attributes.title !== 'string') this.report(start, ':::fold is missing "title"');
     } else if (!node.name.includes('-')) {
       this.report(start, `unknown block ":::${node.name}"`);
+    } else {
+      const attributeStart = start.offset + node.colons + node.name.length;
+      this.readComponent(node, (attribute) => (attribute === undefined ? start : this.positionAt(attributeStart + offsets[attribute])));
     }
+  }
+
+  readComponent(node, attributePosition) {
+    const component = this.components.get(node.name);
+    if (component === undefined) {
+      this.report(node.position.start, `unknown component "${node.name}"; components/ has no ${node.name}.js or ${node.name}.jsx`);
+      return;
+    }
+    if (!component.valid) return;
+    const resolved = resolveComponent(node.name, component, node.attributes, this.folder?.files ?? []);
+    for (const { attribute, message } of resolved.problems) this.report(attributePosition(attribute), message);
+    node.component = resolved;
   }
 
   readHeading(node) {
@@ -637,7 +662,7 @@ class ArticleParser {
     this.walkWithSidenotes(tree, (node) => {
       if (node.type === 'link') links.add(this.imageSource(node.url));
       if (node.type === 'html') texts.push(node.value);
-      if (node.type === 'bakeBlock') texts.push(...Object.values(node.attributes).filter((value) => typeof value === 'string'));
+      if (node.type === 'bakeBlock') texts.push(...[...Object.values(node.attributes), ...Object.values(node.component?.params ?? {})].filter((value) => typeof value === 'string'));
     });
     return (source) => links.has(source) || texts.some((text) => text.includes(source));
   }
@@ -871,7 +896,21 @@ class ArticleParser {
     }));
     const html = [...intro, ...sections.flatMap((section) => section.blocks), ...sidenotes, ...previews].map((entry) => entry.html);
     const glyphs = addGlyphs(this.glyphs, [...this.borrowed].map((source) => source.glyphs), html);
-    return { intro, sections, sidenotes, references, toc, previews, words: countWords(tree), glyphs, images: [...this.images.values()], image: this.image };
+    return { intro, sections, sidenotes, references, toc, previews, words: countWords(tree), glyphs, images: [...this.images.values()], image: this.image, components: this.usedComponents(tree) };
+  }
+
+  usedComponents(tree) {
+    const names = new Set();
+    const add = (node) => {
+      if (node.type === 'bakeBlock' && node.component !== undefined) names.add(node.name);
+    };
+    this.walkWithSidenotes(tree, (node) => {
+      add(node);
+      for (const { address, page } of node.parts ?? []) {
+        for (const embedded of page.article.embedNodes(address.anchor)) walk(embedded, add);
+      }
+    });
+    return [...names].sort();
   }
 
   headingFields(node) {
@@ -902,7 +941,11 @@ class ArticleParser {
     if (width !== undefined) block.naturalWidth = width;
     if (node.type === 'heading') Object.assign(block, { depth: node.depth }, this.headingFields(node));
     if (node.type === 'paragraph' && node.anchor !== undefined) block.id = node.anchor;
-    if (node.type === 'bakeBlock' && block.type === 'component') Object.assign(block, { name: node.name, attributes: node.attributes });
+    if (node.type === 'bakeBlock' && block.type === 'example') Object.assign(block, exampleWidths(resultWidths(node)));
+    if (node.type === 'bakeBlock' && block.type === 'component') {
+      Object.assign(block, { name: node.name, attributes: node.attributes, params: node.component?.params });
+      if (node.component?.width !== undefined) block.width = node.component.width;
+    }
     return block;
   }
 
@@ -919,7 +962,18 @@ function blockType(node) {
   return node.name.includes('-') ? 'component' : 'unknown';
 }
 
+function exampleWidths(widths) {
+  if (widths.length === 0) return {};
+  const fields = { resultWidths: widths };
+  const pixels = widths.filter((width) => width.endsWith('px')).map((width) => Number.parseFloat(width));
+  if (pixels.length > 0) fields.naturalWidth = `${Math.max(...pixels)}px`;
+  const level = ['page', 'wide'].find((width) => widths.includes(width));
+  if (level !== undefined) fields.width = level;
+  return fields;
+}
+
 function naturalWidth(node) {
+  if (node.type === 'bakeBlock') return node.component?.naturalWidth;
   if (node.type === 'math') return (MATH_MIN_WIDTH.exec(node.rendered) ?? MATH_WIDTH.exec(node.rendered))?.[1];
   if (node.type === 'code') return `${Math.max(...node.value.split('\n').map(textColumns))}ch`;
   if (node.type === 'figure') {

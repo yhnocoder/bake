@@ -275,3 +275,38 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.deepEqual(await titles(), ['Added', 'Live on the homepage', 'Sketch']);
   });
 });
+
+test('bake dev starts the components of an article that it updates in place', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'components/label-view.js': `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };
+export const layout = { height: 80 };
+
+export default class LabelView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = this.params.text;
+  }
+}
+`,
+    [ARTICLE]: article({ title: 'Live', slug: 'live', body: 'A paragraph before the component.\n\n:::label-view{text=first}\n:::\n' }),
+  });
+  const file = join(dir, ARTICLE);
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(`${server.url}2026-10/live/`);
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('label-view')?.textContent === 'first');
+  await page.evaluate(() => {
+    window.keptAcrossUpdates = true;
+  });
+  writeFileSync(file, readFileSync(file, 'utf8').replace('text=first', 'text=second'));
+  await page.waitForFunction(() => document.querySelector('label-view')?.textContent === 'second');
+  assert.deepEqual(
+    await page.evaluate(() => [window.keptAcrossUpdates, document.querySelector('figure.component').dataset.state]),
+    [true, 'ready'],
+  );
+  await page.close();
+});

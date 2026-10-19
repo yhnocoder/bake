@@ -5,6 +5,7 @@ import { SETTINGS, storageKey } from '../settings.js';
 import { layoutChanged } from './motion.js';
 
 export const SETTING_EVENT = 'bk:setting';
+export const THEME_EVENT = 'bake:theme';
 
 export const settingRows = [
   { name: 'theme', label: (labels) => labels.theme, option: (labels, value) => labels.themes[value] },
@@ -28,6 +29,7 @@ export function chooseSetting(name, value) {
   } catch {}
   values[name][1](value);
   document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
+  if (name === 'theme') document.dispatchEvent(new CustomEvent(THEME_EVENT));
   if (settingRows.find((row) => row.name === name)?.changesLayout) layoutChanged();
 }
 
@@ -36,6 +38,9 @@ export function startSettings() {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <Settings labels={labels} />, host);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (settingValue('theme') === 'system') document.dispatchEvent(new CustomEvent(THEME_EVENT));
+  });
 }
 
 function appliedValue(name) {

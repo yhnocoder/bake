@@ -23,7 +23,7 @@ const HASH_LENGTH = 12;
 const CARD_TEMPLATE = readFileSync(join(import.meta.dirname, 'share-card.js'));
 const PLAYWRIGHT_VERSION = createRequire(import.meta.url)('playwright/package.json').version;
 
-export function shareImageOf(root, article, config, themeFiles) {
+export function shareImageOf(root, article, config, assets) {
   const { fields } = article;
   const name = `${SHARE_IMAGE_DIR}${article.url.slice(0, -1)}`;
   if (fields.cover !== undefined) {
@@ -41,7 +41,7 @@ export function shareImageOf(root, article, config, themeFiles) {
     summary: fields.summary,
     preview: fields.preview,
   };
-  const inputs = [CARD_TEMPLATE, PLAYWRIGHT_VERSION, JSON.stringify(card), themeFiles.get(THEME_STYLES_PATH)];
+  const inputs = [CARD_TEMPLATE, PLAYWRIGHT_VERSION, JSON.stringify(card), assets.get(THEME_STYLES_PATH)];
   if (fields.preview !== undefined) {
     for (const file of article.files) inputs.push(file, readFileSync(join(root, article.dir, file)));
   }
@@ -56,7 +56,7 @@ export function shareImageOf(root, article, config, themeFiles) {
   };
 }
 
-export async function shareImageOutputs(root, images, themeFiles, errors) {
+export async function shareImageOutputs(root, images, assets, errors) {
   const outputs = [];
   const pending = [];
   for (const image of images) {
@@ -66,10 +66,10 @@ export async function shareImageOutputs(root, images, themeFiles, errors) {
     else pending.push(image);
   }
   if (pending.length === 0) return outputs;
-  return [...outputs, ...(await drawCards(pending, themeFiles, errors))];
+  return [...outputs, ...(await drawCards(pending, assets, errors))];
 }
 
-async function drawCards(images, themeFiles, errors) {
+async function drawCards(images, assets, errors) {
   let browser;
   try {
     browser = await chromium.launch();
@@ -86,7 +86,7 @@ async function drawCards(images, themeFiles, errors) {
       reducedMotion: 'reduce',
       serviceWorkers: 'block',
     });
-    await context.route('**/*', (route) => answer(route, images, themeFiles));
+    await context.route('**/*', (route) => answer(route, images, assets));
     const queue = images.entries();
     const outputs = [];
     const draw = async () => {
@@ -146,7 +146,7 @@ async function drawFirstFrame(preview) {
   }
 }
 
-function answer(route, images, themeFiles) {
+function answer(route, images, assets) {
   const url = new URL(route.request().url());
   if (url.origin !== ORIGIN) return route.abort();
   let path;
@@ -155,13 +155,13 @@ function answer(route, images, themeFiles) {
   } catch {
     return route.fulfill({ status: 404 });
   }
-  const body = requestedFile(path, images, themeFiles);
+  const body = requestedFile(path, images, assets);
   if (body === null) return route.fulfill({ status: 404 });
   return route.fulfill({ status: 200, contentType: contentType(path), body });
 }
 
-function requestedFile(path, images, themeFiles) {
-  if (themeFiles.has(path)) return themeFiles.get(path);
+function requestedFile(path, images, assets) {
+  if (assets.has(path)) return assets.get(path);
   const [index, ...rest] = path.split('/');
   const image = images[Number(index)];
   if (image === undefined || String(Number(index)) !== index) return null;

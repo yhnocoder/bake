@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
+import { bundleComponents } from '../components/bundle.js';
+import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
-import { readArticle } from '../markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES, readArticle } from '../markdown/article.js';
 import { IMAGE_FORMATS, convertImage, readImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
@@ -22,19 +24,20 @@ const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
 export function createSite(root, { drafts = false, base, shareImages = false } = {}) {
-  return { root, drafts, base, shareImages, settings: null, articles: new Map(), themes: new Map() };
+  return { root, drafts, base, shareImages, settings: null, articles: new Map(), themes: new Map(), bundle: null };
 }
 
 export async function updateSite(site, changedPaths = null) {
   const { root } = site;
   const touches = (path) => changedPaths === null || changedPaths.some((changed) => changed === path || changed.startsWith(`${path}/`));
   if (touches(THEMES_DIR)) site.themes.clear();
-  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR)) {
+  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR)) {
     site.settings = await readSettings(root);
     site.articles.clear();
+    site.bundle = null;
   }
   const { settings } = site;
-  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], themeFiles: [], shareImages: [], publicFiles: [] };
+  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], assetFiles: [], shareImages: [], publicFiles: [] };
   const articles = [];
   for (const found of findArticles(root)) {
     const cached = site.articles.get(found.file);
@@ -42,15 +45,15 @@ export async function updateSite(site, changedPaths = null) {
     articles.push(unchanged ? cached : await loadArticle(root, found, settings));
   }
   site.articles = new Map(articles.map((article) => [article.file, article]));
-  const errors = articles.flatMap((article) => article.errors);
+  const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
   linkArticles(articles, errors);
   const published = articles.filter((article) => article.url !== null && (site.drafts || article.fields.draft !== true));
-  const themes = await compileThemes(site, published, settings.config, errors);
+  const [themes, bundle] = await Promise.all([compileThemes(site, published, settings.config, errors), compileComponents(site, published, errors)]);
   const { config } = settings;
-  const themeFiles = themeOutputs(themes);
-  const shareImages = site.shareImages && errors.length === 0 ? shareImagesOf(root, published, config, themeFiles) : new Map();
-  const pageSettings = { config, themes, shareImages, mathStyles: await mathStyles() };
+  const assetFiles = assetOutputs(themes, bundle);
+  const shareImages = site.shareImages && errors.length === 0 ? shareImagesOf(root, published, config, assetFiles) : new Map();
+  const pageSettings = { config, themes, bundle, shareImages, mathStyles: await mathStyles() };
   const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
   const entries = published.map((article) => homeEntry(article, config)).sort(newestFirst);
   const listed = entries.filter((entry) => !entry.draft);
@@ -60,9 +63,9 @@ export async function updateSite(site, changedPaths = null) {
     { path: SITEMAP_PATH, render: () => sitemapXml(config, listed), owner: 'the sitemap' },
     notFoundOutput(listed, site.base ?? sitePath(config.url), pageSettings, errors),
   ];
-  const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...themeFiles, ...shareImages.values()];
+  const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
-  return { errors: sortErrors(errors), articles, pages, home, siteFiles, themeFiles, shareImages: [...shareImages.values()], publicFiles };
+  return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
 }
 
 async function readSettings(root) {
@@ -71,7 +74,9 @@ async function readSettings(root) {
   const config = await loadBakeConfig(root, themeNames, errors);
   if (config === null) return { errors };
   const preamble = await readMathPreamble(root, errors);
-  return { errors, config, preamble, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
+  const componentErrors = [];
+  const components = errors.length > 0 ? new Map() : await readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
+  return { errors, config, preamble, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
 }
 
 async function compileThemes(site, published, config, errors) {
@@ -90,8 +95,8 @@ async function compileThemes(site, published, config, errors) {
   return themes;
 }
 
-function shareImagesOf(root, published, config, themeFiles) {
-  const sources = new Map(themeFiles.map((file) => [file.path, file.render()]));
+function shareImagesOf(root, published, config, assetFiles) {
+  const sources = new Map(assetFiles.map((file) => [file.path, file.render()]));
   const listed = published.filter((article) => article.fields.draft !== true);
   return new Map(listed.map((article) => [article.file, shareImageOf(root, article, config, sources)]));
 }
@@ -161,13 +166,29 @@ function themeOf(article, config) {
   return article.fields.theme ?? config.theme;
 }
 
-function themeOutputs(themes) {
-  const outputs = new Map();
-  for (const [name, theme] of themes) {
-    for (const file of theme?.files ?? []) {
-      if (!outputs.has(file.path)) outputs.set(file.path, { path: file.path, render: () => file.source, owner: `the ${name} theme` });
-    }
+async function compileComponents(site, published, errors) {
+  const names = [...new Set(published.flatMap((article) => article.content?.components ?? []))].sort();
+  if (names.length === 0) return null;
+  const key = names.join('\n');
+  if (site.bundle?.key !== key) {
+    const { root, settings } = site;
+    const bundleErrors = [];
+    const components = names.map((name) => settings.components.get(name));
+    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors), errors: bundleErrors };
   }
+  errors.push(...site.bundle.errors);
+  return site.bundle.bundle;
+}
+
+function assetOutputs(themes, bundle) {
+  const outputs = new Map();
+  const add = (files, owner) => {
+    for (const file of files) {
+      if (!outputs.has(file.path)) outputs.set(file.path, { path: file.path, render: () => file.source, owner });
+    }
+  };
+  for (const [name, theme] of themes) add(theme?.files ?? [], `the ${name} theme`);
+  add(bundle?.files ?? [], 'the components');
   return [...outputs.values()];
 }
 
@@ -189,14 +210,14 @@ function linkArticles(articles, errors) {
   for (const article of articles) article.content = article.document?.structure() ?? null;
 }
 
-async function loadArticle(root, article, { rules, preamble }) {
+async function loadArticle(root, article, { rules, preamble, components }) {
   const errors = [];
   const source = readFileSync(join(root, article.file), 'utf8');
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
   const folder = { path: join(root, article.dir), files: article.files };
-  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url }) : null;
+  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
   const positions = frontMatter?.positions ?? {};
   const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);
   return { ...article, fields, positions, url, document, content: null, cover, errors };
@@ -239,7 +260,7 @@ function convertedImage(file, image) {
   return convertedImages.get(image);
 }
 
-function renderArticle(article, { config, themes, shareImages, mathStyles }, errors) {
+function renderArticle(article, { config, themes, bundle, shareImages, mathStyles }, errors) {
   const name = themeOf(article, config);
   const theme = themes.get(name);
   if (theme === null) return '';
@@ -265,6 +286,7 @@ function renderArticle(article, { config, themes, shareImages, mathStyles }, err
       root,
       styles: theme.styles.map((path) => `${root}${path}`),
       scripts: theme.scripts.map((path) => `${root}${path}`),
+      modules: content.components.length === 0 || bundle === null ? [] : [`${root}${bundle.runtime}`],
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

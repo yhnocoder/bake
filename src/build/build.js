@@ -7,9 +7,9 @@ export async function build(root) {
   const site = await updateSite(createSite(root, { shareImages: true }));
   if (site.errors.length > 0) return { errors: site.errors };
   const errors = [];
-  const themeSources = new Map(site.themeFiles.map((output) => [output.path, output.render()]));
-  const shareImages = await shareImageOutputs(root, site.shareImages, themeSources, errors);
+  const assets = new Map(site.assetFiles.map((output) => [output.path, output.render()]));
+  const shareImages = await shareImageOutputs(root, site.shareImages, assets, errors);
   if (errors.length > 0) return { errors: sortErrors(errors) };
-  await writeDist(root, [...site.pages.flatMap((page) => page.outputs), site.home, ...site.siteFiles, ...site.themeFiles, ...shareImages, ...site.publicFiles]);
+  await writeDist(root, [...site.pages.flatMap((page) => page.outputs), site.home, ...site.siteFiles, ...site.assetFiles, ...shareImages, ...site.publicFiles]);
   return { errors: [], pages: site.pages.length };
 }

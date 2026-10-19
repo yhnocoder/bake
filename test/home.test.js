@@ -181,6 +181,24 @@ describe('homepage', () => {
     assert.doesNotMatch(html, /bk-card-draft/);
   });
 
+  test('a card never shows a component frame: it uses an image of the caption or the colour block, and the homepage loads no component code', async (t) => {
+    const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
+    const component = "export const params = { data: { label: 'Data', type: 'file', default: '' } };\nexport const layout = { height: 200 };\n\nexport default class DataView extends HTMLElement {}\n";
+    const { dir, html } = buildHome(t, {
+      'bake.config.js': validConfig,
+      'components/data-view.js': component,
+      'content/posts/caption/index.md': article({ title: 'Caption', slug: 'caption', date: '2026-10-03', body: ':::data-view\nThe caption with ![a photo](photo.png).\n:::\n' }),
+      'content/posts/caption/photo.png': photo,
+      'content/posts/data/index.md': article({ title: 'Data', slug: 'data', date: '2026-10-02', body: ':::data-view{data=grid.png}\nThe caption.\n:::\n' }),
+      'content/posts/data/grid.png': photo,
+    });
+    const cards = html.split('<a class="bk-card"').slice(1, 3);
+    assert.match(cards[0], /<div class="bk-card-fallback"><img src="2026-10\/caption\/photo.webp" alt loading="lazy" decoding="async"><\/div>/);
+    assert.match(cards[1], /<span class="bk-card-cover" aria-hidden="true">Data<\/span>/);
+    assert.doesNotMatch(html, /component|type="module"/);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/caption/index.html'), 'utf8'), /<figure class="component" data-component="data-view"/);
+  });
+
   test('the essay theme shows a draft badge at the top of the card of a draft', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const errors = [];

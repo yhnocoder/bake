@@ -25,6 +25,9 @@ export default function Page(props) {
         {assets.scripts.map((src) => (
           <script defer src={src} />
         ))}
+        {assets.modules.map((src) => (
+          <script type="module" src={src} />
+        ))}
       </head>
       <body class="bk-page" style={labelStyle(labels)}>
         {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region="glyphs" innerHTML={article.content.glyphs} />}
@@ -41,5 +44,13 @@ export default function Page(props) {
 
 function labelStyle(labels) {
   const { before, after } = labels.embedSource;
-  return `--bk-embed-source-before:${JSON.stringify(before)};--bk-embed-source-after:${JSON.stringify(after)}`;
+  const variables = {
+    'embed-source-before': before,
+    'embed-source-after': after,
+    'component-needs-script': labels.componentNeedsScript,
+    'component-failed': labels.componentFailed,
+  };
+  return Object.entries(variables)
+    .map(([name, value]) => `--bk-${name}:${JSON.stringify(value)}`)
+    .join(';');
 }
