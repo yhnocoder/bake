@@ -13,6 +13,8 @@ export const HOME_FILE = 'home.jsx';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const RENDER_ENTRY = 'bake:render';
+const COPY_MODULE = 'bake/copy';
+const COPY_FILE = join(import.meta.dirname, '../copy/copy.js');
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 
 export async function compileTheme(root, name, { home }, errors) {
@@ -56,6 +58,7 @@ function themeFiles(folders, locate) {
     enforce: 'pre',
     resolveId(source, importer) {
       if (source === RENDER_ENTRY) return RESOLVED_RENDER_ENTRY;
+      if (source === COPY_MODULE) return COPY_FILE;
       if (importer === undefined || !source.startsWith('.')) return null;
       const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
       if (folder === undefined) return null;

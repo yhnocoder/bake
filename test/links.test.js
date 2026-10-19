@@ -241,7 +241,7 @@ describe(':::embed', () => {
   test('shows an :::embed inside embedded content as a link and runs components', async () => {
     const article = await host(':::embed\n/2026-10/target/#order\n:::\n');
     const { html } = article.intro[0];
-    assert.match(html, /<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;gelu&#x22;}"><div class="component-box"/);
+    assert.match(html, /<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;gelu&#x22;}" data-attributes="{&#x22;fn&#x22;:&#x22;gelu&#x22;}"><div class="component-box"/);
     assert.match(html, /<p class="embed-link"><a class="internal-link" href="..\/..\/2026-10\/other\/#far" data-target="\/2026-10\/other\/#far">Far<\/a><\/p>/);
     assert.deepEqual(
       article.previews.map((preview) => preview.target),

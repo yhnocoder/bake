@@ -214,14 +214,14 @@ describe('component blocks', () => {
     const [first, second, third, fourth] = article.intro;
     assert.equal(
       first.html,
-      '<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;range&#x22;:4,&#x22;beta&#x22;:1,&#x22;gamma&#x22;:1,&#x22;toggle&#x22;:true,&#x22;title&#x22;:&#x22;&#x22;,&#x22;data&#x22;:&#x22;&#x22;}" style="width:560px">' +
+      '<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;range&#x22;:4,&#x22;beta&#x22;:1,&#x22;gamma&#x22;:1,&#x22;toggle&#x22;:true,&#x22;title&#x22;:&#x22;&#x22;,&#x22;data&#x22;:&#x22;&#x22;}" data-attributes="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;toggle&#x22;:true,&#x22;width&#x22;:&#x22;560px&#x22;}" style="width:560px">' +
         '<div class="component-box" style="--component-height:360px;--component-ratio:auto;--component-narrow-height:520px;--component-narrow-ratio:auto"></div>' +
         '<figcaption>The <em>curve</em> of SiLU.</figcaption></figure>',
     );
     assert.deepEqual([first.type, first.width, first.naturalWidth, first.name, first.attributes], ['component', undefined, '560px', 'act-fn-plot', { fn: 'silu', toggle: true, width: '560px' }]);
     assert.equal(
       second.html,
-      '<figure class="component" data-component="glu-heatmap" data-params="{}" data-frame="none" style="width:70%"><div class="component-box" style="--component-height:auto;--component-ratio:1.7778;--component-narrow-height:auto;--component-narrow-ratio:1.7778"></div></figure>',
+      '<figure class="component" data-component="glu-heatmap" data-params="{}" data-attributes="{&#x22;width&#x22;:&#x22;70%&#x22;}" data-frame="none" style="width:70%"><div class="component-box" style="--component-height:auto;--component-ratio:1.7778;--component-narrow-height:auto;--component-narrow-ratio:1.7778"></div></figure>',
     );
     assert.deepEqual([second.width, second.naturalWidth], ['body', undefined]);
     assert.match(third.html, /style="--component-height:420px;--component-ratio:auto;--component-narrow-height:420px;--component-narrow-ratio:auto"/);

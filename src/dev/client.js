@@ -119,7 +119,10 @@
 
   function signature(element) {
     const copy = element.cloneNode(true);
-    for (const part of [copy, ...copy.querySelectorAll('[data-line]')]) part.removeAttribute('data-line');
+    for (const part of [copy, ...copy.querySelectorAll('[data-line]')]) {
+      part.removeAttribute('data-line');
+      part.removeAttribute('data-end-line');
+    }
     return copy.outerHTML;
   }
 

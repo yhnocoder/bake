@@ -19,6 +19,7 @@ export function startNotes(article) {
     if (originals.length === 0) return;
     layer = document.createElement('div');
     layer.className = 'bk-notes-layer';
+    layer.dataset.ui = '';
     placed = originals.map((original) => {
       const note = original.cloneNode(true);
       for (const element of [note, ...note.querySelectorAll('[id]')]) element.removeAttribute('id');
