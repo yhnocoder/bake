@@ -5,6 +5,7 @@ import { createSite, updateSite } from '../build/site.js';
 export function createPreview(root) {
   const site = createSite(root, { drafts: true });
   let pages = new Map();
+  let home = null;
   let publicFiles = new Map();
   const assetFiles = new Map();
   let articles = [];
@@ -27,8 +28,11 @@ export function createPreview(root) {
         next.set(article.file, servedPage(published.get(article.file)));
       }
     }
+    const nextHome = servedHome(result.home);
     const changes = compare(pages, next, changedPaths.some((path) => !isArticleSource(path)));
+    if (home?.html !== nextHome.html) changes.reload = changes.reload === 'all' ? 'all' : ['/', ...changes.reload];
     pages = next;
+    home = nextHome;
     articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.fields?.draft === true }));
     publicFiles = new Map(result.publicFiles.map((output) => [output.path, output]));
     for (const output of result.assetFiles) assetFiles.set(output.path, output);
@@ -37,6 +41,7 @@ export function createPreview(root) {
   }
 
   function find(path) {
+    if (path === home?.output.path) return { output: home.output, page: null };
     for (const page of pages.values()) {
       const output = page.outputs.get(path);
       if (output !== undefined) return { output, page };
@@ -66,6 +71,10 @@ function servedPage({ article, outputs }) {
     outline: outlineOf(article.content),
     outputs: new Map(outputs.map((output) => [output.path, output])),
   };
+}
+
+function servedHome(output) {
+  return { output, html: output.render() };
 }
 
 function outlineOf(content) {

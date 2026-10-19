@@ -95,6 +95,7 @@ class ArticleParser {
     this.equationIds = new Map();
     this.glyphs = undefined;
     this.images = new Map();
+    this.image = undefined;
     this.anchors = new Map();
     this.definitions = new Map();
     this.sidenotes = new Map();
@@ -635,6 +636,7 @@ class ArticleParser {
     }
     const linked = this.linkedFiles(tree);
     const owners = new Map();
+    const publishedPaths = new Map();
     for (const [source, { image, nodes: uses }] of sources) {
       if (uses.length === 0) continue;
       const published = publishedImage(source, image, uses.map((node) => displayWidth(node, image)));
@@ -646,8 +648,12 @@ class ArticleParser {
       }
       owners.set(published.path, source);
       if (published.convert !== null) this.images.set(source, { source, path: published.path, ...published.convert, keepSource: linked(source) });
-      for (const node of uses) node.published = imageProperties(node.attributes, published);
+      for (const node of uses) {
+        node.published = imageProperties(node.attributes, published);
+        publishedPaths.set(node, published.path);
+      }
     }
+    this.image = publishedPaths.get(nodes.find((node) => publishedPaths.has(node)));
   }
 
   linkedFiles(tree) {
@@ -890,7 +896,7 @@ class ArticleParser {
     }));
     const html = [...intro, ...sections.flatMap((section) => section.blocks), ...sidenotes, ...previews].map((entry) => entry.html);
     const glyphs = addGlyphs(this.glyphs, [...this.borrowed].map((source) => source.glyphs), html);
-    return { intro, sections, sidenotes, references, toc, previews, words: countWords(tree), glyphs, images: [...this.images.values()], components: this.usedComponents(tree) };
+    return { intro, sections, sidenotes, references, toc, previews, words: countWords(tree), glyphs, images: [...this.images.values()], image: this.image, components: this.usedComponents(tree) };
   }
 
   usedComponents(tree) {

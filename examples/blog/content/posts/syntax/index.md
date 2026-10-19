@@ -4,6 +4,7 @@ slug: syntax
 date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
+category: writing
 toc: notes
 ---
 
@@ -30,6 +31,7 @@ slug: syntax
 date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
+category: writing
 toc: notes
 ---
 ```
@@ -50,6 +52,29 @@ toc: notes
 | `toc` | 否 | 目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用站点默认值。 |
 | `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。 |
 | `page` | 否 | 纯 HTML 页面要原样发布的文件，写了它的 `index.md` 没有正文。 |
+
+`preview` 指向的脚本是一个 ES 模块。它的默认导出是一个函数：函数收到一个覆盖卡片预览区的空元素，在里面画出第一帧，然后返回带 `start` 和 `stop` 两个方法的对象。首页在卡片接近屏幕时加载这个脚本；指针停在卡片上时调用 `start`，指针离开时调用 `stop`；手机上卡片滚到屏幕中间时开始，离开中间时停止；读者要求减少动画时只显示第一帧。颜色用主题的 CSS 变量，深色模式下随之改变。
+
+```js
+export default function preview(element) {
+  element.innerHTML = '<svg viewBox="0 0 320 180"><circle cx="160" cy="90" r="40" fill="var(--series-1)"/></svg>';
+  let frame = 0;
+  return {
+    start() {
+      const step = (time) => {
+        element.querySelector('circle').setAttribute('cx', 160 + 100 * Math.sin(time / 600));
+        frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    },
+    stop() {
+      cancelAnimationFrame(frame);
+    },
+  };
+}
+```
+
+没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章没有 `preview`，卡片显示它的第一张图片。
 
 ## 标题与锚点 {#headings toc="标题"}
 

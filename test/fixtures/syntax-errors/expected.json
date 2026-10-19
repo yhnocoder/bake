@@ -23,8 +23,8 @@
   "component-file-outside.md": "component-file-outside.md:7:16 parameter \"points\" of glu-heatmap must be a file in the article folder, got \"../glu-points.json\"",
   "component-id.md": "component-id.md:7:16 components take no id or class; remove the id from :::act-fn-plot",
   "component-browser-api": "components/window-plot.js:3:21 window-plot: components/window-plot.js uses the browser API window at the top level; the build reads params and layout in Node, so use it inside the component code",
-  "missing-link-target.md": "missing-link-target.md:7:2 link target /2026-10/syntax-linked/#chain does not exist",
-  "embed-self.md": "embed-self.md:8:1 :::embed cannot embed the article itself",
-  "embed-duplicate.md": "embed-duplicate.md:9:1 :::embed lists /2026-10/syntax-linked/#vjp twice",
-  "embed-overlap.md": "embed-overlap.md:9:1 :::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad"
+  "missing-link-target.md": "missing-link-target.md:8:2 link target /2026-10/syntax-linked/#chain does not exist",
+  "embed-self.md": "embed-self.md:9:1 :::embed cannot embed the article itself",
+  "embed-duplicate.md": "embed-duplicate.md:10:1 :::embed lists /2026-10/syntax-linked/#vjp twice",
+  "embed-overlap.md": "embed-overlap.md:10:1 :::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad"
 }
