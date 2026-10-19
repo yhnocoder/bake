@@ -8,12 +8,12 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import { WIDTHS, choiceProblem } from '../config/rules.js';
-import { describeValue, errorAt } from '../report.js';
+import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
+import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { renderChildrenHtml, renderHtml, renderInlineHtml } from '../render/html.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
-import { typesetMath } from '../render/math.js';
+import { EQUATION_ID_PREFIX, typesetMath } from '../render/math.js';
 import { parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
 import { citationsAndMissingFootnotes } from './bracket-syntax.js';
@@ -49,8 +49,10 @@ const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
 const STRAY_CLOSING_LINE = /^([\s>]*):{3,}\s*$/;
 const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
 const IMAGE_ATTRIBUTES = /^\{[^{}\n]*\}/;
-const IMAGE_SIZE = /^(\d+(?:\.\d+)?)(px|%)$/;
 const IMAGE_FLOATS = ['left', 'right'];
+const MATH_MIN_WIDTH = /min-width: ([\d.]+ex)/;
+const MATH_WIDTH = /<svg [^>]*?width="([\d.]+ex)"/;
+const WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/u;
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 
 export async function parseArticle(file, source, errors, { folder = null, preamble = [] } = {}) {
@@ -66,6 +68,8 @@ class ArticleParser {
     this.folder = folder;
     this.preamble = preamble;
     this.equations = new Map();
+    this.equationIds = new Map();
+    this.glyphs = undefined;
     this.images = new Map();
     this.anchors = new Map();
     this.definitions = new Map();
@@ -204,7 +208,8 @@ class ArticleParser {
     const ids = new Map();
     for (const { number } of this.sidenotes.values()) ids.set(`sidenote-${number}`, `sidenote ${number}`);
     for (const { key } of this.references) ids.set(`reference-${key}`, `the reference "${key}"`);
-    for (const [label, { id }] of this.equations) ids.set(id, `the equation \\label{${label}}`);
+    const labelled = new Map([...this.equations].map(([label, { id }]) => [id, label]));
+    for (const id of this.equationIds.keys()) ids.set(id, labelled.has(id) ? `the equation \\label{${labelled.get(id)}}` : `the equation (${id.slice(EQUATION_ID_PREFIX.length)})`);
     return ids;
   }
 
@@ -258,19 +263,32 @@ class ArticleParser {
       if (node.type === 'eqref') references.push(node);
     });
     if (formulas.length === 0 && references.length === 0) return;
-    const { results, labels } = await typesetMath(
+    const { results, labels, glyphs } = await typesetMath(
       this.preamble,
       formulas.map((node) => ({ tex: node.value, display: node.type === 'math' })),
     );
     this.equations = labels;
+    this.glyphs = glyphs;
+    const equationIds = new Map();
     formulas.forEach((node, index) => {
       const result = results[index];
       node.rendered = result.html;
-      if (result.error !== undefined) this.report(node.position.start, `MathJax cannot typeset this formula: ${result.error}`);
+      const position = node.position.start;
+      if (result.error !== undefined) this.report(position, `MathJax cannot typeset this formula: ${result.error}`);
+      for (const label of result.labels) {
+        if (label.trim() === '') this.report(position, '\\label{} needs a name, for example \\label{eq:ffn}');
+        else if (node.type === 'inlineMath') this.report(position, `\\label{${label}} only works in a display formula between $$ lines`);
+        else if (labels.get(label)?.tag === '???') this.report(position, `\\label{${label}} is not on a numbered equation; it is inside a starred environment or on a \\notag line`);
+      }
       for (const reference of result.references) {
-        if (!labels.has(reference.label)) this.report(node.position.start, `${reference.text} refers to an unknown \\label`);
+        if (!labels.has(reference.label)) this.report(position, `${reference.text} refers to an unknown \\label`);
+      }
+      for (const id of result.ids) {
+        if (equationIds.has(id)) this.report(position, `two equations have the id "${id}"; the first is at ${equationIds.get(id).line}:${equationIds.get(id).column}`);
+        else equationIds.set(id, position);
       }
     });
+    this.equationIds = equationIds;
     for (const node of references) {
       if (!labels.has(node.label)) this.report(node.position.start, `${node.value} refers to an unknown \\label`);
     }
@@ -306,9 +324,11 @@ class ArticleParser {
       }
       if (!sources.has(source)) sources.set(source, { image: await readImage(join(this.folder.path, source)), nodes: [] });
       const entry = sources.get(source);
-      if (entry.image === null) this.report(node.position.start, `image ${source} is not a ${IMAGE_FORMATS} file`);
+      if (entry.image.error !== undefined) this.report(node.position.start, `image ${source} cannot be read: ${entry.image.error}`);
+      else if (entry.image.format === null) this.report(node.position.start, `image ${source} is not a ${IMAGE_FORMATS} file`);
       else entry.nodes.push(node);
     }
+    const linked = this.linkedFiles(tree);
     const owners = new Map();
     for (const [source, { image, nodes: uses }] of sources) {
       if (uses.length === 0) continue;
@@ -320,9 +340,20 @@ class ArticleParser {
         this.report(position, `images ${owners.get(published.path)} and ${source} are both published as ${published.path}`);
       }
       owners.set(published.path, source);
-      if (published.convert !== null) this.images.set(source, { source, path: published.path, ...published.convert });
+      if (published.convert !== null) this.images.set(source, { source, path: published.path, ...published.convert, keepSource: linked(source) });
       for (const node of uses) node.published = imageProperties(node.attributes, published);
     }
+  }
+
+  linkedFiles(tree) {
+    const links = new Set();
+    const texts = [];
+    this.walkWithSidenotes(tree, (node) => {
+      if (node.type === 'link') links.add(this.imageSource(node.url));
+      if (node.type === 'html') texts.push(node.value);
+      if (node.type === 'bakeBlock') texts.push(...Object.values(node.attributes).filter((value) => typeof value === 'string'));
+    });
+    return (source) => links.has(source) || texts.some((text) => text.includes(source));
   }
 
   imageSource(url) {
@@ -395,13 +426,11 @@ class ArticleParser {
   checkImageAttributes(attributes, position) {
     this.checkKnownAttributes(attributes, ['width', 'height', 'float'], 'image', position);
     for (const name of ['width', 'height']) {
-      const value = attributes[name];
-      if (value === undefined || imageSize(value) !== null) continue;
-      const tier = name === 'width' && WIDTHS.includes(value) ? `; use :::{width=${value}} around the image` : ', for example 280px or 50%';
-      this.report(position, `image ${name} must be pixels or a percentage, got ${describeValue(value)}${tier}`);
+      const problem = attributes[name] === undefined ? null : sizeProblem(`image ${name}`, attributes[name], 'image');
+      if (problem) this.report(position, problem);
     }
-    const width = imageSize(attributes.width);
-    const height = imageSize(attributes.height);
+    const width = parseSize(attributes.width);
+    const height = parseSize(attributes.height);
     if (width !== null && height !== null && width.unit !== height.unit) this.report(position, 'image width and height must use the same unit');
     if (attributes.float !== undefined) {
       const problem = choiceProblem('float', IMAGE_FLOATS, attributes.float);
@@ -554,7 +583,7 @@ class ArticleParser {
       recap: section.recap,
       children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.toc, recap: subsection.recap })),
     }));
-    return { intro, sections, sidenotes, references, toc, images: [...this.images.values()] };
+    return { intro, sections, sidenotes, references, toc, glyphs: this.glyphs, images: [...this.images.values()] };
   }
 
   headingFields(node) {
@@ -581,6 +610,8 @@ class ArticleParser {
       return { ...this.block(node.children[0]), line: node.position.start.line, endLine: node.position.end.line, width: node.attributes.width };
     }
     const block = { type: blockType(node), line: node.position.start.line, endLine: node.position.end.line, html: renderHtml(node, this.context) };
+    const width = naturalWidth(node);
+    if (width !== undefined) block.naturalWidth = width;
     if (node.type === 'heading') Object.assign(block, { depth: node.depth }, this.headingFields(node));
     if (node.type === 'paragraph' && node.anchor !== undefined) block.id = node.anchor;
     if (node.type === 'bakeBlock' && block.type === 'component') Object.assign(block, { name: node.name, attributes: node.attributes });
@@ -600,28 +631,36 @@ function blockType(node) {
   return node.name.includes('-') ? 'component' : 'unknown';
 }
 
-function imageSize(value) {
-  const match = IMAGE_SIZE.exec(typeof value === 'string' ? value : '');
-  return match === null ? null : { number: Number(match[1]), unit: match[2] };
+function naturalWidth(node) {
+  if (node.type === 'math') return (MATH_MIN_WIDTH.exec(node.rendered) ?? MATH_WIDTH.exec(node.rendered))?.[1];
+  if (node.type === 'code') return `${Math.max(...node.value.split('\n').map(textColumns))}ch`;
+  if (node.type === 'figure') {
+    const { boxWidth, width } = node.children[0].published;
+    if (boxWidth === undefined) return width === undefined ? undefined : `${width}px`;
+    return boxWidth.endsWith('px') ? boxWidth : undefined;
+  }
+  return undefined;
+}
+
+function textColumns(line) {
+  return [...line].reduce((columns, character) => columns + (WIDE_CHARACTER.test(character) ? 2 : 1), 0);
 }
 
 function displayWidth(node, image) {
-  const width = imageSize(node.attributes.width);
-  const height = imageSize(node.attributes.height);
+  const width = parseSize(node.attributes.width);
+  const height = parseSize(node.attributes.height);
   if (width?.unit === 'px') return width.number;
   if (width === null && height?.unit === 'px') return (height.number * image.width) / image.height;
   return undefined;
 }
 
 function imageProperties(attributes, published) {
-  const width = imageSize(attributes.width);
-  const height = imageSize(attributes.height);
+  const width = parseSize(attributes.width);
+  const height = parseSize(attributes.height);
   const properties = { src: encodeURI(published.path), width: published.width, height: published.height };
-  if (width !== null && height !== null && width.unit === height.unit) {
-    return { ...properties, height: Math.round((published.width * height.number) / width.number), style: `width:${attributes.width};height:auto` };
-  }
-  if (width !== null) return { ...properties, style: `width:${attributes.width};height:auto` };
-  if (height !== null) return { ...properties, style: `width:${Number(((height.number * published.width) / published.height).toFixed(2))}${height.unit};height:auto` };
+  if (width !== null && height !== null) return { ...properties, height: Math.round((published.width * height.number) / width.number), boxWidth: attributes.width };
+  if (width !== null) return { ...properties, boxWidth: attributes.width };
+  if (height !== null) return { ...properties, boxWidth: `${Number(((height.number * published.width) / published.height).toFixed(2))}${height.unit}` };
   return properties;
 }
 

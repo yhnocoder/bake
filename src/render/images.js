@@ -6,17 +6,21 @@ const PIXEL_DENSITY = 2;
 const CONVERTED = ['png', 'jpeg', 'gif', 'webp'];
 const LOSSLESS = ['png', 'gif'];
 const KEPT = ['svg', 'avif'];
+const UNSUPPORTED = /unsupported image format/;
 
 export const IMAGE_FORMATS = 'PNG, JPEG, GIF, WebP, AVIF or SVG';
 
 export async function readImage(path) {
+  let metadata;
   try {
-    const { format, width, height, pageHeight } = await sharp(path, { animated: true }).metadata();
-    if (!CONVERTED.includes(format) && !KEPT.includes(format)) return null;
-    return { format, width, height: pageHeight ?? height };
-  } catch {
-    return null;
+    metadata = await sharp(path, { animated: true }).metadata();
+  } catch (error) {
+    if (UNSUPPORTED.test(error.message)) return { format: null };
+    return { error: error.message.replace(/[:\s]+$/, '') };
   }
+  const { format, width, height, pageHeight } = metadata;
+  if (!CONVERTED.includes(format) && !KEPT.includes(format)) return { format: null };
+  return { format, width, height: pageHeight ?? height };
 }
 
 export function publishedImage(source, image, displayWidths) {

@@ -42,12 +42,14 @@ function handlers(context) {
     math: (state, node) => raw(node.rendered),
     code: (state, node) => highlightCode(context.highlighter, node.value, node.lang ?? undefined),
     table: (state, node) => element('div', { className: ['table-scroll'] }, [defaultHandlers.table(state, node)]),
-    image: (state, node) => imageElement(node),
+    image: (state, node) => imageElement(node, true),
     figure(state, node) {
       const [image, caption] = node.children;
       const float = image.attributes.float === undefined ? {} : { dataFloat: image.attributes.float };
       const figcaption = caption === undefined ? [] : [element('figcaption', {}, state.all(caption))];
-      return element('figure', { className: ['figure'], ...float }, [imageElement(image), ...figcaption]);
+      const { boxWidth } = image.published;
+      const style = boxWidth === undefined ? {} : { style: `width:${boxWidth}` };
+      return element('figure', { className: ['figure'], ...float, ...style }, [imageElement(image, false), ...figcaption]);
     },
     blockquote(state, node) {
       const last = node.children.at(-1);
@@ -112,9 +114,10 @@ function cellContent(state, cell) {
   return state.wrap(state.all(cell), true);
 }
 
-function imageElement(node) {
-  const { src, width, height, style } = node.published;
-  return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...(style === undefined ? {} : { style }) }, []);
+function imageElement(node, sized) {
+  const { src, width, height, boxWidth } = node.published;
+  const style = sized && boxWidth !== undefined ? { style: `width:${boxWidth};height:auto` } : {};
+  return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...style }, []);
 }
 
 function element(tagName, properties, children) {

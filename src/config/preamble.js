@@ -59,7 +59,7 @@ export function parsePreamble(source, errors) {
     }
     if (name === 'RequirePackage') {
       for (const pack of parts.groups[0].split(',').map((item) => item.trim())) {
-        if (!MATH_PACKAGES.includes(pack)) report(start, `package "${pack}" is not available; math is typeset by MathJax, which provides ${andList(MATH_PACKAGES)}`);
+        if (!MATH_PACKAGES.includes(pack)) report(start, `package "${pack}" is not loaded by Bake; \\RequirePackage accepts only the packages Bake always loads: ${andList(MATH_PACKAGES)}`);
       }
     } else if (Object.hasOwn(GRAMMARS, name)) {
       definitions.push({ tex: source.slice(start, reader.index), position: reader.positionAt(start) });

@@ -52,6 +52,41 @@ describe('math', () => {
     assert.deepEqual((await parse('## A {#eq:a}\n\n$$\nx \\label{eq:a}\n$$\n')).errors, ['index.md:7:6 anchor "eq:a" is also the id of the equation \\label{eq:a}']);
   });
 
+  test('writes the glyph paths once per article and none for an article without math', async () => {
+    const article = await parsed('$x$ and $x^2$\n\n$$\nx + 1\n$$\n');
+    const html = article.intro.map((block) => block.html).join('');
+    assert.doesNotMatch(html, /<defs>|<path/);
+    const used = new Set([...html.matchAll(/<use [^>]*href="#([^"]+)"/g)].map(([, id]) => id));
+    const defined = new Set([...article.glyphs.matchAll(/<path id="([^"]+)"/g)].map(([, id]) => id));
+    assert.match(article.glyphs, /^<svg style="display: none;" xmlns="http:\/\/www.w3.org\/2000\/svg" id="MJX-SVG-global-cache"><defs>/);
+    assert.ok(used.size > 0);
+    assert.deepEqual([...used].filter((id) => !defined.has(id)), []);
+    assert.equal(defined.size, used.size);
+    assert.equal((await parsed('No math.\n')).glyphs, undefined);
+  });
+
+  test('gives numbered formulas without a label the id eq- and their number', async () => {
+    const article = await parsed('$$\n\\begin{align}\na \\\\\nb \\label{eq:b}\n\\end{align}\n$$\n');
+    assert.deepEqual([...article.intro[0].html.matchAll(/ id="([^"]*)"/g)].map(([, id]) => id), ['eq-1', 'eq:b']);
+  });
+
+  test('reports anchors and labels that take the id of an unlabeled formula', async () => {
+    const source = '$$\n\\begin{align}\na \\\\\nb\n\\end{align}\n$$\n\nText. ^eq-1\n\n$$\nc \\label{eq-2}\n$$\n';
+    assert.deepEqual((await parse(source)).errors, [
+      'index.md:14:7 anchor "eq-1" is also the id of the equation (1)',
+      'index.md:16:1 two equations have the id "eq-2"; the first is at 7:1',
+    ]);
+  });
+
+  test('reports \\label in inline math, an empty \\label and a \\label on an unnumbered line', async () => {
+    const source = 'See $a \\label{inline}$ and \\eqref{inline}.\n\n$$\nb \\label{}\n$$\n\n$$\n\\begin{align*}\nc \\label{starred}\n\\end{align*}\n$$\n';
+    assert.deepEqual((await parse(source)).errors, [
+      'index.md:7:5 \\label{inline} only works in a display formula between $$ lines',
+      'index.md:9:1 \\label{} needs a name, for example \\label{eq:ffn}',
+      'index.md:13:1 \\label{starred} is not on a numbered equation; it is inside a starred environment or on a \\notag line',
+    ]);
+  });
+
   test('keeps | inside $…$ in a table cell and still splits cells at | in code', async () => {
     const [table] = (await parsed('| a | b |\n|---|---|\n| $|x|_1$ | `c` |\n| $$|y|$$ | \\$ |\n')).intro;
     assert.equal(

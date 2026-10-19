@@ -39,7 +39,7 @@ test('reports commands that do not define macros, unknown packages, broken defin
   const { errors } = read('\\usepackage{tikz}\n\\RequirePackage{tikz}\n\\newcommand{\\R}{\\mathbb{R}\nplain text\n\\providecommand{\\x}{y}\n');
   assert.deepEqual(errors, [
     'preamble.sty:1:1 \\usepackage cannot be used in preamble.sty, which accepts \\newcommand, \\renewcommand, \\DeclareMathOperator, \\def, \\let, \\newenvironment, \\renewenvironment, \\ProvidesPackage and \\RequirePackage',
-    'preamble.sty:2:1 package "tikz" is not available; math is typeset by MathJax, which provides amsmath, amssymb, amsfonts, mathtools, braket, cancel, cases, color, xcolor, gensymb and upgreek',
+    'preamble.sty:2:1 package "tikz" is not loaded by Bake; \\RequirePackage accepts only the packages Bake always loads: amsmath, amssymb, amsfonts, mathtools, braket, cancel, cases, color, xcolor, gensymb and upgreek',
     'preamble.sty:3:1 cannot read \\newcommand; check its braces and arguments',
     'preamble.sty:4:1 unexpected text "plain text"; preamble.sty may only contain macro definitions',
     'preamble.sty:5:1 \\providecommand cannot be used in preamble.sty, which accepts \\newcommand, \\renewcommand, \\DeclareMathOperator, \\def, \\let, \\newenvironment, \\renewenvironment, \\ProvidesPackage and \\RequirePackage',

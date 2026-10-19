@@ -175,7 +175,7 @@ toc: notes
 
 ## 公式与公式宏 {#math}
 
-行内公式写在 `$…$` 里，独立公式写在 `$$` 之间，都在生成时排好版。写了 `\label` 的公式在右边显示编号，正文里用 `\eqref` 引用它。
+行内公式写在 `$…$` 里，独立公式写在 `$$` 之间，都在生成时排好版。写了 `\label` 的公式在右边显示编号，正文里用 `\eqref` 引用它。`\label` 只能写在独立公式里，而且要写名字；写在行内公式里、写成空的 `\label{}`，或者写在不编号的环境里时，构建报错。
 
 :::example
 $$
@@ -206,6 +206,8 @@ $$
 \DeclareMathOperator{\softmax}{softmax}
 \newcommand{\norm}[1]{\lVert #1 \rVert}
 ```
+
+`preamble.sty` 里只能写定义宏的命令：`\newcommand`、`\renewcommand`、`\DeclareMathOperator`、`\def`、`\let`、`\newenvironment` 和 `\renewenvironment`。另外可以写 `\ProvidesPackage` 和 `\RequirePackage`，这样同一个文件在 LaTeX 里也能使用。`\RequirePackage` 只能引入 Bake 始终加载的宏包：amsmath、amssymb、amsfonts、mathtools、braket、cancel、cases、color、xcolor、gensymb 和 upgreek。文件里有其他命令，或者引入了其他宏包时，构建报错。
 
 :::example
 设 $x \in \R^d$，$p = \softmax(z)$，$\norm{x}$ 是 $x$ 的范数。
@@ -282,10 +284,12 @@ def swiglu(x, w_gate, w_up, w_down):
 ![FFN 的形状](ffn-shapes.svg "FFN 中间层的形状：先升维到 $d_{ff}$，再降回 $d$。")
 :::
 
-图片后面紧跟 `{…}` 指定尺寸和浮动。`width` 和 `height` 写像素或百分比（相对正文宽度），只写一个时另一个按原始比例。
+图片后面紧跟 `{…}` 指定尺寸和浮动。`width` 和 `height` 写大于 0 的像素或百分比，百分比相对正文栏的宽度；只写一个时另一个按原始比例。写了尺寸的图片，图框缩到这个宽度，在正文栏里居中；屏幕比图框窄时，图框不超过屏幕宽度。
 
 :::example
-![神经元](neuron.svg){width=50%}
+![FFN 的形状](ffn-shapes.svg){width=560px}
+
+![神经元](neuron.svg){width=70%}
 :::
 
 `float=left` 或 `float=right` 时图片靠一边，文字环绕在另一边，图片最宽为正文的一半。新的浮动图片和紧跟它的段落从前面所有浮动图片的下方开始；窄于 600px 时浮动取消。
@@ -410,7 +414,7 @@ SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-r
 | 引用了列表里没有的文献 | `[@vaswani2017]` | `citation "vaswani2017" is not in :::references` |
 | 引用了不存在的公式编号 | `\eqref{eq:fnn}` | `\eqref{eq:fnn} refers to an unknown \label` |
 | list-table 各行单元格数不同 | 第二行只有两个单元格 | `list-table row 2 has 2 cells, the header row has 3` |
-| 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
+| 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
 | 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |
 | 组件参数超出范围 | `:::act-fn-plot{range=20}` | `parameter "range" of act-fn-plot must be between 1 and 10, got 20` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |

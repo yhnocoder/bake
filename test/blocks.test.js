@@ -49,3 +49,20 @@ describe(':::example', () => {
     assert.match(article.intro[0].html, /<a class="eqref" href="#eq%3Ab">\(1\)<\/a>/);
   });
 });
+
+describe('natural width', () => {
+  test('gives math and code blocks the natural width a theme needs to pick their width automatically', async () => {
+    const source = '$$\nx = y + z\n$$\n\n$$\na \\label{eq:a}\n$$\n\n```python\nprint(1)\n# 注释\n```\n\n:::{width=page}\n```\nx\n```\n:::\n\n| a |\n|---|\n| b |\n';
+    const blocks = (await parsed(source)).intro;
+    assert.deepEqual(
+      blocks.map((block) => [block.type, block.width, block.naturalWidth]),
+      [
+        ['math', undefined, '9.242ex'],
+        ['math', undefined, '10.6ex'],
+        ['code', undefined, '8ch'],
+        ['code', 'page', '1ch'],
+        ['table', undefined, undefined],
+      ],
+    );
+  });
+});

@@ -230,20 +230,23 @@ describe('bake build', () => {
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));
   });
-  test('writes raster images as WebP next to the original files', async (t) => {
+  test('publishes raster images as WebP and copies the original only when a link points to it', async (t) => {
     const photo = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#985b57' } }).png().toBuffer();
+    const small = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).jpeg().toBuffer();
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article({ body: '![Angles](angles.png)\n' }),
+      'content/posts/rope/index.md': article({ body: '![Angles](angles.png)\n\n![Small](small.jpg)\n\n[Full size](small.jpg)\n' }),
       'content/posts/rope/angles.png': photo,
+      'content/posts/rope/small.jpg': small,
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     const tree = readTree(join(dir, 'dist'));
-    assert.deepEqual(Object.keys(tree), ['2026-10/rope/angles.png', '2026-10/rope/angles.webp', '2026-10/rope/index.html']);
-    assert.deepEqual(tree['2026-10/rope/angles.png'], photo);
+    assert.deepEqual(Object.keys(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/small.jpg', '2026-10/rope/small.webp']);
+    assert.deepEqual(tree['2026-10/rope/small.jpg'], small);
     assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
     assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
+    assert.doesNotMatch(tree['2026-10/rope/index.html'].toString(), /mjx/i);
   });
 
   test('reports preamble.sty errors and does not check the articles', (t) => {

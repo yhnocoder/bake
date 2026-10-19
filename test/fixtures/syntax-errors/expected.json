@@ -11,7 +11,7 @@
   "missing-citation.md": "missing-citation.md:7:3 citation \"vaswani2017\" is not in :::references",
   "unknown-eqref.md": "unknown-eqref.md:11:4 \\eqref{eq:fnn} refers to an unknown \\label",
   "list-table-cell-count.md": "list-table-cell-count.md:11:1 list-table row 2 has 2 cells, the header row has 3",
-  "image-width-tier.md": "image-width-tier.md:7:18 image width must be pixels or a percentage, got \"wide\"; use :::{width=wide} around the image",
+  "image-width-tier.md": "image-width-tier.md:7:18 image width must be a positive number of pixels or a percentage, got \"wide\"; use :::{width=wide} around the image",
   "unknown-component-parameter.md": "unknown-component-parameter.md:7:16 unknown parameter \"bta\" for act-fn-plot",
   "component-parameter-range.md": "component-parameter-range.md:7:16 parameter \"range\" of act-fn-plot must be between 1 and 10, got 20",
   "missing-link-target.md": "missing-link-target.md:7:2 link target /2026-10/syntax-linked/#chain does not exist",

@@ -28,7 +28,7 @@ export async function build(root) {
   for (const article of findArticles(root)) articles.push(await readArticle(root, article, { rules, preamble }, errors));
   checkDuplicateUrls(articles, errors);
   const published = articles.filter((article) => article.url !== null && article.fields.draft !== true);
-  const pageSettings = { language: config.language, styles: await mathStyles() };
+  const pageSettings = { language: config.language, mathStyles: await mathStyles() };
   const outputs = published.flatMap((article) => articleOutputs(root, article, pageSettings, errors));
   outputs.push(...publicOutputs(root, outputs, errors));
   if (errors.length > 0) return { errors: sortErrors(errors) };
@@ -70,7 +70,7 @@ function articleOutputs(root, article, pageSettings, errors) {
       render: () => convertImage(join(root, article.dir, image.source), image),
       owner: article.file,
     }));
-    const converted = new Set(article.content.images.map((image) => image.path));
+    const converted = new Set(article.content.images.flatMap((image) => (image.keepSource ? [image.path] : [image.path, image.source])));
     const copies = article.files.filter((file) => !converted.has(file)).map((file) => copy(file, file));
     return [{ path: `${base}index.html`, render, owner: article.file }, ...images, ...copies];
   }
