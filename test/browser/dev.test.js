@@ -546,3 +546,34 @@ test('bake dev shows a parameter bar on each component of the article that chang
   });
   await phone.close();
 });
+
+test('bake dev starts an embedded component again when its source article changes its box', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'components/label-view.js': `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };
+export const layout = { height: 80 };
+
+export default class LabelView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = this.params.text;
+  }
+}
+`,
+    'content/posts/rope/index.md': article({ body: '## Grid {#grid}\n\n:::label-view{text=first}\nThe caption.\n:::\n' }),
+    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: 'The host paragraph.\n\n:::embed\n/2026-10/rope/#grid\n:::\n' }),
+  });
+  const file = join(dir, 'content/posts/rope/index.md');
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(`${server.url}2026-10/host/`);
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('.embed label-view')?.textContent === 'first');
+  writeFileSync(file, readFileSync(file, 'utf8').replace('{text=first}', '{text=first height=200}'));
+  await page.waitForFunction(() => document.querySelector('.embed .component-box').style.getPropertyValue('--component-height') === '200px');
+  await page.waitForFunction(() => document.querySelector('.embed label-view')?.textContent === 'first');
+  assert.equal(await page.locator('.embed figure.component').getAttribute('data-state'), 'ready');
+  await page.close();
+});

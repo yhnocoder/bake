@@ -192,7 +192,7 @@
         plan.push(frame);
         return;
       }
-      if (!next.matches(FRAME) && old.tagName === next.tagName && sameAttributes(old, next) && planChildren(old, next, live, plan)) return;
+      if (!next.matches('figure.component') && old.tagName === next.tagName && sameAttributes(old, next) && planChildren(old, next, live, plan)) return;
     }
     plan.push({ live, next });
   }
