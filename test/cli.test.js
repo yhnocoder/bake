@@ -30,9 +30,10 @@ describe('bake cli', () => {
     assert.equal(result.stderr, 'Usage: bake dev [--port <number>]\n');
   });
 
-  test('dev prints the address it serves and stops on an interrupt', async (t) => {
+  test('dev prints the address it serves and stops on an interrupt', { timeout: 30000 }, async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const child = spawn(process.execPath, [cli, 'dev', '--port', '0'], { cwd: dir });
+    t.after(() => child.kill());
     let output = '';
     child.stdout.on('data', (chunk) => {
       output += chunk;
@@ -43,9 +44,10 @@ describe('bake cli', () => {
     assert.equal(code, 0);
   });
 
-  test('dev reports a blog folder it can no longer watch and exits 1', async (t) => {
+  test('dev reports a blog folder it can no longer watch and exits 1', { timeout: 30000 }, async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const child = spawn(process.execPath, [cli, 'dev', '--port', '0'], { cwd: dir });
+    t.after(() => child.kill());
     let output = '';
     let errors = '';
     child.stdout.on('data', (chunk) => {
