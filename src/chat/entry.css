@@ -44,13 +44,14 @@ button:focus-visible {
   -webkit-user-select: none;
   opacity: calc(1 - var(--chat-hidden, 0));
   transform: translateX(calc(var(--chat-hidden, 0) * (100% + var(--chat-right, 16px) + 8px)));
+  visibility: var(--chat-visibility, visible);
   transition:
     color 0.15s,
     scale 0.12s,
     opacity 0.2s,
     translate 0.15s var(--ease-out, ease-out),
     transform 0.25s var(--ease-out, ease-out),
-    visibility 0s;
+    visibility 0.25s;
 }
 
 .bk-chat-launcher:hover {
@@ -186,7 +187,7 @@ button:focus-visible {
     transition:
       color 0.15s,
       opacity 0.2s,
-      visibility 0s;
+      visibility 0.2s;
   }
 
   .bk-chat-figure,

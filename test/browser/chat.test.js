@@ -339,7 +339,10 @@ test('the AI chat on published pages', async (t) => {
         const element = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher');
         const box = element.getBoundingClientRect();
         const opacity = getComputedStyle(element).opacity;
-        return hidden ? box.left >= innerWidth && opacity === '0' : box.right <= innerWidth && opacity === '1';
+        element.focus();
+        const focused = element.getRootNode().activeElement === element;
+        element.blur();
+        return hidden ? box.left >= innerWidth && opacity === '0' && !focused : box.right <= innerWidth && opacity === '1' && focused;
       }, state === 'hidden');
     const scrollBy = async (delta) => {
       for (let step = 0; step < 5; step += 1) {

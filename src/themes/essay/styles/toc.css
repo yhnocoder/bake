@@ -890,7 +890,8 @@ html[data-script] .bk-toc-chapters {
   font-variant-numeric: tabular-nums;
   transition:
     transform 0.25s var(--ease-out),
-    opacity 0.2s;
+    opacity 0.2s,
+    visibility 0.25s;
 }
 
 .bk-toc-ui .bk-toc-handle {
@@ -1097,11 +1098,13 @@ html[data-script] .bk-toc-chapters {
 @media (max-width: 999.98px) {
   html:is(.bk-drawer-open, .bk-buttons-hidden) {
     --chat-hidden: 1;
+    --chat-visibility: hidden;
   }
 
   html:is(.bk-drawer-open, .bk-buttons-hidden) :is(.bk-toc-handle, .bk-settings) {
     opacity: 0;
     pointer-events: none;
     transform: translateX(-110%);
+    visibility: hidden;
   }
 }
