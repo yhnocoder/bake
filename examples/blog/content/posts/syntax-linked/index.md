@@ -4,6 +4,7 @@ slug: syntax-linked
 date: 2026-10-19
 summary: 《Bake 写法一览》里的站内链接和嵌入指向这篇文章。
 tags: [Bake, 写法]
+category: math
 ---
 
 这篇文章提供被《Bake 写法一览》链接和嵌入的标题与段落。

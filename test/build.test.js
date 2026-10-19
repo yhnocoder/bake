@@ -43,6 +43,7 @@ describe('bake build', () => {
     const tree = readTree(join(dir, 'dist'));
     assert.deepEqual(articleFiles(tree), [
       'CNAME',
+      'index.html',
       '2026-08/demo/demo.js',
       '2026-08/demo/index.html',
       '2026-09/part-1/index.html',
@@ -83,7 +84,7 @@ describe('bake build', () => {
       'content/posts/demo/index.html': '<p>demo</p>\n',
     });
     assert.equal(bake(dir, 'build').status, 0);
-    assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), ['2026-08/demo/index.html']);
+    assert.deepEqual(articleFiles(readTree(join(dir, 'dist'))), ['2026-08/demo/index.html', 'index.html']);
   });
 
   test('reports a URL that another article already uses at the later slug', (t) => {
@@ -218,7 +219,7 @@ describe('bake build', () => {
     cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    assert.equal(result.stdout, '2 pages\ndist/ written\n');
+    assert.equal(result.stdout, '3 pages\ndist/ written\n');
     const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
     assert.match(page, /<h1 class="bk-title">Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
@@ -238,7 +239,7 @@ describe('bake build', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     const tree = readTree(join(dir, 'dist'));
-    assert.deepEqual(articleFiles(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/small.jpg', '2026-10/rope/small.webp']);
+    assert.deepEqual(articleFiles(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/small.jpg', '2026-10/rope/small.webp', 'index.html']);
     assert.deepEqual(tree['2026-10/rope/small.jpg'], small);
     assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
     assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
@@ -297,6 +298,7 @@ describe('bake build', () => {
       '.well-known/security.txt',
       '2026-10/rope/figure.svg',
       '2026-10/rope/index.html',
+      'index.html',
       'linked.txt',
     ].sort());
     assert.equal(readFileSync(join(dir, 'dist/linked.txt'), 'utf8'), 'outside\n');

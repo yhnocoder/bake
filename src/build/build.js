@@ -11,7 +11,7 @@ import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { writeDist } from './dist.js';
 import { listFiles } from './files.js';
-import { compileTheme } from './theme.js';
+import { THEMES_DIR, compileTheme } from './theme.js';
 import { articleUrl, checkDuplicateUrls } from './urls.js';
 
 const PUBLIC_DIR = 'public';
@@ -31,6 +31,7 @@ export async function build(root) {
   const themes = await compileThemes(root, published, config, errors);
   const pageSettings = { config, themes, mathStyles: await mathStyles() };
   const outputs = published.flatMap((article) => articleOutputs(root, article, pageSettings, errors));
+  outputs.push(homeOutput(published, pageSettings, errors));
   outputs.push(...themeOutputs(themes));
   outputs.push(...publicOutputs(root, outputs, errors));
   if (errors.length > 0) return { errors: sortErrors(errors) };
@@ -39,10 +40,58 @@ export async function build(root) {
 }
 
 async function compileThemes(root, published, config, errors) {
-  const names = new Set(published.filter((article) => article.content !== null).map((article) => themeOf(article, config)));
+  const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
   const themes = new Map();
-  for (const name of [...names].sort()) themes.set(name, await compileTheme(root, name, errors));
+  for (const name of [...names].sort()) themes.set(name, await compileTheme(root, name, { home: name === config.theme }, errors));
   return themes;
+}
+
+function siteProps(config) {
+  return { title: config.title, url: config.url, language: config.language, description: config.description };
+}
+
+function homeOutput(published, { config, themes }, errors) {
+  const theme = themes.get(config.theme);
+  const html = theme === null ? '' : renderHome(theme, published, config, errors);
+  return { path: 'index.html', render: () => html, owner: 'the homepage' };
+}
+
+function renderHome(theme, published, config, errors) {
+  const props = {
+    site: siteProps(config),
+    home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
+    articles: published.map((article) => homeEntry(article, config)).sort(newestFirst),
+    assets: { root: './', styles: theme.styles, scripts: theme.scripts },
+  };
+  try {
+    return `<!doctype html>\n${theme.renderHome(props)}\n`;
+  } catch (error) {
+    const folder = posix.join(THEMES_DIR, config.theme);
+    errors.push(errorAt(folder, fileStart, `the ${config.theme} theme cannot render the homepage: ${error instanceof Error ? error.message : String(error)}`));
+    return '';
+  }
+}
+
+function homeEntry(article, config) {
+  const base = article.url.slice(1);
+  const { fields, content } = article;
+  return {
+    title: fields.title,
+    summary: fields.summary,
+    date: fields.date,
+    tags: fields.tags ?? [],
+    category: config.categories.find((category) => category.id === fields.category),
+    draft: fields.draft === true,
+    url: base,
+    preview: fields.preview === undefined ? undefined : `${base}${fields.preview}`,
+    image: content?.image === undefined ? undefined : `${base}${content.image}`,
+  };
+}
+
+function newestFirst(a, b) {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  if (a.title === b.title) return 0;
+  return a.title < b.title ? -1 : 1;
 }
 
 function themeOf(article, config) {
@@ -110,7 +159,7 @@ function renderArticle(article, { config, themes, mathStyles }, errors) {
   const { fields, content } = article;
   const root = '../'.repeat(article.url.split('/').length - 2);
   const props = {
-    site: { title: config.title, url: config.url, language: config.language },
+    site: siteProps(config),
     article: {
       title: fields.title,
       summary: fields.summary,

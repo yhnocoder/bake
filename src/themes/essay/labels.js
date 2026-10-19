@@ -12,6 +12,13 @@ const CHINESE = {
   copyLink: '复制本节链接',
   linkCopied: '已复制本节链接',
   sidenote: (number) => `旁注 ${number}`,
+  group: '分组',
+  groups: { category: '分类', month: '月份' },
+  columns: '列数',
+  categories: '分类',
+  tags: '标签',
+  allTags: '全部',
+  posts: (count) => `${count} 篇`,
 };
 
 const ENGLISH = {
@@ -28,6 +35,13 @@ const ENGLISH = {
   copyLink: 'Copy the link to this section',
   linkCopied: 'Link copied',
   sidenote: (number) => `Sidenote ${number}`,
+  group: 'Group',
+  groups: { category: 'Category', month: 'Month' },
+  columns: 'Columns',
+  categories: 'Categories',
+  tags: 'Tags',
+  allTags: 'All',
+  posts: (count) => `${count} ${count === 1 ? 'post' : 'posts'}`,
 };
 
 export function labelsFor(language) {

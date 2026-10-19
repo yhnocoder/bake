@@ -7,7 +7,7 @@ import { TOC_STYLES, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
 
-const FIELDS = ['title', 'url', 'language', 'theme', 'toc', 'bento', 'home', 'categories'];
+const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'bento', 'home', 'categories'];
 const BENTO_FIELDS = ['columns'];
 const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
@@ -63,6 +63,7 @@ function validateConfig(value, themes, report) {
     else field([name], problem(value[name]));
   };
   required('title', (title) => textProblem('title', title));
+  if (value.description !== undefined) field(['description'], textProblem('description', value.description));
   required('url', urlProblem);
   required('language', (language) => textProblem('language', language));
   const theme = value.theme ?? 'essay';
@@ -83,6 +84,7 @@ function validateConfig(value, themes, report) {
   }
   return {
     title: value.title,
+    description: value.description,
     url: value.url,
     language: value.language,
     theme,

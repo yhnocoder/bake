@@ -8,6 +8,7 @@ import { errorAt, fileStart } from '../report.js';
 export const THEMES_DIR = 'themes';
 export const PAGE_FILE = 'page.jsx';
 export const CLIENT_FILE = 'client.jsx';
+export const HOME_FILE = 'home.jsx';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const BAKE_ROOT = join(import.meta.dirname, '../..');
@@ -16,11 +17,11 @@ const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const SHARED_PACKAGES = ['solid-js'];
 const LOCATION_SUFFIX = / \(\d+:\d+\)$/;
 
-export async function compileTheme(root, name, errors) {
+export async function compileTheme(root, name, { home }, errors) {
   const folders = themeFolders(root, name);
   const locate = fileLocator(folders);
   const count = errors.length;
-  for (const file of [PAGE_FILE, CLIENT_FILE]) {
+  for (const file of [PAGE_FILE, CLIENT_FILE, ...(home ? [HOME_FILE] : [])]) {
     if (locate(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
@@ -30,6 +31,7 @@ export async function compileTheme(root, name, errors) {
     const files = outputOf(client).map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source }));
     return {
       render: module.render,
+      renderHome: module.renderHome,
       files,
       styles: files.filter((file) => file.path.endsWith('.css')).map((file) => file.path),
       scripts: files.filter((file) => file.path.endsWith('.js')).map((file) => file.path),
@@ -64,12 +66,15 @@ function themeFiles(folders, locate) {
     },
     load(id) {
       if (id !== RESOLVED_RENDER_ENTRY) return null;
+      const home = locate(HOME_FILE);
       return [
         "import { createComponent, renderToString } from 'solid-js/web';",
         `import Page from ${JSON.stringify(locate(PAGE_FILE))};`,
+        ...(home === null ? [] : [`import Home from ${JSON.stringify(home)};`]),
         'export function render(props) {',
         '  return renderToString(() => createComponent(Page, props));',
         '}',
+        ...(home === null ? [] : ['export function renderHome(props) {', '  return renderToString(() => createComponent(Home, props));', '}']),
       ].join('\n');
     },
   };
