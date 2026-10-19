@@ -1,0 +1,8 @@
+.mc-steps-nav{display:flex;align-items:center;gap:12px;margin:4px 0 10px}
+.mc-steps-count{font-family:var(--font-mono);font-size:13px;color:var(--ink-2);min-width:5em}
+.mc-steps-scroll{overflow-x:auto}
+.mc-steps-graph{display:block;min-width:540px;max-width:660px;width:100%;height:auto;margin:0 auto 10px}
+.mc-steps-text{display:block;padding:12px 16px;background:var(--surface-2);border-radius:8px;font-size:14.5px;line-height:1.8;min-height:7em}
+.mc-steps-text p{margin:0 0 .5em}
+.mc-steps-text p:last-child{margin:0}
+.mc-steps-text .t{color:var(--accent);font-weight:500}
