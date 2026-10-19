@@ -19,6 +19,7 @@ const CHINESE = {
   tags: '标签',
   allTags: '全部',
   posts: (count) => `${count} 篇`,
+  noPosts: '还没有文章',
 };
 
 const ENGLISH = {
@@ -42,6 +43,7 @@ const ENGLISH = {
   tags: 'Tags',
   allTags: 'All',
   posts: (count) => `${count} ${count === 1 ? 'post' : 'posts'}`,
+  noPosts: 'No posts yet',
 };
 
 export function labelsFor(language) {

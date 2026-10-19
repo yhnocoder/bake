@@ -219,13 +219,14 @@ describe('bake build', () => {
     cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    assert.equal(result.stdout, '3 pages\ndist/ written\n');
+    assert.equal(result.stdout, '4 pages\ndist/ written\n');
     const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
     assert.match(page, /<h1 class="bk-title">Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
     assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));
+    assert.ok(existsSync(join(dir, 'dist/2026-10/jacobian/index.html')));
   });
   test('publishes raster images as WebP and copies the original only when a link points to it', async (t) => {
     const photo = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#985b57' } }).png().toBuffer();

@@ -197,10 +197,26 @@ describe('homepage', () => {
     assert.match(html, /<span class="bk-group-count">2 篇<\/span>/);
   });
 
+  test('the essay theme says in Chinese that a Chinese blog has no posts yet', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const errors = [];
+    const theme = await compileTheme(dir, 'essay', { home: true }, errors);
+    assert.deepEqual(errors, []);
+    const html = theme.renderHome({
+      site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
+      home: { groupBy: 'month', columns: 3, categories: [] },
+      articles: [],
+      assets: { root: './', styles: [], scripts: [] },
+    });
+    assert.match(html, /<p class="bk-home-empty">还没有文章<\/p>/);
+  });
+
   test('writes the homepage when the blog has no articles', (t) => {
     const { dir, html } = buildHome(t, { 'bake.config.js': validConfig });
     assert.match(html, /<h1 class="bk-home-title">Test Blog<\/h1>/);
-    assert.deepEqual(grouping(html, 'month'), []);
+    assert.equal(grouping(html, 'month'), null);
+    assert.match(html, /<p class="bk-home-empty">No posts yet<\/p>/);
+    assert.doesNotMatch(html, /bk-home-bar|data-control="columns"/);
     assert.equal(bake(dir, 'build').stdout, '0 pages\ndist/ written\n');
   });
 

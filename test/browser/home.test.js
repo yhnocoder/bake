@@ -37,6 +37,8 @@ const recordingPreview = `export default function preview(element) {
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#2a78d6"/></svg>';
 
+const longWord = 'scaled_dot_product_attention_with_causal_mask';
+
 function post(name, date, category, tags, extra = '') {
   return article({ title: name, slug: name.toLowerCase(), date, extra: `category: ${category}\ntags: [${tags.join(', ')}]\nsummary: ${name} 的摘要。\n${extra}` });
 }
@@ -53,6 +55,7 @@ const files = {
   'content/posts/jacobian/index.md': post('Jacobian', '2026-09-15', 'math', ['梯度', '激活'], 'preview: preview.js\n'),
   'content/posts/jacobian/preview.js': recordingPreview,
   'content/posts/series/index.md': post('Series', '2026-08-03', 'math', ['级数']),
+  'content/posts/attention/index.md': article({ title: longWord, slug: 'attention', date: '2026-07-01', extra: `category: ml\ntags: [注意力]\nsummary: ${longWord} 的摘要。\n` }),
 };
 
 test('the essay homepage', async (t) => {
@@ -134,6 +137,12 @@ test('the essay homepage', async (t) => {
     const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
     assert.equal(await page.evaluate(() => matchMedia('(hover: none)').matches), true);
     assert.equal(await page.locator('[data-control="columns"]').isVisible(), false);
+    const bar = await page.evaluate(() => {
+      const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+      return { bar: box('.bk-home-bar').width, chips: box('.bk-chips[data-for="category"]').width, chipsBottom: box('.bk-chips[data-for="category"]').bottom, controlsTop: box('.bk-home-controls').top };
+    });
+    assert.equal(bar.chips, bar.bar);
+    assert.ok(bar.controlsTop >= bar.chipsBottom, `the switches start at ${bar.controlsTop}px, above the end of the chip row at ${bar.chipsBottom}px`);
     const jacobian = cardIn('category', '2026-09/jacobian/');
     await page.locator(jacobian).evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
@@ -153,6 +162,63 @@ test('the essay homepage', async (t) => {
     await page.evaluate(() => new Promise((done) => setTimeout(done, 100)));
     assert.equal(await previewState(page, gate), null);
     assert.deepEqual(await page.evaluate(() => window.previewLog), []);
+    await context.close();
+  });
+
+  await t.test('a focused card stops its preview when it leaves the screen and starts it again when it comes back', async () => {
+    const { context, page } = await open({ viewport: { width: 1440, height: 500 } });
+    const gate = cardIn('category', '2026-10/gate/');
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.drawn === 'yes', gate);
+    await page.locator(gate).focus();
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', gate);
+    await page.evaluate(() => scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+    assert.equal(await page.locator(gate).evaluate((card) => card.getBoundingClientRect().bottom < 0 && document.activeElement === card), true);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', gate);
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', gate);
+    await context.close();
+  });
+
+  await t.test('clicking the chip of the group on screen does not keep the highlight from following the scroll', async () => {
+    const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
+    const settled = () =>
+      page.evaluate(
+        () =>
+          new Promise((done) => {
+            let last = scrollY;
+            let still = 0;
+            const check = () => {
+              still = scrollY === last ? still + 1 : 0;
+              last = scrollY;
+              if (still >= 10) done();
+              else requestAnimationFrame(check);
+            };
+            requestAnimationFrame(check);
+          }),
+      );
+    await page.locator('.bk-chip[data-target="category-math"]').click();
+    await settled();
+    assert.equal(await page.evaluate(() => document.querySelector('.bk-chip.is-current')?.dataset.target), 'category-math');
+    const chip = await page.locator('.bk-chip[data-target="category-math"]').boundingBox();
+    const before = await page.evaluate(() => scrollY);
+    await page.mouse.click(chip.x + chip.width / 2, chip.y + chip.height / 2);
+    await settled();
+    assert.equal(await page.evaluate(() => scrollY), before);
+    const followed = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          let seen = false;
+          const record = () => {
+            if (scrollY > 0 && document.querySelector('.bk-chip.is-current')?.dataset.target === 'category-ml') seen = true;
+            requestAnimationFrame(record);
+          };
+          addEventListener('scrollend', () => done(seen), { once: true });
+          requestAnimationFrame(record);
+          scrollTo({ top: 0, behavior: 'smooth' });
+        }),
+    );
+    assert.equal(followed, true, 'the highlight did not move to the first group while the page scrolled to the top');
+    assert.equal(await page.evaluate(() => document.querySelector('.bk-chip.is-current')?.dataset.target), 'category-ml');
     await context.close();
   });
 
@@ -191,6 +257,7 @@ test('the essay homepage', async (t) => {
       ['2026-10', '3 篇', ['Gate', 'Broken', 'Norm']],
       ['2026-09', '2 篇', ['Chain', 'Jacobian']],
       ['2026-08', '1 篇', ['Series']],
+      ['2026-07', '1 篇', [longWord]],
     ]);
     await context.close();
   });
@@ -205,7 +272,7 @@ test('the essay homepage', async (t) => {
       chips: [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => chip.offsetParent !== null).length,
       image: document.querySelector('[data-grouping="category"] .bk-card-fallback img')?.getAttribute('src'),
     }));
-    assert.deepEqual(shown, { groupings: ['category'], cards: 6, controls: false, tags: false, chips: 2, image: '2026-09/chain/plot.svg' });
+    assert.deepEqual(shown, { groupings: ['category'], cards: 7, controls: false, tags: false, chips: 2, image: '2026-09/chain/plot.svg' });
     await page.locator('.bk-chip[data-target="category-math"]').click();
     assert.match(page.url(), /#category-math$/);
     await context.close();
@@ -221,6 +288,31 @@ test('the essay homepage', async (t) => {
       if (scrollWidth > width) overflowing.push(`${width}px is ${scrollWidth}px wide`);
     }
     assert.deepEqual(overflowing, []);
+    const clipped = [];
+    for (const [width, columns] of [
+      [1440, '3'],
+      [1440, '4'],
+      [1440, '5'],
+      [375, '3'],
+    ]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate((value) => {
+        document.documentElement.dataset.columns = value;
+      }, columns);
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+      const outside = await page.locator(cardIn('category', '2026-07/attention/')).evaluate((card) => {
+        const box = card.getBoundingClientRect();
+        return ['.bk-card-cover', '.bk-card-title', '.bk-card-summary'].filter((selector) => {
+          const element = card.querySelector(selector);
+          const text = document.createRange();
+          text.selectNodeContents(element);
+          const rect = text.getBoundingClientRect();
+          return element.scrollWidth > element.clientWidth || rect.left < box.left || rect.right > box.right;
+        });
+      });
+      if (outside.length > 0) clipped.push(`${width}px with ${columns} columns: ${outside.join(', ')}`);
+    }
+    assert.deepEqual(clipped, []);
     const colors = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
     assert.deepEqual(colors, ['rgb(17, 20, 19)', 'rgb(26, 30, 28)']);
     await page.getByRole('button', { name: '设置' }).click();

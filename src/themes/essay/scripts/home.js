@@ -38,9 +38,13 @@ export function startHome(home) {
     },
     { rootMargin: MIDDLE_BAND },
   );
+  const screen = new IntersectionObserver((entries) => {
+    for (const entry of entries) previews.get(entry.target).show(entry.isIntersecting);
+  });
   for (const card of cards) {
     const preview = previews.get(card);
     band.observe(card);
+    screen.observe(card);
     card.addEventListener('pointerenter', () => {
       if (!noHover.matches) preview.play();
     });
@@ -52,7 +56,7 @@ export function startHome(home) {
   }
   reducedMotion.addEventListener('change', () => previews.forEach((preview) => preview.sync()));
 
-  startCurrentChip(home);
+  if (home.querySelector('.bk-chips[data-for="category"]') !== null) startCurrentChip(home);
 
   const switches = [...home.querySelectorAll('.bk-switch')];
   const showPressed = () => {
@@ -96,11 +100,19 @@ function startCurrentChip(home) {
   });
   const release = () => {
     pinned = null;
+    update();
+  };
+  const scrollsTo = (group) => {
+    const root = document.documentElement;
+    const padding = parseFloat(getComputedStyle(root).scrollPaddingTop) || 0;
+    const target = Math.min(Math.max(group.getBoundingClientRect().top + scrollY - padding, 0), root.scrollHeight - innerHeight);
+    return Math.abs(target - scrollY) >= 1;
   };
   for (const chip of chips) {
     chip.addEventListener('click', () => {
+      mark(chip.dataset.target);
+      if (!scrollsTo(document.getElementById(chip.dataset.target))) return;
       pinned = chip.dataset.target;
-      mark(pinned);
       addEventListener('scrollend', release, { once: true });
     });
   }
@@ -165,8 +177,9 @@ function cardPreview(card) {
   let controller = null;
   let wanted = false;
   let running = false;
+  let onScreen = false;
   const sync = () => {
-    const play = wanted && controller !== null && !reducedMotion.matches;
+    const play = wanted && onScreen && controller !== null && !reducedMotion.matches;
     if (play === running) return;
     running = play;
     try {
@@ -178,6 +191,10 @@ function cardPreview(card) {
   };
   return {
     sync,
+    show(visible) {
+      onScreen = visible;
+      sync();
+    },
     async load() {
       if (state !== 'idle') return;
       state = 'loading';

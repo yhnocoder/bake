@@ -203,6 +203,14 @@ button.bk-chip[aria-pressed='true'] {
   display: none;
 }
 
+.bk-home-empty {
+  margin: 0;
+  padding: 36px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  color: var(--ink-3);
+}
+
 .bk-group {
   padding: 36px 0 8px;
 }
@@ -322,6 +330,7 @@ button.bk-chip[aria-pressed='true'] {
   line-height: 1.4;
   text-align: center;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .bk-card-draft {
@@ -354,6 +363,7 @@ button.bk-chip[aria-pressed='true'] {
   font-size: calc(18px * var(--k));
   line-height: 1.4;
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 
 .bk-card-summary {
@@ -361,6 +371,7 @@ button.bk-chip[aria-pressed='true'] {
   font-size: calc(13.5px * var(--k));
   line-height: 1.7;
   color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 
 .bk-card-meta {
@@ -421,11 +432,13 @@ button.bk-chip[aria-pressed='true'] {
   }
 
   .bk-home-bar {
+    flex-wrap: wrap;
     gap: 8px 12px;
     padding: 10px 0;
   }
 
   .bk-chips {
+    flex-basis: 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
     margin: -2px 0;

@@ -30,54 +30,67 @@ export default function Home(props) {
             <h1 class="bk-home-title">{site.title}</h1>
             {site.description === undefined ? null : <p class="bk-home-description">{site.description}</p>}
           </header>
-          <div class="bk-home-bar">
-            {byCategory.length === 0 ? null : (
-              <nav class="bk-chips" data-for="category" aria-label={labels.categories}>
-                {byCategory.map((group) => (
-                  <a class="bk-chip" href={`#${group.id}`} data-target={group.id} style={`--c:${group.category.color}`}>
-                    <span class="bk-chip-dot" />
-                    {group.category.name}
-                    <span class="bk-chip-count">{group.articles.length}</span>
-                  </a>
-                ))}
-              </nav>
-            )}
-            {tags.length === 0 ? null : (
-              <div class="bk-chips" data-for="month" role="group" aria-label={labels.tags}>
-                <button type="button" class="bk-chip" data-tag="" aria-pressed="true">
-                  {labels.allTags}
-                </button>
-                {tags.map((tag) => (
-                  <button type="button" class="bk-chip" data-tag={tag} aria-pressed="false">
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div class="bk-home-controls">
-              {groups.length === 1 ? null : (
-                <Switch name="group" label={labels.group} values={groups} current={groupBy} text={(value) => labels.groups[value]} />
-              )}
-              <Switch name="columns" label={labels.columns} values={HOME_COLUMNS} current={String(home.columns)} text={(value) => value} />
-            </div>
-          </div>
-          <main class="bk-home-main">
-            {byCategory.length === 0 ? null : (
-              <div class="bk-grouping" data-grouping="category">
-                {byCategory.map((group) => (
-                  <Group group={group} title={group.category.name} desc={group.category.desc} color={group.category.color} labels={labels} />
-                ))}
-              </div>
-            )}
-            <div class="bk-grouping" data-grouping="month">
-              {byMonth.map((group) => (
-                <Group group={group} title={group.month} labels={labels} />
-              ))}
-            </div>
-          </main>
+          {articles.length === 0 ? (
+            <main class="bk-home-main">
+              <p class="bk-home-empty">{labels.noPosts}</p>
+            </main>
+          ) : (
+            <Listing byCategory={byCategory} byMonth={byMonth} groups={groups} groupBy={groupBy} tags={tags} columns={String(home.columns)} labels={labels} />
+          )}
         </div>
       </body>
     </html>
+  );
+}
+
+function Listing(props) {
+  const { byCategory, byMonth, groups, groupBy, tags, columns, labels } = props;
+  return (
+    <>
+      <div class="bk-home-bar">
+        {byCategory.length === 0 ? null : (
+          <nav class="bk-chips" data-for="category" aria-label={labels.categories}>
+            {byCategory.map((group) => (
+              <a class="bk-chip" href={`#${group.id}`} data-target={group.id} style={`--c:${group.category.color}`}>
+                <span class="bk-chip-dot" />
+                {group.category.name}
+                <span class="bk-chip-count">{group.articles.length}</span>
+              </a>
+            ))}
+          </nav>
+        )}
+        {tags.length === 0 ? null : (
+          <div class="bk-chips" data-for="month" role="group" aria-label={labels.tags}>
+            <button type="button" class="bk-chip" data-tag="" aria-pressed="true">
+              {labels.allTags}
+            </button>
+            {tags.map((tag) => (
+              <button type="button" class="bk-chip" data-tag={tag} aria-pressed="false">
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+        <div class="bk-home-controls">
+          {groups.length === 1 ? null : <Switch name="group" label={labels.group} values={groups} current={groupBy} text={(value) => labels.groups[value]} />}
+          <Switch name="columns" label={labels.columns} values={HOME_COLUMNS} current={columns} text={(value) => value} />
+        </div>
+      </div>
+      <main class="bk-home-main">
+        {byCategory.length === 0 ? null : (
+          <div class="bk-grouping" data-grouping="category">
+            {byCategory.map((group) => (
+              <Group group={group} title={group.category.name} desc={group.category.desc} color={group.category.color} labels={labels} />
+            ))}
+          </div>
+        )}
+        <div class="bk-grouping" data-grouping="month">
+          {byMonth.map((group) => (
+            <Group group={group} title={group.month} labels={labels} />
+          ))}
+        </div>
+      </main>
+    </>
   );
 }
 
