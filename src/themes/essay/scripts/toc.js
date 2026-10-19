@@ -11,6 +11,7 @@ export function startToc(article) {
   const nav = document.querySelector('.bk-toc');
   if (nav === null) return;
   const list = nav.querySelector('.bk-toc-list');
+  const sticky = nav.querySelector('.bk-toc-sticky');
   const copy = list.cloneNode(true);
   startDrawer(copy, labelsFor(document.documentElement.lang));
   const views = [list, copy].map(readView);
@@ -19,6 +20,7 @@ export function startToc(article) {
   let crossing = [];
 
   const update = oncePerFrame(() => {
+    sticky.style.setProperty('--toc-top', `${Math.max(0, Math.round(sticky.getBoundingClientRect().top))}px`);
     nav.classList.toggle('is-yielding', crossing.some(isOnScreen));
     const state = readingState(headings, article);
     for (const view of views) showState(view, state);

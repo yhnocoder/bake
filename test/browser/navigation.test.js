@@ -42,8 +42,26 @@ const body = [
   '',
 ].join('\n');
 
+const longBody = Array.from({ length: 18 }, (_, index) => `## Chapter ${index + 1} {#chapter-${index + 1}}\n\n${'A paragraph of the chapter. '.repeat(30)}\n`).join('\n');
+
+function coveredEntries() {
+  const button = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
+  const scroller = document.querySelector('.bk-toc .bk-toc-scroll').getBoundingClientRect();
+  const top = Math.max(scroller.top, 0);
+  const bottom = Math.min(scroller.bottom, innerHeight);
+  return [...document.querySelectorAll('.bk-toc .bk-toc-entry')]
+    .map((entry) => ({ target: entry.dataset.target, box: entry.getBoundingClientRect() }))
+    .filter(({ box }) => Math.min(box.bottom, bottom) > Math.max(box.top, top))
+    .filter(({ box }) => box.left < button.right && box.right > button.left && Math.min(box.bottom, bottom) > button.top && Math.max(box.top, top) < button.bottom)
+    .map(({ target }) => target);
+}
+
 test('links, folds and the table of contents', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/links/index.md': article({ title: 'Links', slug: 'links', body }) });
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/links/index.md': article({ title: 'Links', slug: 'links', body }),
+    'content/posts/long/index.md': article({ title: 'Long', slug: 'long', body: longBody }),
+  });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
@@ -139,6 +157,20 @@ test('links, folds and the table of contents', async (t) => {
     assert.deepEqual(read.entries, { folds: 'read', nested: 'read', references: 'current' });
     assert.ok(read.recap > 10, `the recap of a read chapter is ${read.recap}px high`);
     await page.close();
+  });
+
+  await t.test('the settings button covers no entry of a long table of contents before or after scrolling', async () => {
+    for (const height of [900, 640]) {
+      const page = await browser.newPage({ viewport: { width: 1440, height }, reducedMotion: 'reduce' });
+      await page.goto(`${base}/2026-10/long/`);
+      await page.waitForFunction(() => document.documentElement.classList.contains('bk-toc-ready'));
+      assert.deepEqual(await page.evaluate(coveredEntries), [], `at the top of the page, ${height}px high`);
+      await page.evaluate(() => scrollTo(0, document.getElementById('chapter-9').getBoundingClientRect().top + scrollY - 100));
+      await page.waitForFunction(() => document.querySelector('.bk-toc [data-target="chapter-9"]').dataset.state === 'current');
+      await page.waitForTimeout(100);
+      assert.deepEqual(await page.evaluate(coveredEntries), [], `in the middle of the page, ${height}px high`);
+      await page.close();
+    }
   });
 
   await t.test('below 1340 px a button above the settings button opens the contents in a drawer that a link closes', async () => {
