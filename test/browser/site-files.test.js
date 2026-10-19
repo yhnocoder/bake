@@ -76,6 +76,20 @@ test('the 404 page and the theme stylesheet', async (t) => {
     await context.close();
   });
 
+  await t.test('the 404 page applies the stored theme before its script runs and offers the theme and the body font in the settings panel', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await context.addInitScript(() => localStorage.setItem('bk-theme', 'dark'));
+    const page = await context.newPage();
+    await page.route('**/assets/*.js', (route) => route.abort());
+    await page.goto(`${origin}/2026-01/rope/`);
+    assert.deepEqual(await page.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor]), ['dark', 'rgb(17, 20, 19)']);
+    await page.unroute('**/assets/*.js');
+    await page.reload();
+    await page.click('.bk-settings-toggle');
+    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['主题', '正文']);
+    await context.close();
+  });
+
   await t.test('without scripts the 404 page shows the heading and the link home', async () => {
     const { context, page } = await open('/2026-01/rope/', { javaScriptEnabled: false });
     assert.equal(await page.locator('h1').isVisible(), true);

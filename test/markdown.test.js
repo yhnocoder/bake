@@ -83,7 +83,22 @@ describe('markdown fixtures', () => {
         '16 errors 附录：构建报错的写法',
       ],
     );
-    assert.deepEqual(article.toc[1].children, [{ id: 'recap', title: '小节要点', recap: undefined }]);
+    assert.deepEqual(article.toc[1].children, [{ id: 'recap', title: '小节要点', recap: '<p><code>:::recap</code> 写在标题后面，不显示在正文里，读过这一节后出现在目录和章节卡片里。</p>' }]);
+    assert.match(article.toc[7].recap, /^<p>公式在生成时排版，例如 <mjx-container/);
+    assert.deepEqual(
+      article.toc[7].children.map(({ id, recap }) => [id, recap === undefined ? 'no recap' : 'recap']),
+      [
+        ['multiline', 'no recap'],
+        ['macros', 'recap'],
+      ],
+    );
+    assert.deepEqual(
+      article.toc[10].children.map(({ id, title, recap }) => [id, title, recap]),
+      [
+        ['image-size', '尺寸', undefined],
+        ['float', '浮动', undefined],
+      ],
+    );
     assert.equal(article.sections[11].width, 'wide');
     assert.deepEqual(
       article.sidenotes.map((note) => [note.number, note.label]),

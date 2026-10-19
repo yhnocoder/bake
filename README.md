@@ -157,7 +157,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 |---|---|
 | `:::aside{title="Notation"}` | A callout. The title is optional. |
 | `:::fold{title="Derivation"}` | A collapsed part that opens when the reader clicks its title. The title is required. |
-| `:::recap` | The summary of the current `##` or `###` section. It is not shown in the text; the `notes` table of contents shows it under the section once the reader has read it. A section has at most one. |
+| `:::recap` | The summary of the current `##` or `###` section. It is not shown in the text. The `notes` table of contents shows it under the section once the reader has read it, and the cards of the other styles and the phone drawer show it under the section title. A section without a recap shows the first sentence of its first paragraph there instead. A section has at most one. |
 | `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
 | `:::list-table` | A table written as a nested list, see below. |
 | `:::example` | Shows the Markdown source of its content next to the result, see below. |
@@ -319,9 +319,20 @@ The cache step is optional: it keeps the Chromium download between runs, and `np
 
 ## Themes
 
-A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1340 pixels the table of contents opens from a button, and below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
+A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number.
 
-A settings button at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. The browser remembers these choices, and the page applies them before it is first shown.
+The `essay` theme has four table of contents styles, which `toc` selects:
+
+| Style | From 1340 pixels | From 1000 to 1339 pixels |
+|---|---|---|
+| `notes` | The list of chapters and sections in the left column, with the current entry marked, the chapters ahead faded, and the recap of each section shown once the reader has read it | One tick per heading at the left edge; pointing at the ticks or clicking them opens the list in a panel |
+| `tabs` | One tab per chapter with its number and a vertical title; pointing at a tab opens a card of the chapter joined to the tab | The same |
+| `dots` | One dot per chapter; the current chapter grows into a capsule that fills as the reader moves through it, and pointing at a dot shows a card of the chapter | The same |
+| `ticks` | One tick per heading; pointing at the ticks shows a card of the chapter | The same |
+
+A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
+
+A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The browser remembers these choices, and the page applies them before it is first shown.
 
 A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, plus a `home.jsx` for the homepage when `bake.config.js` selects it as the site theme, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
 

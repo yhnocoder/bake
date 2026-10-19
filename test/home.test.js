@@ -124,7 +124,7 @@ describe('homepage', () => {
       'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', date: '2026-10-14', extra: 'category: ml\n' }),
       'content/posts/chain/index.md': article({ title: 'Chain rule', slug: 'chain', date: '2026-09-01', extra: 'category: math\n' }),
     });
-    assert.match(html, /^<!doctype html>\n<html lang="en" data-group="category" data-columns="4">/);
+    assert.match(html, /^<!doctype html>\n<html lang="en" data-group="category" data-columns="4" data-theme="system" data-font="sans">/);
     assert.match(html, /<title>Test Blog<\/title><meta name="description" content="Notes on models.">/);
     assert.match(html, /<h1 class="bk-home-title">Test Blog<\/h1><p class="bk-home-description">Notes on models.<\/p>/);
     assert.deepEqual(grouping(html, 'category'), [
@@ -150,7 +150,7 @@ describe('homepage', () => {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ title: 'Rope', slug: 'rope', extra: 'tags: [llm, position]\n' }),
     });
-    assert.match(html, /<html lang="en" data-group="month" data-columns="3">/);
+    assert.match(html, /<html lang="en" data-group="month" data-columns="3" data-theme="system" data-font="sans">/);
     assert.equal(grouping(html, 'category'), null);
     assert.deepEqual(grouping(html, 'month'), [{ id: 'month-2026-10', title: '2026-10', count: '1 post', cards: ['Rope'] }]);
     assert.doesNotMatch(html, /data-control="group"/);

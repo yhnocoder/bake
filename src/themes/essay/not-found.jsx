@@ -1,11 +1,11 @@
 import { labelsFor } from './labels.js';
-import { prepaintScript } from './settings.js';
+import { prepaintScript, settingAttributes } from './settings.js';
 
 export default function NotFound(props) {
   const { site, articles, assets } = props;
   const labels = labelsFor(site.language);
   return (
-    <html lang={site.language}>
+    <html lang={site.language} {...settingAttributes('not-found')}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
