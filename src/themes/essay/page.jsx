@@ -40,7 +40,7 @@ export default function Page(props) {
   );
 }
 
-function labelStyle(labels) {
+export function labelStyle(labels) {
   const { before, after } = labels.embedSource;
   const variables = {
     'embed-source-before': before,

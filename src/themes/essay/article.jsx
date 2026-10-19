@@ -24,7 +24,7 @@ export function Article(props) {
   );
 }
 
-function arrange(content) {
+export function arrange(content) {
   const notes = new Map(content.sidenotes.map((note) => [note.number, note]));
   const placed = new Set();
   const take = (html) => {
@@ -53,7 +53,7 @@ function Flow(props) {
   return props.entries.map(({ block, afterHeading, notes }) => [<Block block={block} afterHeading={afterHeading} labels={props.labels} />, <Sidenotes notes={notes} labels={props.labels} />]);
 }
 
-function Block(props) {
+export function Block(props) {
   const { block, afterHeading, labels } = props;
   if (block.type === 'heading') return <Heading block={block} labels={labels} />;
   if (block.type === 'references') {
@@ -85,7 +85,7 @@ function Heading(props) {
   return <h6 id={block.id} data-line={block.line}>{content}</h6>;
 }
 
-function HeadingLink(props) {
+export function HeadingLink(props) {
   return (
     <a class="bk-heading-link" href={`#${encodeURIComponent(props.id)}`} aria-label={props.labels.copyLink}>
       #
@@ -93,7 +93,7 @@ function HeadingLink(props) {
   );
 }
 
-function Sidenotes(props) {
+export function Sidenotes(props) {
   return props.notes.map((note) => (
     <aside class="bk-sidenote" id={note.id} data-sidenote={note.number} data-line={note.line}>
       <span class="bk-sidenote-number">{note.number}</span>

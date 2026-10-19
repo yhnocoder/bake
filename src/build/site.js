@@ -83,7 +83,7 @@ async function compileThemes(site, published, config, errors) {
 }
 
 function siteProps(config) {
-  return { title: config.title, url: config.url, language: config.language, description: config.description };
+  return { title: config.title, url: config.url, language: config.language, description: config.description, bento: { columns: config.bento.columns } };
 }
 
 function homeOutput(published, { config, themes }, errors) {

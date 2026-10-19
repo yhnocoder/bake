@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article and the homepage in the `essay` theme. `bake dev` serves the same pages and the homepage and updates them on every save. The `bento` theme, the table of contents styles other than `notes` and components are not built yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme and the homepage. `bake dev` serves the same pages and the homepage and updates them on every save. The table of contents styles other than `notes` are not built yet.
 
 ## Commands
 
@@ -226,7 +226,7 @@ The activation can run in the GEMM epilogue[^gemm].
 [^gemm]: The epilogue is the stage of a matrix multiplication kernel that processes each result element.
 ```
 
-`[@key]` cites an entry of `:::references`. Citations are numbered by their first appearance, and entries that are never cited are listed after the numbered ones without a number. The `essay` theme shows the list under the label References, or 参考文献 on a Chinese site, unless the block directly follows a heading:
+`[@key]` cites an entry of `:::references`. Citations are numbered by their first appearance, and entries that are never cited are listed after the numbered ones without a number. The `essay` and `bento` themes show the list under the label References, or 参考文献 on a Chinese site, unless the block directly follows a heading:
 
 ```markdown
 Gated variants lower the loss [@shazeer2020].
@@ -248,7 +248,7 @@ The backward pass follows the [chain rule](/2026-07/matrix-calculus/#chain-rule)
 
 Bake checks every internal link after it has read all articles. A link to an article or an anchor that does not exist is an error. When an article with the same slug exists under another month, the error gives its current address, because such a link usually broke when the date of the article changed; the address of a draft is never given. An address written without the trailing slash or with `index.html`, such as `/2026-07/matrix-calculus` or `/2026-07/matrix-calculus/index.html#chain-rule`, is an error that gives the address to write. A query string is kept in the link and does not change the check. A link from a published article to a draft is an error. A link to an anchor on the same page, such as `[see above](#act-fns)`, may name the same kinds of anchors and must exist in the article. Addresses with a scheme, such as `https://…`, are not checked. Bake writes internal links relative to the page, so the site also works when it is published under a sub-path.
 
-In the `essay` theme, when the reader rests the pointer on an internal link or moves the keyboard focus to it, a card shows the title of the target article, the number and title of the section, and the content at the target with its formulas: the first paragraphs of a section, the paragraph, the formula of an equation or the text of a sidenote. A link to a reference entry shows the entry, as a citation does. A click on the card opens the target. On a touch screen there is no card, and a tap on the link opens the target.
+In the `essay` and `bento` themes, when the reader rests the pointer on an internal link or moves the keyboard focus to it, a card shows the title of the target article, the number and title of the section, and the content at the target with its formulas: the first paragraphs of a section, the paragraph, the formula of an equation or the text of a sidenote. A link to a reference entry shows the entry, as a citation does. A click on the card opens the target. On a touch screen there is no card, and a tap on the link opens the target.
 
 ### Embedding other articles
 
@@ -293,6 +293,8 @@ The homepage loads a preview when its card comes near the screen. The animation 
 ## Themes
 
 A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1340 pixels the table of contents opens from a button, and below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
+
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours, fonts and settings of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 3 from 1000 to 1339 pixels, at most 2 from 600 to 999 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. When the next card does not fit into the rest of a row, the last card of the row is widened to fill it. The sidenotes of a section are listed at the bottom of its card, and the page has no table of contents. Without scripts, every card keeps the span its width gives it.
 
 A settings button at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. The browser remembers these choices, and the page applies them before it is first shown.
 
