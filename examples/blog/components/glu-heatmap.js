@@ -1,6 +1,6 @@
+import { formatNumber, niceTicks } from 'bake/kit';
 import { texToSvg } from 'bake/math';
 import { silu } from './lib/activations.js';
-import { formatNumber, niceTicks } from './lib/ticks.js';
 import './lib/glu-heatmap.css';
 
 export const params = {
