@@ -3,20 +3,25 @@ import { describe, test } from 'node:test';
 import { PNG } from 'pngjs';
 import {
   addToGroups,
-  changedArea,
+  changedColumns,
+  changedPixels,
+  changedRows,
   compareShot,
   crop,
-  cropArea,
+  cropColumns,
+  cropRows,
   describe as describeChange,
+  describeArea,
   maxImageWidth,
   maxPanelWidth,
+  neighbourRange,
   pad,
   parseShot,
   sheetColumns,
   sheetGap,
   sheetPadding,
-  slices,
   summary,
+  withinRange,
 } from '../scripts/compare-screenshots.js';
 
 function image(width, height, color = [255, 255, 255, 255]) {
@@ -32,50 +37,117 @@ function paint(png, { left, top, right, bottom }, color = [0, 0, 0, 255]) {
   return png;
 }
 
+function ruled(width, height) {
+  const png = image(width, height);
+  for (let y = 0; y < height; y += 1) {
+    const shade = Math.floor(y / width) * 60;
+    paint(png, { left: y % width, top: y, right: (y % width) + 1, bottom: y + 1 }, [shade, shade, shade, 255]);
+  }
+  return png;
+}
+
 function sheetWidth(widths) {
   const columns = sheetColumns(widths);
-  return columns * Math.max(...widths) + (columns - 1) * sheetGap + 2 * sheetPadding;
+  return columns * Math.min(Math.max(...widths), maxPanelWidth) + (columns - 1) * sheetGap + 2 * sheetPadding;
 }
 
 describe('screenshot comparison', () => {
   test('finds the rows and columns of the changed pixels', () => {
     const diff = paint(image(100, 50), { left: 20, top: 10, right: 31, bottom: 13 }, [255, 0, 0, 255]);
     paint(diff, { left: 90, top: 40, right: 91, bottom: 41 }, [255, 255, 0, 255]);
-    assert.deepEqual(changedArea(diff), { left: 20, top: 10, right: 30, bottom: 12 });
+    assert.deepEqual(changedPixels(diff), { left: 20, top: 10, right: 30, bottom: 12 });
   });
 
   test('crops a small change to the minimum width around it, inside the page', () => {
-    assert.deepEqual(cropArea({ left: 700, top: 1000, right: 710, bottom: 1010 }, 1440, 7000), {
-      left: 386, top: 920, right: 1026, bottom: 1091, continues: false,
-    });
-    assert.deepEqual(cropArea({ left: 5, top: 5, right: 10, bottom: 10 }, 375, 800), {
-      left: 0, top: 0, right: 375, bottom: 91, continues: false,
-    });
+    assert.deepEqual(cropColumns({ left: 700, right: 710 }, 1440), { left: 386, right: 1026 });
+    assert.deepEqual(cropColumns({ left: 5, right: 10 }, 375), { left: 0, right: 375 });
+    assert.deepEqual(cropRows(1000, 1011, 7000), { top: 920, bottom: 1091, continues: false });
   });
 
   test('limits the crop height and says that the difference continues below', () => {
-    const area = cropArea({ left: 0, top: 100, right: 1439, bottom: 5000 }, 1440, 7000);
-    assert.equal(area.top, 20);
-    assert.equal(area.bottom, 820);
-    assert.equal(area.continues, true);
-    assert.equal(area.right - area.left, 1440);
+    assert.deepEqual(cropRows(100, 5000, 7000), { top: 20, bottom: 1220, continues: true });
+    assert.deepEqual(cropRows(6900, 6990, 7000), { top: 6820, bottom: 7000, continues: false });
   });
 
-  test('cuts panels wider than the description column into equal slices', () => {
-    assert.deepEqual(slices(0, 1440, maxPanelWidth), [{ left: 0, right: 720 }, { left: 720, right: 1440 }]);
-    assert.deepEqual(slices(100, 740, maxPanelWidth), [{ left: 100, right: 740 }]);
-    for (const width of [375, 849, 1440, 2000, 3000]) {
-      for (const slice of slices(0, width, maxPanelWidth)) assert.ok(slice.right - slice.left <= maxPanelWidth);
-    }
+  test('finds inserted rows with a row diff', () => {
+    const before = ruled(400, 300);
+    const after = image(400, 340);
+    PNG.bitblt(before, after, 0, 0, 400, 100, 0, 0);
+    paint(after, { left: 100, top: 100, right: 300, bottom: 140 });
+    PNG.bitblt(before, after, 0, 100, 400, 200, 0, 140);
+    assert.deepEqual(changedRows(before, after), [{ beforeStart: 100, beforeEnd: 100, afterStart: 100, afterEnd: 140 }]);
   });
 
-  test('changed panels never make an image wider than the description column', () => {
-    const before = image(1440, 900);
-    const after = paint(image(1440, 900), { left: 0, top: 300, right: 1440, bottom: 320 });
-    const { panels } = compareShot(before, after);
-    assert.equal(panels.length, 6);
-    assert.deepEqual(panels.map((panel) => panel.label).slice(0, 3), ['Before, columns 0 to 720', 'After, columns 0 to 720', 'Diff, columns 0 to 720']);
-    assert.ok(sheetWidth(panels.map((panel) => panel.png.width)) <= maxImageWidth);
+  test('treats text moved by a fraction of a pixel as unchanged', () => {
+    const before = paint(image(400, 200), { left: 50, top: 50, right: 350, bottom: 52 });
+    const after = paint(image(400, 200), { left: 50, top: 50, right: 350, bottom: 51 }, [128, 128, 128, 255]);
+    paint(after, { left: 50, top: 51, right: 350, bottom: 52 });
+    paint(after, { left: 50, top: 52, right: 350, bottom: 53 }, [128, 128, 128, 255]);
+    assert.deepEqual(changedRows(before, after), []);
+    assert.equal(compareShot(before, after).status, 'unchanged');
+  });
+
+  test('ignores a change confined to one row', () => {
+    const before = ruled(400, 300);
+    const after = paint(ruled(400, 300), { left: 100, top: 150, right: 300, bottom: 151 }, [120, 0, 0, 255]);
+    assert.equal(compareShot(before, after).status, 'unchanged');
+    paint(after, { left: 100, top: 151, right: 300, bottom: 152 }, [120, 0, 0, 255]);
+    assert.equal(compareShot(before, after).status, 'changed');
+  });
+
+  test('reports a colour change inside a shape thicker than one pixel', () => {
+    const before = paint(image(400, 200), { left: 50, top: 50, right: 350, bottom: 53 });
+    const after = paint(image(400, 200), { left: 50, top: 50, right: 350, bottom: 53 }, [51, 51, 51, 255]);
+    assert.equal(withinRange(after, 51, neighbourRange(before)(51)), false);
+    assert.equal(compareShot(before, after).status, 'changed');
+  });
+
+  test('limits the changed columns to the columns that hold content in the changed rows', () => {
+    const before = paint(image(1440, 400), { left: 200, top: 100, right: 1200, bottom: 120 });
+    const after = paint(image(1440, 440), { left: 200, top: 100, right: 1200, bottom: 120 });
+    paint(after, { left: 600, top: 200, right: 800, bottom: 240 });
+    assert.deepEqual(changedColumns(before, after, { beforeStart: 200, beforeEnd: 200, afterStart: 200, afterEnd: 240 }), { left: 600, right: 799 });
+  });
+
+  test('shows an insertion whole in the before and after panels without a diff panel', () => {
+    const before = paint(image(1440, 3000), { left: 300, top: 100, right: 1100, bottom: 120 });
+    paint(before, { left: 300, top: 2000, right: 1100, bottom: 2900 });
+    const after = paint(image(1440, 3400), { left: 300, top: 100, right: 1100, bottom: 120 });
+    paint(after, { left: 400, top: 1000, right: 1000, bottom: 1400 }, [200, 0, 0, 255]);
+    paint(after, { left: 300, top: 2400, right: 1100, bottom: 3300 });
+    const change = compareShot(before, after);
+    assert.equal(change.status, 'changed');
+    assert.equal(change.areas.length, 1);
+    const [area] = change.areas;
+    assert.deepEqual([area.left, area.right], [320, 1080]);
+    assert.deepEqual([area.before.top, area.before.bottom], [920, 1080]);
+    assert.deepEqual([area.after.top, area.after.bottom], [920, 1480]);
+    assert.deepEqual(area.panels.map((panel) => [panel.label, panel.png.width, panel.png.height]), [['Before', 760, 160], ['After', 760, 560]]);
+  });
+
+  test('shows separate changes as separate areas', () => {
+    const before = ruled(640, 3000);
+    const after = paint(ruled(640, 3000), { left: 100, top: 500, right: 200, bottom: 520 });
+    paint(after, { left: 100, top: 2000, right: 200, bottom: 2020 });
+    const change = compareShot(before, after);
+    assert.deepEqual(change.areas.map((area) => [area.after.top, area.after.bottom]), [[420, 600], [1920, 2100]]);
+    assert.equal(change.hiddenAreas, 0);
+  });
+
+  test('adds a diff panel when the changed rows keep their height', () => {
+    const before = ruled(375, 900);
+    const after = paint(ruled(375, 900), { left: 0, top: 300, right: 375, bottom: 320 });
+    const [area] = compareShot(before, after).areas;
+    assert.deepEqual(area.panels.map((panel) => panel.label), ['Before', 'After', 'Diff']);
+    assert.deepEqual([area.after.top, area.after.bottom, area.left, area.right], [220, 400, 0, 375]);
+    assert.equal(sheetColumns(area.panels.map((panel) => panel.png.width)), 2);
+  });
+
+  test('never cuts a wide panel and fits the image to the description column', () => {
+    const [area] = compareShot(ruled(1440, 900), paint(ruled(1440, 900), { left: 0, top: 300, right: 1440, bottom: 320 })).areas;
+    assert.deepEqual(area.panels.map((panel) => panel.png.width), [1440, 1440, 1440]);
+    assert.equal(sheetColumns([1440, 1440, 1440]), 1);
+    assert.ok(sheetWidth([1440, 1440, 1440]) <= maxImageWidth);
   });
 
   test('puts panels side by side only while the image fits the description column', () => {
@@ -83,20 +155,20 @@ describe('screenshot comparison', () => {
     assert.equal(sheetColumns([375, 375, 375]), 2);
     assert.equal(sheetColumns([375, 375]), 2);
     assert.equal(sheetColumns([640, 640, 640]), 1);
-    assert.equal(sheetColumns([848]), 1);
-    for (const widths of [[200, 200, 200], [375, 375, 375], [640, 640], [848]]) assert.ok(sheetWidth(widths) <= maxImageWidth);
+    assert.equal(sheetColumns([872]), 1);
+    for (const widths of [[200, 200, 200], [375, 375, 375], [640, 640], [872], [1440, 1440]]) assert.ok(sheetWidth(widths) <= maxImageWidth);
   });
 
   test('reports identical screenshots as unchanged and a missing base as a new page', () => {
     assert.equal(compareShot(image(375, 900), image(375, 900)).status, 'unchanged');
     const added = compareShot(undefined, image(1440, 2000));
     assert.equal(added.status, 'new');
-    assert.equal(added.bottom, 800);
-    assert.equal(added.continues, true);
-    assert.equal(added.panels.length, 2);
+    assert.equal(added.afterHeight, 2000);
+    assert.deepEqual(added.areas[0].after, { left: 0, right: 1440, top: 0, bottom: 1200, continues: true });
+    assert.deepEqual(added.areas[0].panels.map((panel) => [panel.label, panel.png.width]), [['New page', 1440]]);
   });
 
-  test('pads screenshots of different heights before comparing them', () => {
+  test('pads a narrower screenshot to the width of the other one', () => {
     const padded = pad(image(10, 5), 10, 8);
     assert.equal(padded.height, 8);
     assert.deepEqual([...padded.data.subarray(10 * 7 * 4, 10 * 7 * 4 + 4)], [128, 128, 128, 255]);
@@ -119,23 +191,31 @@ describe('screenshot comparison', () => {
     ]);
   });
 
-  test('describes the shown area of a change', () => {
-    const change = { status: 'changed', ratio: 0.0123, top: 20, bottom: 820, height: 7000, left: 0, right: 1440, continues: true };
-    assert.equal(describeChange(change), '1.2% of pixels differ. Shown: rows 20 to 820 of 7000, columns 0 to 1440; the difference continues below.');
-    assert.equal(describeChange({ status: 'new', top: 0, bottom: 800, height: 900, continues: true }), 'new page. Shown: rows 0 to 800 of 900; the page continues below.');
+  test('describes the changed areas', () => {
+    const long = { left: 0, right: 1440, before: { top: 20, bottom: 1220, continues: true }, after: { top: 20, bottom: 1220, continues: true } };
+    assert.equal(describeChange({ status: 'changed', beforeHeight: 7000, afterHeight: 7000, areas: [long], hiddenAreas: 0 }),
+      '1 changed area; the page keeps its height of 7000 pixels. Rows 20 to 1220, columns 0 to 1440; the area continues below.');
+    const inserted = { left: 300, right: 1140, before: { top: 920, bottom: 1080 }, after: { top: 920, bottom: 1480 } };
+    assert.equal(describeArea(inserted), 'Rows 920 to 1080 before and 920 to 1480 after, columns 300 to 1140.');
+    assert.equal(describeChange({ status: 'changed', beforeHeight: 3000, afterHeight: 3400, areas: [inserted, inserted, inserted, inserted], hiddenAreas: 2 }),
+      '6 changed areas; the page is 400 pixels taller. The first 4 are shown; the full-page screenshots have the rest.');
+    assert.equal(describeChange({ status: 'new', afterHeight: 1500, areas: [{ after: { top: 0, bottom: 1200, continues: true } }] }), 'New page, 1500 pixels tall. Shown: the top 1200 rows.');
+    assert.equal(describeChange({ status: 'removed', beforeHeight: 900, areas: [{ before: { top: 0, bottom: 900, continues: false } }] }), 'Removed page, 900 pixels tall.');
   });
 
   test('writes the count first and collapses the changes and every page', () => {
     const results = ['post.desktop-light.png', 'post.desktop-dark.png'].map((file) => ({ ...parseShot(file), status: 'changed' }));
-    const changes = [{ ...results[0], colorSchemes: ['light', 'dark'], ratio: 0.5, top: 0, bottom: 10, height: 10, left: 0, right: 640 }];
+    const rows = { top: 0, bottom: 10 };
+    const areas = [1, 2].map((index) => ({ left: 0, right: 640, before: rows, after: rows, image: `post.desktop-light.${index}.png` }));
+    const changes = [{ ...results[0], colorSchemes: ['light', 'dark'], beforeHeight: 10, afterHeight: 10, areas, hiddenAreas: 0 }];
     const pages = [{ page: 'post', images: [{ name: 'post.desktop.png', label: 'desktop' }] }];
     const text = summary({ results, changes, pages, hasBase: true, url: (path) => `u/${path}` });
     assert.equal(text.split('\n')[0], '**2 screenshots of 1 pages: 2 changed.**');
     assert.equal(text.split('\n')[1], '');
     assert.equal(text.match(/<details>/g).length, 3);
     assert.equal(text.match(/<\/details>/g).length, 3);
-    assert.match(text, /<summary>Changes on post<\/summary>\n\n\*\*post, desktop, light and dark\*\*/);
-    assert.match(text, /!\[post desktop\]\(u\/changes\/post\.desktop-light\.png\)/);
+    assert.match(text, /<summary>Changes on post<\/summary>\n\n\*\*post, desktop, light and dark\*\*: 2 changed areas/);
+    assert.match(text, /Area 2: Rows 0 to 10, columns 0 to 640\.\n\n!\[post desktop\]\(u\/changes\/post\.desktop-light\.2\.png\)/);
     assert.match(text, /Full pages: \[desktop, light\]\(u\/full\/post\.desktop-light\.png\) · \[desktop, dark\]\(u\/full\/post\.desktop-dark\.png\)/);
   });
 
