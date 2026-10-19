@@ -25,7 +25,11 @@ export const params = {
   beta: { label: 'β 初始值', type: 'number', min: 0.1, max: 5, step: 0.05, default: 1 },
 }
 
-export const layout = { width: 'wide', height: 360 }
+export const layout = {
+  width: 'body',
+  height: (params) => (params.toggle ? 365 : params.zoom ? 400 : keyList(params.fns).includes('swish') ? 430 : 360),
+  narrowHeight: (params) => (params.toggle ? 572 : params.zoom ? 600 : keyList(params.fns).includes('swish') ? 566 : 500),
+}
 
 const ZOOM_MIN = 0.25
 const TWO_COLUMN_MIN_WIDTH = 600

@@ -79,7 +79,7 @@ function formatWords(count) {
   return `约 ${count} 字`
 }
 
-const themeScript = `try{var t=localStorage.getItem('bk-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;var s=localStorage.getItem('bk-toc');if(['notes','tabs','dots','ticks'].includes(s))document.documentElement.dataset.toc=s}catch(e){}`
+const themeScript = `try{var t=localStorage.getItem('bk-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;var s=localStorage.getItem('bk-toc');if(['notes','tabs','dots','ticks'].includes(s))document.documentElement.dataset.toc=s;var f=localStorage.getItem('bk-font');if(f==='wenkai')document.documentElement.dataset.font=f}catch(e){}`
 
 export function articlePage(article, ctx) {
   const body = renderFlow(article.tree.children, ctx)

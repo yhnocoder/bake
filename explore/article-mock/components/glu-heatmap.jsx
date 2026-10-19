@@ -9,7 +9,7 @@ export const params = {
   limit: { label: '色标范围 ±', type: 'number', min: 1, max: 50, step: 1, default: 8 },
 }
 
-export const layout = { width: 'body', height: 515 }
+export const layout = { width: 'body', height: 515, narrowHeight: { ratio: 0.99 } }
 
 const CELLS = 160
 const minus = (value) => String(value).replace('-', '−')

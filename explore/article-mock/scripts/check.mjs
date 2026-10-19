@@ -26,7 +26,7 @@ const beta = readFileSync(join(outDir, '2026-07/matrix-fixture/index.html'), 'ut
 check('list-table cell images stay inline', alpha.includes('<td><img class="bk-inline-img"') && !/<td><figure/.test(alpha))
 check('heading attributes after inline math keep the id', beta.includes('<h2 id="jacobian-shape">') && beta.includes('"title":"雅可比矩阵的形状"'))
 check('a 式 written before \\eqref is part of the link', alpha.includes('由<a class="bk-eqref" href="#eq-pre" data-eq="eq-pre">式 (1)</a>'))
-check('math in a fold title is typeset', /bk-fold-title">展开了解：为什么期望恰好是 <span class="bk-m"><mjx-container/.test(alpha))
+check('math in a fold title is typeset', /bk-fold-title">展开了解：为什么期望恰好是 <span class="bk-m" data-tex="[^"]*"><mjx-container/.test(alpha))
 check('recap is not in the article body', !alpha.slice(alpha.indexOf('<article'), alpha.indexOf('</article>')).includes('每个神经元只看自己的预激活值'))
 check('citations are numbered by first use', alpha.includes('data-ref="shazeer2020">1</a>') && alpha.includes('data-ref="gelu">2</a>'))
 check('every asset URL is relative', !/(?:src|href)="\/(?!\/)/.test(alpha + beta))
@@ -51,6 +51,8 @@ const expectedErrors = [
   'one/index.md:29:36 footnote [^nothing] has no definition',
   'one/index.md:32:1 an article cannot embed itself',
   'one/index.md:38:1 list-table row 2 has 1 cells; the first row has 2',
+  'one/index.md:41:1 fixture-curve: width must be body, wide, page, pixels such as 560px, or a percentage up to 100% such as 70%; got "120%"',
+  'one/index.md:44:1 fixture-window: components/fixture-window.js uses the browser API window at the top level; the build reads params and layout in Node, so use it inside the component code',
 ]
 for (const expected of expectedErrors) check(`build error: ${expected}`, broken.stderr.includes(expected), broken.stderr)
 const reported = broken.stderr.split('\n').filter((line) => /:\d+:\d+ /.test(line))
@@ -148,8 +150,95 @@ try {
     chapterMark.color === chapterMark.accent && chapterMark.bar === chapterMark.accent && chapterMark.barWidth === '2px',
     JSON.stringify(chapterMark),
   )
+  const narrowFrames = await page.evaluate(() => {
+    const article = document.querySelector('.bk-article').getBoundingClientRect()
+    return [...document.querySelectorAll('.bk-component[data-size]')].map((figure) => {
+      const rect = figure.getBoundingClientRect()
+      return { width: Math.round(rect.width), left: Math.round(rect.left - article.left), right: Math.round(article.right - rect.right) }
+    })
+  })
+  check(
+    'components with a pixel or percentage width are that wide and centred',
+    narrowFrames.length === 2 && narrowFrames[0].width === 300 && narrowFrames[1].width === 410 && narrowFrames.every((frame) => Math.abs(frame.left - frame.right) <= 1),
+    JSON.stringify(narrowFrames),
+  )
+  const fonts = await page.evaluate(async () => {
+    const body = getComputedStyle(document.body).fontFamily
+    const heading = getComputedStyle(document.querySelector('.bk-article h2')).fontFamily
+    document.querySelector('.bk-sw-toggle').click()
+    document.querySelector('.bk-sw-seg button[data-value="wenkai"]').click()
+    const chosen = getComputedStyle(document.body).fontFamily
+    document.querySelector('.bk-sw-seg button[data-value="sans"]').click()
+    document.querySelector('.bk-sw-toggle').click()
+    return { body, heading, chosen, stored: localStorage.getItem('bk-font') }
+  })
+  check(
+    'the body font defaults to sans, headings use WenKai, and the setting switches the body to WenKai',
+    !fonts.body.includes('WenKai') && fonts.heading.includes('WenKai') && fonts.chosen.includes('WenKai') && fonts.stored === null,
+    JSON.stringify(fonts),
+  )
+  async function copyOf(select) {
+    return page.evaluate((select) => {
+      const range = document.createRange()
+      const start = document.querySelector(select.start)
+      const end = document.querySelector(select.end ?? select.start)
+      range.setStartBefore(start)
+      range.setEndAfter(end)
+      getSelection().removeAllRanges()
+      getSelection().addRange(range)
+      const data = new DataTransfer()
+      const event = new ClipboardEvent('copy', { clipboardData: data, bubbles: true, cancelable: true })
+      document.dispatchEvent(event)
+      return { text: data.getData('text/plain'), html: data.getData('text/html'), prevented: event.defaultPrevented, toast: document.querySelector('.bk-toast')?.textContent ?? '' }
+    }, select)
+  }
+  const paragraph = await copyOf({ start: '#neuron-input' })
+  check(
+    'copying a paragraph gives Markdown with TeX, footnotes and their text',
+    paragraph.prevented &&
+      paragraph.text.includes('$w_i$') &&
+      paragraph.text.includes('[^1]') &&
+      paragraph.text.includes('[^2]') &&
+      paragraph.text.includes('[^1]: epilogue 是矩阵乘法内核里') &&
+      paragraph.text.includes('[^2]: 两种做法：clamp 直接截断，soft-capping 用 $c \\cdot \\tanh(x/c)$'),
+    paragraph.text,
+  )
+  check('copying shows the Markdown toast', paragraph.toast === '已复制为 Markdown', paragraph.toast)
+  const intro = await copyOf({ start: '#intro', end: '#intro + p' })
+  check(
+    'copying a heading and paragraph drops the chapter number and keeps marks, links and emphasis',
+    /^## 引言\n\n这一段/.test(intro.text) && intro.text.includes('==逐元素==') && intro.text.includes('[epilogue](https://en.wikipedia.org/wiki/Matrix_multiplication)') && intro.text.includes('**加粗**') && intro.text.includes('`act_fn`'),
+    intro.text,
+  )
+  const component = await copyOf({ start: '.bk-component[data-size]' })
+  check('copying a component gives its directive block', component.text === ':::fixture-curve{fn=tanh width=300px}\n窄组件的框宽 300px，在正文栏里居中。\n:::', component.text)
+  const display = await copyOf({ start: '.bk-article .bk-math[data-tex]' })
+  check('copying a display formula gives its TeX between $$ lines', /^\$\$\n[^$]+\n\$\$$/.test(display.text), display.text)
+  await page.evaluate(() => getSelection().removeAllRanges())
+  const tint = await page.evaluate(() => {
+    const note = document.querySelector('.bk-notes-layer .bk-sn')
+    note.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+    const ref = document.querySelector(`.bk-ref[data-note="${note.dataset.note}"]`)
+    const block = ref.closest('p, li')
+    return { tinted: block.classList.contains('bk-tinted'), transition: getComputedStyle(block).transitionDuration }
+  })
+  check('hovering a sidenote tints its paragraph with a transition', tint.tinted && tint.transition !== '0s', JSON.stringify(tint))
   check('no console errors at 1440', errors.length === 0, errors.join(' | '))
   await page.close()
+
+  const middle = await open(1024)
+  const drawerButton = await middle.page.evaluate(() => {
+    const button = document.querySelector('.bk-toc-button')
+    const settings = document.querySelector('.bk-sw-toggle').getBoundingClientRect()
+    const rect = button.getBoundingClientRect()
+    return { display: getComputedStyle(button).display, overlap: !(rect.bottom <= settings.top || settings.bottom <= rect.top || rect.right <= settings.left || settings.right <= rect.left) }
+  })
+  check('at 1024 the T1 notes open from a drawer button that does not overlap the settings button', drawerButton.display !== 'none' && !drawerButton.overlap, JSON.stringify(drawerButton))
+  await middle.page.click('.bk-toc-button')
+  await middle.page.waitForTimeout(400)
+  const drawerNotes = await middle.page.evaluate(() => document.querySelectorAll('.bk-drawer .bk-tn-it').length)
+  check('the drawer at 1024 shows the T1 notes', drawerNotes > 0, String(drawerNotes))
+  await middle.page.close()
 
   for (const width of [1440, 1024]) {
     const matrix = await open(width, { path: '2026-07/matrix-fixture/' })
@@ -181,14 +270,38 @@ try {
   const expanded = await ticks.page.evaluate(() => document.querySelector('.bk-tk').classList.contains('is-expanded'))
   check('T4 expands after resting on the tick column', expanded)
   check('T4 shows only the current chapter sections', hiddenRows > 0, String(hiddenRows))
+  await ticks.page.locator('.bk-tk-it').first().hover()
+  await ticks.page.waitForTimeout(300)
+  const tickPanel = await ticks.page.evaluate(() => {
+    const column = document.querySelector('.bk-tk-col').getBoundingClientRect()
+    const list = document.querySelector('.bk-tk-list').getBoundingClientRect()
+    const focus = document.querySelector('.bk-tk-row.is-focus .bk-tk-link')?.textContent ?? ''
+    return { gap: Math.round(list.left - column.right), focus, cards: [...document.querySelectorAll('.bk-toc-card')].filter((card) => !card.hidden).length }
+  })
+  check('the T4 panel opens beside the ticks and highlights the hovered tick', tickPanel.gap >= 0 && tickPanel.focus.length > 0 && tickPanel.cards === 0, JSON.stringify(tickPanel))
   await ticks.page.close()
 
   const phone = await open(375)
   const overflow = await phone.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  check('no horizontal page scroll at 375', overflow === 0, String(overflow))
+  check('no horizontal page scroll at 375, and a long inline formula wraps', overflow === 0, String(overflow))
   await phone.page.click('.bk-ref a')
   const open375 = await phone.page.evaluate(() => getComputedStyle(document.getElementById('sn-1')).display)
   check('a tapped sidenote number opens the note under its paragraph at 375', open375 === 'block', open375)
+  const placeholders = await phone.page.evaluate(() =>
+    [...document.querySelectorAll('.bk-slot[data-component="fixture-curve"]')]
+      .filter((slot) => slot.dataset.state !== 'ready')
+      .map((slot) => {
+        const rect = slot.getBoundingClientRect()
+        const params = JSON.parse(slot.dataset.params)
+        return { fn: params.fn, declared: slot.style.getPropertyValue('--slot-h'), width: Math.round(rect.width), height: Math.round(rect.height) }
+      }),
+  )
+  const expectedPlaceholder = (slot) => (slot.declared === '220px' ? 220 : slot.fn === 'tanh' ? 240 : Math.round(slot.width / 2))
+  check(
+    'at 375 a component placeholder uses the narrow height, and a Markdown height still wins',
+    placeholders.length >= 3 && placeholders.every((slot) => Math.abs(slot.height - expectedPlaceholder(slot)) <= 1),
+    JSON.stringify(placeholders),
+  )
   check('no console errors at 375', phone.errors.length === 0, phone.errors.join(' | '))
   await phone.page.close()
 } finally {

@@ -3,7 +3,7 @@ import { MathText } from './lib/mc/view.jsx'
 import { Matrix } from './lib/mc/matrix.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 395 }
+export const layout = { width: 'body', height: 395, narrowHeight: 745 }
 
 const WEIGHTS = [
   [1, 1, 0.5],

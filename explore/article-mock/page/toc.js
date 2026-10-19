@@ -2,6 +2,8 @@ import { jumpTo, onFrame } from './blocks.js'
 
 const wideScreen = matchMedia('(min-width: 1340px)')
 const narrowScreen = matchMedia('(max-width: 999.98px)')
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
+const dotPitch = 26
 const styleNames = { notes: '前文笔记', tabs: '书签索引', dots: '圆点胶囊', ticks: '刻度线' }
 
 function element(tag, className, html) {
@@ -143,7 +145,7 @@ function notesView(chapters) {
   const list = element('div', 'bk-tn-list')
   root.append(list)
   const parts = chapters.map((chapter) => {
-    const part = linkTo(chapter.id, 'bk-tn-part', `${chapter.number} ${chapter.title}`)
+    const part = linkTo(chapter.id, 'bk-tn-part', `<span class="bk-tn-num">${chapter.number}</span>${chapter.title}`)
     const fold = element('div', 'bk-tn-fold')
     const inner = element('div', 'bk-tn-fold-inner')
     fold.append(inner)
@@ -164,7 +166,16 @@ function notesView(chapters) {
     return { part, fold, items }
   })
   let lastIndex = null
-  let revealTimer
+  let clicked = false
+  root.addEventListener('click', (event) => {
+    if (event.target.closest('a')) clicked = true
+  })
+  root.addEventListener('pointerleave', () => follow(true))
+  const fadeTop = () => {
+    const scroller = root.closest('.bk-toc-scroll')
+    if (scroller) scroller.style.setProperty('--bk-tn-fade-top', `${Math.min(scroller.scrollTop, scroller.clientHeight * 0.36)}px`)
+  }
+  queueMicrotask(() => root.closest('.bk-toc-scroll')?.addEventListener('scroll', fadeTop, { passive: true }))
   return {
     root,
     update(state) {
@@ -182,22 +193,29 @@ function notesView(chapters) {
         })
       })
       if (state.index !== lastIndex) {
+        const first = lastIndex === null
         lastIndex = state.index
-        clearTimeout(revealTimer)
-        revealTimer = setTimeout(reveal, 340)
+        setTimeout(() => follow(!first, clicked), first ? 0 : 340)
+        clicked = false
       }
     },
   }
 
-  function reveal() {
-    const current = root.querySelector('[data-state="cur"].bk-tn-it') ?? root.querySelector('.bk-tn-part[data-state="cur"]')
+  function follow(smooth, force) {
     const scroller = root.closest('.bk-toc-scroll')
-    if (current && scroller) {
-      const box = scroller.getBoundingClientRect()
-      const rect = current.getBoundingClientRect()
-      if (rect.top < box.top + 40 || rect.bottom > box.bottom - 40) scroller.scrollBy({ top: rect.top - box.top - box.height / 3, behavior: 'smooth' })
-    }
+    if (!scroller || (!force && root.matches(':hover'))) return
+    const current = root.querySelector('.bk-tn-it[data-state="cur"]') ?? root.querySelector('.bk-tn-part[data-state="cur"]')
+    if (!current) return
+    const anchor = current.classList.contains('bk-tn-it') ? (current.previousElementSibling ?? current) : current
+    const top = offsetWithin(anchor, scroller) + anchor.offsetHeight / 2 - scroller.clientHeight / 2
+    const target = Math.max(0, top)
+    if (Math.abs(scroller.scrollTop - target) > 1) scroller.scrollTo({ top: target, behavior: smooth && !reducedMotion.matches ? 'smooth' : 'instant' })
+    fadeTop()
   }
+}
+
+function offsetWithin(node, ancestor) {
+  return node.getBoundingClientRect().top - ancestor.getBoundingClientRect().top + ancestor.scrollTop
 }
 
 function tabsView(chapters, card) {
@@ -266,7 +284,7 @@ function dotsView(chapters, card) {
         if (index === current && !dot.classList.contains('is-cur')) {
           dot.classList.add('is-cur')
           const text = dot.querySelector('.bk-td-vt')
-          dot.style.height = `${Math.min(260, text.scrollHeight) + 40}px`
+          dot.style.height = `${Math.min(220, text.scrollHeight) + 36}px`
         } else if (index !== current && dot.classList.contains('is-cur')) {
           dot.classList.remove('is-cur')
           dot.style.height = ''
@@ -275,6 +293,7 @@ function dotsView(chapters, card) {
       if (shown !== current) {
         shown = current
         requestAnimationFrame(() => {
+          column.style.setProperty('--bk-td-fill', `${current * dotPitch}px`)
           const viewport = root.clientHeight
           const total = column.scrollHeight
           const overflow = total > viewport - 80
@@ -283,8 +302,7 @@ function dotsView(chapters, card) {
             column.style.translate = '0 40px'
             return
           }
-          const item = items[current].item
-          const center = item.offsetTop + 120
+          const center = current * dotPitch + 120
           const shift = Math.max(viewport - total - 40, Math.min(40, viewport / 2 - center))
           column.style.translate = `0 ${shift}px`
         })
@@ -293,66 +311,87 @@ function dotsView(chapters, card) {
   }
 }
 
-function ticksView(chapters, entries, card) {
+function ticksView(chapters, entries) {
   const root = element('div', 'bk-tk')
   const column = element('div', 'bk-tk-col')
-  root.append(column)
+  const list = element('div', 'bk-tk-list')
+  root.append(column, list)
+  const rows = []
+  const rowFor = (chapterIndex, sectionIndex) => rows.find((row) => row.chapterIndex === chapterIndex && row.sectionIndex === sectionIndex)
+  chapters.forEach((chapter, chapterIndex) => {
+    const items = [{ id: chapter.id, html: `<span class="bk-tk-num">${chapter.number}</span>${chapter.title}`, lead: chapter.lead, sectionIndex: -1 }]
+    chapter.sections.forEach((section, sectionIndex) => items.push({ id: section.id, html: section.title, lead: section.lead, sectionIndex }))
+    for (const item of items) {
+      const box = element('div', item.sectionIndex === -1 ? 'bk-tk-row' : 'bk-tk-row bk-tk-sub')
+      box.append(linkTo(item.id, 'bk-tk-link', item.html))
+      if (item.lead) {
+        const lead = element('div', 'bk-tk-lead')
+        lead.append(element('div', 'bk-tk-lead-inner', item.lead))
+        box.append(lead)
+      }
+      const row = { box, chapterIndex, sectionIndex: item.sectionIndex }
+      box.addEventListener('pointerenter', () => setFocus(row))
+      list.append(box)
+      rows.push(row)
+    }
+  })
   const ticks = entries.map((entry) => {
     const tick = element('a', `bk-tk-it bk-tk-h${entry.level}`)
     tick.href = `#${entry.id}`
+    tick.setAttribute('aria-label', plain(entry.element.textContent))
     tick.append(element('span', 'bk-tk-line'))
     tick.addEventListener('click', (event) => {
       event.preventDefault()
       go(entry.id)
     })
-    tick.addEventListener('pointerenter', () => {
-      if (!root.classList.contains('is-expanded')) card.show(entryCard(chapters, entry), column)
-      card.card.style.top = `${Math.max(12, tick.getBoundingClientRect().top - 20)}px`
-    })
+    tick.addEventListener('pointerenter', () => setFocus(rowFor(entry.chapterIndex, entry.sectionIndex)))
     column.append(tick)
     return tick
   })
-  const list = element('div', 'bk-tk-list')
-  root.append(list)
-  const rows = []
-  chapters.forEach((chapter, chapterIndex) => {
-    const row = linkTo(chapter.id, 'bk-tk-row', `${chapter.number} ${chapter.title}`)
-    row.dataset.chapter = chapterIndex
-    list.append(row)
-    rows.push({ row, chapterIndex, sectionIndex: -1 })
-    chapter.sections.forEach((section, sectionIndex) => {
-      const sub = linkTo(section.id, 'bk-tk-row bk-tk-sub', section.title)
-      list.append(sub)
-      rows.push({ row: sub, chapterIndex, sectionIndex })
-    })
-  })
-  let dwell
+  let state = { chapter: -1, section: -1, index: -1 }
+  let focus = null
+  let openTimer
+  let closeTimer
+  const open = () => {
+    list.style.top = `${Math.max(12, column.offsetTop - 14)}px`
+    root.classList.add('is-expanded')
+  }
+  const close = () => {
+    root.classList.remove('is-expanded')
+    setFocus(null)
+  }
   root.addEventListener('pointerenter', () => {
-    clearTimeout(dwell)
-    dwell = setTimeout(() => {
-      card.hide(0)
-      root.classList.add('is-expanded')
-    }, 500)
+    clearTimeout(closeTimer)
+    if (!root.classList.contains('is-expanded')) openTimer = setTimeout(open, 120)
   })
   root.addEventListener('pointerleave', () => {
-    clearTimeout(dwell)
-    root.classList.remove('is-expanded')
-    card.hide()
+    clearTimeout(openTimer)
+    closeTimer = setTimeout(close, 250)
   })
+  function setFocus(row) {
+    focus = row ?? null
+    render()
+  }
+  function render() {
+    const shownChapter = focus ? focus.chapterIndex : Math.max(0, state.chapter)
+    for (const row of rows) {
+      const { box, chapterIndex, sectionIndex } = row
+      box.classList.toggle('is-cur', chapterIndex === state.chapter && (sectionIndex === -1 ? state.section === -1 : sectionIndex === state.section))
+      box.classList.toggle('is-in', chapterIndex === state.chapter && sectionIndex === -1)
+      box.classList.toggle('is-ahead', chapterIndex > state.chapter || (chapterIndex === state.chapter && sectionIndex > state.section))
+      box.classList.toggle('is-focus', row === focus)
+      box.hidden = sectionIndex !== -1 && chapterIndex !== shownChapter
+    }
+  }
   return {
     root,
-    update(state) {
+    update(next) {
+      state = next
       ticks.forEach((tick, index) => {
         tick.classList.toggle('is-cur', index === state.index)
         tick.classList.toggle('is-read', index < state.index)
       })
-      rows.forEach(({ row, chapterIndex, sectionIndex }) => {
-        const isCurrent = chapterIndex === state.chapter && sectionIndex === (sectionIndex === -1 ? -1 : state.section)
-        row.classList.toggle('is-cur', chapterIndex === state.chapter && (sectionIndex === -1 || sectionIndex === state.section))
-        row.classList.toggle('is-ahead', chapterIndex > state.chapter || (chapterIndex === state.chapter && sectionIndex > state.section))
-        row.hidden = sectionIndex !== -1 && chapterIndex !== Math.max(0, state.chapter)
-        row.toggleAttribute('aria-current', isCurrent)
-      })
+      render()
     },
   }
 }
@@ -471,8 +510,11 @@ export function startToc() {
       if (next === 'notes') view = notesView(chapters)
       else if (next === 'tabs') view = tabsView(chapters, card)
       else if (next === 'dots') view = dotsView(chapters, card)
-      else view = ticksView(chapters, entries, card)
+      else view = ticksView(chapters, entries)
       scroller.replaceChildren(view.root)
+      sticky.querySelector(':scope > .bk-toc-label')?.remove()
+      const label = view.root.querySelector(':scope > .bk-toc-label')
+      if (label) sticky.insertBefore(label, scroller)
       nav.setAttribute('aria-label', `目录：${styleNames[next]}`)
     }
     positionNav()

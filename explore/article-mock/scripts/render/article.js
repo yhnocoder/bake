@@ -157,10 +157,11 @@ function numberEquations(article, fail) {
 
 function numberCitations(article, fail) {
   const references = new Map()
-  visit(article.tree, 'containerDirective', (node) => {
+  visit(article.tree, 'containerDirective', (node, index, parent) => {
     if (node.name !== 'references') return
     if (article.referencesNode) fail(node, 'an article can have only one :::references block')
     article.referencesNode = node
+    node.afterHeading = parent?.children[index - 1]?.type === 'heading'
     const list = node.children.find((child) => child.type === 'list')
     if (!list || node.children.length !== 1) fail(node, ':::references must contain one list with items "- [@key] text"')
     for (const item of list?.children ?? []) {
@@ -192,7 +193,6 @@ function numberCitations(article, fail) {
       if (!reference.number) reference.number = ++count
     }
   })
-  for (const reference of references.values()) if (!reference.number) reference.number = ++count
   article.references = references
 }
 
@@ -252,7 +252,7 @@ async function titleWithMath(title, math, fail) {
       continue
     }
     try {
-      html += `<span class="bk-m">${await math.render(parts[index], false)}</span>`
+      html += `<span class="bk-m" data-tex="${escapeText(parts[index]).replaceAll('"', '&quot;')}">${await math.render(parts[index], false)}</span>`
     } catch (error) {
       fail(`TeX error in title: ${error.message}`)
     }
@@ -301,6 +301,10 @@ export async function prepareArticle(article, { math, components, fail }) {
     const component = await components.load(node.name)
     if (!component) {
       failAt(node, `unknown component ${node.name}: no components/${node.name}.jsx or .js`)
+      continue
+    }
+    if (component.error) {
+      failAt(node, component.error)
       continue
     }
     node.component = resolveComponent(component, node.attributes, (message) => failAt(node, `${node.name}: ${message}`))

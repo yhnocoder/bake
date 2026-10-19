@@ -5,7 +5,7 @@ export const params = {
   x0: { label: 'x₀', type: 'number', min: -2, max: 2, step: 0.01, default: 1.2 },
   y0: { label: 'y₀', type: 'number', min: -2, max: 2, step: 0.01, default: 0.8 },
 }
-export const layout = { width: 'body', height: 430 }
+export const layout = { width: 'body', height: 430, narrowHeight: 730 }
 
 const f = (x, y) => 3 * x * x * y
 const fx = (x, y) => 6 * x * y

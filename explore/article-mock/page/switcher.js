@@ -4,6 +4,10 @@ const tocOptions = [
   ['dots', 'T3 圆点胶囊'],
   ['ticks', 'T4 刻度线'],
 ]
+const fontOptions = [
+  ['sans', '黑体'],
+  ['wenkai', '霞鹜文楷'],
+]
 const themeOptions = [
   ['system', '跟随系统'],
   ['light', '浅'],
@@ -51,7 +55,8 @@ export function startSwitcher() {
   const toggle = document.createElement('button')
   toggle.type = 'button'
   toggle.className = 'bk-sw-toggle'
-  toggle.textContent = '样式'
+  toggle.innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h7M13 4h1M2 12h1M7 12h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="4" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>设置</span>'
   toggle.setAttribute('aria-expanded', 'false')
   toggle.addEventListener('click', () => {
     const open = !panel.classList.contains('is-open')
@@ -70,6 +75,14 @@ export function startSwitcher() {
       }),
     )
   }
+  body.append(
+    segment('正文', fontOptions, root.dataset.font ?? 'sans', (value) => {
+      if (value === 'sans') delete root.dataset.font
+      else root.dataset.font = value
+      store('bk-font', value === 'sans' ? null : value)
+      document.dispatchEvent(new CustomEvent('bk:layout'))
+    }),
+  )
   body.append(
     segment('主题', themeOptions, root.dataset.theme ?? 'system', (value) => {
       if (value === 'system') delete root.dataset.theme

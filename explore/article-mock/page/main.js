@@ -7,6 +7,7 @@ import './toc.css'
 import './ui.css'
 import './print.css'
 import { startBlocks, startDragGuard, startFolds, startJumps } from './blocks.js'
+import { startCopy } from './copy.js'
 import { startNotes } from './notes.js'
 import { startPreviews } from './preview.js'
 import { startComponents } from './runtime.js'
@@ -23,5 +24,6 @@ if (article) {
   startJumps()
   startDragGuard()
   startComponents(article)
+  startCopy(article)
 }
 startSwitcher()

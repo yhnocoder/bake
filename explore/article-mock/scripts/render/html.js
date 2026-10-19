@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { imageSize } from 'image-size'
-import { widthDirective } from './parse.js'
+import { pipeInMath, widthDirective } from './parse.js'
 import { parseAttributes } from './inline.js'
 
 const internalPattern = /^\/(\d{4}-\d{2})\/([a-z0-9-]+)\/(?:#(.+))?$/
@@ -19,6 +19,21 @@ export function escapeAttribute(text) {
 
 function isPage(ctx) {
   return ctx.mode === 'page'
+}
+
+function markdownSource(node, ctx) {
+  const source = ctx.article?.source
+  if (!isPage(ctx) || !source || node.position?.start.offset === undefined) return ''
+  return source
+    .slice(node.position.start.offset, node.position.end.offset)
+    .replaceAll(pipeInMath, '|')
+    .replace(new RegExp(`^(\\s*(?:>\\s*)*:{3,})${widthDirective}\\{`, 'gm'), '$1{')
+}
+
+function withSource(html, node, ctx) {
+  const source = markdownSource(node, ctx)
+  if (!source) return html
+  return html.replace(/^<([a-z]+)/, `<$1 data-md="${escapeAttribute(source)}"`)
 }
 
 export function relativeTo(host, path) {
@@ -155,7 +170,7 @@ function renderInline(node, ctx) {
     case 'inlineCode':
       return `<code>${escapeHtml(node.value)}</code>`
     case 'inlineMath':
-      return `<span class="bk-m">${node.svg ?? ''}</span>`
+      return `<span class="bk-m" data-tex="${escapeAttribute(node.value)}">${node.svg ?? ''}</span>`
     case 'break':
       return '<br>'
     case 'html':
@@ -218,10 +233,10 @@ function headingHtml(node, ctx) {
   const hash = `<a class="bk-hash" href="#${id}" aria-label="复制本节链接">#</a>`
   if (node.depth === 2) {
     const number = node.chapter ? `<span class="bk-chapter-num">${node.chapter.number}</span>` : ''
-    return `<h2 id="${id}">${number}${hash}<span class="bk-h-text">${text}</span></h2>`
+    return `<h2 id="${id}">${number.replace('<span ', '<span data-ui ')}${hash.replace('<a ', '<a data-ui ')}<span class="bk-h-text">${text}</span></h2>`
   }
   const level = Math.min(node.depth, 4)
-  return `<h${level} id="${id}">${hash}<span class="bk-h-text">${text}</span></h${level}>`
+  return `<h${level} id="${id}">${hash.replace('<a ', '<a data-ui ')}<span class="bk-h-text">${text}</span></h${level}>`
 }
 
 function cellContent(children, ctx) {
@@ -314,7 +329,7 @@ function mathHtml(node, ctx) {
         .map((label) => `<span class="bk-eq-anchor" id="${label.id}"></span>`)
         .join('')
     : ''
-  return block('math', ctx, `${extra}${node.svg ?? ''}`, id)
+  return block('math', ctx, `${extra}${node.svg ?? ''}`, `${id} data-tex="${escapeAttribute(node.value)}"`)
 }
 
 function captionHtml(children, ctx) {
@@ -331,9 +346,10 @@ function componentHtml(node, ctx) {
     return `<div class="bk-pv-component">${text}</div>`
   }
   const width = ctx.width ?? component.width
+  const size = !ctx.width && component.size ? ` data-size style="--fig-w:${component.size}"` : ''
   const frame = component.frame ? '' : ' data-frame="none"'
   const params = escapeAttribute(JSON.stringify(component.params))
-  return `<figure class="bk-fig bk-component" data-width="${width}"${frame}><div class="bk-slot" data-component="${node.name}" data-params="${params}" style="${component.style}"></div>${caption}</figure>`
+  return `<figure class="bk-fig bk-component" data-width="${width}"${size}${frame}><div class="bk-slot" data-component="${node.name}" data-params="${params}" style="${component.style}"></div>${caption}</figure>`
 }
 
 function titleOf(node) {
@@ -348,13 +364,16 @@ function checkAttributes(node, ctx, allowed) {
 
 function referencesHtml(node, ctx) {
   if (!isPage(ctx)) return ''
-  const items = [...ctx.article.references.values()]
-    .sort((a, b) => a.number - b.number)
-    .map((reference) => {
-      const body = renderTight(reference.item.children, ctx)
-      return `<li id="ref-${escapeAttribute(reference.key)}" data-ref="${escapeAttribute(reference.key)}"><span class="bk-refs-num">[${reference.number}]</span><div class="bk-refs-text">${body}</div></li>`
-    })
-  return `<section class="bk-refs" id="references"><div class="bk-refs-title">参考文献</div><ol>${items.join('')}</ol></section>`
+  const all = [...ctx.article.references.values()]
+  const cited = all.filter((reference) => reference.number).sort((a, b) => a.number - b.number)
+  const items = [...cited, ...all.filter((reference) => !reference.number)].map((reference) => {
+    const body = renderTight(reference.item.children, ctx)
+    const number = reference.number ? `[${reference.number}]` : ''
+    return `<li id="ref-${escapeAttribute(reference.key)}" data-ref="${escapeAttribute(reference.key)}"><span class="bk-refs-num">${number}</span><div class="bk-refs-text">${body}</div></li>`
+  })
+  const heading = node.afterHeading ? '' : '<div class="bk-refs-title">参考文献</div>'
+  const id = node.afterHeading ? '' : ' id="references"'
+  return `<section class="bk-refs"${id}>${heading}<ol>${items.join('')}</ol></section>`
 }
 
 function embedRange(target) {
@@ -509,13 +528,13 @@ function renderBlock(node, ctx) {
     case 'math':
       return mathHtml(node, ctx)
     case 'table':
-      return tableHtml(node, ctx)
+      return withSource(tableHtml(node, ctx), node, ctx)
     case 'thematicBreak':
       return '<hr>'
     case 'html':
       return node.value
     case 'containerDirective':
-      return directiveHtml(node, ctx)
+      return node.name === widthDirective ? directiveHtml(node, ctx) : withSource(directiveHtml(node, ctx), node, ctx)
     case 'definition':
       return ''
     case 'floatGroup':

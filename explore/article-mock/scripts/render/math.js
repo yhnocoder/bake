@@ -27,7 +27,7 @@ export function createMathRenderer() {
       throw error
     },
   })
-  const output = new SVG({ fontData: MathJaxNewcmFont, fontCache: 'global', useXlink: false, linebreaks: { inline: false } })
+  const output = new SVG({ fontData: MathJaxNewcmFont, fontCache: 'global', useXlink: false })
   const document = mathjax.document('', { InputJax: input, OutputJax: output })
   const cache = new Map()
   let queue = Promise.resolve()
@@ -60,5 +60,9 @@ export function createMathRenderer() {
     return `<svg class="bk-math-defs" aria-hidden="true" style="display:none"><defs>${paths}</defs></svg>`
   }
 
-  return { render, defineMacros, glyphDefinitions }
+  function styleSheet() {
+    return adaptor.textContent(output.styleSheet(document))
+  }
+
+  return { render, defineMacros, glyphDefinitions, styleSheet }
 }

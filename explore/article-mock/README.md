@@ -36,8 +36,9 @@ npm run shots          # Playwright screenshots: 1440, 1024, 375 px, light and d
 
 ## Syntax used by the articles
 
-Every item below comes from a canvas board (in brackets). Anything an article needs that the canvas does not
-cover is listed under "Gaps" at the end instead of being invented silently.
+Most items below come from a canvas board (in brackets). Where the articles needed something the canvas does
+not cover, Linda or the coordinator decided it on 2026-10-19 after the first review of the mock; those items
+have no board number. What is still open is listed at the end.
 
 - Front matter (01-2): `title`, `slug`, `date`, `summary`, `tags`, `toc`. URL is `/YYYY-MM/slug/`.
   `toc` is `notes`, `tabs`, `dots` or `ticks` for T1 to T4.
@@ -46,21 +47,29 @@ cover is listed under "Gaps" at the end instead of being invented silently.
 - Headings (02-2): `##` chapters are numbered 01, 02 automatically; `###` sections are not numbered.
   `{#id}` fixes the anchor; `{toc="short title"}` sets the TOC text.
 - Inline (02-2): `==mark==`, links, inline code, `$math$`, `**bold**`, `*italic*`.
+- Chapter subtitles are the first paragraph of the chapter.
 - Lists and quotes (02-2): a quote whose last paragraph starts with `— ` shows that paragraph as the source.
-- Callout (02-2): `:::aside{title="阅读约定"}` … `:::`. One style only.
+- Callout (02-2): `:::aside{title="阅读约定"}` … `:::`. One style only. Short notes that the old blog wrote as
+  quotes use `:::aside` too.
 - Fold (02-2): `:::fold{title="推导：GELU 的导数"}` … `:::`. Closed by default.
 - Citations (02-2): `[@key]` in text, the list in `:::references` with items `- [@key] text`.
-  Numbered [1], [2] by first use.
+  Numbered [1], [2] by first use. Entries the text never cites are listed after the numbered ones without a
+  number. Right after a heading, `:::references` omits its own 「参考文献」 label.
 - Display math (02-3): `$$ … $$`. `\label{eq:x}` numbers the equation; `\eqref{eq:x}` renders as a link
   "式 (n)" with a hover preview. Macros live in `preamble.sty` (01-2).
 - Code (02-3): fenced blocks with a language; highlighted with theme variables.
-- Tables (02-3, 02-4): pipe tables; `|` inside `$…$` needs no escaping. `:::list-table` for cells with block
-  content (MyST layout: each top-level item is a row, its sub-items are cells, the first row is the header).
+- Tables (02-3, 02-4): pipe tables; `|` inside `$…$` needs no escaping. Pipe-table cells keep their text on one
+  line where they can, so sentence-length cells belong in `:::list-table`, which takes block content (MyST
+  layout: each top-level item is a row, its sub-items are cells, the first row is the header). Table cells have
+  no state syntax; the text names cells by position. Tags such as `gelu_pytorch_tanh` are inline code.
 - Images (02-3, 02-4): `![alt](file.svg "caption")`; `{width=160px float=left}` right after the image.
 - Widths (02-1): wrap any block in `:::{width=body|wide|page}` … `:::`. Unwrapped blocks are `auto`.
+- Component width (Linda, 2026-10-19): a component also accepts `width=560px` or `width=70%` (up to 100%).
+  The frame takes that width inside the body column and is centred. Wider than the column, it shrinks to the
+  column.
 - Sidenotes (03-5): standard footnotes `[^name]` with `[^name]: text` definitions.
 - Internal links (02-8): plain links to `/YYYY-MM/slug/#anchor`. `^name` at the end of a paragraph gives the
-  paragraph an anchor.
+  paragraph an anchor. A link to an article that is not migrated yet is an absolute URL to the old site.
 - Embeds (02-4): `:::embed` with one internal address per line.
 - Components (02-7): block form only.
 
@@ -81,84 +90,79 @@ export const params = {
   title: { label: '标题', type: 'text', default: '' },
   approx: { label: '显示近似', type: 'boolean', default: false },
 }
-export const layout = { width: 'wide', height: 360 }
+export const layout = {
+  width: 'wide',
+  height: (params) => (params.fn === 'relu' ? 320 : 360),
+  narrowHeight: 560,
+}
 export default function ActFnPlot(props) { … }
 ```
 
-- `params`: the four types are `number`, `text`, `boolean`, `enum`. The renderer converts the Markdown
+- `params`: the types are `number`, `text`, `boolean` and `enum`. The renderer converts the Markdown
   attributes to these types and fails on unknown names, wrong types and values out of range. `width` and
-  `height` are reserved for Bake.
-- `layout.width`: which width `auto` resolves to: `body` (820px), `wide` (1100px) or `page` (1340px).
-- `layout.height`: placeholder height before the code loads, in pixels (`360`) or as a ratio
-  (`{ ratio: 16 / 9 }`). The author may override it with `height=420` in Markdown. Make the component fit the
-  declared height at desktop width so the page does not jump when it loads.
+  `height` are reserved for Bake. The coordinator decided to add a `file` type that names a data file next to
+  the article; the mock does not implement it yet, so llm-act-fns still selects its annotation presets in
+  `components/lib/act/guides.js` with the enum param `guides`.
+- `layout.width`: which width `auto` resolves to: `body` (820px), `wide` (1100px), `page` (1340px), pixels
+  (`560px`) or a percentage of the body column (`70%`). Markdown `width=` overrides it.
+- `layout.height`: placeholder height before the code loads, in pixels (`360`), as a ratio
+  (`{ ratio: 16 / 9 }`), or a function of the params that returns either. Make the component fit the declared
+  height at desktop width so the page does not jump when it loads.
+- `layout.narrowHeight`: optional placeholder height below 600px, in the same forms. Components that stack
+  their panels on phones declare it. Markdown `height=420` overrides both heights.
 - `layout.frame: false`: no border or background, only width and caption.
 - Default export: either a SolidJS function component, which receives the params as props, or a class that
   extends `HTMLElement`, which reads `this.params` and gets `update()` calls.
+- The module must not use browser APIs (`window`, `document`, `localStorage` and similar) at the top level,
+  because the build reads `params` and `layout` in Node. A module that does fails the build with the line
+  `file:line:col <name>: components/<file> uses the browser API window at the top level; …`.
+- Components may import CSS from `components/lib/`. Class names in that CSS start with the component's own
+  prefix, for example `.act-heat`.
+- TeX inside a component: both articles still use their own MathJax helper in `components/lib/`. The
+  coordinator decided the kit will provide one TeX helper that also reads `preamble.sty`.
 - Components load when they come within 800px of the viewport (`page/runtime.js`).
 - Colors and fonts come only from the CSS variables in `page/tokens.css` (`--ink`, `--ink-2`, `--line`,
   `--accent`, `--series-1` … `--series-8`, `--diverge-low|mid|high`, `--font-body`, `--font-mono`, …).
   SVG and HTML use `var(--…)` directly. Canvas and WebGL redraw on the `bake:theme` event on `document`.
 - Reader controls (sliders, buttons) only change the page; they are not params.
 - On screens narrower than 1000px every figure is full width; the component lays itself out for that width.
+  Floated components are centred; only images float.
 
-## Gaps
+## Page shell
 
-Found while converting the two articles. Each item says what was needed, what the mock does for now and a
-suggestion. None of these is decided.
+What the canvas does not specify and what the mock chose. The independent thread 「高保真目录设计」 will
+replace the four TOC styles.
 
-Syntax:
+- Header: the old blog's masthead. Titles and headings use 霞鹜文楷.
+- Body font: a reader setting behind the 「设置」 button at the bottom left, next to the theme and TOC style.
+  The options are 黑体 (the default, the old blog's sans stack) and 霞鹜文楷, which is downloaded only when the
+  reader picks it. The choice is stored in `localStorage` (`bk-font`).
+- T1 notes: follows the old blog's recap. The list keeps the chapter before the current one centred, read
+  entries are darker than the ones ahead, the current entry has a bar with a progress fill, and the summaries
+  of read sections stay open.
+- T2 tabs and T3 dots: the current chapter shows its title under its tab or inside its dot, and hovering
+  another tab or dot shows a card with that chapter's sections. T3 has no dividers and shows the number on
+  hover.
+- T4 ticks: hovering the tick column opens one panel beside the ticks with every chapter; the hovered tick
+  highlights its row and shows that chapter's lead and sections.
+- From 1000px to 1339px T1 opens from a drawer button; T2 to T4 stay in the margin. Below 1000px every style
+  opens the same drawer from a button at the bottom left, above the settings button.
+- Sidenotes: hovering a number or a note tints the note and its paragraph with a 0.15s transition in and a
+  0.3s transition out.
+- Fold titles change colour in 0.12s when pressed and return in 0.3s.
+- Copy: a selection inside the article is copied as Markdown (text/plain) and as clean HTML (text/html), and a
+  toast says 「已复制为 Markdown」. Footnote numbers become `[^n]` with the note text appended, math becomes
+  `$…$` and `$$…$$`, and a fully selected component, table or `:::` block is copied as its Markdown source.
+  Numbers, anchor links and buttons are left out and get a lighter selection colour.
 
-1. Per-figure annotations (llm-act-fns, all 14 two-panel plots). The original places bands, reference lines and
-   labelled points by hand for each figure. Params are scalars only, so the mock selects a named preset in
-   `components/lib/act/guides.js` with the enum param `guides`. Suggestion: a param type that names a data file
-   next to the article (`guides=fig-intro-neg.yaml`), so the annotations become article content.
-2. Chapter subtitle (llm-act-fns, every chapter has a one-line grey subtitle). The mock writes it as the first
-   paragraph. Suggestion: a `:::lede` block, which the T2–T4 hover cards could also use as the first sentence.
-3. TOC entries without a visible heading (llm-act-fns chapter 13 points at a table and the reference list).
-   The mock adds two `###` headings, so 「参考文献」 appears twice. Suggestion: `:::references` omits its own
-   label right after a heading, or blocks accept `{#id toc="…"}`.
-4. Table cell states (matrix-calculus shape table: three grey cells and one outlined cell, referred to in the
-   text as 「标灰的三格」). Lost in the mock. Suggestion: two fixed cell classes in `:::list-table`, for example
-   `- {.muted}` and `- {.target}`.
-5. Floated components (matrix-calculus, three lm head local views floated left with text wrapping). The mock
-   centres them. 02-4 allows floating only for images. Suggestion: a `float` layout option for body-width
-   components, or accept the change.
-6. Uncited references (llm-act-fns lists two Raschka articles that the text never cites). The mock numbers
-   them last. Decide: allowed, a build error, or listed without a number.
-7. Links to articles that were not migrated (matrix-calculus links to the old Chinese translation page and to
-   `transformer-backward.html`). Kept as broken relative links.
-8. Inline tag (`gelu_pytorch_tanh` styled as a tag in a table). Written as inline code.
-9. Pipe-table cells do not wrap, so sentence-length cells belong in `:::list-table`. Worth one line in the
-   syntax article.
-10. Short notes written as `<blockquote>` in matrix-calculus became `:::aside` (callout style, not quote style).
+## Open questions for Linda
 
-Component contract:
-
-11. Placeholder height that depends on params (one diagram is 104px for one variant and 200px for others).
-    The mock writes `height=` in Markdown. Suggestion: `layout.height` may be a function of the params.
-12. Height below 1000px. Many components stack their panels on phones and grow (for example 430px → 684px).
-    The mock lets a loaded slot take the component's own height below 1000px, so the page moves once there.
-    Suggestion: an optional narrow-width height.
-13. Components import their own CSS from `components/lib/`. Works; the contract should say so and require
-    prefixed class names.
-14. TeX in components. Both articles need TeX labels inside SVG; each wrote its own MathJax helper in
-    `components/lib/`. Suggestion: the runtime provides one TeX helper that also reads `preamble.sty`.
-15. A component module must not touch browser APIs at the top level, because the build reads `params` and
-    `layout` in Node.
-
-Content:
-
-16. Text written for the mock, not in the originals: the `:::recap` notes of llm-act-fns (one sentence per
-    section), one internal link from llm-act-fns chapter 07 to matrix-calculus `#ffn-jac`, and `[@key]`
-    citation markers placed where the text names a work. Sidenotes are existing parenthetical remarks with
-    unchanged wording.
-17. Possible error in the original matrix-calculus, kept as written: in section `vjp-order` the left side of
-    the aligned equation is ∂h/∂x where ∂L/∂x seems intended.
-
-Page shell (what the canvas does not specify and what the mock chose):
-
-18. The header is not drawn 1:1 on any board; the mock uses the old blog's masthead with WenKai.
-19. T2 and T3 on phones: the mock shows the current chapter tab at the bottom left and opens the same drawer
-    as T1, with a text list instead of the sliding tab column.
-20. The mock style switcher sits behind a 「样式」 button at the top right; it exists only in the mock.
+- Text written for the mock that is not in the originals: the `:::recap` notes of llm-act-fns (one sentence
+  per section), one internal link from llm-act-fns chapter 07 to matrix-calculus `#ffn-jac`, and `[@key]`
+  citation markers placed where the text names a work. Sidenotes are existing parenthetical remarks with
+  unchanged wording.
+- A possible error in the original matrix-calculus, kept as written: in section `vjp-order` the left side of
+  the aligned equation is ∂h/∂x where ∂L/∂x seems intended.
+- The old-site address `https://yhnocoder.github.io/learn_by_visualization/` used for unmigrated links is
+  inferred from the repository name and not checked. `transformer-backward.html` does not exist in the old
+  repository, so that link is plain text.

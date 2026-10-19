@@ -22,7 +22,7 @@ $$
 其中 $w_i$ 是 $W_1$ 的第 $i$ 列。由式 \eqref{eq:pre} 可知，激活函数只看 $z_i$ 这一个数[^gemm]。这一层的开销直接决定整个模型的开销[^cost]。^neuron-input
 
 - ==$f(0)$ 是多少==：输入为零时是否输出零。
-- ==导数在原点是否连续==：不连续意味着梯度跳变。
+- ==导数在原点是否连续==：不连续意味着梯度跳变。求导可以按项拆开：$\dfrac{d}{dx}\big(f(x) + g(x)\big) = \dfrac{d}{dx}f(x) + \dfrac{d}{dx}g(x)$。
 
 1. 有序列表的第一项。
 2. 有序列表的第二项，带一个旁注[^list]。
@@ -148,6 +148,13 @@ const short = 1
 :::
 
 :::fixture-curve{fn=relu width=body height=220 dashed}
+:::
+
+:::fixture-curve{fn=tanh width=300px}
+窄组件的框宽 300px，在正文栏里居中。
+:::
+
+:::fixture-curve{fn=relu width=50%}
 :::
 
 :::fixture-grid{cells=24}

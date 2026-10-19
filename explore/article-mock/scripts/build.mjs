@@ -99,6 +99,8 @@ if (hasErrors()) stop()
 
 await build(clientConfig({ components: componentsDir, outDir }))
 const assets = clientAssets()
+writeFileSync(join(outDir, 'assets', 'mathjax.css'), math.styleSheet())
+assets.css.unshift('assets/mathjax.css')
 const sorted = [...articles].sort((a, b) => b.date.localeCompare(a.date))
 for (const { article, page } of rendered) {
   copyArticleFiles(article)

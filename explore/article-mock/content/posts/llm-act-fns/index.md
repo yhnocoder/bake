@@ -126,7 +126,7 @@ $\frac{df(z_i)}{dz_i}$ 同时控制两条路径：一条是流向本神经元参
 
 比较各函数的输出、导数和极限行为。
 
-:::act-fn-plot{fns="relu,relu2,gelu,silu,softplus,sigmoid,tanh" colors="1,2,3,4,6,7,8" off="softplus,sigmoid,tanh" dymin=-0.5 dymax=2.5 toggle=true height=365}
+:::act-fn-plot{fns="relu,relu2,gelu,silu,softplus,sigmoid,tanh" colors="1,2,3,4,6,7,8" off="softplus,sigmoid,tanh" dymin=-0.5 dymax=2.5 toggle=true}
 **勾选曲线进行比较**。读图时先看负半轴的输出与斜率，再看原点和过渡宽度，最后看大正输入是近似线性增长、饱和还是加速增长。色带、参考线、关键点和详细定义见各函数的单独图。
 :::
 
@@ -257,7 +257,7 @@ $$
 例如，若某个输入的保留概率为 $0.8$，那么平均输出就是 $0.8x$。ReLU 对应 $P(B=1\mid x)=\mathbb{1}[x>0]$，dropout 对应 $P(B=1\mid x)=p$ 且与 $x$ 无关；GELU 把这个概率改成随 $x$ 单调增加的 $\Phi(x)$，再取期望，就得到确定性的 $x\Phi(x)$。
 :::
 
-:::act-fn-plot{fns="gelu-erf" dashed="gelu-tanh,gelu-quick" guides=gelu-approx zoom=true height=400}
+:::act-fn-plot{fns="gelu-erf" dashed="gelu-tanh,gelu-quick" guides=gelu-approx zoom=true}
 左图是 GELU 的输出 $f(x)$，右图是导数 $\frac{df(x)}{dx}$；实线是精确 GELU，虚线是两种近似。三条曲线在默认视野下几乎重合，拖动“横轴范围”、“横轴中心”查看差异。
 :::
 
@@ -341,7 +341,7 @@ $\beta=1$ 的特例叫 SiLU（Sigmoid Linear Unit）。这个名字由 Hendrycks
 
 [^iclr]: 据作者在论文附录中的说明，最早见于 2016 年的 ICLR 投稿。
 
-:::act-fn-plot{fns="swish" reference="relu" beta=1 height=430}
+:::act-fn-plot{fns="swish" reference="relu" beta=1}
 拖动 β，色带和最低点随曲线移动；色带或最低点超出视野时，图下方会给出提示。
 :::
 
@@ -385,7 +385,7 @@ $$
 
 这里的门控系数不局限于 0 到 1。$\mathrm{SiLU}(g_i)$ 可以为负，也可以大于 1，因此它既能减小信号幅度，也能翻转符号或放大信号。下面的热力图展示 $g_i$、$u_i$ 不同组合产生的 $h_i$：横轴改变门控输入 $g_i$，纵轴改变待传递的数值 $u_i$（图中省略下标，记作 g、u）。
 
-:::glu-heatmap
+:::glu-heatmap{width=600px}
 横轴是门控输入 g，纵轴是线性分支 u；每个位置的颜色表示两者相乘后的输出 SiLU(g)·u。
 
 图中左侧颜色较浅，因为较大的负门控输入会减小输出幅度；右侧颜色更鲜明，因为 g 超过约 1.28 时 SiLU(g)>1，线性分支被放大，0<g<1.28 时线性分支仍被缩小。

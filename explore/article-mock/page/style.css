@@ -82,9 +82,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 17px;
+  font-size: var(--body-size);
   line-height: 1.85;
-  -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   transition:
     background-color 0.2s,
@@ -93,6 +92,11 @@ body {
 
 ::selection {
   background: var(--sel);
+}
+
+:is([data-ui], .bk-ref, .bk-sn-num)::selection,
+:is([data-ui], .bk-ref) *::selection {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 a {
@@ -184,6 +188,7 @@ html.bk-dragging * {
 }
 
 .bk-title {
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: clamp(32px, 5vw, 46px);
   line-height: 1.25;
@@ -261,6 +266,7 @@ html.bk-dragging * {
 
 .bk-article :is(h2, h3, h4):not(.bk-slot *) {
   position: relative;
+  font-family: var(--font-heading);
   font-weight: 700;
   text-wrap: balance;
   clear: both;
@@ -294,7 +300,6 @@ html.bk-dragging * {
   letter-spacing: 0.1em;
   color: var(--ink-3);
   margin-bottom: 10px;
-  user-select: none;
 }
 
 .bk-hash {
@@ -308,7 +313,6 @@ html.bk-dragging * {
   text-decoration: none;
   opacity: 0;
   transition: opacity 0.15s;
-  user-select: none;
 }
 
 h2 .bk-hash {
@@ -327,17 +331,6 @@ h2 .bk-hash {
 
 .bk-m mjx-container {
   font-size: 1.04em;
-}
-
-mjx-container[jax="SVG"] {
-  direction: ltr;
-  white-space: nowrap;
-}
-
-mjx-container[jax="SVG"] > svg {
-  overflow: visible;
-  min-height: 1px;
-  min-width: 1px;
 }
 
 mjx-container[display] {
@@ -653,6 +646,7 @@ g[data-mml-node="mtable"] > g > svg {
 }
 
 .bk-quote {
+  font-family: var(--font-heading);
   margin: 22px 0 28px;
   padding: 18px 26px;
   background: var(--surface-2);
@@ -686,7 +680,7 @@ g[data-mml-node="mtable"] > g > svg {
   cursor: pointer;
   user-select: none;
   border-radius: 4px;
-  transition: color 0.28s ease-in-out;
+  transition: color 0.3s ease-out;
 }
 
 .bk-fold summary::-webkit-details-marker {
@@ -699,6 +693,7 @@ g[data-mml-node="mtable"] > g > svg {
 
 .bk-fold summary:active {
   color: var(--accent);
+  transition: color 0.12s ease-out;
 }
 
 .bk-fold-icon {
@@ -789,6 +784,7 @@ g[data-mml-node="mtable"] > g > svg {
 }
 
 .bk-embed-h {
+  font-family: var(--font-heading);
   font-weight: 700;
   line-height: 1.4;
   margin: 0 0 8px;
@@ -837,12 +833,12 @@ g[data-mml-node="mtable"] > g > svg {
   text-decoration: none;
   border-radius: 3px;
   padding: 0 2px;
-  transition: background-color 0.15s;
-  user-select: none;
+  transition: background-color 0.3s;
 }
 
 .bk-ref.is-hot a {
   background: var(--mark);
+  transition-duration: 0.15s;
 }
 
 .bk-sn {
@@ -850,8 +846,8 @@ g[data-mml-node="mtable"] > g > svg {
   line-height: 1.7;
   color: var(--ink-2);
   transition:
-    color 0.15s,
-    background-color 0.15s;
+    color 0.3s,
+    background-color 0.3s;
 }
 
 .bk-sn p {
@@ -863,7 +859,8 @@ g[data-mml-node="mtable"] > g > svg {
   font-family: var(--font-mono);
   font-size: 11px;
   margin-right: 6px;
-  user-select: none;
+  border-radius: 3px;
+  transition: background-color 0.3s;
 }
 
 .bk-sn-body {
@@ -876,17 +873,26 @@ g[data-mml-node="mtable"] > g > svg {
 
 .bk-sn.is-hot {
   color: var(--ink);
+  transition-duration: 0.15s;
 }
 
 .bk-sn.is-hot .bk-sn-num {
   background: var(--mark);
-  border-radius: 3px;
+  transition-duration: 0.15s;
 }
 
-.bk-tinted {
-  background: color-mix(in srgb, var(--mark) 60%, transparent);
+.bk-tintable {
   border-radius: 4px;
+  box-shadow: 0 0 0 4px transparent;
+  transition:
+    background-color 0.3s,
+    box-shadow 0.3s;
+}
+
+.bk-tintable.bk-tinted {
+  background: color-mix(in srgb, var(--mark) 60%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--mark) 60%, transparent);
+  transition-duration: 0.15s;
 }
 
 .bk-article > .bk-sn,
@@ -1013,6 +1019,13 @@ g[data-mml-node="mtable"] > g > svg {
     height: auto;
     aspect-ratio: auto;
   }
+}
+
+@media (max-width: 599.98px) {
+  .bk-slot:not([data-state="ready"]) {
+    height: var(--slot-nh, var(--slot-h, auto));
+    aspect-ratio: var(--slot-nratio, var(--slot-ratio, auto));
+  }
 
   .bk-quote {
     font-size: 17px;
@@ -1060,4 +1073,11 @@ g[data-mml-node="mtable"] > g > svg {
 .bk-article :is(.bk-fold-body, .bk-callout, .bk-quote, li, td, th, .bk-embed-part) > :is(.bk-fig, .bk-block)[data-width] {
   width: 100%;
   margin-left: 0;
+}
+
+.bk-article .bk-fig.bk-component[data-width][data-size] {
+  width: var(--fig-w);
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }

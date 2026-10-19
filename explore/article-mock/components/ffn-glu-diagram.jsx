@@ -5,7 +5,7 @@ import './lib/act/diagram.css'
 
 export const params = {}
 
-export const layout = { width: 'body', height: { ratio: 720 / 502 } }
+export const layout = { width: 'body', height: { ratio: 720 / 502 }, narrowHeight: { ratio: 0.545 } }
 
 const UNIT = 42
 const ACT_HEIGHT = 27

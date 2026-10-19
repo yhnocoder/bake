@@ -37,3 +37,9 @@ date: 2026-09-01
   - 乙
 * - 只有一格
 :::
+
+:::fixture-curve{fn=relu width=120%}
+:::
+
+:::fixture-window
+:::

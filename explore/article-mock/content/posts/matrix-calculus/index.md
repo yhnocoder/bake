@@ -10,7 +10,7 @@ toc: notes
 ## 引言 {#intro}
 
 :::aside
-规则本身与 Terence Parr 和 Jeremy Howard 的[《深度学习所需的矩阵微积分》](index.html)[@parr2018]一致。本文把贯穿全文的例子换成了 Transformer 语言模型里的运算。
+规则本身与 Terence Parr 和 Jeremy Howard 的[《深度学习所需的矩阵微积分》](https://yhnocoder.github.io/learn_by_visualization/topics/matrix-calculus/)[@parr2018]一致。本文把贯穿全文的例子换成了 Transformer 语言模型里的运算。
 :::
 
 深度学习里的反向传播，本质上是在回答一个问题：模型中的==某个中间量发生微小变化时，最终的 Loss 会怎样变化==？
@@ -27,7 +27,7 @@ $$
 
 实际写深度学习代码时，我们通常看不到这些推导。PyTorch 会把前向计算记录成计算图，调用 `loss.backward()` 之后，每个参数的 `.grad` 里就有了 Loss 对它的导数，形状与参数相同。本文要说明这个导数是什么，它怎样由每个运算的局部导数经过链式法则得到，以及计算它时为什么不需要矩阵对矩阵那样的高维导数。
 
-本文以 lm head、softmax 与 cross-entropy、SwiGLU FFN 为例来介绍求导规则。而整个模型的反向传播，如 RMSNorm、attention 和 Embedding 的反向规则，以及训练时的显存和计算量，放在第二篇[《Transformer 的反向传播》](transformer-backward.html)。
+本文以 lm head、softmax 与 cross-entropy、SwiGLU FFN 为例来介绍求导规则。而整个模型的反向传播，如 RMSNorm、attention 和 Embedding 的反向规则，以及训练时的显存和计算量，放在第二篇《Transformer 的反向传播》。
 
 本文假定读者了解 Transformer 的各个模块，用 PyTorch 训练过模型，微积分已经生疏 :)。
 
@@ -215,7 +215,7 @@ Transformer：从输入 token_ids 到 loss 的完整计算过程，以及模型�
   - $\displaystyle \frac{\partial Y}{\partial W} \in \mathbb{R}^{r \times s \times p \times q}$
 :::
 
-表中标灰的三格是三维和四维的数组。模型里的运算大多是矩阵进、矩阵出，例如 lm head 的 $Z = XW_{out}$，按这张表，$Z$ 对 $X$ 的导数在右下角的格子里，有 $T \times V \times T \times d$ 个元素。反向传播怎样处理这三格，是本文要回答的问题之一。
+表中右下角的三格，即 $\mathbf{y}$ 对 $W$、$Y$ 对 $\mathbf{x}$ 和 $Y$ 对 $W$ 的导数，是三维和四维的数组。模型里的运算大多是矩阵进、矩阵出，例如 lm head 的 $Z = XW_{out}$，按这张表，$Z$ 对 $X$ 的导数在右下角的格子里，有 $T \times V \times T \times d$ 个元素。反向传播怎样处理这三格，是本文要回答的问题之一。
 
 :::aside{title="记号约定"}
 本文不把矩阵展平，而是保留原有维度，因此 $Y\in\mathbb R^{r\times s}$ 对 $W\in\mathbb R^{p\times q}$ 的完整导数记为 $\mathbb R^{r\times s\times p\times q}$。
@@ -361,7 +361,7 @@ $$
 
 反向传播利用的正是这种组合方式。前向计算沿 $x\to v\to u\to y$ 得到结果；如果最终的 Loss 就是 $y$，反向传播便从 $y$ 出发，先计算 $\dfrac{dy}{du}$，再乘上 $\dfrac{du}{dv}$ 得到 $\dfrac{dy}{dv}$，继续往回得到 $\dfrac{dy}{dx}$。每往回一步，都是把已经得到的梯度与这一段的局部导数组合起来。
 
-:::backprop-path-diagram{paths=chain height=110}
+:::backprop-path-diagram{paths=chain}
 :::
 
 :::recap
@@ -1110,7 +1110,7 @@ $$
 
 ### 例：Loss 对 lm head 输入的梯度 {#head-jac}
 
-:::lm-head-local-view{from=x to=z brace=true height=320}
+:::lm-head-local-view{from=x to=z brace=true}
 :::
 
 考虑单个 token 位置。lm head 的输入是行向量 $\mathbf{x}\in\mathbb{R}^{d}$，权重记作 $W=W_{out}\in\mathbb{R}^{d\times V}$，输出是词表中 $V$ 个 token 的 logits：
@@ -1378,7 +1378,7 @@ $\dfrac{\partial L}{\partial \mathbf{x}} = \dfrac{\partial L}{\partial \mathbf{z
 
 ### 求 lm head 的权重的梯度 {#head-weight toc="lm head 的权重"}
 
-:::lm-head-local-view{from=head to=head brace=true height=320}
+:::lm-head-local-view{from=head to=head brace=true}
 :::
 
 [“例：Loss 对 lm head 输入的梯度”](#head-jac)求出了 $\dfrac{\partial \ell}{\partial \mathbf{x}}$，那时把权重 $W$ 当作常量。但训练要更新的是权重：梯度下降每一步把 $W$ 换成 $W - \eta\,\dfrac{\partial \ell}{\partial W}$，$\eta$ 是学习率。所以还需要 Loss 对 $W$ 的导数。
@@ -1598,7 +1598,7 @@ $T$、$d$、$V$、$N$ 是序列长度、模型宽度、词表大小和 Decoder �
 ### 参考文献 {#references}
 
 :::references
-- [@parr2018] Parr, T. & Howard, J. [The Matrix Calculus You Need For Deep Learning](https://arxiv.org/abs/1802.01528), 2018. 中文翻译见[本站](index.html)。
+- [@parr2018] Parr, T. & Howard, J. [The Matrix Calculus You Need For Deep Learning](https://arxiv.org/abs/1802.01528), 2018. 中文翻译见[旧站](https://yhnocoder.github.io/learn_by_visualization/topics/matrix-calculus/)。
 - [@griewank2008] Griewank, A. & Walther, A. [Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation](https://doi.org/10.1137/1.9780898717761), 2nd ed., SIAM, 2008.
 - [@giles2008] Giles, M. B. [An extended collection of matrix derivative results for forward and reverse mode algorithmic differentiation](https://people.maths.ox.ac.uk/gilesm/files/NA-08-01.pdf), Oxford University Computing Laboratory, Report NA-08-01, 2008.
 - [@zhang2019] Zhang, B. & Sennrich, R. [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467), NeurIPS 2019.

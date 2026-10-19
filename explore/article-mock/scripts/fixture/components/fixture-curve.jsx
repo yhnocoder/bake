@@ -7,7 +7,7 @@ export const params = {
   dashed: { label: '虚线', type: 'boolean', default: false },
 }
 
-export const layout = { width: 'wide', height: 300 }
+export const layout = { width: 'wide', height: 300, narrowHeight: (params) => (params.fn === 'tanh' ? 240 : { ratio: 2 }) }
 
 const functions = { relu: (x) => Math.max(0, x), tanh: Math.tanh }
 

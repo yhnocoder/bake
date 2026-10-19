@@ -67,7 +67,12 @@ function setHot(article, number, on) {
 function tintParagraph(article, number, on) {
   const ref = refsFor(article, number)[0]
   const block = ref?.closest('p, li, td, th, .bk-block, figcaption, blockquote, .bk-callout')
-  block?.classList.toggle('bk-tinted', on)
+  if (!block) return
+  if (!block.classList.contains('bk-tintable')) {
+    block.classList.add('bk-tintable')
+    block.getBoundingClientRect()
+  }
+  block.classList.toggle('bk-tinted', on)
 }
 
 export function startNotes(article) {

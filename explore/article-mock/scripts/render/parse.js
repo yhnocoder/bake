@@ -8,7 +8,7 @@ import { parse as parseYaml } from 'yaml'
 import { visit, SKIP } from 'unist-util-visit'
 
 export const widthDirective = 'bkwidth'
-const pipeInMath = ''
+export const pipeInMath = ''
 const namelessDirective = /^(\s*(?:>\s*)*)(:{3,})\{/gm
 
 function protectTablePipes(source) {
