@@ -8,7 +8,7 @@ import { serve } from './server.js';
 const filler = (topic) => Array.from({ length: 6 }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
 const body = [
-  'The introduction.',
+  filler('the introduction'),
   '',
   '## Folds {#folds}',
   '',
@@ -37,6 +37,8 @@ const body = [
   ':::references',
   '- [@shazeer] Shazeer. *GLU Variants Improve Transformer*. 2020.',
   ':::',
+  '',
+  filler('the end'),
   '',
 ].join('\n');
 
