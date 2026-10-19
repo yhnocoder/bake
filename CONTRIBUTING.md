@@ -4,7 +4,7 @@ Bake is being rebuilt from scratch to follow the redesign. This file holds the a
 
 ## Tool and blog are separate
 
-This repository contains only the tool: the CLI, the Markdown pipeline, the built-in themes and the optional component kit. Posts, components, custom themes and site settings live in the blog's own repository. Bake never assumes a particular blog, and nothing blog-specific is committed here. Test blogs are created by tests in temporary directories.
+This repository contains only the tool: the CLI, the Markdown pipeline, the built-in themes and the optional component kit. Posts, components, custom themes and site settings live in the blog's own repository. Bake never assumes a particular blog. `examples/blog/` is the only blog in this repository: it holds the syntax article that lists every syntax item, serves as the source of the tutorial, and is the integration test fixture. Unit tests that need other blogs, such as error cases, create them in temporary directories.
 
 ## Planned layout
 
@@ -21,6 +21,7 @@ The layout grows task by task. Only `src/cli.js` exists today.
 | `src/themes/essay/`, `src/themes/bento/` | Built-in themes: page structure in SolidJS JSX plus styles |
 | `src/kit/` | Optional parts for writing components |
 | `test/` | Unit and integration tests, see TESTING.md |
+| `examples/blog/` | The example blog: the syntax article and the posts it links to |
 | `scripts/` | Repository checks |
 
 ## Themes interpret, they never add syntax
@@ -56,3 +57,4 @@ The format is `file:line:col message`, with the path relative to the blog root a
 |---|---|
 | No comments except `why: <reason>` | `scripts/check_comment.py`, tested by `test/check-comment.test.js` |
 | CLI output is English and lists the commands | `test/cli.test.js` |
+| The syntax article's error appendix matches `test/fixtures/syntax-errors/` | `test/syntax-article.test.js` |
