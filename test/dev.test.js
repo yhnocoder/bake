@@ -89,6 +89,22 @@ describe('bake dev', () => {
     assert.match(listing, /<script src="\/__bake\/client.js" data-bake-dev data-missing><\/script><\/body>/);
   });
 
+  test('serves the homepage at / with drafts and the page script', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', date: '2026-10-20', extra: 'draft: true\n' }),
+    });
+    const { get } = await start(t, dir);
+    const home = await get('/');
+    assert.equal(home.status, 200);
+    const html = await home.text();
+    assert.match(html, /<title>Test Blog<\/title>/);
+    assert.match(html, /href="2026-10\/rope\/"/);
+    assert.match(html, /href="2026-10\/gelu\/"[\s\S]*<span class="bk-card-draft">Draft<\/span>/);
+    assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
+  });
+
   test('prints problems as file:line:col lines, sends them to the page and prints when they are fixed', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
@@ -159,6 +175,41 @@ describe('preview updates', () => {
     assert.match(third.pages[0].outputs[0].render(), /<header class="custom-header">/);
   });
 
+  test('compiles the site theme again with home.jsx when an article theme becomes the site theme', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
+      'themes/plain/page.jsx': 'export default function Page(props) {\n  return <html><body>{props.article.title}</body></html>;\n}\n',
+      'themes/plain/client.jsx': '',
+    });
+    const site = createSite(dir);
+    assert.deepEqual((await updateSite(site)).errors, []);
+    writeFiles(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" });
+    const result = await updateSite(site, ['bake.config.js']);
+    assert.deepEqual(result.errors.map(formatError), ['themes/plain:1:1 theme "plain" has no home.jsx']);
+  });
+
+  test('the homepage reloads when the front matter of an article changes or an article is added', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+    });
+    const preview = createPreview(dir);
+    await preview.update();
+    assert.match(indexHtml(preview, '/'), /Rope/);
+    writeFiles(dir, { 'content/posts/rope/index.md': article({ body: 'Changed.\n' }) });
+    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: [], refresh: ['/2026-10/rope/'] });
+    writeFiles(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again', body: 'Changed.\n' }) });
+    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/rope/'], refresh: [] });
+    assert.match(indexHtml(preview, '/'), /Rope again/);
+    writeFiles(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu' }) });
+    assert.deepEqual(await preview.update(['content/posts/gelu/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/gelu/'], refresh: [] });
+    assert.match(indexHtml(preview, '/'), /GELU/);
+    rmSync(join(dir, 'content/posts/gelu'), { recursive: true });
+    assert.deepEqual(await preview.update(['content/posts/gelu/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/gelu/'], refresh: [] });
+    assert.doesNotMatch(indexHtml(preview, '/'), /GELU/);
+  });
+
   test('an article with errors keeps its last good page while other articles update', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
@@ -209,7 +260,7 @@ describe('preview updates', () => {
     const preview = createPreview(dir);
     await preview.update();
     writeFiles(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) });
-    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: ['/2026-10/rope/'], refresh: [] });
+    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/rope/'], refresh: [] });
     writeFiles(dir, { 'components/demo-chart.js': 'export {};\n' });
     assert.equal((await preview.update(['components/demo-chart.js'])).reload, 'all');
     writeFiles(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com' };\n" });

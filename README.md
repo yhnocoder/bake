@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article and the homepage in the `essay` theme. `bake dev` serves the same article pages and updates them on every save. The `bento` theme, the homepage in `bake dev`, the table of contents styles other than `notes` and components are not built yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article and the homepage in the `essay` theme. `bake dev` serves the same pages and the homepage and updates them on every save. The `bento` theme, the table of contents styles other than `notes` and components are not built yet.
 
 ## Commands
 
@@ -27,12 +27,13 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 - Saving the Markdown of an article replaces the article text on the open page in place. The scroll position, the table of contents and the open or closed state of every fold stay as they were. Each changed block is highlighted in light yellow for one second. When no changed block is on the screen, a notice at the bottom of the page names the section of the change, and clicking the notice scrolls there. Bake checks the links of every article again after each save, so the pages of other articles that link to the changed article or embed one of its sections are updated in the same way, and a link that no longer finds its target is reported.
 - Changing the front matter of an article, `bake.config.js`, `preamble.sty` or a file in `themes/` generates the page again, and the browser reloads it at the same scroll position.
 - Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
+- The homepage at http://localhost:4321/ shows every article, drafts included, and reloads when the front matter of an article changes or an article is added or removed.
 
 Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While an article has errors, its page keeps showing the last version without errors, and the other articles keep updating. Errors outside the articles, such as in `bake.config.js`, `preamble.sty` or a theme, stop all updates until they are fixed.
 
 Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
 
-A draft shows the label Draft, or 草稿 on a Chinese site, next to its date. An address without a page, such as http://localhost:4321/, where `bake dev` does not serve the homepage yet, lists every article with a link, drafts included.
+A draft shows the label Draft, or 草稿 on a Chinese site, next to its date on its page and on its card on the homepage. An address without a page lists every article with a link, drafts included.
 
 ## A blog repository
 
