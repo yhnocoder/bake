@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 import { build } from './build/build.js';
 import { newArticle } from './build/new-article.js';
+import { configNotFoundError, hasConfig } from './config/bake-config.js';
+import { DEFAULT_PORT, startDevServer } from './dev/server.js';
 import { errorCountLine, formatError } from './report.js';
 
 const usage = `Usage: bake <command>
 
 Commands:
-  new <path>   Create content/posts/<path>/index.md as a draft
-  dev          Serve the blog locally and update pages on save (not implemented yet)
-  build        Check the blog and generate the static site into dist/
+  new <path>         Create content/posts/<path>/index.md as a draft
+  dev                Serve the blog at http://localhost:4321/ and update pages on save
+  build              Check the blog and generate the static site into dist/
 
 Options:
-  -h, --help   Show this help`;
+  --port <number>    Port for bake dev; when it is in use, the next free port is used
+  -h, --help         Show this help`;
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -22,7 +25,7 @@ if (command === '--help' || command === '-h') {
 } else if (command === 'build') {
   await runBuild(args);
 } else if (command === 'dev') {
-  fail('bake dev: not implemented yet');
+  await runDev(args);
 } else {
   fail(command === undefined ? usage : `Unknown command ${command}\n\n${usage}`);
 }
@@ -41,6 +44,25 @@ async function runBuild(args) {
     return fail([...result.errors.map(formatError), errorCountLine(result.errors.length)].join('\n'));
   }
   console.log(`${result.pages} ${result.pages === 1 ? 'page' : 'pages'}\ndist/ written`);
+}
+
+async function runDev(args) {
+  const port = devPort(args);
+  if (port === null) return fail('Usage: bake dev [--port <number>]');
+  if (!hasConfig(process.cwd())) return fail(formatError(configNotFoundError()));
+  let server;
+  try {
+    server = await startDevServer(process.cwd(), { port });
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : String(error));
+  }
+  process.once('SIGINT', () => server.close().then(() => process.exit(0)));
+}
+
+function devPort(args) {
+  if (args.length === 0) return DEFAULT_PORT;
+  if (args.length !== 2 || args[0] !== '--port' || !/^\d+$/.test(args[1]) || Number(args[1]) > 65535) return null;
+  return Number(args[1]);
 }
 
 function fail(message) {

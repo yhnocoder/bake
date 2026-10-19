@@ -6,11 +6,11 @@ export function Article(props) {
   const { content, labels } = props;
   const { intro, sections, rest } = arrange(content);
   return (
-    <article class="bk-article">
+    <article class="bk-article" data-region="article">
       <Flow entries={intro} labels={labels} />
       {sections.map(({ section, notes, entries }) => (
         <section class="bk-section">
-          <h2 id={section.id}>
+          <h2 id={section.id} data-line={section.line}>
             <span class="bk-chapter-number">{section.number}</span>
             <HeadingLink id={section.id} labels={labels} />
             <span class="bk-heading-text" innerHTML={section.title} />
@@ -58,15 +58,15 @@ function Block(props) {
   if (block.type === 'heading') return <Heading block={block} labels={labels} />;
   if (block.type === 'references') {
     return (
-      <div class="bk-block bk-references" data-type="references">
+      <div class="bk-block bk-references" data-type="references" data-line={block.line}>
         {afterHeading ? null : <p class="bk-references-label">{labels.references}</p>}
         <div class="bk-references-list" innerHTML={block.html} />
       </div>
     );
   }
   const width = blockWidth(block);
-  if (block.naturalWidth === undefined) return <div class="bk-block" data-type={block.type} data-width={width} innerHTML={block.html} />;
-  return <div class="bk-block" data-type={block.type} data-width={width} style={`--natural-width:${block.naturalWidth}`} innerHTML={block.html} />;
+  if (block.naturalWidth === undefined) return <div class="bk-block" data-type={block.type} data-width={width} data-line={block.line} innerHTML={block.html} />;
+  return <div class="bk-block" data-type={block.type} data-width={width} data-line={block.line} style={`--natural-width:${block.naturalWidth}`} innerHTML={block.html} />;
 }
 
 function blockWidth(block) {
@@ -79,10 +79,10 @@ function blockWidth(block) {
 function Heading(props) {
   const { block, labels } = props;
   const content = [<HeadingLink id={block.id} labels={labels} />, <span class="bk-heading-text" innerHTML={block.title} />];
-  if (block.depth <= 3) return <h3 id={block.id}>{content}</h3>;
-  if (block.depth === 4) return <h4 id={block.id}>{content}</h4>;
-  if (block.depth === 5) return <h5 id={block.id}>{content}</h5>;
-  return <h6 id={block.id}>{content}</h6>;
+  if (block.depth <= 3) return <h3 id={block.id} data-line={block.line}>{content}</h3>;
+  if (block.depth === 4) return <h4 id={block.id} data-line={block.line}>{content}</h4>;
+  if (block.depth === 5) return <h5 id={block.id} data-line={block.line}>{content}</h5>;
+  return <h6 id={block.id} data-line={block.line}>{content}</h6>;
 }
 
 function HeadingLink(props) {
@@ -95,7 +95,7 @@ function HeadingLink(props) {
 
 function Sidenotes(props) {
   return props.notes.map((note) => (
-    <aside class="bk-sidenote" id={note.id} data-sidenote={note.number}>
+    <aside class="bk-sidenote" id={note.id} data-sidenote={note.number} data-line={note.line}>
       <span class="bk-sidenote-number">{note.number}</span>
       <div class="bk-sidenote-body" innerHTML={note.html} />
     </aside>

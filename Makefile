@@ -1,4 +1,4 @@
-.PHONY: check browser example screenshots
+.PHONY: check browser example dev screenshots
 
 BASE ?= origin/main
 
@@ -15,6 +15,9 @@ browser: node_modules
 example: node_modules
 	cd examples/blog && node ../../src/cli.js build
 	python3 -m http.server --directory examples/blog/dist --bind 127.0.0.1 8000
+
+dev: node_modules
+	cd examples/blog && node ../../src/cli.js dev
 
 screenshots: node_modules
 	scripts/screenshots.sh $(BASE)

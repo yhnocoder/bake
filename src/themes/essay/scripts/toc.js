@@ -1,6 +1,6 @@
 import { labelsFor } from '../labels.js';
 import { startDrawer } from './drawer.jsx';
-import { LAYOUT_EVENT, oncePerFrame, reducedMotion } from './motion.js';
+import { CONTENT_EVENT, LAYOUT_EVENT, oncePerFrame, reducedMotion } from './motion.js';
 
 const READING_LINE = 0.3;
 const READING_LINE_MAX = 240;
@@ -14,10 +14,16 @@ export function startToc(article) {
   const sticky = nav.querySelector('.bk-toc-sticky');
   const copy = list.cloneNode(true);
   startDrawer(copy, labelsFor(document.documentElement.lang));
-  const views = [list, copy].map(readView);
-  const headings = views[0].entries.map((entry) => document.getElementById(entry.dataset.target));
+  let views = [];
+  let headings = [];
   let current = null;
   let crossing = [];
+  const read = () => {
+    views = [list, copy].map(readView);
+    headings = views[0].entries.map((entry) => document.getElementById(entry.dataset.target));
+    current = null;
+  };
+  read();
 
   const update = oncePerFrame(() => {
     sticky.style.setProperty('--toc-top', `${Math.max(0, Math.round(sticky.getBoundingClientRect().top))}px`);
@@ -40,6 +46,10 @@ export function startToc(article) {
   addEventListener('scroll', update, { passive: true });
   addEventListener('resize', layout);
   document.addEventListener(LAYOUT_EVENT, layout);
+  document.addEventListener(CONTENT_EVENT, () => {
+    read();
+    layout();
+  });
   new ResizeObserver(layout).observe(article);
 }
 

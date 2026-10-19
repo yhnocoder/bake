@@ -2,6 +2,8 @@ export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 export const LAYOUT_EVENT = 'bk:layout';
 
+export const CONTENT_EVENT = 'bake:content';
+
 const COLLAPSED = { height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px', opacity: 0 };
 const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 

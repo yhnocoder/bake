@@ -33,7 +33,7 @@ describe('themes', () => {
     const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
     assert.match(page, /<header class="custom-header">Custom (<!--!\$-->)?Rope<\/header>/);
     assert.doesNotMatch(page, /bk-header/);
-    assert.match(page, /<article class="bk-article">/);
+    assert.match(page, /<article class="bk-article" data-region="article">/);
   });
 
   test('a folder in themes/ adds a theme that articles can choose', (t) => {
@@ -53,7 +53,7 @@ describe('themes', () => {
     assert.equal(plainStyles.length, 1);
     assert.equal(page, `<!doctype html>\n<html lang="en"><head><title>Rope</title><link rel="stylesheet" href="../../assets/${plainStyles[0]}"></head><body><main><p>Plain <em>text</em>.</p></main></body></html>\n`);
     assert.match(readFileSync(join(dir, 'dist/assets', plainStyles[0]), 'utf8'), /main\{color:red\}/);
-    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<article class="bk-article">/);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<article class="bk-article" data-region="article">/);
     assert.ok(assets.some((name) => /^essay-[\w-]+\.css$/.test(name)));
   });
 

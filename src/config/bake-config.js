@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -29,16 +30,17 @@ export async function loadBakeConfig(root, themes, errors) {
     return null;
   }
   const path = join(root, CONFIG_FILE);
+  const source = readFileSync(path, 'utf8');
   let program;
   try {
-    program = parse(readFileSync(path, 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+    program = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
   } catch (error) {
     errors.push(errorAt(CONFIG_FILE, { line: error.loc.line, column: error.loc.column + 1 }, error.message.replace(/ \(\d+:\d+\)$/, '')));
     return null;
   }
   let exported;
   try {
-    exported = (await import(pathToFileURL(path).href)).default;
+    exported = (await import(`${pathToFileURL(path).href}?version=${createHash('sha256').update(source).digest('hex')}`)).default;
   } catch (error) {
     errors.push(errorAt(CONFIG_FILE, fileStart, firstLine(error instanceof Error ? error.message : String(error))));
     return null;

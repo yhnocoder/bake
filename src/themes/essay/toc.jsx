@@ -6,7 +6,7 @@ export function Toc(props) {
       <div class="bk-toc-sticky">
         <p class="bk-toc-label">{labels.notes}</p>
         <div class="bk-toc-scroll">
-          <ol class="bk-toc-list">
+          <ol class="bk-toc-list" data-region="toc">
             {toc.map((chapter) => (
               <li class="bk-toc-chapter" data-state="ahead">
                 <TocEntry entry={chapter} number={chapter.number} />

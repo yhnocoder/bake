@@ -8,7 +8,6 @@ const EDGE = 12;
 const OFFSET = 8;
 
 export function startCitations(article) {
-  if (article.querySelector('a.citation') === null) return;
   const [entry, setEntry] = createSignal(null);
   const [shown, setShown] = createSignal(false);
   let showTimer;
