@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
+import sharp from 'sharp';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 
 const exampleBlog = join(import.meta.dirname, '../examples/blog');
@@ -49,7 +50,7 @@ describe('bake build', () => {
       'icons/favicon.svg',
     ].sort());
     assert.equal(
-      tree['2026-10/rope/index.html'].toString(),
+      tree['2026-10/rope/index.html'].toString().replace(/<style>[\s\S]*?<\/style>\n/, ''),
       [
         '<!doctype html>',
         '<html lang="en">',
@@ -222,10 +223,47 @@ describe('bake build', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     assert.equal(result.stdout, '2 pages\ndist/ written\n');
-    assert.match(readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8'), /<h1>Bake 写法一览<\/h1>/);
+    const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
+    assert.match(page, /<h1>Bake 写法一览<\/h1>/);
+    assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
+    assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));
   });
+  test('writes raster images as WebP next to the original files', async (t) => {
+    const photo = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#985b57' } }).png().toBuffer();
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ body: '![Angles](angles.png)\n' }),
+      'content/posts/rope/angles.png': photo,
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const tree = readTree(join(dir, 'dist'));
+    assert.deepEqual(Object.keys(tree), ['2026-10/rope/angles.png', '2026-10/rope/angles.webp', '2026-10/rope/index.html']);
+    assert.deepEqual(tree['2026-10/rope/angles.png'], photo);
+    assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
+    assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
+  });
+
+  test('reports preamble.sty errors and does not check the articles', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'preamble.sty': '\\newcommand{\\R}{\\mathbb{R}}\n\\newcommand{\\bad}[x]{y}\n\\usepackage{tikz}\n',
+      'content/posts/rope/index.md': article({ body: '$\\undefined$\n' }),
+    });
+    const result = bake(dir, 'build');
+    assert.equal(
+      result.stderr,
+      [
+        'preamble.sty:2:1 MathJax cannot read this definition: Illegal number of parameters specified in \\newcommand',
+        'preamble.sty:3:1 \\usepackage cannot be used in preamble.sty, which accepts \\newcommand, \\renewcommand, \\DeclareMathOperator, \\def, \\let, \\newenvironment, \\renewenvironment, \\ProvidesPackage and \\RequirePackage',
+        '2 errors, dist/ was not written',
+        '',
+      ].join('\n'),
+    );
+  });
+
   test('removes staging folders left by an interrupted build', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

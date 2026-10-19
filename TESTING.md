@@ -6,6 +6,8 @@
 |---|---|
 | `make check` | Comment check, shellcheck on shell scripts (when installed), unit tests |
 | `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
+| `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`) |
+| `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
 | `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://127.0.0.1:8000/ |
 | `python3 scripts/check_comment.py [file...]` | Comment check on the given files, or on every tracked file |
 
@@ -19,7 +21,7 @@
 
 During development, run the unit tests plus the tests the change affects. CI runs the full PR tier; watch it and fix it when it turns red. Run the full suite locally only for large or risky changes, or for what CI cannot cover, such as performance measurements or screenshot comparisons at a milestone. Small gaps between tiers are acceptable; a large regression, and whatever is being fixed right now, must be tested in every tier.
 
-Today CI runs `make check`. Browser tests and nightly jobs are added by the tasks that need them. Performance jobs run alone, never in parallel with other heavy jobs.
+Today CI runs `make check`, then installs Playwright's Chromium and runs `npm run test:browser`. Nightly jobs are added by the tasks that need them. Performance jobs run alone, never in parallel with other heavy jobs.
 
 ## Rules for tests
 
@@ -33,4 +35,4 @@ Today CI runs `make check`. Browser tests and nightly jobs are added by the task
 
 ## Browsers
 
-Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. Manual testing on macOS goes through Makefile targets, and those targets must keep working.
+Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working.

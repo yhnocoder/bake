@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article and writes one plain page per article with its sections and sidenotes until the themes are added. Math is not typeset yet, code is not highlighted, and images, components, links between articles and `:::example`, `:::list-table` and `:::embed` blocks are not checked or laid out yet. `bake dev` is not implemented yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images and writes one plain page per article with its sections and sidenotes until the themes are added. Components, links between articles and `:::embed` blocks are not checked or laid out yet. `bake dev` is not implemented yet.
 
 ## Commands
 
@@ -142,9 +142,61 @@ A block starts with a line of three or more colons and a name, and ends with a l
 | `:::fold{title="Derivation"}` | A collapsed part that opens when the reader clicks its title. The title is required. |
 | `:::recap` | The summary of the current `##` or `###` section. It is not shown in the text; the `notes` table of contents shows it under the section once the reader has read it. A section has at most one. |
 | `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
+| `:::list-table` | A table written as a nested list, see below. |
+| `:::example` | Shows the Markdown source of its content next to the result, see below. |
 | `:::{width=wide}` | Sets the width of the one block inside it to `body`, `wide` or `page`. |
 
 Any other block name without a `-` is an error, and so is an attribute the block does not know. A name with a `-` is an interactive component.
+
+### Math
+
+Math between `$` signs is inline and math between `$$` lines is a display formula. Bake typesets every formula at build time with MathJax into SVG, so the published page loads no math script. A formula MathJax cannot typeset is an error that quotes MathJax's message.
+
+A display formula with `\label{name}` is numbered, and `\eqref{name}` in the text or in another formula links to it and shows its number. Numbered environments such as `align` number each line that is not marked `\notag`. A reference to an unknown label and two equations with the same label are errors.
+
+`preamble.sty` in the blog root holds math macros shared by every article. It may only contain `\newcommand`, `\renewcommand`, `\DeclareMathOperator`, `\def`, `\let`, `\newenvironment`, `\renewenvironment`, `\ProvidesPackage` and `\RequirePackage`, and `\RequirePackage` only accepts packages that MathJax provides: amsmath, amssymb, amsfonts, mathtools, braket, cancel, cases, color, xcolor, gensymb and upgreek. Anything else in the file is an error. Macros defined inside one article apply only to that article.
+
+### Code
+
+A fenced code block names its language after the opening fence. Bake highlights it at build time with Shiki. The colors are CSS variables named `--code-…`, so the theme sets them and switches them in dark mode. An unknown language name is an error; a block without a language is shown as plain text.
+
+### Tables
+
+GitHub tables work as usual, and a `|` inside `$…$` in a table cell belongs to the formula and does not split the cell. A table wider than the column scrolls horizontally.
+
+`:::list-table` writes a table as a nested list. Each item of the outer list is a row, and each item of its inner list is a cell, so a cell can hold several paragraphs, lists or code. The first row is the header. Every row must have as many cells as the header row.
+
+```markdown
+:::list-table
+- - Function
+  - Formula
+- - ReLU
+  - $\max(0, x)$
+:::
+```
+
+### Images
+
+`![alt](relu.svg "Caption")` shows an image from the article folder. When the image stands alone on the first line of a paragraph, it is shown as a figure, its quoted title becomes the caption, and the lines after it form a new paragraph. An image inside a line of text stays inline. Braces after the image set its size and position:
+
+```markdown
+![ReLU](relu.png "The ReLU function"){width=280px float=right}
+```
+
+| Attribute | Meaning |
+|---|---|
+| `width`, `height` | Display size in pixels, such as `280px`, or as a percentage of the column, such as `50%`. When both are set they use the same unit. |
+| `float` | `left` or `right`: the text flows around the figure. Only for a figure. |
+
+Bake reads every image at build time and writes its width and height into the page, so the page does not shift while images load, and images load lazily. PNG, JPEG, GIF and WebP images are published as WebP next to the original name, PNG and GIF without loss. An image wider than twice its largest display width, or twice the page width of 1340 pixels when no width is set, is scaled down. SVG and AVIF images are published unchanged. An image that is not a file in the article folder, an image in another format and two images published under the same name are errors. To make an image wider than the text, wrap it in `:::{width=wide}` or `:::{width=page}`.
+
+### Widths
+
+`:::{width=body}`, `:::{width=wide}` and `:::{width=page}` set the width of the one block inside them, such as a formula, a code block, a table, an image or a component. `body` is the width of the text, `wide` extends into the margin and `page` uses the whole page. The theme decides how each width is laid out.
+
+### Examples
+
+`:::example` shows the Markdown source of its content next to the rendered result; on a narrow screen the source is above the result. Headings inside an example do not enter the table of contents or the section numbering. Sidenotes, citations and equation numbers inside an example are numbered together with the rest of the article.
 
 ### Sidenotes and citations
 

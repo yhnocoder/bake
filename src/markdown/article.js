@@ -1,3 +1,4 @@
+import { join, posix } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
 import remarkCjkFriendly from 'remark-cjk-friendly';
@@ -8,12 +9,17 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { WIDTHS, choiceProblem } from '../config/rules.js';
+import { describeValue, errorAt } from '../report.js';
+import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { renderChildrenHtml, renderHtml, renderInlineHtml } from '../render/html.js';
-import { errorAt } from '../report.js';
+import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
+import { typesetMath } from '../render/math.js';
 import { parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
 import { citationsAndMissingFootnotes } from './bracket-syntax.js';
+import { equationReferences } from './eqref-syntax.js';
 import { highlight } from './highlight-syntax.js';
+import { protectPipesInMath, restorePipesInMath } from './table-math.js';
 
 const processor = unified()
   .use(remarkParse)
@@ -24,6 +30,7 @@ const processor = unified()
   .use(remarkCjkFriendlyStrikethrough, { singleTilde: false })
   .use(highlight)
   .use(citationsAndMissingFootnotes)
+  .use(equationReferences)
   .use(bakeBlocks)
   .freeze();
 
@@ -41,27 +48,37 @@ const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
 const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
 const STRAY_CLOSING_LINE = /^([\s>]*):{3,}\s*$/;
 const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
+const IMAGE_ATTRIBUTES = /^\{[^{}\n]*\}/;
+const IMAGE_SIZE = /^(\d+(?:\.\d+)?)(px|%)$/;
+const IMAGE_FLOATS = ['left', 'right'];
+const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 
-export function parseArticle(file, source, errors) {
-  const article = new ArticleParser(file, source, errors);
+export async function parseArticle(file, source, errors, { folder = null, preamble = [] } = {}) {
+  const article = new ArticleParser(file, source, errors, folder, preamble);
   return article.parse();
 }
 
 class ArticleParser {
-  constructor(file, source, errors) {
+  constructor(file, source, errors, folder, preamble) {
     this.file = file;
     this.source = source;
     this.errors = errors;
+    this.folder = folder;
+    this.preamble = preamble;
+    this.equations = new Map();
+    this.images = new Map();
     this.anchors = new Map();
     this.definitions = new Map();
     this.sidenotes = new Map();
     this.recapLines = new Map();
     this.citations = new Map();
     this.references = [];
-    this.notes = {
+    this.context = {
       sidenoteNumber: (identifier) => this.sidenotes.get(identifier).number,
       citationNumber: (key) => this.citations.get(key),
       references: () => this.references,
+      equation: (label) => this.equations.get(label),
+      highlighter: null,
     };
   }
 
@@ -69,8 +86,9 @@ class ArticleParser {
     this.errors.push(errorAt(this.file, position, message));
   }
 
-  parse() {
-    const tree = processor.parse(this.source);
+  async parse() {
+    const tree = processor.parse(protectPipesInMath(this.source));
+    restorePipesInMath(tree);
     tree.children = tree.children.filter((node) => node.type !== 'yaml');
     walk(tree, (node) => {
       if (node.type === 'bakeBlock') this.readBlock(node);
@@ -81,10 +99,16 @@ class ArticleParser {
       }
     });
     this.resolveLinkReferences(tree);
+    this.readImageAttributes(tree);
     this.readFootnotes(tree);
     this.readCitations(tree);
+    this.readListTables(tree);
+    this.readExamples(tree);
+    await this.renderMath(tree);
     this.checkGeneratedIds();
     this.assignHeadingIds(tree);
+    await this.loadCodeLanguages(tree);
+    await this.readImages(tree);
     return this.buildStructure(tree);
   }
 
@@ -180,7 +204,136 @@ class ArticleParser {
     const ids = new Map();
     for (const { number } of this.sidenotes.values()) ids.set(`sidenote-${number}`, `sidenote ${number}`);
     for (const { key } of this.references) ids.set(`reference-${key}`, `the reference "${key}"`);
+    for (const [label, { id }] of this.equations) ids.set(id, `the equation \\label{${label}}`);
     return ids;
+  }
+
+  readListTables(tree) {
+    walk(tree, (node) => {
+      if (node.type !== 'bakeBlock' || node.name !== 'list-table') return;
+      const [list] = node.children;
+      if (node.children.length !== 1 || list.type !== 'list') {
+        this.report(node.position.start, ':::list-table must contain one list whose items are the rows of the table');
+        return;
+      }
+      const rows = [];
+      for (const item of list.children) {
+        const [cells] = item.children;
+        if (item.children.length !== 1 || cells.type !== 'list') {
+          this.report(item.position.start, 'each :::list-table item is a row that holds a list of its cells');
+          return;
+        }
+        rows.push(cells.children);
+      }
+      rows.forEach((cells, index) => {
+        if (cells.length !== rows[0].length) this.report(list.children[index].position.start, `list-table row ${index + 1} has ${cells.length} ${cells.length === 1 ? 'cell' : 'cells'}, the header row has ${rows[0].length}`);
+      });
+      node.rows = rows;
+    });
+  }
+
+  readExamples(tree) {
+    walk(tree, (node) => {
+      if (node.type === 'bakeBlock' && node.name === 'example') node.sourceText = this.blockSource(node);
+    });
+  }
+
+  blockSource(node) {
+    const start = this.source.indexOf('\n', node.position.start.offset) + 1;
+    const end = node.closed ? this.source.lastIndexOf('\n', node.position.end.offset - 1) : node.position.end.offset;
+    if (start === 0 || end < start) return '';
+    const indent = node.position.start.column - 1;
+    return this.source
+      .slice(start, end)
+      .split('\n')
+      .map((line) => line.replace(/\r$/, '').slice(Math.min(indent, /^[ \t]*/.exec(line)[0].length)))
+      .join('\n');
+  }
+
+  async renderMath(tree) {
+    const formulas = [];
+    const references = [];
+    this.walkWithSidenotes(tree, (node) => {
+      if (node.type === 'math' || node.type === 'inlineMath') formulas.push(node);
+      if (node.type === 'eqref') references.push(node);
+    });
+    if (formulas.length === 0 && references.length === 0) return;
+    const { results, labels } = await typesetMath(
+      this.preamble,
+      formulas.map((node) => ({ tex: node.value, display: node.type === 'math' })),
+    );
+    this.equations = labels;
+    formulas.forEach((node, index) => {
+      const result = results[index];
+      node.rendered = result.html;
+      if (result.error !== undefined) this.report(node.position.start, `MathJax cannot typeset this formula: ${result.error}`);
+      for (const reference of result.references) {
+        if (!labels.has(reference.label)) this.report(node.position.start, `${reference.text} refers to an unknown \\label`);
+      }
+    });
+    for (const node of references) {
+      if (!labels.has(node.label)) this.report(node.position.start, `${node.value} refers to an unknown \\label`);
+    }
+  }
+
+  async loadCodeLanguages(tree) {
+    const languages = new Set();
+    this.walkWithSidenotes(tree, (node) => {
+      if (node.type === 'bakeBlock' && node.name === 'example') languages.add('markdown');
+      if (node.type !== 'code') return;
+      if (node.lang && !isKnownLanguage(node.lang)) {
+        this.report(node.position.start, `unknown code language "${node.lang}"`);
+        node.lang = null;
+      }
+      languages.add(node.lang ?? 'text');
+    });
+    if (languages.size > 0) this.context.highlighter = await loadLanguages([...languages]);
+  }
+
+  async readImages(tree) {
+    const nodes = [];
+    this.walkWithSidenotes(tree, (node) => {
+      if (node.type === 'image') nodes.push(node);
+    });
+    const sources = new Map();
+    for (const node of nodes) {
+      node.published = { src: node.url };
+      if (node.attributes.float !== undefined && !node.inFigure) this.report(node.attributesPosition, 'float only applies to an image that starts a paragraph');
+      const source = this.imageSource(node.url);
+      if (source === null) {
+        this.report(node.position.start, `image ${node.url} is not a file in the article folder`);
+        continue;
+      }
+      if (!sources.has(source)) sources.set(source, { image: await readImage(join(this.folder.path, source)), nodes: [] });
+      const entry = sources.get(source);
+      if (entry.image === null) this.report(node.position.start, `image ${source} is not a ${IMAGE_FORMATS} file`);
+      else entry.nodes.push(node);
+    }
+    const owners = new Map();
+    for (const [source, { image, nodes: uses }] of sources) {
+      if (uses.length === 0) continue;
+      const published = publishedImage(source, image, uses.map((node) => displayWidth(node, image)));
+      const position = uses[0].position.start;
+      if (published.path !== source && this.folder.files.includes(published.path)) {
+        this.report(position, `image ${source} is published as ${published.path}, which is also a file in the article folder`);
+      } else if (owners.has(published.path)) {
+        this.report(position, `images ${owners.get(published.path)} and ${source} are both published as ${published.path}`);
+      }
+      owners.set(published.path, source);
+      if (published.convert !== null) this.images.set(source, { source, path: published.path, ...published.convert });
+      for (const node of uses) node.published = imageProperties(node.attributes, published);
+    }
+  }
+
+  imageSource(url) {
+    if (this.folder === null || URL_SCHEME.test(url) || url.startsWith('/')) return null;
+    let path;
+    try {
+      path = posix.normalize(decodeURIComponent(url.split(/[?#]/)[0]));
+    } catch {
+      return null;
+    }
+    return this.folder.files.includes(path) ? path : null;
   }
 
   checkGeneratedIds() {
@@ -215,6 +368,69 @@ class ArticleParser {
       const { url, title } = definitions.get(node.identifier);
       Object.assign(node, node.type === 'linkReference' ? { type: 'link', url, title } : { type: 'image', url, title });
     });
+  }
+
+  readImageAttributes(tree) {
+    const paragraphs = [];
+    walk(tree, (node, parent) => {
+      if (node.type === 'paragraph' && node.children[0]?.type === 'image' && (parent.type === 'root' || parent.type === 'bakeBlock')) paragraphs.push({ paragraph: node, parent });
+      if (node.type !== 'image') return;
+      node.attributes = {};
+      const next = parent.children[parent.children.indexOf(node) + 1];
+      const match = next?.type === 'text' ? IMAGE_ATTRIBUTES.exec(next.value) : null;
+      if (!match) return;
+      const position = next.position.start;
+      next.value = next.value.slice(match[0].length);
+      next.position = { ...next.position, start: this.positionAt(position.offset + match[0].length) };
+      if (next.value === '') parent.children.splice(parent.children.indexOf(next), 1);
+      const { attributes, error } = parseAttributes(match[0]);
+      if (error) this.report(position, error);
+      node.attributes = attributes;
+      node.attributesPosition = position;
+      this.checkImageAttributes(attributes, position);
+    });
+    for (const { paragraph, parent } of paragraphs) this.splitFigure(paragraph, parent);
+  }
+
+  checkImageAttributes(attributes, position) {
+    this.checkKnownAttributes(attributes, ['width', 'height', 'float'], 'image', position);
+    for (const name of ['width', 'height']) {
+      const value = attributes[name];
+      if (value === undefined || imageSize(value) !== null) continue;
+      const tier = name === 'width' && WIDTHS.includes(value) ? `; use :::{width=${value}} around the image` : ', for example 280px or 50%';
+      this.report(position, `image ${name} must be pixels or a percentage, got ${describeValue(value)}${tier}`);
+    }
+    const width = imageSize(attributes.width);
+    const height = imageSize(attributes.height);
+    if (width !== null && height !== null && width.unit !== height.unit) this.report(position, 'image width and height must use the same unit');
+    if (attributes.float !== undefined) {
+      const problem = choiceProblem('float', IMAGE_FLOATS, attributes.float);
+      if (problem) this.report(position, problem);
+    }
+  }
+
+  splitFigure(paragraph, parent) {
+    const [image, after, ...others] = paragraph.children;
+    const startsLine = after === undefined || after.type === 'break' || (after.type === 'text' && after.value.startsWith('\n'));
+    if (!startsLine) return;
+    image.inFigure = true;
+    const figure = { type: 'figure', children: [image, ...this.caption(image)], position: { start: image.position.start, end: paragraph.position.end } };
+    const nodes = [figure];
+    const rest = after?.type === 'text' ? [{ ...after, value: after.value.slice(1), position: { ...after.position, start: this.positionAt(after.position.start.offset + 1) } }, ...others] : others;
+    if (rest.length > 0) {
+      figure.position.end = after.position.start;
+      nodes.push({ ...paragraph, children: rest, position: { start: rest[0].position.start, end: paragraph.position.end } });
+    }
+    parent.children.splice(parent.children.indexOf(paragraph), 1, ...nodes);
+  }
+
+  caption(image) {
+    if (!image.title) return [];
+    const children = processor.parse(image.title).children.flatMap((node) => (node.type === 'paragraph' ? node.children : [node]));
+    walk({ children }, (node) => {
+      node.position = image.position;
+    });
+    return [{ type: 'figcaption', children, position: image.position }];
   }
 
   readFootnotes(tree) {
@@ -328,9 +544,9 @@ class ArticleParser {
       number,
       id: `sidenote-${number}`,
       line: definition.position.start.line,
-      html: renderChildrenHtml(definition.children, this.notes),
+      html: renderChildrenHtml(definition.children, this.context),
     }));
-    const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: `reference-${entry.key}`, html: renderInlineHtml(entry.children, this.notes) }));
+    const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: `reference-${entry.key}`, html: renderInlineHtml(entry.children, this.context) }));
     const toc = sections.map((section) => ({
       id: section.id,
       number: section.number,
@@ -338,12 +554,12 @@ class ArticleParser {
       recap: section.recap,
       children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.toc, recap: subsection.recap })),
     }));
-    return { intro, sections, sidenotes, references, toc };
+    return { intro, sections, sidenotes, references, toc, images: [...this.images.values()] };
   }
 
   headingFields(node) {
     const text = toString(node);
-    return { id: node.id, title: renderInlineHtml(node.children, this.notes), text, toc: typeof node.attributes.toc === 'string' ? node.attributes.toc : text };
+    return { id: node.id, title: renderInlineHtml(node.children, this.context), text, toc: typeof node.attributes.toc === 'string' ? node.attributes.toc : text };
   }
 
   attachRecap(node, target) {
@@ -356,7 +572,7 @@ class ArticleParser {
       this.report(node.position.start, `this section already has a :::recap at ${first.line}:${first.column}`);
       return;
     }
-    target.recap = renderChildrenHtml(node.children, this.notes);
+    target.recap = renderChildrenHtml(node.children, this.context);
     this.recapLines.set(target, node.position.start);
   }
 
@@ -364,7 +580,7 @@ class ArticleParser {
     if (node.type === 'bakeBlock' && node.name === '' && node.children.length === 1) {
       return { ...this.block(node.children[0]), line: node.position.start.line, endLine: node.position.end.line, width: node.attributes.width };
     }
-    const block = { type: blockType(node), line: node.position.start.line, endLine: node.position.end.line, html: renderHtml(node, this.notes) };
+    const block = { type: blockType(node), line: node.position.start.line, endLine: node.position.end.line, html: renderHtml(node, this.context) };
     if (node.type === 'heading') Object.assign(block, { depth: node.depth }, this.headingFields(node));
     if (node.type === 'paragraph' && node.anchor !== undefined) block.id = node.anchor;
     if (node.type === 'bakeBlock' && block.type === 'component') Object.assign(block, { name: node.name, attributes: node.attributes });
@@ -374,7 +590,7 @@ class ArticleParser {
   positionAt(offset) {
     const before = this.source.slice(0, offset);
     const lineStart = before.lastIndexOf('\n') + 1;
-    return { line: before.split('\n').length, column: offset - lineStart + 1 };
+    return { line: before.split('\n').length, column: offset - lineStart + 1, offset };
   }
 }
 
@@ -382,6 +598,31 @@ function blockType(node) {
   if (node.type !== 'bakeBlock') return node.type;
   if (Object.hasOwn(BUILT_IN_BLOCKS, node.name)) return node.name;
   return node.name.includes('-') ? 'component' : 'unknown';
+}
+
+function imageSize(value) {
+  const match = IMAGE_SIZE.exec(typeof value === 'string' ? value : '');
+  return match === null ? null : { number: Number(match[1]), unit: match[2] };
+}
+
+function displayWidth(node, image) {
+  const width = imageSize(node.attributes.width);
+  const height = imageSize(node.attributes.height);
+  if (width?.unit === 'px') return width.number;
+  if (width === null && height?.unit === 'px') return (height.number * image.width) / image.height;
+  return undefined;
+}
+
+function imageProperties(attributes, published) {
+  const width = imageSize(attributes.width);
+  const height = imageSize(attributes.height);
+  const properties = { src: encodeURI(published.path), width: published.width, height: published.height };
+  if (width !== null && height !== null && width.unit === height.unit) {
+    return { ...properties, height: Math.round((published.width * height.number) / width.number), style: `width:${attributes.width};height:auto` };
+  }
+  if (width !== null) return { ...properties, style: `width:${attributes.width};height:auto` };
+  if (height !== null) return { ...properties, style: `width:${Number(((height.number * published.width) / published.height).toFixed(2))}${height.unit};height:auto` };
+  return properties;
 }
 
 function walk(node, visit, parent = null) {

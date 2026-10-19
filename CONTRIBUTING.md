@@ -8,7 +8,7 @@ This repository contains only the tool: the CLI, the Markdown pipeline, the buil
 
 ## Planned layout
 
-The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/`, `src/markdown/`, `src/build/` and `src/render/` exist. `src/config/` reads `bake.config.js` and front matter, `src/markdown/` parses the article body into the article structure, `src/build/` writes `dist/`, and `src/render/` turns Markdown nodes into HTML and holds a placeholder article page that shows the article structure until the essay theme is added.
+The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/`, `src/markdown/`, `src/build/` and `src/render/` exist. `src/config/` reads `bake.config.js`, front matter and `preamble.sty`, `src/markdown/` parses the article body into the article structure, `src/build/` writes `dist/`, and `src/render/` typesets math, highlights code, reads and converts images, turns Markdown nodes into HTML and holds a placeholder article page that shows the article structure until the essay theme is added.
 
 | Path | Contents |
 |---|---|
@@ -16,7 +16,7 @@ The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/
 | `src/report.js` | Error records and the `file:line:col message` lines printed for them |
 | `src/config/` | Reading `bake.config.js`, front matter and `preamble.sty` |
 | `src/markdown/` | Parsing Markdown into the article structure: sections, blocks, sidenotes, table of contents |
-| `src/render/` | Math, code highlighting and static HTML output |
+| `src/render/` | Math, code highlighting, image conversion and static HTML output |
 | `src/build/` | Site generation: pages, URLs, links, homepage, RSS, share images |
 | `src/dev/` | The local server for `bake dev`: rebuild on save and in-place page updates |
 | `src/themes/essay/`, `src/themes/bento/` | Built-in themes: page structure in SolidJS JSX plus styles |
@@ -31,7 +31,7 @@ The set of things an article can write (heading levels, blocks, width levels `bo
 
 ## The article structure
 
-The article structure is the interface between Bake and the themes. `parseArticle(file, source, errors)` in `src/markdown/article.js` returns it for one `index.md`; the front matter is read separately by `src/config/front-matter.js`. Every `html` value is an HTML fragment that a theme inserts unchanged.
+The article structure is the interface between Bake and the themes. `parseArticle(file, source, errors, { folder, preamble })` in `src/markdown/article.js` returns it for one `index.md`. It is asynchronous because it typesets math and reads images. `folder` is `{ path, files }` of the article folder, which images are resolved against, and `preamble` holds the definitions read from `preamble.sty` by `src/config/preamble.js`. The front matter is read separately by `src/config/front-matter.js`. Every `html` value is an HTML fragment that a theme inserts unchanged.
 
 | Field | Contents |
 |---|---|
@@ -41,8 +41,9 @@ The article structure is the interface between Bake and the themes. `parseArticl
 | `toc` | The table of contents: for each section `id`, `number`, `title`, `recap` and `children`, and for each `###` heading in `children` its `id`, `title` and `recap`. The titles are plain text. |
 | `sidenotes` | The footnotes, numbered by their first reference: `number`, `id` (`sidenote-1`), `line` of the definition and `html`. |
 | `references` | The entries of `:::references`, numbered by their first citation, with uncited entries numbered after the cited ones: `key`, `number`, `id` (`reference-key`) and `html`. |
+| `images` | The images that the build converts to WebP: `source` (the path in the article folder), `path` (the published path), `width` and `lossless`. Images published unchanged are copied with the other files of the folder. |
 
-A block has `type`, `line`, `endLine` and `html`. The type is the mdast node type (`paragraph`, `heading`, `list`, `blockquote`, `code`, `math`, `table`, `html`, `thematicBreak`), the name of a built-in block (`aside`, `fold`, `references`, `example`, `list-table`, `embed`) or `component`. A block wrapped in `:::{width=…}` has `width`. A paragraph that ends with `^name` and a heading have `id`. A `###` or deeper heading also has `depth`, `title`, `text` and `toc`. A component has `name` and `attributes`. Headings inside other blocks do not start sections, and a `:::recap` inside another block stays in that block's HTML as `<div class="recap">`.
+A block has `type`, `line`, `endLine` and `html`. The type is the mdast node type (`paragraph`, `heading`, `list`, `blockquote`, `code`, `math`, `table`, `html`, `thematicBreak`), `figure` for an image on its own line, the name of a built-in block (`aside`, `fold`, `references`, `example`, `list-table`, `embed`) or `component`. A block wrapped in `:::{width=…}` has `width`. A paragraph that ends with `^name` and a heading have `id`. A `###` or deeper heading also has `depth`, `title`, `text` and `toc`. A component has `name` and `attributes`. Headings inside other blocks do not start sections, and a `:::recap` inside another block stays in that block's HTML as `<div class="recap">`.
 
 The HTML marks the parts a theme styles or moves:
 
@@ -56,8 +57,16 @@ The HTML marks the parts a theme styles or moves:
 | Fold | `<details class="fold">` with the title in `<summary>` |
 | Reference list | `<ol class="references">` with one `<li id="reference-key" value="1">` per entry |
 | Width inside another block | `<div data-width="wide">` |
-| Block that a later task renders (`example`, `list-table`, `embed`, components) | `<div data-block="name">` around its content |
-| Math | `<code class="language-math math-inline">` and `<pre><code class="language-math math-display">` with the TeX source, until math is typeset |
+| Block that a later task renders (`embed`, components) | `<div data-block="name">` around its content |
+| Math | `<mjx-container class="MathJax" jax="SVG" data-tex="…">` holding an SVG, with `display="true"` for a display formula. The styles from `mathStyles()` in `src/render/math.js` lay it out. |
+| Numbered equation | `id` on the element MathJax generates for the label, equal to the label name |
+| Equation reference | `<a class="eqref" href="#label">(1)</a>`, with the label percent-encoded in `href` |
+| Code | `<pre class="shiki bake" data-language="python">` with `<span>` colors that use the `--code-…` CSS variables |
+| Table | `<div class="table-scroll">` around the `<table>`, so a wide table scrolls horizontally |
+| List table | `<div class="table-scroll">` around `<table class="list-table">` with a `<thead>` row and `<tbody>` rows |
+| Image | `<img>` with `width`, `height`, `loading="lazy"` and `decoding="async"`, and `style` when the article sets a size |
+| Figure | `<figure class="figure">` holding the `<img>` and a `<figcaption>`, with `data-float="left"` or `data-float="right"` when the article sets `float` |
+| Example | `<div class="example">` holding `<div class="example-source">` with the highlighted Markdown and `<div class="example-result">` with the rendered content |
 
 ## Error reports
 
@@ -75,7 +84,11 @@ The format is `file:line:col message`, with the path relative to the blog root a
 - Write Bake's own core pieces by hand: the article structure, the theme interface, the component contract and the dev server's page updates.
 - When switching to a library, accept its native behavior. Do not wrap it to reproduce the quirks of the code it replaces.
 - Add a dependency only in the change that uses it, and pin the npm major version given in `package.json` when regenerating the lock file.
-- Markdown is parsed by remark with GFM, math, front matter and `remark-cjk-friendly`, which lets emphasis close next to Chinese punctuation. Bake's own syntax is written as micromark extensions in `src/markdown/`: `:::` blocks (remark-directive does not accept a block without a name such as `:::{width=wide}`, and its text directives would read `\eqref{eq:ffn}` as a directive), `==highlight==` with the same CJK rules that `remark-cjk-friendly-gfm-strikethrough` uses for `~~`, `[@key]` citations, and footnote references without a definition, which GFM would otherwise leave as plain text.
+- Markdown is parsed by remark with GFM, math, front matter and `remark-cjk-friendly`, which lets emphasis close next to Chinese punctuation. Bake's own syntax is written as micromark extensions in `src/markdown/`: `\eqref{label}` in text, `:::` blocks (remark-directive does not accept a block without a name such as `:::{width=wide}`, and its text directives would read `\eqref{eq:ffn}` as a directive), `==highlight==` with the same CJK rules that `remark-cjk-friendly-gfm-strikethrough` uses for `~~`, `[@key]` citations, and footnote references without a definition, which GFM would otherwise leave as plain text. Before parsing, `src/markdown/table-math.js` replaces each `|` inside `$…$` on a table line with a private-use character and restores it afterwards, because GFM splits cells before it reads math.
+- Math is typeset by MathJax 4 (`@mathjax/src`) into SVG with the New Computer Modern font. Each article is typeset in its own MathJax document, so macros defined in one article do not reach another, and every formula is compiled twice so that `\eqref` can refer to a later label.
+- Code is highlighted by Shiki with a theme created by `createCssVariablesTheme`, so the colors are CSS variables that themes and dark mode set.
+- Images are read and converted by sharp.
+- Browser tests use Playwright, pinned to the exact version that matches the Chromium preinstalled in the cloud environment.
 
 ## Clean code
 
@@ -95,3 +108,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Every text syntax item has tests for its output and its errors, the Markdown fixtures in `test/fixtures/syntax-errors/` report the lines in `expected.json`, and the syntax article parses without errors | `test/markdown.test.js` |
 | The example blog in `examples/blog/` builds without errors | `test/build.test.js` |
 | The syntax article's error appendix matches `test/fixtures/syntax-errors/` | `test/syntax-article.test.js` |
+| Math is typeset with numbering, references and errors; `preamble.sty` accepts only macro definitions | `test/math.test.js`, `test/preamble.test.js` |
+| Code, tables, `:::list-table`, `:::example` and images render as described above, with their errors | `test/code.test.js`, `test/blocks.test.js`, `test/images.test.js` |
+| Raster images are published as WebP and `preamble.sty` errors stop the build | `test/build.test.js` |
+| Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph | `test/browser/math.test.js` |
