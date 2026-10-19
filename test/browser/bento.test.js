@@ -107,25 +107,29 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the settings button covers no card and not the text before the first section from 1000 pixels up', async () => {
+  await t.test('the settings button covers no card and not the text before the first section from 1000 pixels up, with a gap of 16 to 24 pixels', async () => {
     const covered = [];
+    const gaps = [];
     for (const url of [`${origin}/2026-10/bento-cards/`, `${englishOrigin}/2026-10/cards/`]) {
       const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
       await page.goto(url);
       for (const width of [1440, 1340, 1339, 1100, 1000]) {
         await resize(page, width);
-        const hits = await page.evaluate(() => {
+        const { hits, gap } = await page.evaluate(() => {
           const button = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
-          return [...document.querySelectorAll('.bt-card, .bt-intro')].flatMap((element) => {
-            const box = element.getBoundingClientRect();
-            return box.left < button.right && box.right > button.left ? [element.className] : [];
-          });
+          const boxes = [...document.querySelectorAll('.bt-card, .bt-intro')].map((element) => ({ name: element.className, box: element.getBoundingClientRect() }));
+          return {
+            hits: boxes.filter(({ box }) => box.left < button.right && box.right > button.left).map(({ name }) => name),
+            gap: Math.min(...boxes.map(({ box }) => box.left)) - button.right,
+          };
         });
         if (hits.length > 0) covered.push(`${url} at ${width}px: ${[...new Set(hits)].join(', ')}`);
+        if (gap < 16 || gap > 24) gaps.push(`${url} at ${width}px: ${gap}px`);
       }
       await page.close();
     }
     assert.deepEqual(covered, []);
+    assert.deepEqual(gaps, []);
   });
 
   await t.test('a card is as tall as its content and its sidenotes follow its last block', async () => {

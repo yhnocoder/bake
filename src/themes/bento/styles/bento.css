@@ -1,5 +1,5 @@
 .bt-page {
-  --bt-gutter: 120px;
+  --bt-gutter: 72px;
   --bt-gap: 18px;
   --bt-measure: 46em;
   --bt-card-padding: 22px 24px 20px;
@@ -218,10 +218,6 @@
 }
 
 @media (max-width: 1339.98px) {
-  .bt-page {
-    --bt-gutter: 104px;
-  }
-
   .bt-grid {
     --bt-cols: var(--bt-columns-narrow);
   }
