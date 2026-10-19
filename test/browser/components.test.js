@@ -483,6 +483,30 @@ test('the example components run on the syntax page', async (t) => {
     }
   });
 
+  await t.test('an example with a component stacks its source above its result, so pixel widths keep their size and stay centred', async () => {
+    for (const width of [1440, 375]) {
+      const { page, problems } = await start({ viewport: { width, height: 900 } });
+      const frames = await page.evaluate(() =>
+        ['560px', '1000px'].map((size) => {
+          const frame = document.querySelector(`.example-result figure.component[style="width:${size}"]`);
+          const rect = frame.getBoundingClientRect();
+          const result = frame.closest('.example-result').getBoundingClientRect();
+          return { width: rect.width, offset: rect.left + rect.width / 2 - (result.left + result.width / 2), right: rect.right };
+        }),
+      );
+      const screen = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      const label = `${width}px`;
+      assert.ok(screen.scroll <= screen.client, `${label}: the page scrolls horizontally, ${screen.scroll} > ${screen.client}`);
+      for (const frame of frames) {
+        assert.ok(Math.abs(frame.offset) < 1, `${label}: a frame is ${frame.offset}px off the centre of its result`);
+        assert.ok(frame.right <= screen.client, `${label}: a frame ends at ${frame.right}`);
+      }
+      if (width === 1440) assert.deepEqual(frames.map((frame) => Math.round(frame.width)), [560, 1000]);
+      assert.deepEqual(problems, [], label);
+      await page.close();
+    }
+  });
+
   await t.test('the heatmap redraws when the theme setting changes', async () => {
     const { page, problems } = await start({ viewport: { width: 1440, height: 900 } });
     const pixels = () => page.evaluate(() => document.querySelector('glu-heatmap canvas').toDataURL());

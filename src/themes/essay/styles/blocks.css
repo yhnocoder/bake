@@ -560,6 +560,10 @@ h4 + .bk-references {
   container: example / inline-size;
 }
 
+.bk-block[data-type='example']:has(> .example[data-result-widths]) {
+  --natural-width: 0px;
+}
+
 .bk-article .example:where(:not(.component-box *)) {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -592,7 +596,7 @@ h4 + .bk-references {
 }
 
 @container example (min-width: 880px) {
-  .bk-article .example:where(:not(.component-box *)) {
+  .bk-article .example:not([data-result-widths]):where(:not(.component-box *)) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }

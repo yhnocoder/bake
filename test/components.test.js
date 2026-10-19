@@ -231,6 +231,24 @@ describe('component blocks', () => {
     assert.deepEqual(article.components, ['act-fn-plot', 'glu-heatmap']);
   });
 
+  test('marks an example whose result holds a component or a figure with a pixel width with those widths', async () => {
+    const options = { components, folder: folder(join(import.meta.dirname, 'fixtures/syntax-errors')) };
+    const article = await parsed(
+      [
+        '::::example\n:::act-fn-plot{width=560px}\n:::\n\n:::act-fn-plot\n:::\n::::',
+        '::::example\n:::glu-heatmap\n:::\n\n![Graph](relu.svg){width=900px}\n::::',
+        ':::example\nText with **bold**.\n:::',
+      ].join('\n\n'),
+      options,
+    );
+    const fields = article.intro.map(({ resultWidths, naturalWidth, width, html }) => ({ resultWidths, naturalWidth, width, marked: /^<div class="example"( data-result-widths="[^"]*")?>/.exec(html)[1] }));
+    assert.deepEqual(fields, [
+      { resultWidths: ['560px', 'body'], naturalWidth: '560px', width: undefined, marked: ' data-result-widths="560px body"' },
+      { resultWidths: ['wide', '900px'], naturalWidth: '900px', width: 'wide', marked: ' data-result-widths="wide 900px"' },
+      { resultWidths: undefined, naturalWidth: undefined, width: undefined, marked: undefined },
+    ]);
+  });
+
   test('validates and renders components inside other blocks', async () => {
     const { errors } = await parse('::::example\n:::act-fn-plot{range=20}\n:::\n::::\n', { components });
     assert.deepEqual(errors, ['index.md:8:16 parameter "range" of act-fn-plot must be between 1 and 10, got 20']);

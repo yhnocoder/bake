@@ -14,7 +14,7 @@ import { indexPages } from '../build/links.js';
 import { addressHref, pageRoot, parseAddress } from '../build/urls.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
-import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml } from '../render/html.js';
+import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, addGlyphs, typesetMath } from '../render/math.js';
 import { parseAttributes } from './attributes.js';
@@ -941,6 +941,7 @@ class ArticleParser {
     if (width !== undefined) block.naturalWidth = width;
     if (node.type === 'heading') Object.assign(block, { depth: node.depth }, this.headingFields(node));
     if (node.type === 'paragraph' && node.anchor !== undefined) block.id = node.anchor;
+    if (node.type === 'bakeBlock' && block.type === 'example') Object.assign(block, exampleWidths(resultWidths(node)));
     if (node.type === 'bakeBlock' && block.type === 'component') {
       Object.assign(block, { name: node.name, attributes: node.attributes, params: node.component?.params });
       if (node.component?.width !== undefined) block.width = node.component.width;
@@ -959,6 +960,16 @@ function blockType(node) {
   if (node.type !== 'bakeBlock') return node.type;
   if (Object.hasOwn(BUILT_IN_BLOCKS, node.name)) return node.name;
   return node.name.includes('-') ? 'component' : 'unknown';
+}
+
+function exampleWidths(widths) {
+  if (widths.length === 0) return {};
+  const fields = { resultWidths: widths };
+  const pixels = widths.filter((width) => width.endsWith('px')).map((width) => Number.parseFloat(width));
+  if (pixels.length > 0) fields.naturalWidth = `${Math.max(...pixels)}px`;
+  const level = ['page', 'wide'].find((width) => widths.includes(width));
+  if (level !== undefined) fields.width = level;
+  return fields;
 }
 
 function naturalWidth(node) {

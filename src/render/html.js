@@ -8,6 +8,18 @@ const ATTRIBUTION_PREFIX = '— ';
 const ID_ATTRIBUTE = /\sid\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const RELATIVE_URL = /^(?![A-Za-z][A-Za-z0-9+.-]*:|\/|\?)/;
 
+export function resultWidths(example) {
+  const widths = new Set();
+  const visit = (node) => {
+    if (node.component !== undefined) widths.add(node.component.width ?? node.component.naturalWidth);
+    if (node.type === 'figure' && node.children[0].published?.boxWidth?.endsWith('px')) widths.add(node.children[0].published.boxWidth);
+    if (node.type === 'bakeBlock' && node.name === 'example') return;
+    for (const child of node.children ?? []) visit(child);
+  };
+  for (const child of example.children) visit(child);
+  return [...widths];
+}
+
 export function renderHtml(node, context) {
   const tree = toHast(node, { allowDangerousHtml: true, handlers: handlers(context) });
   return toHtml(tree, { allowDangerousHtml: true });
@@ -125,11 +137,13 @@ function blockElement(state, node, context) {
         ...(uncited.length === 0 ? [] : [element('ul', { className: ['references', 'uncited'] }, uncited.map(item))]),
       ];
     }
-    case 'example':
-      return element('div', { className: ['example'] }, [
+    case 'example': {
+      const widths = resultWidths(node);
+      return element('div', { className: ['example'], ...(widths.length === 0 ? {} : { dataResultWidths: widths.join(' ') }) }, [
         element('div', { className: ['example-source'] }, [highlightCode(context.highlighter, node.sourceText, 'markdown')]),
         element('div', { className: ['example-result'] }, children()),
       ]);
+    }
     case 'list-table':
       if (node.rows === undefined) return element('div', { dataBlock: node.name }, children());
       return element('div', { className: ['table-scroll'] }, [listTable(state, node.rows)]);
