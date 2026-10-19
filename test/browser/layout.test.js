@@ -211,6 +211,25 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
+  await t.test('no separator of the masthead meta line starts a line on a phone', async () => {
+    const page = await open('syntax', { viewport: { width: 375, height: 800 } });
+    const items = await page.evaluate(() => {
+      const meta = document.querySelector('.bk-meta').getBoundingClientRect();
+      return [...document.querySelectorAll('.bk-meta :is(time, .bk-words, .bk-tags, .bk-copy)')].map((item) => {
+        const box = item.getBoundingClientRect();
+        return { text: item.textContent, top: Math.round(box.top), separatorShown: box.left >= meta.left - 1 };
+      });
+    });
+    const lines = [...new Set(items.map((item) => item.top))];
+    assert.ok(lines.length >= 2, `the meta line does not wrap at 375 px: ${JSON.stringify(items)}`);
+    const startsLine = (item, index) => index === 0 || items[index - 1].top !== item.top;
+    assert.deepEqual(
+      items.filter((item, index) => startsLine(item, index) === item.separatorShown).map((item) => item.text),
+      [],
+    );
+    await page.close();
+  });
+
   await t.test('with the default body font the page downloads only the WenKai subsets that the masthead, title and headings use', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const requested = [];

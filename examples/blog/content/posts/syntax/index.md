@@ -473,6 +473,30 @@ SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-r
 :::
 ::::
 
+## 复制为 Markdown {#copy toc="复制"}
+
+在页面上选中内容复制，粘贴到文本编辑器里得到的是 Markdown 原文，粘贴到 Notion 或 Word 里得到带格式的内容。复制后右下角显示「已复制为 Markdown」。页头的「复制为 Markdown」复制整篇文章的 `index.md`，包括 front matter。
+
+完整选中的块按 `index.md` 里的原文复制。只选中一部分的块从页面内容转换：==重点标记==、粗体和链接保留原来的写法，公式 $\sigma(x)$ 写成 `$…$`，旁注编号写成脚注引用，脚注的定义附在末尾[^copy-notes]。
+
+- 章节编号、标题旁的 `#` 和页边的旁注编号可以选中，复制的内容里没有它们。
+- 选区从文章外面开始时，只复制文章里的部分。
+
+$$
+\mathrm{SiLU}(x) = x\,\sigma(x) = \frac{x}{1 + e^{-x}}
+$$
+
+```python
+def silu(x):
+    return x / (1 + math.exp(-x))
+```
+
+:::act-fn-plot{fn=silu range=6}
+选中交互组件的任何部分，复制的都是它的整个 `:::` 块。
+:::
+
+[^copy-notes]: 每个脚注的定义只附一次，按 `index.md` 里的原文复制。
+
 ## 附录：构建报错的写法 {#errors}
 
 下面的写法会让 `bake build` 报错并且不写出 `dist/`。报错格式是 `文件:行:列 说明`，全部检查完后一起报告。每一行在 `test/fixtures/syntax-errors/` 里有对应的测试文件或文件夹。

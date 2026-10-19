@@ -110,6 +110,16 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.equal(await page.locator('#bake-dev .notice').isVisible(), false);
   });
 
+  await t.test('a save that adds lines highlights only the added block and updates the source of the page', async () => {
+    await page.evaluate(() => {
+      window.highlighted = [];
+    });
+    edit('Paragraph 1 about folds.', 'An added paragraph.\n\nParagraph 1 about folds.');
+    await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('An added paragraph.'));
+    assert.deepEqual(await page.evaluate(() => window.highlighted), ['An added paragraph.']);
+    assert.equal(await page.evaluate(() => JSON.parse(document.querySelector('script.bk-source').textContent)), readFileSync(file, 'utf8'));
+  });
+
   await t.test('the page scripts work on the replaced article', async () => {
     await page.evaluate(() => scrollBy(0, 10));
     await page.waitForFunction(() => document.querySelector('.bk-toc [data-target="editing"]').dataset.state === 'current');
