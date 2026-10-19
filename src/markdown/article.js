@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
@@ -43,6 +44,7 @@ const BUILT_IN_BLOCKS = {
   'list-table': [],
   embed: [],
 };
+export const BUILT_IN_BLOCK_NAMES = Object.freeze(Object.keys(BUILT_IN_BLOCKS));
 const HEADING_ATTRIBUTES = ['id', 'toc', 'width'];
 const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
 const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
@@ -57,18 +59,19 @@ const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const HAN_CHARACTER = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
 const WORD = /[\p{L}\p{N}]+/gu;
 
-export async function parseArticle(file, source, errors, { folder = null, preamble = [] } = {}) {
-  const article = new ArticleParser(file, source, errors, folder, preamble);
+export async function parseArticle(file, source, errors, { folder = null, preamble = [], components = new Map() } = {}) {
+  const article = new ArticleParser(file, source, errors, folder, preamble, components);
   return article.parse();
 }
 
 class ArticleParser {
-  constructor(file, source, errors, folder, preamble) {
+  constructor(file, source, errors, folder, preamble, components) {
     this.file = file;
     this.source = source;
     this.errors = errors;
     this.folder = folder;
     this.preamble = preamble;
+    this.components = components;
     this.equations = new Map();
     this.equationIds = new Map();
     this.glyphs = undefined;
@@ -123,10 +126,12 @@ class ArticleParser {
     const [, name, attributeText] = BLOCK_LINE.exec(node.info);
     node.name = name ?? '';
     node.attributes = {};
+    let offsets = {};
     if (attributeText !== undefined) {
-      const { attributes, error } = parseAttributes(attributeText);
-      node.attributes = attributes;
-      if (error) this.report(start, error);
+      const parsed = parseAttributes(attributeText);
+      node.attributes = parsed.attributes;
+      offsets = parsed.offsets;
+      if (parsed.error) this.report(start, parsed.error);
     }
     const label = node.name === '' ? ':::{width=…}' : `:::${node.name}`;
     if (!node.closed) this.report(start, `${label} is not closed; end it with a line of ${node.colons} or more colons`);
@@ -135,12 +140,32 @@ class ArticleParser {
       if (node.attributes.width === undefined) this.report(start, 'a block without a name must set width, for example :::{width=wide}');
       else this.checkWidth(node.attributes.width, start);
       if (node.children.length !== 1) this.report(start, ':::{width=…} must contain exactly one block');
+      const [child] = node.children;
+      const childName = child?.type === 'bakeBlock' ? BLOCK_LINE.exec(child.info)?.[1] : undefined;
+      if (childName?.includes('-') && !Object.hasOwn(BUILT_IN_BLOCKS, childName)) {
+        this.report(start, `write the width of a component in its own braces, such as :::${childName}{width=wide}, instead of :::{width=…} around it`);
+      }
     } else if (Object.hasOwn(BUILT_IN_BLOCKS, node.name)) {
       this.checkKnownAttributes(node.attributes, BUILT_IN_BLOCKS[node.name], label, start);
       if (node.name === 'fold' && typeof node.attributes.title !== 'string') this.report(start, ':::fold is missing "title"');
     } else if (!node.name.includes('-')) {
       this.report(start, `unknown block ":::${node.name}"`);
+    } else {
+      const attributeStart = start.offset + node.colons + node.name.length;
+      this.readComponent(node, (attribute) => (attribute === undefined ? start : this.positionAt(attributeStart + offsets[attribute])));
     }
+  }
+
+  readComponent(node, attributePosition) {
+    const component = this.components.get(node.name);
+    if (component === undefined) {
+      this.report(node.position.start, `unknown component "${node.name}"; components/ has no ${node.name}.js or ${node.name}.jsx`);
+      return;
+    }
+    if (!component.valid) return;
+    const resolved = resolveComponent(node.name, component, node.attributes, this.folder?.files ?? []);
+    for (const { attribute, message } of resolved.problems) this.report(attributePosition(attribute), message);
+    node.component = resolved;
   }
 
   readHeading(node) {
@@ -353,7 +378,7 @@ class ArticleParser {
     this.walkWithSidenotes(tree, (node) => {
       if (node.type === 'link') links.add(this.imageSource(node.url));
       if (node.type === 'html') texts.push(node.value);
-      if (node.type === 'bakeBlock') texts.push(...Object.values(node.attributes).filter((value) => typeof value === 'string'));
+      if (node.type === 'bakeBlock') texts.push(...[...Object.values(node.attributes), ...Object.values(node.component?.params ?? {})].filter((value) => typeof value === 'string'));
     });
     return (source) => links.has(source) || texts.some((text) => text.includes(source));
   }
@@ -584,7 +609,15 @@ class ArticleParser {
       recap: section.recap,
       children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.toc, recap: subsection.recap })),
     }));
-    return { intro, sections, sidenotes, references, toc, words: countWords(tree), glyphs: this.glyphs, images: [...this.images.values()] };
+    return { intro, sections, sidenotes, references, toc, words: countWords(tree), glyphs: this.glyphs, images: [...this.images.values()], components: this.usedComponents(tree) };
+  }
+
+  usedComponents(tree) {
+    const names = new Set();
+    this.walkWithSidenotes(tree, (node) => {
+      if (node.type === 'bakeBlock' && node.component !== undefined) names.add(node.name);
+    });
+    return [...names].sort();
   }
 
   headingFields(node) {
@@ -615,7 +648,10 @@ class ArticleParser {
     if (width !== undefined) block.naturalWidth = width;
     if (node.type === 'heading') Object.assign(block, { depth: node.depth }, this.headingFields(node));
     if (node.type === 'paragraph' && node.anchor !== undefined) block.id = node.anchor;
-    if (node.type === 'bakeBlock' && block.type === 'component') Object.assign(block, { name: node.name, attributes: node.attributes });
+    if (node.type === 'bakeBlock' && block.type === 'component') {
+      Object.assign(block, { name: node.name, attributes: node.attributes, params: node.component?.params });
+      if (node.component?.width !== undefined) block.width = node.component.width;
+    }
     return block;
   }
 
@@ -633,6 +669,7 @@ function blockType(node) {
 }
 
 function naturalWidth(node) {
+  if (node.type === 'bakeBlock') return node.component?.naturalWidth;
   if (node.type === 'math') return (MATH_MIN_WIDTH.exec(node.rendered) ?? MATH_WIDTH.exec(node.rendered))?.[1];
   if (node.type === 'code') return `${Math.max(...node.value.split('\n').map(textColumns))}ch`;
   if (node.type === 'figure') {

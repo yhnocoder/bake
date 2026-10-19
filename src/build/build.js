@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
+import { bundleComponents } from '../components/bundle.js';
+import { readComponents } from '../components/read.js';
 import { loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
-import { parseArticle } from '../markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES, parseArticle } from '../markdown/article.js';
 import { convertImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
@@ -23,15 +25,16 @@ export async function build(root) {
   if (config === null) return { errors: sortErrors(errors) };
   const preamble = await readMathPreamble(root, errors);
   if (errors.length > 0) return { errors: sortErrors(errors) };
+  const components = await readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors);
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id) };
   const articles = [];
-  for (const article of findArticles(root)) articles.push(await readArticle(root, article, { rules, preamble }, errors));
+  for (const article of findArticles(root)) articles.push(await readArticle(root, article, { rules, preamble, components }, errors));
   checkDuplicateUrls(articles, errors);
   const published = articles.filter((article) => article.url !== null && article.fields.draft !== true);
-  const themes = await compileThemes(root, published, config, errors);
-  const pageSettings = { config, themes, mathStyles: await mathStyles() };
+  const [themes, bundle] = await Promise.all([compileThemes(root, published, config, errors), compileComponents(root, published, components, preamble, errors)]);
+  const pageSettings = { config, themes, bundle, mathStyles: await mathStyles() };
   const outputs = published.flatMap((article) => articleOutputs(root, article, pageSettings, errors));
-  outputs.push(...themeOutputs(themes));
+  outputs.push(...assetOutputs(themes, bundle));
   outputs.push(...publicOutputs(root, outputs, errors));
   if (errors.length > 0) return { errors: sortErrors(errors) };
   await writeDist(root, outputs);
@@ -49,13 +52,21 @@ function themeOf(article, config) {
   return article.fields.theme ?? config.theme;
 }
 
-function themeOutputs(themes) {
+async function compileComponents(root, published, components, preamble, errors) {
+  const names = new Set(published.flatMap((article) => article.content?.components ?? []));
+  if (names.size === 0 || errors.length > 0) return null;
+  return bundleComponents(root, [...names].sort().map((name) => components.get(name)), preamble, errors);
+}
+
+function assetOutputs(themes, bundle) {
   const outputs = new Map();
-  for (const [name, theme] of themes) {
-    for (const file of theme?.files ?? []) {
-      if (!outputs.has(file.path)) outputs.set(file.path, { path: file.path, render: () => file.source, owner: `the ${name} theme` });
+  const add = (files, owner) => {
+    for (const file of files) {
+      if (!outputs.has(file.path)) outputs.set(file.path, { path: file.path, render: () => file.source, owner });
     }
-  }
+  };
+  for (const [name, theme] of themes) add(theme?.files ?? [], `the ${name} theme`);
+  add(bundle?.files ?? [], 'the components');
   return [...outputs.values()];
 }
 
@@ -69,13 +80,13 @@ async function readMathPreamble(root, errors) {
   return definitions;
 }
 
-async function readArticle(root, article, { rules, preamble }, errors) {
+async function readArticle(root, article, { rules, preamble, components }, errors) {
   const source = readFileSync(join(root, article.file), 'utf8');
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
   const folder = { path: join(root, article.dir), files: article.files };
-  const content = fields?.page === undefined ? await parseArticle(article.file, source, errors, { folder, preamble }) : null;
+  const content = fields?.page === undefined ? await parseArticle(article.file, source, errors, { folder, preamble, components }) : null;
   return { ...article, fields, positions: frontMatter?.positions ?? {}, url, content };
 }
 
@@ -103,7 +114,7 @@ function articleOutputs(root, article, pageSettings, errors) {
   return article.files.map((file) => copy(file, file === page ? 'index.html' : file));
 }
 
-function renderArticle(article, { config, themes, mathStyles }, errors) {
+function renderArticle(article, { config, themes, bundle, mathStyles }, errors) {
   const name = themeOf(article, config);
   const theme = themes.get(name);
   if (theme === null) return '';
@@ -127,6 +138,7 @@ function renderArticle(article, { config, themes, mathStyles }, errors) {
       root,
       styles: theme.styles.map((path) => `${root}${path}`),
       scripts: theme.scripts.map((path) => `${root}${path}`),
+      modules: content.components.length === 0 || bundle === null ? [] : [`${root}${bundle.runtime}`],
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

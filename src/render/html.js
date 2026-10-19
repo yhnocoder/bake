@@ -99,8 +99,25 @@ function blockElement(state, node, context) {
     case '':
       return element('div', { dataWidth: node.attributes.width }, children());
     default:
+      if (node.component !== undefined) return componentElement(state, node);
       return element('div', { dataBlock: node.name }, children());
   }
+}
+
+function componentElement(state, node) {
+  const { params, frame, frameWidth, height, narrowHeight } = node.component;
+  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(params) };
+  if (!frame) properties.dataFrame = 'none';
+  if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
+  const boxStyle = [
+    `--component-height:${height.height}`,
+    `--component-ratio:${height.ratio}`,
+    `--component-narrow-height:${narrowHeight.height}`,
+    `--component-narrow-ratio:${narrowHeight.ratio}`,
+  ].join(';');
+  const box = element('div', { className: ['component-box'], style: boxStyle }, []);
+  const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
+  return element('figure', properties, [box, ...caption]);
 }
 
 function listTable(state, [header, ...rows]) {

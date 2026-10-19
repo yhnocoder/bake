@@ -366,6 +366,18 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
+宽度也可以写成像素数或百分比。这时组件框缩到这个宽度，在正文栏里居中。百分比按正文栏的宽度计算，不能超过 100%。无论写多宽，组件框都不会超出屏幕。
+
+::::example
+:::glu-heatmap{width=560px}
+:::
+::::
+
+::::example
+:::act-fn-plot{fn=relu width=70%}
+:::
+::::
+
 `height` 覆盖组件声明的占位高度：
 
 ::::example
