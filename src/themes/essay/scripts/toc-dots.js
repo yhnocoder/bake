@@ -1,4 +1,4 @@
-import { chapterCard, clamp, el, floorOf, hoverIntent, stateKey, tocLink } from './toc-card.js';
+import { cardKeyboard, chapterCard, clamp, el, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 90;
 const DOT_PITCH = 16;
@@ -27,7 +27,7 @@ export function dotsView(ctx) {
     dot.append(...faces);
     item.append(dot);
     item.addEventListener('pointerenter', () => hover(chapterIndex));
-    item.addEventListener('focus', () => hover(chapterIndex));
+    item.addEventListener('focus', () => hover(chapterIndex, item.matches(':focus-visible')));
     root.append(item);
     return { item, dot, title: faces[0].lastChild, fill: faces[1] };
   });
@@ -39,20 +39,22 @@ export function dotsView(ctx) {
     if (!root.contains(event.relatedTarget)) leave();
   });
   ctx.host.append(root, card);
+  cardKeyboard({ entries: items.map((entry) => entry.item), card, shown: () => (card.classList.contains('is-on') ? hovered : -1), leave: () => leave() });
   let shownCurrent = null;
   let hovered = -1;
   let shownState = '';
 
   function place(chapterIndex) {
-    const floor = floorOf();
     const box = items[chapterIndex].dot.getBoundingClientRect();
     const column = root.getBoundingClientRect();
+    const left = column.right + 14;
+    const floor = floorFor(left);
     card.style.maxHeight = `${floor - 12}px`;
     const height = Math.min(card.scrollHeight, floor - 12);
-    card.style.left = `${column.right + 14}px`;
+    card.style.left = `${left}px`;
     card.style.top = `${clamp(box.top + Math.min(box.height, 6) / 2 - 34, 12, floor - height)}px`;
   }
-  function hover(chapterIndex) {
+  function hover(chapterIndex, now = false) {
     items.forEach((entry, entryIndex) => entry.item.classList.toggle('is-hover', entryIndex === chapterIndex));
     intent.enter(() => {
       const wasOn = card.classList.contains('is-on');
@@ -66,7 +68,7 @@ export function dotsView(ctx) {
       card.getBoundingClientRect();
       card.classList.remove('is-snap');
       card.classList.add('is-on');
-    });
+    }, now);
   }
   function leave() {
     intent.leave(() => {

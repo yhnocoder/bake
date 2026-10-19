@@ -50,31 +50,31 @@ export function readOutline(nav) {
 export function chapterCard(ctx, chapterIndex, state) {
   const chapter = ctx.outline.chapters[chapterIndex];
   const current = chapterIndex === state.chapter;
-  const card = el('div', 'bk-card');
-  const head = tocLink(chapter.id, 'bk-card-head');
+  const card = el('div', 'bk-toc-card');
+  const head = tocLink(chapter.id, 'bk-toc-card-head');
   head.dataset.index = chapter.index;
-  const number = el('span', current ? 'bk-card-number is-current' : 'bk-card-number', current ? `${chapter.number} · ${ctx.labels.reading}` : chapter.number);
-  const title = el('span', 'bk-card-title');
+  const number = el('span', current ? 'bk-toc-card-number is-current' : 'bk-toc-card-number', current ? `${chapter.number} · ${ctx.labels.reading}` : chapter.number);
+  const title = el('span', 'bk-toc-card-title');
   title.append(fullTitle(chapter));
   head.append(number, title);
   card.append(head);
-  if (chapter.recap !== undefined) card.append(summary('div', 'bk-card-recap bk-card-chapter-recap', chapter.recap));
+  if (chapter.recap !== undefined) card.append(summary('div', 'bk-toc-card-recap bk-toc-card-chapter-recap', chapter.recap));
   else {
     const lead = leadOf(chapter.heading);
-    if (lead !== null) card.append(summary('p', 'bk-card-lead bk-card-chapter-lead', lead));
+    if (lead !== null) card.append(summary('p', 'bk-toc-card-lead bk-toc-card-chapter-lead', lead));
   }
   if (chapter.sections.length > 0) {
-    const list = el('div', 'bk-card-sections');
+    const list = el('div', 'bk-toc-card-sections');
     for (const section of chapter.sections) {
-      const row = tocLink(section.id, 'bk-card-section');
+      const row = tocLink(section.id, 'bk-toc-card-section');
       row.dataset.index = section.index;
       row.classList.toggle('is-read', state.read[section.index]);
       row.classList.toggle('is-current', state.entry === section.index);
-      row.append(el('span', 'bk-card-section-title', section.title));
-      if (section.recap !== undefined) row.append(summary('span', 'bk-card-recap', section.recap));
+      row.append(el('span', 'bk-toc-card-section-title', section.title));
+      if (section.recap !== undefined) row.append(summary('span', 'bk-toc-card-recap', section.recap));
       else {
         const lead = leadOf(section.heading);
-        if (lead !== null) row.append(summary('span', 'bk-card-lead', lead));
+        if (lead !== null) row.append(summary('span', 'bk-toc-card-lead', lead));
       }
       list.append(row);
     }
@@ -92,14 +92,14 @@ export function hoverIntent(delay) {
     get shown() {
       return shown;
     },
-    enter(show) {
+    enter(show, now = false) {
       clearTimeout(hideTimer);
       clearTimeout(showTimer);
       const run = () => {
         shown = true;
         show();
       };
-      if (shown || performance.now() < warmUntil) run();
+      if (now || shown || performance.now() < warmUntil) run();
       else showTimer = setTimeout(run, delay);
     },
     stay() {
@@ -122,10 +122,42 @@ export function hoverIntent(delay) {
   };
 }
 
-export function floorOf() {
-  const toggle = document.querySelector('.bk-settings-toggle');
-  const top = toggle === null ? innerHeight : toggle.getBoundingClientRect().top;
-  return Math.min(innerHeight, top) - 8;
+export function cardKeyboard({ entries, card, shown, leave }) {
+  const links = () => [...card.querySelectorAll('.bk-toc-card a[href]')];
+  for (const [index, entry] of entries.entries()) {
+    entry.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab' || event.shiftKey || shown() !== index) return;
+      const first = links()[0];
+      if (first === undefined) return;
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    });
+  }
+  card.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    const all = links();
+    const index = shown();
+    if (index < 0) return;
+    if (event.shiftKey && event.target === all[0]) {
+      event.preventDefault();
+      entries[index].focus({ preventScroll: true });
+    } else if (!event.shiftKey && event.target === all.at(-1) && index + 1 < entries.length) {
+      event.preventDefault();
+      entries[index + 1].focus({ preventScroll: true });
+    }
+  });
+  const inside = (element) => element instanceof Node && (card.contains(element) || entries.some((entry) => entry.parentElement.contains(element)));
+  for (const element of [card, ...entries]) {
+    element.addEventListener('focusout', (event) => {
+      if (!inside(event.relatedTarget)) leave();
+    });
+  }
+}
+
+export function floorFor(left) {
+  const toggle = document.querySelector('.bk-settings-toggle')?.getBoundingClientRect();
+  if (toggle === undefined || left >= toggle.right) return innerHeight - 12;
+  return Math.min(innerHeight - 12, toggle.top - 8);
 }
 
 export function keepVisible(box, row, smooth) {

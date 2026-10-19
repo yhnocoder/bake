@@ -378,14 +378,35 @@ test('bake dev rebuilds every table of contents style from the saved headings an
 
   for (const [round, view] of TOC_VIEWS.entries()) {
     await t.test(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once next to a restarted component`, async () => {
-      await page.setViewportSize({ width: view.width, height: 800 });
+      await page.setViewportSize({ width: view.width, height: view.width < 1000 ? 360 : 800 });
       await page.goto(url);
-      await page.evaluate((style) => localStorage.setItem('bk-toc', style), view.style);
+      await page.evaluate((style) => {
+        localStorage.setItem('bk-toc', style);
+        localStorage.setItem('bk-buttons', 'always');
+      }, view.style);
       await page.reload();
       await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-      await page.evaluate(() => scrollTo(0, document.getElementById('second').getBoundingClientRect().top + scrollY - 100));
+      await page.evaluate(() => scrollTo(0, document.getElementById('inside').getBoundingClientRect().top + scrollY - 100));
       await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
       const before = await snapshot(view);
+      const drawer = () =>
+        page.evaluate(() => ({
+          open: document.querySelector('.bk-drawer').classList.contains('is-open'),
+          selected: [...document.querySelectorAll('.bk-drawer-index button')].findIndex((button) => button.classList.contains('is-selected')),
+          title: document.querySelector('.bk-drawer-detail .bk-toc-card-title').textContent,
+          scroll: document.querySelector('.bk-drawer-detail').scrollTop,
+        }));
+      let drawerBefore = null;
+      if (view.width < 1000) {
+        await page.click('.bk-toc-handle');
+        await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
+        await page.locator('.bk-drawer-index button').nth(1).click();
+        await page.evaluate(() => {
+          document.querySelector('.bk-drawer-detail').scrollTop = 30;
+        });
+        drawerBefore = await drawer();
+        assert.ok(drawerBefore.scroll > 0, `the drawer of the ${view.style} style does not scroll`);
+      }
       const name = `Renamed ${round}`;
       writeFileSync(file, readFileSync(file, 'utf8').replace(/## \S.* \{#second\}/, `## ${name} {#second}`).replace('### Inside {#inside}', `### Added ${round} {#added-${round}}\n\nText.\n\n### Inside {#inside}`).replace(/text=\w+\}/, `text=round${round}}`));
       await page.waitForFunction((text) => document.querySelector('.bk-toc .bk-toc-chapters').textContent.includes(text), name);
@@ -394,6 +415,7 @@ test('bake dev rebuilds every table of contents style from the saved headings an
       await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await page.waitForFunction((text) => document.querySelector('label-view')?.textContent === text && document.querySelector('figure.component').dataset.state === 'ready', `round${round}`);
       assert.equal(await page.locator('label-view').count(), 1);
+      if (drawerBefore !== null) assert.deepEqual(await drawer(), { ...drawerBefore, title: name }, `the drawer of the ${view.style} style after the save`);
       const after = await snapshot(view);
       assert.deepEqual(after.parts, view.parts.map(() => 1), `parts of the ${view.style} style after the save`);
       assert.deepEqual(before.parts, after.parts);

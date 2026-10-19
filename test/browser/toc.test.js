@@ -105,9 +105,9 @@ function cardReport(selector) {
     inside: box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight,
     clearOfSettings: box.bottom <= button.top || box.right <= button.left || box.left >= button.right,
     marks: card.querySelectorAll('mark').length,
-    head: card.querySelector('.bk-card-number').textContent,
-    summary: card.querySelector('.bk-card-chapter-recap, .bk-card-chapter-lead')?.textContent ?? null,
-    sections: [...card.querySelectorAll('.bk-card-section')].map((row) => [row.querySelector('.bk-card-section-title').textContent, row.querySelector('.bk-card-recap, .bk-card-lead')?.textContent ?? null]),
+    head: card.querySelector('.bk-toc-card-number').textContent,
+    summary: card.querySelector('.bk-toc-card-chapter-recap, .bk-toc-card-chapter-lead')?.textContent ?? null,
+    sections: [...card.querySelectorAll('.bk-toc-card-section')].map((row) => [row.querySelector('.bk-toc-card-section-title').textContent, row.querySelector('.bk-toc-card-recap, .bk-toc-card-lead')?.textContent ?? null]),
     readLabel: card.textContent.includes('读过'),
   };
 }
@@ -240,6 +240,129 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
+  await t.test('the cards of the table of contents keep their own look on article pages, and the homepage cards keep theirs', async () => {
+    for (const style of ['tabs', 'dots', 'ticks']) {
+      const { page, context } = await open({ style });
+      const trigger = { tabs: '.bk-tab', dots: '.bk-dot-item', ticks: '.bk-tick.is-chapter' }[style];
+      const box = style === 'tabs' ? '.bk-index-body' : '.bk-popover';
+      await pointAt(page, page.locator(trigger).nth(1));
+      await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('第2章'), box);
+      const look = await page.evaluate((selector) => {
+        const frame = document.querySelector(selector);
+        const card = frame.querySelector('.bk-toc-card');
+        const frameStyle = getComputedStyle(frame);
+        const cardStyle = getComputedStyle(card);
+        const titleStyle = getComputedStyle(card.querySelector('.bk-toc-card-title'));
+        return {
+          border: cardStyle.borderTopWidth,
+          radius: cardStyle.borderTopLeftRadius,
+          shadow: cardStyle.boxShadow,
+          background: cardStyle.backgroundColor,
+          width: Math.round(card.getBoundingClientRect().width) === Math.round(frame.clientWidth - parseFloat(frameStyle.paddingLeft) - parseFloat(frameStyle.paddingRight)),
+          titleSize: titleStyle.fontSize,
+          titleWrap: titleStyle.textWrapStyle,
+          frameRadius: frameStyle.borderTopLeftRadius,
+          frameShadow: frameStyle.boxShadow !== 'none',
+        };
+      }, box);
+      assert.deepEqual(
+        look,
+        { border: '0px', radius: '0px', shadow: 'none', background: 'rgba(0, 0, 0, 0)', width: true, titleSize: '17px', titleWrap: 'balance', frameRadius: '12px', frameShadow: style !== 'tabs' },
+        `the ${style} card`,
+      );
+      await context.close();
+    }
+    const { page, context } = await open();
+    await page.goto(`${base}/`);
+    const home = await page.evaluate(() => {
+      const card = document.querySelector('.bk-home .bk-card');
+      const cardStyle = getComputedStyle(card);
+      const titleStyle = getComputedStyle(card.querySelector('.bk-card-title'));
+      return { border: cardStyle.borderTopWidth, radius: cardStyle.borderTopLeftRadius, shadow: cardStyle.boxShadow !== 'none', titleWeight: titleStyle.fontWeight, titleWrap: titleStyle.textWrapStyle, titleMargin: titleStyle.marginTop };
+    });
+    assert.deepEqual(home, { border: '1px', radius: '14px', shadow: true, titleWeight: '700', titleWrap: 'pretty', titleMargin: '0px' });
+    await context.close();
+  });
+
+  await t.test('the tabs of chapters ahead, the drawer tabs, the drawer close button and the settings button use the ink colour', async () => {
+    for (const [colorScheme, ink] of [
+      ['light', 'rgb(22, 26, 29)'],
+      ['dark', 'rgb(233, 236, 231)'],
+    ]) {
+      const desk = await open({ style: 'tabs', colorScheme });
+      await scrollToHeading(desk.page, 'chapter-2');
+      const tabs = await desk.page.evaluate(() => ({
+        ahead: getComputedStyle(document.querySelectorAll('.bk-tab')[4]).color,
+        settings: getComputedStyle(document.querySelector('.bk-settings-toggle')).color,
+      }));
+      assert.deepEqual(tabs, { ahead: ink, settings: ink }, colorScheme);
+      await desk.context.close();
+      const phone = await open({ style: 'tabs', colorScheme, viewport: { width: 375, height: 760 } });
+      await phone.page.evaluate(() => localStorage.setItem('bk-buttons', 'always'));
+      await phone.page.reload();
+      await scrollToHeading(phone.page, 'chapter-2');
+      await phone.page.click('.bk-toc-handle');
+      await phone.page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
+      const drawer = await phone.page.evaluate(() => ({
+        ahead: getComputedStyle(document.querySelectorAll('.bk-drawer-tab')[4]).color,
+        close: getComputedStyle(document.querySelector('.bk-drawer-close')).color,
+        settings: getComputedStyle(document.querySelector('.bk-settings-toggle')).color,
+      }));
+      assert.deepEqual(drawer, { ahead: ink, close: ink, settings: ink }, `${colorScheme} on a phone`);
+      await phone.context.close();
+    }
+  });
+
+  await t.test('the notes style keeps the top padding of the first chapter', async () => {
+    const { page, context } = await open({ style: 'notes' });
+    const padding = await page.evaluate(() => [...document.querySelectorAll('.bk-toc .bk-toc-chapter-title')].slice(0, 2).map((title) => getComputedStyle(title).paddingTop));
+    assert.deepEqual(padding, ['20px', '20px']);
+    await context.close();
+  });
+
+  await t.test('the dots and ticks cards may reach 12 pixels above the bottom of the screen, and the tabs card stops above the settings button', async () => {
+    for (const style of ['tabs', 'dots', 'ticks']) {
+      const { page, context } = await open({ style, path: 'long', viewport: { width: 1440, height: 600 } });
+      const trigger = { tabs: '.bk-tab', dots: '.bk-dot-item', ticks: '.bk-tick.is-chapter' }[style];
+      const box = style === 'tabs' ? '.bk-index-body' : '.bk-popover';
+      await pointAt(page, page.locator(trigger).last());
+      await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('Chapter 18'), box);
+      const limit = await page.evaluate((selector) => {
+        const frame = document.querySelector(selector);
+        const toggle = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
+        return { maxHeight: parseFloat(getComputedStyle(frame).maxHeight), screen: innerHeight - 24, settings: toggle.top - 20 };
+      }, box);
+      assert.equal(limit.maxHeight, style === 'tabs' ? limit.settings : limit.screen, `${style}: ${JSON.stringify(limit)}`);
+      await context.close();
+    }
+  });
+
+  await t.test('the keyboard reaches the tabs and the dots first, and moves from each one into the links of its card and on to the next', async () => {
+    for (const style of ['tabs', 'dots']) {
+      const { page, context } = await open({ style });
+      const entry = style === 'tabs' ? 'bk-tab' : 'bk-dot-item';
+      const focused = () =>
+        page.evaluate(() => {
+          const element = document.activeElement;
+          return `${element.closest('.bk-index, .bk-popover') === null ? element.classList[0] : 'card'} ${decodeURIComponent(element.getAttribute('href') ?? '')}`;
+        });
+      const expected = [
+        [`${entry} #one`, 'card #one', 'card #one-a', 'card #one-b'],
+        ...[2, 3, 4, 5, 6].map((number) => [`${entry} #chapter-${number}`, `card #chapter-${number}`, `card #chapter-${number}-a`]),
+      ].flat();
+      const seen = [];
+      for (let step = 0; step < expected.length; step += 1) {
+        await page.keyboard.press('Tab');
+        seen.push(await focused());
+      }
+      assert.deepEqual(seen, expected, style);
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Shift+Tab');
+      assert.equal(await focused(), `${entry} #chapter-6`, `${style}: shift and tab go back from the card to its entry`);
+      await context.close();
+    }
+  });
+
   await t.test('the notes panel opens from the tick rail between 1000 and 1340 pixels and closes when the pointer leaves', async () => {
     const { page, context } = await open({ style: 'notes', viewport: { width: 1100, height: 700 } });
     await scrollToHeading(page, 'chapter-2');
@@ -301,10 +424,10 @@ test('the table of contents', async (t) => {
       await handle.click();
       await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
       assert.equal(await page.locator(style === 'dots' ? '.bk-drawer-index .bk-drawer-dot' : '.bk-drawer-index .bk-drawer-tab').count(), 6);
-      assert.equal(await page.locator('.bk-drawer-detail .bk-card-number').textContent(), '01');
+      assert.equal(await page.locator('.bk-drawer-detail .bk-toc-card-number').textContent(), '01');
       await page.locator('.bk-drawer-index button').nth(2).click();
-      assert.equal(await page.locator('.bk-drawer-detail .bk-card-title').textContent(), '第3章');
-      await page.locator('.bk-drawer-detail .bk-card-section').click();
+      assert.equal(await page.locator('.bk-drawer-detail .bk-toc-card-title').textContent(), '第3章');
+      await page.locator('.bk-drawer-detail .bk-toc-card-section').click();
       await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().right <= 0);
       await page.waitForFunction(() => Math.abs(document.getElementById('chapter-3-a').getBoundingClientRect().top - 24) < 2, null, { timeout: 3000 });
       await handle.click();
@@ -364,15 +487,15 @@ test('the table of contents', async (t) => {
         left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
       }));
     assert.deepEqual(await read(), { toc: 'dots', stored: null, views: ['.bk-dots'], left: 198 });
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录', '主题', '正文', '按钮']);
+    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '按钮']);
     await page.click('.bk-settings-toggle');
-    await page.getByRole('button', { name: '书签索引' }).click();
+    await page.getByRole('radio', { name: /书签索引/ }).click();
     await settle(page);
     assert.deepEqual(await read(), { toc: 'tabs', stored: 'tabs', views: ['.bk-tabs'], left: 198 });
-    await page.getByRole('button', { name: '前文笔记' }).click();
+    await page.getByRole('radio', { name: /前文笔记/ }).click();
     await settle(page);
     assert.deepEqual(await read(), { toc: 'notes', stored: 'notes', views: ['.bk-toc'], left: 290 });
-    await page.getByRole('button', { name: '刻度线' }).click();
+    await page.getByRole('radio', { name: /刻度线/ }).click();
     await page.reload();
     await settle(page);
     assert.deepEqual(await read(), { toc: 'ticks', stored: 'ticks', views: ['.bk-ticks'], left: 198 });

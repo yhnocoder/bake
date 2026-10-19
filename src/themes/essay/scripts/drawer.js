@@ -51,7 +51,9 @@ export function drawerView(ctx) {
   });
 
   const isOpen = () => drawer.classList.contains('is-open');
+  let selected = 0;
   function select(chapterIndex) {
+    selected = chapterIndex;
     buttons.forEach((button, buttonIndex) => {
       button.classList.toggle('is-selected', buttonIndex === chapterIndex);
       button.setAttribute('aria-pressed', String(buttonIndex === chapterIndex));
@@ -122,6 +124,19 @@ export function drawerView(ctx) {
         button.classList.toggle('is-current', buttonIndex === Math.max(0, state.chapter));
         button.classList.toggle('is-read', buttonIndex < state.chapter);
       });
+    },
+    saved() {
+      return isOpen() ? { selected, detail: detail.scrollTop, index: index.scrollTop } : null;
+    },
+    restore(saved) {
+      drawer.classList.add('is-open');
+      scrim.classList.add('is-open');
+      root.classList.add('bk-drawer-open');
+      handle.setAttribute('aria-expanded', 'true');
+      select(Math.min(saved.selected, buttons.length - 1));
+      detail.scrollTop = saved.detail;
+      index.scrollTop = saved.index;
+      if (document.activeElement === document.body) drawer.focus({ preventScroll: true });
     },
     jumped() {
       travel = 0;

@@ -62,7 +62,21 @@ test('reader settings', async (t) => {
     assert.equal(await panel.isVisible(), false);
     await page.getByRole('button', { name: '设置' }).click();
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
-    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录', '主题', '正文', '按钮']);
+    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '按钮']);
+    const styles = await panel.locator('[role="radiogroup"]').evaluate((group) => ({
+      label: document.getElementById(group.getAttribute('aria-labelledby')).textContent,
+      choices: [...group.querySelectorAll('[role="radio"]')].map((choice) => [choice.querySelector('svg').getBoundingClientRect().width, choice.querySelector('b').textContent, choice.querySelector('small').textContent, choice.getAttribute('aria-checked')]),
+    }));
+    assert.deepEqual(styles, {
+      label: '目录样式',
+      choices: [
+        [28, '前文笔记', 'T1 · 默认', 'true'],
+        [28, '书签索引', 'T2', 'false'],
+        [28, '圆点胶囊', 'T3', 'false'],
+        [28, '刻度线', 'T4', 'false'],
+      ],
+    });
+    assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="theme"] button').allTextContents(), ['跟随系统', '浅', '深']);
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).visibility === 'hidden');
     await page.getByRole('button', { name: '设置' }).click();
@@ -95,9 +109,10 @@ test('reader settings', async (t) => {
     await page.setViewportSize({ width: 375, height: 700 });
     await page.goto(url);
     assert.deepEqual(await read(), { box: [0, 24, 40, 38], radius: '0px 11px 11px 0px', ...expected });
-    const before = await page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
+    const color = () => page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
+    assert.equal(await color(), 'rgb(22, 26, 29)');
     await page.hover('.bk-settings-toggle');
-    await page.waitForFunction((color) => getComputedStyle(document.querySelector('.bk-settings-toggle')).color !== color, before);
+    assert.equal(await color(), 'rgb(22, 26, 29)');
     await page.close();
   });
 

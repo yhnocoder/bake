@@ -1,5 +1,5 @@
 import { reducedMotion } from './motion.js';
-import { chapterCard, clamp, el, floorOf, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
+import { chapterCard, clamp, el, floorFor, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 70;
 const MARGIN = 140;
@@ -83,12 +83,13 @@ export function ticksView(ctx) {
     shownState = stateKey(ctx.state());
   }
   function place() {
-    const floor = floorOf();
     const column = ticks.element.getBoundingClientRect();
     const first = ticks.rows[ctx.outline.chapters[shownChapter].index].getBoundingClientRect();
+    const left = column.right + 8;
+    const floor = floorFor(left);
     card.style.maxHeight = `${floor - 12}px`;
     const height = Math.min(card.scrollHeight, floor - 12);
-    card.style.left = `${column.right + 8}px`;
+    card.style.left = `${left}px`;
     card.style.top = `${clamp(first.top - 22, 12, floor - height)}px`;
   }
   function mark(reveal) {

@@ -9,7 +9,7 @@ export default function Page(props) {
   const { site, article, assets } = props;
   const labels = labelsFor(site.language);
   return (
-    <html lang={site.language} {...settingAttributes('article', article)}>
+    <html lang={site.language} {...settingAttributes('article', article)} data-default-toc={article.toc}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

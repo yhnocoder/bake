@@ -76,10 +76,6 @@ html[data-script] .bk-toc-label-notes {
   transition: color 0.2s;
 }
 
-.bk-toc-chapter:nth-child(1 of .bk-toc-chapter) > .bk-toc-chapter-title {
-  padding-top: 2px;
-}
-
 .bk-toc-number {
   flex: none;
   padding-top: 2px;
@@ -123,37 +119,37 @@ html[data-script] .bk-toc-label-notes {
 }
 
 .bk-toc-recap-text p,
-.bk-card-recap p {
+.bk-toc-card-recap p {
   margin: 0 0 4px;
 }
 
 .bk-toc-recap-text p:last-child,
-.bk-card-recap p:last-child {
+.bk-toc-card-recap p:last-child {
   margin: 0;
 }
 
-:is(.bk-toc-recap-text, .bk-card-recap) .bk-block {
+:is(.bk-toc-recap-text, .bk-toc-card-recap) .bk-block {
   width: auto;
   margin: 4px 0;
 }
 
-:is(.bk-toc-recap-text, .bk-card-recap) mjx-container {
+:is(.bk-toc-recap-text, .bk-toc-card-recap) mjx-container {
   color: inherit;
 }
 
-:is(.bk-toc-recap-text, .bk-card-recap) mjx-container[display] {
+:is(.bk-toc-recap-text, .bk-toc-card-recap) mjx-container[display] {
   justify-content: flex-start;
   padding: 2px 0;
   overflow: hidden;
   font-size: 0.92em;
 }
 
-:is(.bk-toc-recap-text, .bk-card-recap) mjx-container[display] > svg {
+:is(.bk-toc-recap-text, .bk-toc-card-recap) mjx-container[display] > svg {
   max-width: 100%;
   height: auto;
 }
 
-:is(.bk-toc-recap-text, .bk-card-recap) mjx-container:not([display]) {
+:is(.bk-toc-recap-text, .bk-toc-card-recap) mjx-container:not([display]) {
   display: inline-block;
   margin-block: 2px;
 }
@@ -440,16 +436,12 @@ html[data-script] .bk-toc-chapters {
   line-height: 1;
   letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--ink-3) 80%, var(--tab));
+  color: var(--ink);
   transition:
     width 0.2s var(--ease-out),
     background-color 0.2s,
     color 0.2s,
     box-shadow 0.2s;
-}
-
-.bk-toc-ui .bk-tab {
-  color: color-mix(in srgb, var(--ink-3) 80%, var(--tab));
 }
 
 .bk-toc-ui .bk-tab.is-read {
@@ -508,10 +500,6 @@ html[data-script] .bk-toc-chapters {
   letter-spacing: 0.16em;
   color: var(--ink);
   box-shadow: inset 2px 0 0 var(--tab-current);
-}
-
-.bk-toc-ui .bk-tab-title-text {
-  color: var(--ink);
 }
 
 .bk-index {
@@ -640,18 +628,18 @@ html[data-script] .bk-toc-chapters {
     transform 0.2s var(--ease-out);
 }
 
-.bk-card {
+.bk-toc-card {
   font-family: var(--font-ui);
 }
 
-.bk-card-head {
+.bk-toc-card-head {
   display: block;
   padding: 0 8px;
   border-radius: 7px;
   transition: background-color 0.12s;
 }
 
-.bk-card-number {
+.bk-toc-card-number {
   display: block;
   margin-bottom: 2px;
   font-size: 11.5px;
@@ -662,11 +650,11 @@ html[data-script] .bk-toc-chapters {
   color: var(--ink-3);
 }
 
-.bk-card-number.is-current {
+.bk-toc-card-number.is-current {
   color: var(--accent);
 }
 
-.bk-card-title {
+.bk-toc-card-title {
   display: block;
   font-family: var(--font-heading);
   font-size: 17px;
@@ -676,11 +664,11 @@ html[data-script] .bk-toc-chapters {
   text-wrap: balance;
 }
 
-.bk-card-head:hover .bk-card-title {
+.bk-toc-card-head:hover .bk-toc-card-title {
   color: var(--accent);
 }
 
-.bk-card-lead {
+.bk-toc-card-lead {
   display: -webkit-box;
   margin: 5px 0 0;
   padding: 0 8px;
@@ -692,11 +680,11 @@ html[data-script] .bk-toc-chapters {
   -webkit-box-orient: vertical;
 }
 
-.bk-card-lead mjx-container {
+.bk-toc-card-lead mjx-container {
   font-size: 1em;
 }
 
-.bk-card-sections {
+.bk-toc-card-sections {
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -705,29 +693,29 @@ html[data-script] .bk-toc-chapters {
   border-top: 1px solid var(--line);
 }
 
-.bk-card-section {
+.bk-toc-card-section {
   display: block;
   padding: 6px 8px 7px;
   border-radius: 7px;
   transition: background-color 0.12s;
 }
 
-.bk-card-section:hover,
-.bk-card-section.is-hover,
-.bk-card-head.is-hover {
+.bk-toc-card-section:hover,
+.bk-toc-card-section.is-hover,
+.bk-toc-card-head.is-hover {
   background: var(--surface-2);
 }
 
-.is-ticks .bk-card-head {
+.is-ticks .bk-toc-card-head {
   margin-top: -6px;
   padding-block: 6px 7px;
 }
 
-.is-ticks .bk-card-sections {
+.is-ticks .bk-toc-card-sections {
   margin-top: 6px;
 }
 
-.bk-card-section-title {
+.bk-toc-card-section-title {
   display: flex;
   align-items: baseline;
   gap: 7px;
@@ -737,7 +725,7 @@ html[data-script] .bk-toc-chapters {
   color: var(--ink);
 }
 
-.bk-card-section-title::before {
+.bk-toc-card-section-title::before {
   content: '';
   flex: none;
   width: 5px;
@@ -747,19 +735,19 @@ html[data-script] .bk-toc-chapters {
   transform: translateY(-2px);
 }
 
-.bk-card-section.is-read .bk-card-section-title::before {
+.bk-toc-card-section.is-read .bk-toc-card-section-title::before {
   background: var(--ink-3);
 }
 
-.bk-card-section.is-current .bk-card-section-title {
+.bk-toc-card-section.is-current .bk-toc-card-section-title {
   color: var(--accent);
 }
 
-.bk-card-section.is-current .bk-card-section-title::before {
+.bk-toc-card-section.is-current .bk-toc-card-section-title::before {
   background: var(--accent);
 }
 
-.bk-card-section .bk-card-lead {
+.bk-toc-card-section .bk-toc-card-lead {
   margin-top: 2px;
   padding: 0 0 0 12px;
   font-size: 12.5px;
@@ -768,7 +756,7 @@ html[data-script] .bk-toc-chapters {
   -webkit-line-clamp: 2;
 }
 
-.bk-card-recap {
+.bk-toc-card-recap {
   display: block;
   margin-top: 2px;
   padding-left: 12px;
@@ -777,7 +765,7 @@ html[data-script] .bk-toc-chapters {
   color: var(--recap);
 }
 
-.bk-card-chapter-recap {
+.bk-toc-card-chapter-recap {
   margin: 5px 0 0;
   padding: 0 8px;
 }
@@ -896,7 +884,7 @@ html[data-script] .bk-toc-chapters {
   padding: 0 13px 0 11px;
   border-radius: 0 11px 11px 0;
   font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -921,6 +909,10 @@ html[data-script] .bk-toc-chapters {
 
 .bk-toc-handle.is-capsule {
   padding-left: 9px;
+}
+
+.bk-handle-number {
+  font-size: 12.5px;
 }
 
 .bk-handle-capsule {
@@ -1006,7 +998,7 @@ html[data-script] .bk-toc-chapters {
   width: 30px;
   height: 30px;
   border-radius: 15px;
-  color: var(--ink-3);
+  color: var(--ink);
 }
 
 .bk-drawer-close:active {
@@ -1044,7 +1036,7 @@ html[data-script] .bk-toc-chapters {
   font-size: 12.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--ink-3);
+  color: var(--ink);
   transition:
     background-color 0.15s,
     color 0.15s;

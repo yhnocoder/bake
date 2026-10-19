@@ -1,4 +1,4 @@
-import { chapterCard, clamp, el, floorOf, hoverIntent, stateKey, tocLink } from './toc-card.js';
+import { cardKeyboard, chapterCard, clamp, el, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 110;
 const TAB_PITCH = 28;
@@ -26,7 +26,7 @@ export function tabsView(ctx) {
     text.tabIndex = -1;
     title.append(text);
     tab.addEventListener('pointerenter', () => hover(chapterIndex));
-    tab.addEventListener('focus', () => hover(chapterIndex));
+    tab.addEventListener('focus', () => hover(chapterIndex, tab.matches(':focus-visible')));
     tab.addEventListener('pointerleave', (event) => {
       if (!index.element.contains(event.relatedTarget)) leave();
     });
@@ -38,16 +38,17 @@ export function tabsView(ctx) {
     if (!root.contains(event.relatedTarget)) leave();
   });
   ctx.host.append(root, index.element);
+  cardKeyboard({ entries: items.map((item) => item.tab), card: index.element, shown: () => (index.shown() ? hovered : -1), leave: () => leave() });
   let shownCurrent = null;
   let hovered = -1;
   let shownState = '';
 
-  function hover(chapterIndex) {
+  function hover(chapterIndex, now = false) {
     items.forEach((item, itemIndex) => item.tab.classList.toggle('is-hover', itemIndex === chapterIndex));
     intent.enter(() => {
       hovered = chapterIndex;
       index.show(chapterIndex, items[chapterIndex].tab);
-    });
+    }, now);
   }
   function leave() {
     intent.leave(() => {
@@ -107,6 +108,7 @@ export function tabsView(ctx) {
 function indexCard(ctx) {
   const element = el('div', 'bk-index');
   const tab = el('a', 'bk-index-tab');
+  tab.tabIndex = -1;
   const body = el('div', 'bk-index-body');
   element.append(tab, body);
   let shown = -1;
@@ -114,7 +116,7 @@ function indexCard(ctx) {
   let frame = 0;
   function place() {
     const box = anchor.getBoundingClientRect();
-    const floor = floorOf();
+    const floor = floorFor(box.left);
     body.style.maxHeight = `${floor - 12}px`;
     const height = Math.min(body.scrollHeight, floor - 12);
     const top = clamp(box.top - 22, 12, floor - height);

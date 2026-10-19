@@ -22,7 +22,7 @@ export function startToc(article) {
   const root = document.documentElement;
   const host = document.createElement('div');
   host.className = 'bk-toc-ui';
-  document.body.append(host);
+  document.body.insertBefore(host, document.querySelector('.bk-shell'));
   let jumping = false;
   let state = null;
   let kind = null;
@@ -92,10 +92,12 @@ export function startToc(article) {
   const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add('is-ready')));
   const reread = () => {
     nav.classList.remove('is-ready');
+    const saved = view.saved?.() ?? null;
     column.destroy();
     ctx.outline = readOutline(nav);
     column = notesColumn(nav, ctx);
     mount(true);
+    if (saved !== null) view.restore(saved);
     settle();
   };
   mount();
