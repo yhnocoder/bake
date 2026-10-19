@@ -326,6 +326,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 - Fix root causes and replace old behavior outright. Code that is no longer used is deleted; git history keeps it.
 - A known performance gap is written down here together with who accepted it.
 - Drawing share images makes `npm test` about 30 seconds slower on the development machine, 81 seconds against 51 seconds without share images, because every unit test that runs `bake build` on a blog with articles launches Chromium. Accepted by the coordinator on 2026-10-19.
+- The AI chat bundle has its own copies of `solid-js` and MathJax, so a page with components and math loads them twice when the reader opens the chat and an answer has a formula. Sharing them with the component bundle would make the chat build depend on each blog. Accepted by the coordinator on 2026-10-19.
 
 ## Checks guarded by tests
 
