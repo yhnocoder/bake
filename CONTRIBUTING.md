@@ -4,7 +4,7 @@ Bake is being rebuilt from scratch to follow the redesign. This file holds the a
 
 ## Tool and blog are separate
 
-This repository contains only the tool: the CLI, the Markdown pipeline, the built-in themes and the optional component kit. Posts, components, custom themes and site settings live in the blog's own repository. Bake never assumes a particular blog, and nothing blog-specific is committed here. Test blogs are created by tests in temporary directories.
+This repository contains only the tool: the CLI, the Markdown pipeline, the built-in themes and the optional component kit. Posts, components, custom themes and site settings live in the blog's own repository. Bake never assumes a particular blog. `examples/blog/` is the only blog in this repository: it holds the syntax article that lists every syntax item, serves as the source of the tutorial, and is the integration test fixture. Unit tests that need other blogs, such as error cases, create them in temporary directories.
 
 ## Planned layout
 
@@ -22,6 +22,7 @@ The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/
 | `src/themes/essay/`, `src/themes/bento/` | Built-in themes: page structure in SolidJS JSX plus styles |
 | `src/kit/` | Optional parts for writing components |
 | `test/` | Unit and integration tests, see TESTING.md |
+| `examples/blog/` | The example blog: the syntax article and the posts it links to |
 | `scripts/` | Repository checks |
 
 ## Themes interpret, they never add syntax
@@ -61,3 +62,4 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Every `bake.config.js` and front matter error states its exact position | `test/config.test.js`, `test/front-matter.test.js` |
 | The front matter fixtures in `test/fixtures/syntax-errors/` report the lines in `expected.json` | `test/front-matter.test.js` |
 | The example blog in `examples/blog/` builds without errors | `test/build.test.js` |
+| The syntax article's error appendix matches `test/fixtures/syntax-errors/` | `test/syntax-article.test.js` |
