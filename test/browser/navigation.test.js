@@ -75,7 +75,7 @@ test('links, folds and the table of contents', async (t) => {
   });
 
   await t.test('an in-page link opens the fold around its target and scrolls the target near the top', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await page.goto(url);
     await page.click('a[href="#inside"]');
     await page.waitForFunction(() => Math.abs(document.getElementById('inside').getBoundingClientRect().top - 24) < 2, null, { timeout: 3000 });
@@ -140,7 +140,7 @@ test('links, folds and the table of contents', async (t) => {
   });
 
   await t.test('below 1340 px a button above the settings button opens the contents in a drawer that a link closes', async () => {
-    const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
+    const page = await browser.newPage({ viewport: { width: 1100, height: 800 }, reducedMotion: 'reduce' });
     await page.goto(url);
     const button = page.locator('.bk-toc-button');
     const toggle = page.locator('.bk-settings-toggle');

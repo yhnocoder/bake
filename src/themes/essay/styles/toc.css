@@ -4,11 +4,16 @@
   left: calc(var(--body-left) - var(--column-gap) - var(--toc-width));
   z-index: 20;
   width: var(--toc-width);
+  opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
 }
 
-.bk-toc.is-yielding {
+.bk-toc-ready .bk-toc {
+  opacity: 1;
+}
+
+.bk-toc-ready .bk-toc.is-yielding {
   opacity: 0;
 }
 
@@ -329,5 +334,13 @@
   .bk-drawer,
   .bk-drawer-scrim {
     display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-toc-button,
+  .bk-drawer,
+  .bk-drawer.is-open {
+    transition-duration: 0s;
   }
 }
