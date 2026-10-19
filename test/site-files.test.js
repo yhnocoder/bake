@@ -215,6 +215,23 @@ describe('site files', () => {
     assert.equal(read('2026-09/demo/index.html'), pageHtml);
   });
 
+  test('_bake/theme.css resolves every form of a relative @import in a theme folder against the built-in theme', (t) => {
+    const themeCss = [
+      '@IMPORT url(./styles/fonts.css);',
+      "@import url( './styles/tokens.css' );",
+      '@import url("./styles/home.css");',
+      "@import './styles/not-found.css';",
+      '',
+    ].join('\n');
+    const { read } = built(t, { ...blogFiles, 'themes/essay/theme.css': themeCss });
+    const styles = read('_bake/theme.css');
+    assert.doesNotMatch(styles, /@import/i);
+    assert.match(styles, /font-family:LXGW WenKai/);
+    assert.match(styles, /--bg:#f5f6f4/);
+    assert.match(styles, /\.bk-card-frame\{/);
+    assert.match(styles, /\.bk-not-found/);
+  });
+
   test('reports public files at the addresses of the feed, the sitemap, the 404 page and in _bake/', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

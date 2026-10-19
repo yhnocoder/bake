@@ -88,6 +88,15 @@ describe('images', () => {
     );
   });
 
+  test('publishes an AVIF image unchanged with its size', async (t) => {
+    const avif = sharp({ create: { width: 48, height: 24, channels: 3, background: '#2a78d6' } }).avif().toBuffer();
+    const options = { folder: await imageFolder(t, { 'photo.avif': avif }) };
+    const structure = await parsed('![A photo](photo.avif)\n', options);
+    assert.equal(structure.intro[0].html, '<figure class="figure"><img src="photo.avif" alt="A photo" width="48" height="24" loading="lazy" decoding="async"></figure>');
+    assert.deepEqual(structure.images, []);
+    assert.equal(structure.image, 'photo.avif');
+  });
+
   test('publishes raster images as WebP no wider than twice their largest display width', async (t) => {
     const options = { folder: await imageFolder(t, { 'wide.png': png(3000, 1500), 'photo.jpg': sharp({ create: { width: 900, height: 600, channels: 3, background: '#fff' } }).jpeg().toBuffer(), 'small.png': png(400, 200) }) };
     const article = await parsed('![](wide.png)\n\n![](photo.jpg){width=300px}\n\n![](small.png){width=200px}\n\n![](small.png){width=50%}\n', options);

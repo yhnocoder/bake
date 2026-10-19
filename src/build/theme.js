@@ -18,7 +18,7 @@ const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const RENDER_ENTRY = 'bake:render';
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const RELATIVE_IMPORT = /^\.\.?[/]/;
-const CSS_IMPORT = /(@import\s+(?:url\(\s*)?)(['"])(\.\.?\/[^'"]+)\2/g;
+const CSS_IMPORT = /@import\s+(?:url\(\s*(['"]?)(\.\.?[/][^'"()\s]+)\1\s*\)|(['"])(\.\.?[/][^'"]+)\3)/gi;
 const ASSET_FILE_NAMES = 'assets/[name]-[hash][extname]';
 
 export async function compileTheme(root, name, { siteTheme }, errors) {
@@ -79,9 +79,9 @@ function themeFiles(folders, locate) {
     resolveId: resolveThemeFile,
     transform(code, id) {
       if (!id.endsWith('.css')) return null;
-      return code.replace(CSS_IMPORT, (match, start, quote, source) => {
-        const file = resolveThemeFile(source, id);
-        return file === null ? match : `${start}${JSON.stringify(file)}`;
+      return code.replace(CSS_IMPORT, (match, urlQuote, urlSource, quote, quotedSource) => {
+        const file = resolveThemeFile(urlSource ?? quotedSource, id);
+        return file === null ? match : `@import ${JSON.stringify(file)}`;
       });
     },
   };

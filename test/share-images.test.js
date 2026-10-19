@@ -58,7 +58,9 @@ function imageTags(html) {
 describe('share images', () => {
   let cover;
   let photo;
+  let still;
   before(async () => {
+    still = await sharp({ create: { width: 360, height: 240, channels: 3, background: '#ffff00' } }).avif().toBuffer();
     cover = await sharp({ create: { width: 300, height: 200, channels: 3, background: '#ff0000' } }).png().toBuffer();
     photo = await sharp({ create: { width: 320, height: 180, channels: 3, background: '#00ff00' } }).jpeg().toBuffer();
   });
@@ -69,15 +71,20 @@ describe('share images', () => {
       'content/posts/covered/index.md': article({ title: 'Covered', slug: 'covered', date: '2026-10-01', extra: 'category: notes\ncover: cover.png\n' }),
       'content/posts/photo/index.md': article({ title: 'Photo', slug: 'photo', date: '2026-10-02', extra: 'category: notes\ncover: photo.png\n' }),
       'content/posts/vector/index.md': article({ title: 'Vector', slug: 'vector', date: '2026-10-03', extra: 'category: notes\ncover: cover.svg\n' }),
+      'content/posts/still/index.md': article({ title: 'Still', slug: 'still', date: '2026-10-04', extra: 'category: notes\ncover: cover.avif\n' }),
       'content/posts/vector/cover.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="210"><rect width="400" height="210" fill="#0000ff"/></svg>\n',
     });
     writeFileSync(join(dir, 'content/posts/covered/cover.png'), cover);
     writeFileSync(join(dir, 'content/posts/photo/photo.png'), photo);
+    writeFileSync(join(dir, 'content/posts/still/cover.avif'), still);
     const first = bake(dir, 'build');
     assert.equal(first.stderr, '');
     const images = readdirSync(join(dir, 'dist/og'), { recursive: true }).filter((path) => path.includes('.')).sort();
-    assert.equal(images.length, 5);
-    const [plain, covered, photoImage, rope, vector] = images;
+    assert.equal(images.length, 6);
+    const [plain, covered, photoImage, rope, stillImage, vector] = images;
+    assert.match(stillImage, /^2026-10\/still-[0-9a-f]{12}\.png$/);
+    const converted = PNG.sync.read(readFileSync(join(dir, 'dist/og', stillImage)));
+    assert.deepEqual([converted.width, converted.height], [360, 240]);
     assert.match(plain, /^2026-09\/plain-[0-9a-f]{12}\.png$/);
     assert.match(covered, /^2026-10\/covered-[0-9a-f]{12}\.png$/);
     assert.match(photoImage, /^2026-10\/photo-[0-9a-f]{12}\.jpg$/);
@@ -111,6 +118,7 @@ describe('share images', () => {
     assert.deepEqual(imageTags(page('2026-10/covered/index.html')), tags(covered, 'image/png', 300, 200));
     assert.deepEqual(imageTags(page('2026-10/photo/index.html')), tags(photoImage, 'image/jpeg', 320, 180));
     assert.deepEqual(imageTags(page('2026-10/vector/index.html')), tags(vector, 'image/png', 400, 210));
+    assert.deepEqual(imageTags(page('2026-10/still/index.html')), tags(stillImage, 'image/png', 360, 240));
     assert.deepEqual(imageTags(page('index.html')), ['<meta name="twitter:card" content="summary">']);
     assert.equal(page('2026-09/demo/index.html'), '<!doctype html>\n<p>demo</p>\n');
 

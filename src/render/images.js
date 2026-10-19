@@ -18,7 +18,8 @@ export async function readImage(path) {
     if (UNSUPPORTED.test(error.message)) return { format: null };
     return { error: error.message.replace(/[:\s]+$/, '') };
   }
-  const { format, width, height, pageHeight } = metadata;
+  const { width, height, pageHeight } = metadata;
+  const format = metadata.format === 'heif' && metadata.compression === 'av1' ? 'avif' : metadata.format;
   if (!CONVERTED.includes(format) && !KEPT.includes(format)) return { format: null };
   return { format, width, height: pageHeight ?? height };
 }
