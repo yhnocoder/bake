@@ -61,7 +61,7 @@ jobs:
               '<!-- screenshots:start -->',
               '## Screenshots',
               '',
-              `Commit ${process.env.HEAD_SHA.slice(0, 7)} merged into the base branch, compared with the base branch. Every page of \`examples/blog/\` at 1440 and 375 pixels wide, in light and dark mode. [Run](${run})`,
+              `Every page of \`examples/blog/\` at 1440 and 375 pixels wide, light and dark, for commit ${process.env.HEAD_SHA.slice(0, 7)} compared with its base branch. [Run](${run})`,
               '',
               fs.readFileSync('test-out/screenshots/report/summary.md', 'utf8').trim(),
               '<!-- screenshots:end -->',

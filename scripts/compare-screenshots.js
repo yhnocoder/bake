@@ -27,18 +27,21 @@ const headShots = screenshots(headDir);
 const browser = await chromium.launch();
 const sheet = await browser.newPage();
 try {
-  const results = [];
+  const shots = [];
+  const changes = [];
   for (const file of sortShots([...new Set([...baseShots, ...headShots])])) {
     if (headShots.includes(file)) copyFileSync(join(headDir, file), join(outDir, 'full', file));
-    results.push({ ...parseShot(file), ...(await compareShot(file)) });
+    const { panels, ...shot } = { ...parseShot(file), ...compareShot(file) };
+    shots.push(shot);
+    if (shot.status !== 'unchanged') await addChange(changes, shot, panels);
   }
   const pages = [];
-  for (const page of new Set(results.filter((result) => result.status !== 'removed').map((result) => result.page))) {
-    pages.push({ page, sheets: await writeOverview(page) });
+  for (const page of new Set(shots.filter((shot) => shot.status !== 'removed').map((shot) => shot.page))) {
+    pages.push({ page, images: await writeOverview(page) });
   }
-  writeFileSync(join(outDir, 'summary.json'), `${JSON.stringify(results, null, 2)}\n`);
-  writeFileSync(join(outDir, 'summary.md'), summary(results, pages));
-  console.log(countLine(results));
+  writeFileSync(join(outDir, 'summary.json'), `${JSON.stringify(shots, null, 2)}\n`);
+  writeFileSync(join(outDir, 'summary.md'), summary(shots, changes, pages));
+  console.log(countLine(shots));
 } finally {
   await browser.close();
 }
@@ -50,21 +53,18 @@ function screenshots(dir) {
 function parseShot(file) {
   const name = file.replace(/\.png$/, '');
   const dot = name.lastIndexOf('.');
-  return { file, page: name.slice(0, dot), variant: name.slice(dot + 1) };
+  const variant = variants.find((item) => item.name === name.slice(dot + 1));
+  return { file, page: name.slice(0, dot), variant: variant.name, device: variant.device, colorScheme: variant.colorScheme };
 }
 
 function sortShots(files) {
-  const order = (variant) => variants.findIndex((item) => item.name === variant);
-  return files.sort((a, b) => {
-    const shotA = parseShot(a);
-    const shotB = parseShot(b);
-    return shotA.page.localeCompare(shotB.page) || order(shotA.variant) - order(shotB.variant);
-  });
+  const order = (file) => variants.findIndex((item) => item.name === parseShot(file).variant);
+  return files.sort((a, b) => parseShot(a).page.localeCompare(parseShot(b).page) || order(a) - order(b));
 }
 
-async function compareShot(file) {
-  if (!baseShots.includes(file)) return singleShot(join(headDir, file), file, 'new', 'New page');
-  if (!headShots.includes(file)) return singleShot(join(baseDir, file), file, 'removed', 'Removed page');
+function compareShot(file) {
+  if (!baseShots.includes(file)) return topOfPage(join(headDir, file), 'new', 'New page');
+  if (!headShots.includes(file)) return topOfPage(join(baseDir, file), 'removed', 'Removed page');
   const before = readPng(join(baseDir, file));
   const after = readPng(join(headDir, file));
   const width = Math.max(before.width, after.width);
@@ -75,50 +75,63 @@ async function compareShot(file) {
   const pixels = pixelmatch(paddedBefore.data, paddedAfter.data, diff.data, width, height, { threshold: 0.1 });
   if (pixels === 0) return { status: 'unchanged' };
   const area = cropArea(changedArea(diff), width, height);
-  await writeSheet(join(outDir, 'changes', file), [
+  const panels = [
     { label: 'Before', png: crop(paddedBefore, area) },
     { label: 'After', png: crop(paddedAfter, area) },
     { label: 'Diff', png: crop(diff, area) },
-  ], area.right - area.left <= maxSideBySideWidth ? 3 : 1);
-  return { status: 'changed', ratio: pixels / (width * height), ...area, height };
+  ];
+  return { status: 'changed', ratio: pixels / (width * height), ...area, height, panels };
 }
 
-async function singleShot(path, file, status, label) {
+function topOfPage(path, status, label) {
   const png = readPng(path);
   const area = { left: 0, top: 0, right: png.width, bottom: Math.min(png.height, maxCropHeight) };
-  await writeSheet(join(outDir, 'changes', file), [{ label, png: crop(png, area) }], 1);
-  return { status, ...area, height: png.height };
+  return { status, ...area, height: png.height, continues: area.bottom < png.height, panels: [{ label, png: crop(png, area) }] };
+}
+
+async function addChange(changes, shot, panels) {
+  const hash = hashPanels(panels);
+  const same = changes.find((change) => change.page === shot.page && change.device === shot.device && change.hash === hash);
+  if (same !== undefined) {
+    same.colorSchemes.push(shot.colorScheme);
+    return;
+  }
+  const columns = panels.length === 3 && panels[0].png.width <= maxSideBySideWidth ? 3 : 1;
+  await writeSheet(join(outDir, 'changes', shot.file), panels, columns);
+  changes.push({ ...shot, hash, colorSchemes: [shot.colorScheme] });
 }
 
 async function writeOverview(page) {
-  const sheets = [];
+  const images = [];
   for (const device of [...new Set(variants.map((variant) => variant.device))]) {
-    const shots = variants
-      .filter((variant) => variant.device === device && headShots.includes(`${page}.${variant.name}.png`))
-      .map((variant) => ({ variant, png: firstScreen(page, variant) }));
-    if (shots.length === 0) continue;
-    if (shots.every(({ png }) => png.width <= maxSideBySideWidth)) {
-      const name = `${page}.${device}.png`;
-      await writeSheet(join(outDir, 'pages', name), shots.map(panel), shots.length);
-      sheets.push({ name, label: device, open: true });
+    const panels = [];
+    for (const variant of variants.filter((item) => item.device === device)) {
+      const file = `${page}.${variant.name}.png`;
+      if (!headShots.includes(file)) continue;
+      const png = readPng(join(headDir, file));
+      const firstScreen = crop(png, { left: 0, top: 0, right: png.width, bottom: Math.min(png.height, variant.height) });
+      const same = panels.find((item) => item.hash === hashPanels([{ png: firstScreen }]));
+      if (same !== undefined) same.colorSchemes.push(variant.colorScheme);
+      else panels.push({ png: firstScreen, hash: hashPanels([{ png: firstScreen }]), colorSchemes: [variant.colorScheme], file });
+    }
+    const labeled = panels.map((item) => ({ ...item, label: `${device}, ${item.colorSchemes.join(' and ')}` }));
+    if (labeled.length > 1 && labeled.every((item) => item.png.width <= maxSideBySideWidth)) {
+      await writeSheet(join(outDir, 'pages', `${page}.${device}.png`), labeled, labeled.length);
+      images.push({ name: `${page}.${device}.png`, label: device });
     } else {
-      for (const [index, shot] of shots.entries()) {
-        const name = `${page}.${shot.variant.name}.png`;
-        await writeSheet(join(outDir, 'pages', name), [panel(shot)], 1);
-        sheets.push({ name, label: panel(shot).label, open: index === 0 });
+      for (const item of labeled) {
+        await writeSheet(join(outDir, 'pages', item.file), [item], 1);
+        images.push({ name: item.file, label: item.label });
       }
     }
   }
-  return sheets;
+  return images;
 }
 
-function firstScreen(page, variant) {
-  const png = readPng(join(headDir, `${page}.${variant.name}.png`));
-  return crop(png, { left: 0, top: 0, right: png.width, bottom: Math.min(png.height, variant.height) });
-}
-
-function panel({ variant, png }) {
-  return { label: `${variant.device}, ${variant.colorScheme}`, png };
+function hashPanels(panels) {
+  const hash = createHash('sha256');
+  for (const { png } of panels) hash.update(`${png.width}x${png.height}`).update(png.data);
+  return hash.digest('hex');
 }
 
 function changedArea(diff) {
@@ -200,46 +213,52 @@ function countLine(results) {
   return `${results.length} screenshots of ${pages} pages: ${counts.join(', ') || 'none'}`;
 }
 
-function summary(results, pages) {
-  const lines = [`**${countLine(results)}.**`, ''];
-  if (!hasBase) lines.push('There are no base screenshots, so every screenshot is reported as new.', '');
-  const shown = results.filter((result) => result.status !== 'unchanged');
-  lines.push('#### Changes', '');
-  if (shown.length === 0) lines.push('No page looks different from the base.', '');
-  const shownImages = new Map();
-  for (const result of shown) {
-    lines.push(`**${result.page}, ${result.variant}**: ${describe(result)}`, '');
-    const hash = createHash('sha256').update(readFileSync(join(outDir, 'changes', result.file))).digest('hex');
-    const same = shownImages.get(hash);
-    if (same === undefined) {
-      shownImages.set(hash, result);
-      lines.push(`![${result.page} ${result.variant}](${url(`changes/${result.file}`)})`, '');
-    } else {
-      lines.push(`The images are the same as for ${same.page}, ${same.variant}.`, '');
-    }
+function summary(results, changes, pages) {
+  const lines = [`**${countLine(results)}.**`];
+  if (!hasBase) lines.push('There are no base screenshots, so every screenshot is reported as new.');
+  if (changes.length === 0) lines.push('No page looks different from the base.');
+  lines.push('');
+  if (changes.length > 0) {
+    const changedPages = [...new Set(changes.map((change) => change.page))];
+    lines.push(details(`Changes on ${listPages(changedPages)}`, changes.flatMap((change) => [
+      `**${change.page}, ${change.device}, ${change.colorSchemes.join(' and ')}**: ${describe(change)}`,
+      '',
+      `![${change.page} ${change.device}](${url(`changes/${change.file}`)})`,
+      '',
+    ])));
   }
-  if (pages.length > 0) lines.push('#### Pages', '', 'The first screen of every page. The links open the full page.', '');
-  for (const { page, sheets } of pages) {
-    const links = results
-      .filter((result) => result.page === page && result.status !== 'removed')
-      .map((result) => `[${result.variant}](${url(`full/${result.file}`)})`);
-    lines.push(`**${page}**: ${links.join(' · ')}`, '');
-    for (const sheet of sheets) {
-      const image = `![${page} ${sheet.label}](${url(`pages/${sheet.name}`)})`;
-      if (sheet.open) lines.push(image, '');
-      else lines.push(`<details><summary>${page}, ${sheet.label}</summary>`, '', image, '', '</details>', '');
-    }
+  if (pages.length > 0) {
+    lines.push(details(`First screen of ${listPages(pages.map(({ page }) => page))}`, pages.flatMap(({ page, images }) => {
+      const links = results
+        .filter((result) => result.page === page && result.status !== 'removed')
+        .map((result) => `[${result.device}, ${result.colorScheme}](${url(`full/${result.file}`)})`);
+      return [
+        details(page, [
+          `Full pages: ${links.join(' · ')}`,
+          '',
+          ...images.flatMap((image) => [`![${page} ${image.label}](${url(`pages/${image.name}`)})`, '']),
+        ]),
+      ];
+    })));
   }
   return `${lines.join('\n')}\n`;
 }
 
-function describe(result) {
-  const rows = `rows ${result.top} to ${result.bottom} of ${result.height}`;
-  if (result.status === 'new') return `new page, ${rows}${result.continues ? ', the page continues below' : ''}.`;
-  if (result.status === 'removed') return `removed page, ${rows}${result.continues ? ', the page continues below' : ''}.`;
-  const columns = `columns ${result.left} to ${result.right}`;
-  const continues = result.continues ? ', and the difference continues below' : '';
-  return `${formatPercent(result.ratio)} of pixels differ; shown are ${rows} and ${columns}${continues}.`;
+function details(title, body) {
+  return ['<details>', `<summary>${title}</summary>`, '', ...body, '</details>', ''].join('\n');
+}
+
+function listPages(pages) {
+  return pages.length === 1 ? pages[0] : `${pages.length} pages: ${pages.join(', ')}`;
+}
+
+function describe(change) {
+  const rows = `rows ${change.top} to ${change.bottom} of ${change.height}`;
+  if (change.status !== 'changed') {
+    return `${change.status} page. Shown: ${rows}${change.continues ? '; the page continues below' : ''}.`;
+  }
+  const continues = change.continues ? '; the difference continues below' : '';
+  return `${formatPercent(change.ratio)} of pixels differ. Shown: ${rows}, columns ${change.left} to ${change.right}${continues}.`;
 }
 
 function formatPercent(ratio) {
