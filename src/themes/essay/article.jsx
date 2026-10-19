@@ -2,6 +2,7 @@ import { Dynamic } from 'solid-js/web';
 
 const SIDENOTE_REFERENCE = /data-sidenote="(\d+)"/g;
 const PLACED_BLOCKS = new Set(['math', 'code', 'table', 'list-table', 'example', 'figure', 'component', 'embed']);
+const FLOATED_FIGURE = /^<figure[^>]*\sdata-float=/;
 
 export function Article(props) {
   const { content, labels } = props;
@@ -10,7 +11,7 @@ export function Article(props) {
     <article class="bk-article">
       <Flow entries={intro} labels={labels} />
       {sections.map(({ section, notes, entries }) => (
-        <section class="bk-section" data-width={section.width}>
+        <section class="bk-section">
           <h2 id={section.id}>
             <span class="bk-chapter-number">{section.number}</span>
             <HeadingLink id={section.id} labels={labels} />
@@ -72,9 +73,14 @@ function Block(props) {
       </div>
     );
   }
-  const width = block.width ?? (PLACED_BLOCKS.has(block.type) ? 'auto' : undefined);
-  const style = block.naturalWidth === undefined ? undefined : `--natural-width:${block.naturalWidth}`;
-  return <div class="bk-block" data-type={block.type} data-width={width} style={style} innerHTML={block.html} />;
+  const style = block.naturalWidth === undefined ? {} : { style: `--natural-width:${block.naturalWidth}` };
+  return <div class="bk-block" data-type={block.type} data-width={blockWidth(block)} {...style} innerHTML={block.html} />;
+}
+
+function blockWidth(block) {
+  if (block.width !== undefined) return block.width;
+  if (!PLACED_BLOCKS.has(block.type) || FLOATED_FIGURE.test(block.html)) return undefined;
+  return 'auto';
 }
 
 function HeadingLink(props) {

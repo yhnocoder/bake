@@ -1,0 +1,488 @@
+.bk-block[data-width] {
+  position: relative;
+  clear: both;
+  width: var(--body-width);
+  margin: 22px 0 26px;
+}
+
+.bk-block:is([data-width='wide'], [data-resolved='wide']) {
+  width: var(--wide-width);
+}
+
+.bk-block:is([data-width='page'], [data-resolved='page']) {
+  width: var(--page-width);
+  margin-left: var(--page-shift);
+}
+
+.bk-block[data-type='math'] {
+  margin: 14px 0 18px;
+}
+
+.bk-article :is(pre.shiki, .table-scroll, mjx-container[display]) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.15s;
+}
+
+.bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):hover {
+  scrollbar-color: color-mix(in srgb, var(--ink) 25%, transparent) transparent;
+}
+
+.bk-article [data-fade-left] {
+  mask-image: linear-gradient(to right, transparent, #000 36px);
+}
+
+.bk-article [data-fade-right] {
+  mask-image: linear-gradient(to left, transparent, #000 36px);
+}
+
+.bk-article [data-fade-left][data-fade-right] {
+  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+
+.bk-article mjx-container[display] {
+  display: flex;
+  justify-content: safe center;
+  min-width: 0 !important;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.3em 2px;
+  font-size: 1.08em;
+}
+
+.bk-article mjx-container[display] > svg {
+  flex: none;
+}
+
+.bk-article mjx-container[display][width='full'] > svg {
+  flex: 1 0 auto;
+}
+
+.bk-article :is(p, li, td, th, figcaption) mjx-container:not([display]) {
+  font-size: 1.04em;
+}
+
+.bk-article .eqref {
+  white-space: nowrap;
+}
+
+.bk-article pre.shiki {
+  margin: 0;
+  padding: 14px 18px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.65;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.bk-article pre.shiki code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.bk-article :is(li, td, th, aside, details, blockquote, .example-result) > pre.shiki {
+  margin: 0 0 16px;
+}
+
+.bk-article .table-scroll {
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.bk-block > .table-scroll {
+  margin: 0;
+}
+
+.bk-article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.6;
+  overflow-wrap: normal;
+}
+
+.bk-article :is(th, td) {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.bk-article tbody tr:last-child > td {
+  border-bottom: 0;
+}
+
+.bk-article th {
+  font-weight: 700;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--surface-2) 45%, var(--surface));
+}
+
+.bk-article table.list-table :is(th, td) {
+  min-width: 6em;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.bk-article table.list-table th {
+  white-space: nowrap;
+}
+
+.bk-article table.list-table :is(th, td) > :last-child {
+  margin-bottom: 0;
+}
+
+.bk-article table.list-table :is(th, td) p {
+  margin: 0 0 6px;
+}
+
+.bk-article table.list-table :is(th, td) :is(ul, ol) {
+  padding-left: 18px;
+}
+
+.bk-article table.list-table :is(th, td) li {
+  margin: 0;
+}
+
+.bk-article img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+.bk-article .figure {
+  position: relative;
+  clear: both;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 18px 18px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.bk-article :not(.bk-block) > .figure {
+  margin: 22px auto 26px;
+}
+
+.bk-article .figure > img {
+  display: block;
+  width: 100%;
+}
+
+.bk-article .figure > figcaption {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+.bk-article .figure[data-float] {
+  max-width: 50%;
+  margin-top: 7px;
+  margin-bottom: 12px;
+  padding: 8px 8px 6px;
+}
+
+.bk-article .figure[data-float='left'] {
+  float: left;
+  margin-right: 24px;
+}
+
+.bk-article .figure[data-float='right'] {
+  float: right;
+  margin-left: 24px;
+}
+
+.bk-article .figure[data-float] > figcaption {
+  margin-top: 6px;
+  padding-top: 4px;
+  font-size: 13px;
+}
+
+.bk-article .aside {
+  clear: both;
+  margin: 22px 0 28px;
+  padding: 18px 24px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 15.5px;
+  line-height: 1.8;
+}
+
+.bk-article .aside-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.bk-article :is(.aside, .quote, blockquote, details.fold, .example-result, [data-block], [data-width], td, th, li) > :last-child {
+  margin-bottom: 0;
+}
+
+.bk-article :is(.quote, blockquote:not(.quote > blockquote)) {
+  clear: both;
+  margin: 22px 0 28px;
+  padding: 18px 26px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 17.5px;
+  line-height: 1.75;
+}
+
+.bk-article .quote > blockquote {
+  margin: 0;
+}
+
+.bk-article :is(.quote, blockquote) p {
+  margin: 0 0 10px;
+}
+
+.bk-article .quote > figcaption {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+.bk-article .quote > figcaption::before {
+  content: '— ';
+}
+
+.bk-article details.fold {
+  clear: both;
+  margin: 18px 0 24px;
+}
+
+.bk-article details.fold > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink-2);
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.3s ease-out;
+}
+
+.bk-article details.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bk-article details.fold > summary::after {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  rotate: -90deg;
+  transition: rotate 0.2s var(--ease-out);
+}
+
+.bk-article details.fold[open] > summary::after {
+  rotate: 0deg;
+}
+
+.bk-article details.fold > summary:hover {
+  color: var(--ink);
+}
+
+.bk-article details.fold > summary:active {
+  color: var(--accent);
+  transition: color 0.12s ease-out;
+}
+
+.bk-article details.fold::details-content {
+  padding-left: 20px;
+  border-left: 2px solid var(--line-2);
+  font-size: 16px;
+}
+
+.bk-article details.fold[open]::details-content {
+  margin-top: 8px;
+}
+
+.bk-article a.citation {
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.bk-references {
+  clear: both;
+  margin: 48px 0 26px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+h2 + .bk-references,
+h3 + .bk-references,
+h4 + .bk-references {
+  margin-top: 16px;
+}
+
+.bk-references-label {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.bk-article .references {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.bk-references .references {
+  margin-bottom: 0;
+}
+
+.bk-article .references > li {
+  margin: 4px 0;
+  padding-left: calc(2.4em + 8px);
+  border-radius: 4px;
+  transition: background-color 1s;
+}
+
+.bk-article ol.references > li::before {
+  content: '[' attr(value) ']';
+  display: inline-block;
+  width: 2.4em;
+  margin-left: calc(-2.4em - 8px);
+  margin-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-3);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bk-article .references > li > p {
+  display: inline;
+  margin: 0;
+}
+
+.bk-article [data-block] {
+  clear: both;
+  margin: 0 0 16px;
+  padding: 14px 18px;
+  border: 1px dashed var(--line-2);
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+.bk-block > [data-block] {
+  margin: 0;
+}
+
+.bk-article [data-block]::before {
+  content: attr(data-block);
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.bk-article .recap {
+  margin: 0 0 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line-2);
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+
+.bk-block[data-type='example'] {
+  --natural-width: 880px;
+  container: example / inline-size;
+}
+
+.bk-article .example {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.bk-article .example-source > pre.shiki {
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bk-article .example-result {
+  display: flow-root;
+  min-width: 0;
+  padding: 16px 20px;
+}
+
+.bk-article .example-result > :first-child {
+  margin-top: 0;
+}
+
+.bk-article .example-result .figure {
+  box-shadow: none;
+}
+
+@container example (min-width: 880px) {
+  .bk-article .example {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999.98px) {
+  .bk-article .figure {
+    padding: 12px 12px 10px;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .bk-article .figure[data-float] {
+    float: none;
+    max-width: 100%;
+    margin: 22px auto;
+  }
+
+  .bk-article :is(.quote, blockquote:not(.quote > blockquote)) {
+    padding: 14px 18px;
+    font-size: 16.5px;
+  }
+
+  .bk-article .aside {
+    padding: 14px 18px;
+  }
+
+  .bk-article .example-result {
+    padding: 14px 16px;
+  }
+}
