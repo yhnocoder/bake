@@ -61,12 +61,13 @@ describe('bake build', () => {
         '<body>',
         '<h1>RoPE &#60;&#38;&#62; &#34;quotes&#34;</h1>',
         '<p>Rotary &#38; &#39;position&#39; &#60;embeddings&#62;</p>',
+        '<p>Text.</p>',
         '</body>',
         '</html>',
         '',
       ].join('\n'),
     );
-    assert.doesNotMatch(tree['2026-09/series/index.html'].toString(), /<p>/);
+    assert.match(tree['2026-09/series/index.html'].toString(), /<h1>Series<\/h1>\n<p>Text\.<\/p>\n<\/body>/);
     assert.deepEqual(tree['2026-10/rope/figure.png'], pngBytes);
     assert.equal(tree['2026-08/demo/index.html'].toString(), '<!doctype html><p>demo</p>\n');
     assert.equal(tree.CNAME.toString(), 'example.com\n');
