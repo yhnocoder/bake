@@ -7,7 +7,7 @@ export function createPreview(root) {
   let pages = new Map();
   let home = null;
   let publicFiles = new Map();
-  const themeFiles = new Map();
+  const assetFiles = new Map();
   let articles = [];
   let problems = [];
   let changedPaths = [];
@@ -35,7 +35,7 @@ export function createPreview(root) {
     home = nextHome;
     articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.fields?.draft === true }));
     publicFiles = new Map(result.publicFiles.map((output) => [output.path, output]));
-    for (const output of result.themeFiles) themeFiles.set(output.path, output);
+    for (const output of result.assetFiles) assetFiles.set(output.path, output);
     changedPaths = [];
     return { problems, applied: true, ...changes };
   }
@@ -46,7 +46,7 @@ export function createPreview(root) {
       const output = page.outputs.get(path);
       if (output !== undefined) return { output, page };
     }
-    const output = publicFiles.get(path) ?? themeFiles.get(path);
+    const output = publicFiles.get(path) ?? assetFiles.get(path);
     return output === undefined ? null : { output, page: null };
   }
 

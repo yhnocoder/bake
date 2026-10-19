@@ -1,0 +1,209 @@
+.glu-heat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-family: var(--font-ui);
+  color: var(--ink-2);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.glu-heat-chart {
+  display: grid;
+}
+
+.glu-heat-tex {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 1.4em;
+  color: var(--ink);
+}
+
+.glu-heat-y-title {
+  grid-area: 1 / 2;
+  align-self: start;
+  font-size: 12.5px;
+}
+
+.glu-heat-x-title {
+  grid-area: 4 / 2;
+  align-self: end;
+  justify-self: center;
+  font-size: 12.5px;
+}
+
+.glu-heat-y-ticks,
+.glu-heat-x-ticks {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.glu-heat-y-ticks {
+  grid-area: 2 / 1;
+}
+
+.glu-heat-x-ticks {
+  grid-area: 3 / 2;
+}
+
+.glu-heat-tick {
+  position: absolute;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.glu-heat-y-ticks .glu-heat-tick {
+  right: 7px;
+  transform: translateY(50%);
+}
+
+.glu-heat-x-ticks .glu-heat-tick {
+  top: 4px;
+  transform: translateX(-50%);
+}
+
+.glu-heat-plot {
+  position: relative;
+  grid-area: 2 / 2;
+}
+
+.glu-heat-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+
+.glu-heat-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.glu-heat-mark {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: 0 0 -4.5px -4.5px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.glu-heat-mark-label {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  font-size: 11.5px;
+  line-height: 18px;
+  white-space: nowrap;
+  color: var(--ink);
+  transform: translateY(-50%);
+}
+
+.glu-heat-mark-left .glu-heat-mark-label {
+  right: 12px;
+  left: auto;
+}
+
+.glu-heat-readout {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 128px;
+  padding: 5px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s var(--ease-out);
+}
+
+.glu-heat-readout-visible {
+  opacity: 1;
+}
+
+.glu-heat-readout-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.glu-heat-readout-number {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.glu-heat-legend {
+  display: grid;
+  grid-area: 1 / 3 / 3 / 4;
+  grid-template-columns: 12px auto;
+  grid-template-rows: 22px 1fr;
+  column-gap: 7px;
+  padding-left: 16px;
+}
+
+.glu-heat-legend-title {
+  grid-column: 1 / 3;
+  align-self: start;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.glu-heat-legend-bar {
+  border-radius: 3px;
+  background: linear-gradient(to top, var(--diverge-low), var(--diverge-mid), var(--diverge-high));
+}
+
+.glu-heat-legend-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: -7px 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.glu-heat-legend-below .glu-heat-legend {
+  grid-area: 5 / 2;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 10px 16px;
+  align-content: end;
+  column-gap: 10px;
+  padding-left: 0;
+}
+
+.glu-heat-legend-below .glu-heat-legend-title {
+  grid-area: 1 / 1 / 3 / 2;
+  align-self: center;
+}
+
+.glu-heat-legend-below .glu-heat-legend-bar {
+  grid-area: 1 / 2;
+  background: linear-gradient(to right, var(--diverge-low), var(--diverge-mid), var(--diverge-high));
+}
+
+.glu-heat-legend-below .glu-heat-legend-labels {
+  grid-area: 2 / 2;
+  flex-direction: row-reverse;
+  margin: 2px 0 0;
+}

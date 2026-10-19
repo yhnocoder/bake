@@ -4,21 +4,11 @@ import { RegisterHTMLHandler } from '@mathjax/src/js/handlers/html.js';
 import { TeX } from '@mathjax/src/js/input/tex.js';
 import { TagsFactory } from '@mathjax/src/js/input/tex/Tags.js';
 import { AmsTags } from '@mathjax/src/js/input/tex/ams/AmsConfiguration.js';
-import '@mathjax/src/js/input/tex/base/BaseConfiguration.js';
-import '@mathjax/src/js/input/tex/boldsymbol/BoldsymbolConfiguration.js';
-import '@mathjax/src/js/input/tex/braket/BraketConfiguration.js';
-import '@mathjax/src/js/input/tex/cancel/CancelConfiguration.js';
-import '@mathjax/src/js/input/tex/cases/CasesConfiguration.js';
-import '@mathjax/src/js/input/tex/color/ColorConfiguration.js';
-import '@mathjax/src/js/input/tex/gensymb/GensymbConfiguration.js';
-import '@mathjax/src/js/input/tex/mathtools/MathtoolsConfiguration.js';
-import '@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js';
-import '@mathjax/src/js/input/tex/upgreek/UpgreekConfiguration.js';
 import { mathjax } from '@mathjax/src/js/mathjax.js';
 import { SVG } from '@mathjax/src/js/output/svg.js';
 import { MathJaxNewcmFont } from '@mathjax/mathjax-newcm-font/js/svg.js';
+import { TEX_PACKAGES } from './tex.js';
 
-const PACKAGES = ['base', 'ams', 'boldsymbol', 'braket', 'cancel', 'cases', 'color', 'gensymb', 'mathtools', 'newcommand', 'upgreek'];
 const EM = 16;
 const EX = 8;
 const CONTAINER_WIDTH = 820;
@@ -61,7 +51,7 @@ export async function typesetMath(definitions, formulas) {
   const font = await loadFont();
   let current = null;
   const tex = new TeX({
-    packages: PACKAGES,
+    packages: TEX_PACKAGES,
     tags: 'bake',
     formatError(jax, error) {
       current.error ??= error.message;
@@ -107,7 +97,7 @@ export async function typesetMath(definitions, formulas) {
 export async function mathStyles() {
   const font = await loadFont();
   const svg = new SVG({ fontCache: 'global', fontData: font });
-  const document = mathjax.document('', { InputJax: new TeX({ packages: PACKAGES }), OutputJax: svg });
+  const document = mathjax.document('', { InputJax: new TeX({ packages: TEX_PACKAGES }), OutputJax: svg });
   return adaptor.textContent(svg.styleSheet(document));
 }
 

@@ -59,7 +59,10 @@ test('every example block in the syntax article is closed by the same number of 
 
 test('syntax error appendix matches the error fixtures', () => {
   const expected = JSON.parse(readFileSync(new URL('expected.json', fixturesDir), 'utf8'));
-  const fixtureFiles = readdirSync(fixturesDir).filter((name) => name.endsWith('.md')).sort();
+  const fixtureFiles = readdirSync(fixturesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() || entry.name.endsWith('.md'))
+    .map((entry) => entry.name)
+    .sort();
   assert.deepEqual(Object.keys(expected).sort(), fixtureFiles);
   const fixtureMessages = Object.values(expected).map((line) => line.replace(/^\S+:\d+:\d+ /, '')).sort();
   assert.deepEqual(appendixMessages(article).sort(), fixtureMessages);

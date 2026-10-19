@@ -4,6 +4,7 @@ import { build } from 'vite';
 import solid from 'vite-plugin-solid';
 import { BUILT_IN_THEMES } from '../config/rules.js';
 import { errorAt, fileStart } from '../report.js';
+import { compileProblem, outputOf, viteConfig } from './vite.js';
 
 export const THEMES_DIR = 'themes';
 export const PAGE_FILE = 'page.jsx';
@@ -11,11 +12,8 @@ export const CLIENT_FILE = 'client.jsx';
 export const HOME_FILE = 'home.jsx';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
-const BAKE_ROOT = join(import.meta.dirname, '../..');
 const RENDER_ENTRY = 'bake:render';
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
-const SHARED_PACKAGES = ['solid-js'];
-const LOCATION_SUFFIX = / \(\d+:\d+\)$/;
 
 export async function compileTheme(root, name, { home }, errors) {
   const folders = themeFolders(root, name);
@@ -81,15 +79,7 @@ function themeFiles(folders, locate) {
 }
 
 function sharedConfig(folders, locate) {
-  return {
-    configFile: false,
-    envDir: false,
-    root: BAKE_ROOT,
-    logLevel: 'silent',
-    optimizeDeps: { noDiscovery: true },
-    resolve: { dedupe: SHARED_PACKAGES },
-    plugins: [themeFiles(folders, locate)],
-  };
+  return viteConfig([themeFiles(folders, locate)]);
 }
 
 function serverConfig(folders, locate) {
@@ -126,20 +116,8 @@ function clientConfig(folders, locate, name) {
   };
 }
 
-function outputOf(result) {
-  return (Array.isArray(result) ? result[0] : result).output;
-}
-
 function compileError(root, name, error) {
-  const cause = error.errors?.[0] ?? error;
-  const file = cause.loc?.file ?? cause.id;
-  const message = String(cause.message ?? cause)
-    .split('\n')[0]
-    .replace(`${file}: `, '')
-    .replace(LOCATION_SUFFIX, '');
-  if (file === undefined || !resolve(file).startsWith(`${resolve(root)}${sep}`)) {
-    return errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" cannot be built: ${message}`);
-  }
-  const position = cause.loc?.line === undefined ? fileStart : { line: cause.loc.line, column: cause.loc.column + 1 };
-  return errorAt(relative(root, file).split(sep).join('/'), position, message);
+  const { message, file, position } = compileProblem(root, error);
+  if (file === null) return errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" cannot be built: ${message}`);
+  return errorAt(file, position, message);
 }

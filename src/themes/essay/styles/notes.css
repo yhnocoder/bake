@@ -113,7 +113,7 @@ html:not([data-script]) .bk-article .bk-sidenote {
     padding: 2px 4px;
   }
 
-  .bk-article .bk-sidenote.is-open {
+  .bk-article .bk-sidenote.is-open:where(:not(.component-box *)) {
     display: block;
     margin: 6px 0 14px;
     padding: 8px 12px;
@@ -128,7 +128,7 @@ html:not([data-script]) .bk-article .bk-sidenote {
     display: none;
   }
 
-  .bk-article .bk-sidenote {
+  .bk-article .bk-sidenote:where(:not(.component-box *)) {
     display: block;
     margin: 4px 0 12px;
     padding: 6px 10px;
