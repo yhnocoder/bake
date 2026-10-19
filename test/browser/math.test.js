@@ -27,6 +27,7 @@ test('formulas in the syntax article render in Chromium without errors', async (
       count: containers.length,
       errors: containers.filter((container) => container.querySelector('[data-mml-node="merror"], [data-mjx-error]')).map((container) => container.dataset.tex),
       empty: containers
+        .filter((container) => container.closest('.bk-sidenote')?.checkVisibility() !== false)
         .filter((container) => {
           const box = container.querySelector('svg')?.getBoundingClientRect();
           return box === undefined || box.width === 0 || box.height === 0;

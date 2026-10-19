@@ -3,7 +3,7 @@ import { LAYOUT_EVENT, expand, flash, oncePerFrame, reducedMotion, stopAnimation
 
 const wideScreen = matchMedia('(min-width: 1000px)');
 const NOTE_GAP = 12;
-const TINTED_CONTAINER = 'p, li, td, th, figcaption, blockquote, summary, .bk-block';
+const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, summary, .bk-block';
 
 export function startNotes(article) {
   const originals = [...article.querySelectorAll('.bk-sidenote')];
@@ -13,7 +13,7 @@ export function startNotes(article) {
   layer.className = 'bk-notes-layer';
   const placed = originals.map((original) => {
     const note = original.cloneNode(true);
-    note.removeAttribute('id');
+    for (const element of [note, ...note.querySelectorAll('[id]')]) element.removeAttribute('id');
     note.setAttribute('aria-label', labels.sidenote(original.dataset.sidenote));
     layer.append(note);
     return { note, number: original.dataset.sidenote };
