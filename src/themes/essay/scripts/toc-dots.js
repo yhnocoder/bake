@@ -1,4 +1,4 @@
-import { cardKeyboard, chapterCard, clamp, el, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
+import { cardKeyboard, chapterCard, clamp, createElement, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 90;
 const DOT_PITCH = 16;
@@ -8,20 +8,20 @@ const TOP_SHARE = 0.2;
 const TOP_MIN = 24;
 const BOTTOM_ROOM = 76;
 
-export function dotsView(ctx) {
-  const { outline } = ctx;
-  const root = el('nav', 'bk-dots');
-  root.setAttribute('aria-label', ctx.labels.toc);
-  const card = el('div', 'bk-popover');
+export function dotsView(context) {
+  const { outline } = context;
+  const root = createElement('nav', 'bk-dots');
+  root.setAttribute('aria-label', context.labels.toc);
+  const card = createElement('div', 'bk-popover');
   const intent = hoverIntent(SHOW_DELAY);
   const items = outline.chapters.map((chapter, chapterIndex) => {
     const item = tocLink(chapter.id, 'bk-dot-item');
     item.setAttribute('aria-label', `${chapter.number} ${chapter.title}`);
-    const dot = el('span', 'bk-dot');
+    const dot = createElement('span', 'bk-dot');
     const faces = ['is-base', 'is-fill'].map((kind) => {
-      const face = el('span', `bk-dot-face ${kind}`);
+      const face = createElement('span', `bk-dot-face ${kind}`);
       face.setAttribute('aria-hidden', 'true');
-      face.append(el('span', 'bk-dot-number', chapter.number), el('span', 'bk-dot-title', chapter.title));
+      face.append(createElement('span', 'bk-dot-number', chapter.number), createElement('span', 'bk-dot-title', chapter.title));
       return face;
     });
     dot.append(...faces);
@@ -38,7 +38,7 @@ export function dotsView(ctx) {
   card.addEventListener('pointerleave', (event) => {
     if (!root.contains(event.relatedTarget)) leave();
   });
-  ctx.host.append(root, card);
+  context.host.append(root, card);
   cardKeyboard({ groups: items.map((entry) => [entry.item]), card, shown: () => (card.classList.contains('is-on') ? hovered : -1), leave: () => leave() });
   let shownCurrent = null;
   let hovered = -1;
@@ -59,7 +59,7 @@ export function dotsView(ctx) {
     intent.enter(() => {
       const wasOn = card.classList.contains('is-on');
       if (hovered !== chapterIndex || !wasOn) {
-        card.replaceChildren(chapterCard(ctx, chapterIndex, ctx.state()));
+        card.replaceChildren(chapterCard(context, chapterIndex, context.state()));
         card.scrollTop = 0;
       }
       hovered = chapterIndex;
@@ -88,12 +88,12 @@ export function dotsView(ctx) {
     root.style.setProperty('--capsule-title', `${limit}px`);
     entry.dot.style.setProperty('--capsule-height', `${title + CAPSULE_EDGES}px`);
     root.style.top = `${Math.round(clamp(innerHeight * TOP_SHARE, TOP_MIN, innerHeight - BOTTOM_ROOM - count * pitch - title - CAPSULE_EDGES))}px`;
-    root.style.left = `${Math.max(16, ctx.article.getBoundingClientRect().left - 76)}px`;
+    root.style.left = `${Math.max(16, context.article.getBoundingClientRect().left - 76)}px`;
   }
   return {
     columns: [root],
     update(state) {
-      if (ctx.jumping() && shownCurrent !== null) return;
+      if (context.jumping() && shownCurrent !== null) return;
       const current = Math.max(0, state.chapter);
       items.forEach((entry, entryIndex) => {
         entry.item.classList.toggle('is-read', entryIndex < current);
@@ -111,7 +111,7 @@ export function dotsView(ctx) {
       const key = stateKey(state);
       if (hovered >= 0 && card.classList.contains('is-on') && key !== shownState) {
         const scrollTop = card.scrollTop;
-        card.replaceChildren(chapterCard(ctx, hovered, state));
+        card.replaceChildren(chapterCard(context, hovered, state));
         card.scrollTop = scrollTop;
       }
       shownState = key;

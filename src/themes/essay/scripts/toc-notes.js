@@ -1,5 +1,5 @@
 import { reducedMotion } from './motion.js';
-import { el } from './toc-card.js';
+import { createElement } from './toc-card.js';
 import { ticksColumn } from './toc-ticks.js';
 
 const FOLLOW_DELAY = 360;
@@ -7,9 +7,9 @@ const TOP_FADE_SHARE = 0.16;
 const OPEN_DELAY = 160;
 const CLOSE_DELAY = 220;
 
-export function notesColumn(nav, ctx) {
+export function notesColumn(nav, context) {
   const column = nav.querySelector('.bk-toc-column');
-  const list = notesList(nav.querySelector('.bk-toc-list'), ctx);
+  const list = notesList(nav.querySelector('.bk-toc-list'), context);
   return {
     update(state) {
       column.style.setProperty('--column-top', `${Math.max(0, Math.round(column.getBoundingClientRect().top))}px`);
@@ -21,17 +21,17 @@ export function notesColumn(nav, ctx) {
   };
 }
 
-export function notesRailView(ctx) {
+export function notesRailView(context) {
   const abort = new AbortController();
   const { signal } = abort;
-  const panel = el('div', 'bk-toc-panel');
+  const panel = createElement('div', 'bk-toc-panel');
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', ctx.labels.notes);
-  panel.append(el('p', 'bk-toc-label', ctx.labels.notes));
+  panel.setAttribute('aria-label', context.labels.notes);
+  panel.append(createElement('p', 'bk-toc-label', context.labels.notes));
   const source = document.querySelector('.bk-toc .bk-toc-list').cloneNode(true);
   for (const marker of source.querySelectorAll('.bk-toc-marker')) marker.remove();
   panel.append(source);
-  const list = notesList(source, ctx);
+  const list = notesList(source, context);
   let openTimer = 0;
   let closeTimer = 0;
   const isOpen = () => panel.classList.contains('is-open');
@@ -46,7 +46,7 @@ export function notesRailView(ctx) {
     clearTimeout(closeTimer);
     closeTimer = setTimeout(() => panel.classList.remove('is-open'), delay);
   };
-  const ticks = ticksColumn(ctx, {
+  const ticks = ticksColumn(context, {
     rail: true,
     hover(index) {
       ticks.hover(index);
@@ -66,6 +66,12 @@ export function notesRailView(ctx) {
   panel.addEventListener('click', (event) => {
     if (event.target.closest('a') !== null) close(0);
   });
+  for (const element of [ticks.element, panel]) {
+    element.addEventListener('focusout', (event) => {
+      const next = event.relatedTarget;
+      if (!(next instanceof Node) || (!ticks.element.contains(next) && !panel.contains(next))) close();
+    });
+  }
   addEventListener(
     'keydown',
     (event) => {
@@ -73,7 +79,7 @@ export function notesRailView(ctx) {
     },
     { signal },
   );
-  ctx.host.append(ticks.element, panel);
+  context.host.append(ticks.element, panel);
   return {
     columns: [ticks.element],
     update(state) {
@@ -95,11 +101,11 @@ export function notesRailView(ctx) {
   };
 }
 
-function notesList(list, ctx) {
+function notesList(list, context) {
   const abort = new AbortController();
   const { signal } = abort;
   const inner = list.querySelector('.bk-toc-chapters');
-  const marker = el('li', 'bk-toc-marker');
+  const marker = createElement('li', 'bk-toc-marker');
   marker.setAttribute('aria-hidden', 'true');
   inner.prepend(marker);
   const chapters = [...inner.querySelectorAll('.bk-toc-chapter')].map((box) => ({
@@ -163,7 +169,7 @@ function notesList(list, ctx) {
         const relation = chapterIndex < state.chapter ? 'read' : chapterIndex === state.chapter ? 'current' : 'ahead';
         chapter.box.dataset.state = relation;
         chapter.box.toggleAttribute('data-here', relation === 'current' && state.section === -1);
-        const first = ctx.outline.chapters[chapterIndex].index;
+        const first = context.outline.chapters[chapterIndex].index;
         chapter.recap?.classList.toggle('is-read', state.read[first]);
         chapter.sections.forEach((row, sectionIndex) => {
           const index = first + 1 + sectionIndex;

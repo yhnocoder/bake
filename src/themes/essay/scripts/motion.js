@@ -4,8 +4,9 @@ export const LAYOUT_EVENT = 'bk:layout';
 
 export const CONTENT_EVENT = 'bake:content';
 
+export const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+
 const COLLAPSED = { height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px', opacity: 0 };
-const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
 export function layoutChanged() {
   document.dispatchEvent(new CustomEvent(LAYOUT_EVENT));

@@ -31,7 +31,7 @@ if (article !== null) {
   startWidths(article);
   startFolds(article);
   startNotes(article);
-  startHeadingLinks(article);
+  startHeadingLinks();
   startMarkdownCopy(article);
   startPreviewCard(article);
   startToc(article);

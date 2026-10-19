@@ -186,6 +186,27 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
+  await t.test('a section counts as read once 85 percent of it is above the middle of the viewport', async () => {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1440, height: 600 },
+    ]) {
+      const { page, context } = await open({ style: 'notes', viewport });
+      const readAt = async (share) => {
+        await page.evaluate((part) => {
+          const top = document.getElementById('one-a').getBoundingClientRect().top + scrollY;
+          const end = document.getElementById('one-b').getBoundingClientRect().top + scrollY;
+          scrollTo(0, top - innerHeight / 2 + part * (end - top));
+        }, share);
+        await settle(page);
+        return page.evaluate(() => [document.querySelector('.bk-toc [data-target="one-a"]').dataset.state, document.querySelector('.bk-toc [data-target="one-a"]').classList.contains('is-read')]);
+      };
+      assert.deepEqual(await readAt(0.84), ['current', false], `just under the threshold at ${viewport.width}×${viewport.height}`);
+      assert.deepEqual(await readAt(0.86), ['current', true], `just over the threshold at ${viewport.width}×${viewport.height}`);
+      await context.close();
+    }
+  });
+
   await t.test('hover cards stay inside the viewport and show the recap, else the first sentence, without highlights', async () => {
     const triggers = { tabs: '.bk-tab', dots: '.bk-dot-item', ticks: '.bk-tick.is-chapter' };
     for (const viewport of [
@@ -337,7 +358,7 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('the keyboard reaches the tabs, dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter', async () => {
+  await t.test('the keyboard reaches the tabs, dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter, and the notes panel closes when the focus leaves it', async () => {
     for (const style of ['tabs', 'dots', 'ticks']) {
       const { page, context } = await open({ style });
       const entry = { tabs: 'bk-tab', dots: 'bk-dot-item', ticks: 'bk-tick' }[style];
@@ -362,6 +383,55 @@ test('the table of contents', async (t) => {
       assert.equal(await focused(), style === 'ticks' ? `${entry} #chapter-6-a` : `${entry} #chapter-6`, `${style}: shift and tab go back from the card to the last entry of its chapter`);
       await context.close();
     }
+    const { page, context } = await open({ style: 'notes', viewport: { width: 1100, height: 700 } });
+    const isOpen = () => page.evaluate(() => document.querySelector('.bk-toc-panel').classList.contains('is-open'));
+    const inside = () => page.evaluate(() => document.activeElement.closest('.bk-ticks, .bk-toc-panel') !== null);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.matches('.bk-ticks .bk-tick')), true, 'the keyboard reaches the tick rail first');
+    await page.waitForFunction(() => document.querySelector('.bk-toc-panel').classList.contains('is-open'));
+    let steps = 0;
+    while (await inside()) {
+      assert.equal(await isOpen(), true, `the notes panel closed while the focus was on the rail or the panel, after ${steps} steps`);
+      await page.keyboard.press('Tab');
+      steps += 1;
+      assert.ok(steps < 60, 'the focus never leaves the rail and the panel');
+    }
+    await page.waitForFunction(() => !document.querySelector('.bk-toc-panel').classList.contains('is-open'), null, { timeout: 2000 });
+    await context.close();
+  });
+
+  await t.test('while a wide block crosses the notes column, its entries take no keyboard focus until the block is gone', async () => {
+    const { page, context } = await open({ style: 'notes', path: 'long' });
+    await scrollToHeading(page, 'chapter-9');
+    const focusable = () =>
+      page.evaluate(() => {
+        const column = document.querySelector('.bk-toc-column');
+        const links = [...column.querySelectorAll('a[href]')];
+        const reached = links.filter((link) => {
+          link.focus({ preventScroll: true });
+          return document.activeElement === link;
+        }).length;
+        document.activeElement.blur();
+        return { yielding: column.classList.contains('is-yielding'), reached, links: links.length };
+      });
+    const hidden = await focusable();
+    assert.deepEqual([hidden.yielding, hidden.reached], [true, 0], `the hidden column takes focus: ${JSON.stringify(hidden)}`);
+    const before = await page.evaluate(() => {
+      const column = document.querySelector('.bk-toc-column');
+      const earlier = [...document.querySelectorAll('a[href], button')].filter((element) => element.compareDocumentPosition(column) & Node.DOCUMENT_POSITION_FOLLOWING && element.checkVisibility());
+      earlier.at(-1).focus({ preventScroll: true });
+      return earlier.length;
+    });
+    assert.ok(before > 0);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.closest('.bk-toc-column') === null), true, 'the tab key moves into the hidden column');
+    await page.evaluate(() => {
+      for (const block of document.querySelectorAll('.bk-block[data-width="page"]')) block.remove();
+    });
+    await settle(page);
+    const shown = await focusable();
+    assert.deepEqual([shown.yielding, shown.reached], [false, shown.links], `the column stays hidden: ${JSON.stringify(shown)}`);
+    await context.close();
   });
 
   await t.test('the notes panel opens from the tick rail between 1000 and 1340 pixels and closes when the pointer leaves', async () => {
@@ -437,6 +507,31 @@ test('the table of contents', async (t) => {
       await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().right <= 0);
       await context.close();
     }
+  });
+
+  await t.test('on phones choosing another style in the settings rebuilds the handle and the drawer at once', async () => {
+    const { page, context } = await open({ style: 'tabs', viewport: { width: 375, height: 760 } });
+    const read = async () => {
+      const handle = await page.locator('.bk-toc-handle').getAttribute('class');
+      await page.click('.bk-toc-handle');
+      await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
+      const index = await page.evaluate(() => [...document.querySelectorAll('.bk-drawer-index button')].map((button) => button.className.split(' ')[0]));
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().right <= 0);
+      return { handle, index: [...new Set(index)], count: index.length };
+    };
+    assert.deepEqual(await read(), { handle: 'bk-toc-handle is-tab', index: ['bk-drawer-tab'], count: 6 });
+    for (const [name, handle, index] of [
+      ['圆点胶囊', 'bk-toc-handle is-capsule', 'bk-drawer-dot'],
+      ['刻度线', 'bk-toc-handle is-tab', 'bk-drawer-tab'],
+    ]) {
+      await page.click('.bk-settings-toggle');
+      await page.getByRole('radio', { name: new RegExp(name) }).click();
+      await page.keyboard.press('Escape');
+      await settle(page);
+      assert.deepEqual(await read(), { handle, index: [index], count: 6 }, name);
+    }
+    await context.close();
   });
 
   await t.test('on phones scrolling down hides the buttons, scrolling up shows them, and the setting turns this off', async () => {

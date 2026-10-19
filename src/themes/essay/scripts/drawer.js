@@ -1,50 +1,50 @@
 import { SETTING_EVENT } from './settings.jsx';
-import { chapterCard, el } from './toc-card.js';
+import { chapterCard, createElement } from './toc-card.js';
 
 const TOP_ZONE = 40;
 const TRAVEL = 8;
 const CLOSE_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
-export function drawerView(ctx) {
-  const { outline, labels } = ctx;
+export function drawerView(context) {
+  const { outline, labels } = context;
   const root = document.documentElement;
   const dots = root.dataset.toc === 'dots';
   const abort = new AbortController();
   const { signal } = abort;
-  const handle = el('button', dots ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab');
+  const handle = createElement('button', dots ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab');
   handle.type = 'button';
   handle.setAttribute('aria-label', labels.openToc);
   handle.setAttribute('aria-expanded', 'false');
   handle.setAttribute('aria-controls', 'bk-drawer');
-  const capsule = el('span', 'bk-handle-capsule');
-  capsule.append(el('i'));
-  const number = el('span', 'bk-handle-number');
+  const capsule = createElement('span', 'bk-handle-capsule');
+  capsule.append(createElement('i'));
+  const number = createElement('span', 'bk-handle-number');
   if (dots) handle.append(capsule);
   handle.append(number);
-  const scrim = el('div', 'bk-drawer-scrim');
-  const drawer = el('div', 'bk-drawer');
+  const scrim = createElement('div', 'bk-drawer-scrim');
+  const drawer = createElement('div', 'bk-drawer');
   drawer.id = 'bk-drawer';
   drawer.tabIndex = -1;
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-label', labels.toc);
-  const head = el('div', 'bk-drawer-head');
-  head.append(el('p', 'bk-drawer-label', labels.toc));
-  const close = el('button', 'bk-drawer-close');
+  const head = createElement('div', 'bk-drawer-head');
+  head.append(createElement('p', 'bk-drawer-label', labels.toc));
+  const close = createElement('button', 'bk-drawer-close');
   close.type = 'button';
   close.setAttribute('aria-label', labels.close);
   close.innerHTML = CLOSE_ICON;
   head.append(close);
-  const split = el('div', 'bk-drawer-split');
-  const index = el('div', dots ? 'bk-drawer-index is-dots' : 'bk-drawer-index');
-  const detail = el('div', 'bk-drawer-detail');
+  const split = createElement('div', 'bk-drawer-split');
+  const index = createElement('div', dots ? 'bk-drawer-index is-dots' : 'bk-drawer-index');
+  const detail = createElement('div', 'bk-drawer-detail');
   split.append(index, detail);
   drawer.append(head, split);
-  ctx.host.append(scrim, drawer, handle);
+  context.host.append(scrim, drawer, handle);
   const buttons = outline.chapters.map((chapter, chapterIndex) => {
-    const button = el('button', dots ? 'bk-drawer-dot' : 'bk-drawer-tab', dots ? undefined : chapter.number);
+    const button = createElement('button', dots ? 'bk-drawer-dot' : 'bk-drawer-tab', dots ? undefined : chapter.number);
     button.type = 'button';
     button.setAttribute('aria-label', `${chapter.number} ${chapter.title}`);
-    if (dots) button.append(el('i'));
+    if (dots) button.append(createElement('i'));
     button.addEventListener('click', () => select(chapterIndex));
     index.append(button);
     return button;
@@ -58,7 +58,7 @@ export function drawerView(ctx) {
       button.classList.toggle('is-selected', buttonIndex === chapterIndex);
       button.setAttribute('aria-pressed', String(buttonIndex === chapterIndex));
     });
-    detail.replaceChildren(chapterCard(ctx, chapterIndex, ctx.state()));
+    detail.replaceChildren(chapterCard(context, chapterIndex, context.state()));
     detail.scrollTop = 0;
   }
   function setOpen(open) {
@@ -67,7 +67,7 @@ export function drawerView(ctx) {
     root.classList.toggle('bk-drawer-open', open);
     handle.setAttribute('aria-expanded', String(open));
     if (!open) return;
-    select(Math.max(0, ctx.state().chapter));
+    select(Math.max(0, context.state().chapter));
     drawer.focus({ preventScroll: true });
   }
   handle.addEventListener('click', () => setOpen(true));
@@ -96,7 +96,7 @@ export function drawerView(ctx) {
       const top = scrollY;
       const delta = top - lastTop;
       lastTop = top;
-      if (ctx.jumping()) return;
+      if (context.jumping()) return;
       if (!autohide() || isOpen() || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
         travel = 0;
         hideButtons(false);
