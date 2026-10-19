@@ -157,6 +157,24 @@ test('sidenotes', async (t) => {
     assert.deepEqual(state, { reference: true, note: true, paragraph: true });
   });
 
+  await t.test('show every note under its block when scripts are disabled', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(`${base}/2026-10/stress/`);
+    const notes = await page.evaluate(() => {
+      const sources = document.querySelectorAll('.bk-sidenote');
+      return {
+        count: sources.length,
+        visible: [...sources].filter((note) => note.checkVisibility() && note.getBoundingClientRect().height > 0).map((note) => `${note.dataset.sidenote} ${note.querySelector('.bk-sidenote-body').textContent.trim()}`),
+        target: document.querySelector('#sidenote-1')?.checkVisibility() ?? false,
+      };
+    });
+    await context.close();
+    assert.equal(notes.count, 6);
+    assert.deepEqual(notes.visible, ['1 A short note.', '2 Another short note.', `3 ${longNote('c')}`, `4 ${longNote('d')}`, '5 A short note.', '6 The note of the fold.']);
+    assert.equal(notes.target, true);
+  });
+
   await t.test('open under their block when the number is tapped at 375 px and close on a second tap', async () => {
     const context = await browser.newContext({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
     const phone = await context.newPage();

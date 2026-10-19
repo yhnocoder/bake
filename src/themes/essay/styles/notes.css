@@ -31,6 +31,13 @@
     background-color 0.3s ease-out;
 }
 
+html:not([data-script]) .bk-article .bk-sidenote {
+  display: block;
+  margin: 4px 0 14px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--line-2);
+}
+
 .bk-sidenote-number {
   margin-right: 6px;
   border-radius: 3px;
