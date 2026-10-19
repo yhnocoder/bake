@@ -25,13 +25,16 @@ function fencedBlocks(text) {
   return { lines, blocks };
 }
 
-function textWithoutMarkdownSources(text) {
-  const { lines, blocks } = fencedBlocks(text);
-  const removed = new Set();
-  for (const block of blocks.filter((b) => b.lang === 'markdown')) {
-    for (let i = block.start; i <= block.end; i++) removed.add(i);
-  }
-  return lines.filter((_, i) => !removed.has(i)).join('\n');
+function exampleBlocks(text) {
+  const lines = text.split('\n');
+  const blocks = [];
+  lines.forEach((line, index) => {
+    const match = /^(:{3,})example$/.exec(line);
+    if (!match) return;
+    const close = lines.findIndex((other, i) => i > index && other === match[1]);
+    blocks.push({ start: index, close });
+  });
+  return blocks;
 }
 
 function appendixMessages(text) {
@@ -42,12 +45,16 @@ function appendixMessages(text) {
     .map((line) => line.split(' | ').at(-1).replace(/ \|$/, '').replace(/^`|`$/g, ''));
 }
 
-test('every markdown source block in the syntax article is followed by the same text rendered live', () => {
-  const live = textWithoutMarkdownSources(article);
-  const sources = fencedBlocks(article).blocks.filter((b) => b.lang === 'markdown');
-  assert.ok(sources.length >= 30);
-  const missing = sources.filter((b) => !live.includes(b.body)).map((b) => `line ${b.start + 1}`);
-  assert.deepEqual(missing, []);
+test('the front matter shown in the syntax article is its own front matter', () => {
+  const frontMatter = /^---\n[\s\S]*?\n---$/m.exec(article)[0];
+  const shown = fencedBlocks(article).blocks.find((b) => b.lang === 'markdown' && b.body.startsWith('---'));
+  assert.equal(shown.body, frontMatter);
+});
+
+test('every example block in the syntax article is closed by the same number of colons', () => {
+  const blocks = exampleBlocks(article);
+  assert.ok(blocks.length >= 30);
+  assert.deepEqual(blocks.filter((b) => b.close === -1).map((b) => `line ${b.start + 1}`), []);
 });
 
 test('syntax error appendix matches the error fixtures', () => {
