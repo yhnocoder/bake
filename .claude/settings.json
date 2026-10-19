@@ -6,12 +6,10 @@
   },
   "permissions": {
     "allow": [
-      "Bash(uv sync:*)",
-      "Bash(uv run pytest:*)",
-      "Bash(uv run ruff:*)",
-      "Bash(uv run scripts/check_design.py:*)",
+      "Bash(make check:*)",
       "Bash(scripts/test.sh:*)",
-      "Bash(uv run scripts/check_comment.py:*)"
+      "Bash(npm test:*)",
+      "Bash(python3 scripts/check_comment.py:*)"
     ]
   }
 }
