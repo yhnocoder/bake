@@ -59,6 +59,16 @@ test('the bento theme lays out sections as cards', async (t) => {
   assert.equal(result.status, 0);
   const origin = await serve(t, join(dir, 'dist'));
 
+  const english = mkdtempSync(join(tmpdir(), 'bake-bento-english-'));
+  t.after(() => rmSync(english, { recursive: true, force: true }));
+  writeFiles(english, {
+    'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', bento: { columns: 2 } };\n",
+    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: 'Text before the first section.\n\n## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n' }),
+  });
+  const englishBuild = bake(english, 'build');
+  assert.equal(englishBuild.stderr, '');
+  const englishOrigin = await serve(t, join(english, 'dist'));
+
   const browser = await chromium.launch();
   t.after(() => browser.close());
   const open = async (path, options = {}) => {
@@ -88,21 +98,33 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the column count follows bento.columns in bake.config.js', async (t) => {
-    const small = mkdtempSync(join(tmpdir(), 'bake-bento-columns-'));
-    t.after(() => rmSync(small, { recursive: true, force: true }));
-    writeFiles(small, {
-      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', bento: { columns: 2 } };\n",
-      'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: '## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n' }),
-    });
-    const built = bake(small, 'build');
-    assert.equal(built.stderr, '');
-    const smallOrigin = await serve(t, join(small, 'dist'));
+  await t.test('the column count follows bento.columns in bake.config.js', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await page.goto(`${smallOrigin}/2026-10/cards/`);
+    await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);
     assert.deepEqual(await page.evaluate(gridLayout), { columns: 2, spans: { One: 1, Two: 1, Three: 2 }, unfilledRows: [] });
     await page.close();
+  });
+
+  await t.test('the settings button covers no card and not the text before the first section from 1000 pixels up', async () => {
+    const covered = [];
+    for (const url of [`${origin}/2026-10/bento-cards/`, `${englishOrigin}/2026-10/cards/`]) {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      await page.goto(url);
+      for (const width of [1440, 1340, 1339, 1100, 1000]) {
+        await resize(page, width);
+        const hits = await page.evaluate(() => {
+          const button = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
+          return [...document.querySelectorAll('.bt-card, .bt-intro')].flatMap((element) => {
+            const box = element.getBoundingClientRect();
+            return box.left < button.right && box.right > button.left ? [element.className] : [];
+          });
+        });
+        if (hits.length > 0) covered.push(`${url} at ${width}px: ${[...new Set(hits)].join(', ')}`);
+      }
+      await page.close();
+    }
+    assert.deepEqual(covered, []);
   });
 
   await t.test('no page scrolls horizontally', async () => {
