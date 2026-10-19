@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
@@ -24,16 +27,9 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: write
-      pull-requests: write
     env:
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
-      GIT_AUTHOR_NAME: github-actions[bot]
-      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-      GIT_COMMITTER_NAME: github-actions[bot]
-      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,10 +41,35 @@ jobs:
       - run: npx playwright install --with-deps --only-shell chromium
       - name: Take and compare screenshots
         run: |
-          folder="pr/$PR_NUMBER/${HEAD_SHA:0:7}"
-          export SCREENSHOT_URL_PREFIX="https://github.com/$GITHUB_REPOSITORY/blob/ci-screenshots/$folder/"
+          export SCREENSHOT_URL_PREFIX="https://github.com/$GITHUB_REPOSITORY/blob/ci-screenshots/pr/$PR_NUMBER/${HEAD_SHA:0:7}/"
           export SCREENSHOT_URL_SUFFIX="?raw=true"
           scripts/screenshots.sh HEAD^1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-report
+          path: test-out/screenshots/report
+          retention-days: 7
+
+  publish-screenshots:
+    needs: screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: screenshots-report
+          path: test-out/screenshots/report
       - name: Publish screenshots to the ci-screenshots branch
         run: scripts/publish-screenshots.sh test-out/screenshots/report "$PR_NUMBER" "${HEAD_SHA:0:7}"
       - name: Update the screenshots section of the pull request description
@@ -56,18 +77,11 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const section = [
-              '<!-- screenshots:start -->',
-              '## Screenshots',
-              '',
-              `Every page of \`examples/blog/\` at 1440 and 375 pixels wide, light and dark, for commit ${process.env.HEAD_SHA.slice(0, 7)} compared with its base branch. [Run](${run})`,
-              '',
-              fs.readFileSync('test-out/screenshots/report/summary.md', 'utf8').trim(),
-              '<!-- screenshots:end -->',
-            ].join('\n');
+            const { replaceSection, screenshotSection } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/screenshot-section.js`);
+            const section = screenshotSection({
+              summary: fs.readFileSync('test-out/screenshots/report/summary.md', 'utf8'),
+              commit: process.env.HEAD_SHA,
+              runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
             const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: context.issue.number });
-            const body = pr.body ?? '';
-            const marked = /<!-- screenshots:start -->[\s\S]*<!-- screenshots:end -->/;
-            const next = marked.test(body) ? body.replace(marked, () => section) : `${body}\n\n${section}`;
-            await github.rest.pulls.update({ ...context.repo, pull_number: context.issue.number, body: next });
+            await github.rest.pulls.update({ ...context.repo, pull_number: context.issue.number, body: replaceSection(pr.body, section) });

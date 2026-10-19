@@ -95,3 +95,5 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Every text syntax item has tests for its output and its errors, the Markdown fixtures in `test/fixtures/syntax-errors/` report the lines in `expected.json`, and the syntax article parses without errors | `test/markdown.test.js` |
 | The example blog in `examples/blog/` builds without errors | `test/build.test.js` |
 | The syntax article's error appendix matches `test/fixtures/syntax-errors/` | `test/syntax-article.test.js` |
+| The screenshots section replaces only the marked part of a pull request description, gives the same result when written twice and keeps `$` literally | `test/screenshot-section.test.js` |
+| Every screenshot image in a pull request description is at most 880 pixels wide, changes are cropped to the changed area, and identical light and dark images are drawn once | `test/compare-screenshots.test.js` |

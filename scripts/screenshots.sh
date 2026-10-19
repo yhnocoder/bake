@@ -8,9 +8,9 @@ if [ $# -gt 1 ]; then
 fi
 base_ref=${1:-}
 out=test-out/screenshots
-tree=$out/base-tree
 
 rm -rf "$out"
+git worktree prune
 mkdir -p "$out"
 
 (cd examples/blog && node ../../src/cli.js build)
@@ -18,8 +18,12 @@ node scripts/capture-pages.js examples/blog/dist "$out/head"
 
 if [ -n "$base_ref" ]; then
   base_commit=$(git rev-parse --verify "$base_ref^{commit}")
+  scratch=$(mktemp -d)
+  tree=$scratch/base
+  trap 'git worktree remove --force "$tree" 2>/dev/null || true; rm -rf "$scratch"; git worktree prune' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   git worktree add --quiet --detach "$tree" "$base_commit"
-  trap 'git worktree remove --force "$tree"' EXIT
   if git diff --quiet "$base_commit" -- package-lock.json; then
     ln -s "$PWD/node_modules" "$tree/node_modules"
   else
