@@ -3,9 +3,10 @@ import { POSTS_DIR } from '../build/articles.js';
 import { createSite, updateSite } from '../build/site.js';
 
 export function createPreview(root) {
-  const site = createSite(root, { drafts: true });
+  const site = createSite(root, { drafts: true, base: '/' });
   let pages = new Map();
   let home = null;
+  let siteFiles = new Map();
   let publicFiles = new Map();
   const assetFiles = new Map();
   let articles = [];
@@ -34,6 +35,7 @@ export function createPreview(root) {
     pages = next;
     home = nextHome;
     articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.fields?.draft === true }));
+    siteFiles = new Map(result.siteFiles.map((output) => [output.path, output]));
     publicFiles = new Map(result.publicFiles.map((output) => [output.path, output]));
     for (const output of result.assetFiles) assetFiles.set(output.path, output);
     changedPaths = [];
@@ -46,7 +48,7 @@ export function createPreview(root) {
       const output = page.outputs.get(path);
       if (output !== undefined) return { output, page };
     }
-    const output = publicFiles.get(path) ?? assetFiles.get(path);
+    const output = siteFiles.get(path) ?? publicFiles.get(path) ?? assetFiles.get(path);
     return output === undefined ? null : { output, page: null };
   }
 

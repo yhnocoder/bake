@@ -1,0 +1,16 @@
+@import './styles/fonts.css';
+@import './styles/tokens.css';
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono);
+}

@@ -1,6 +1,7 @@
 import { Article } from './article.jsx';
 import { Header } from './header.jsx';
 import { labelsFor } from './labels.js';
+import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
 import { prepaintScript } from './settings.js';
 import { Toc } from './toc.jsx';
@@ -15,6 +16,7 @@ export default function Page(props) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
+        <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
         <script innerHTML={prepaintScript} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />

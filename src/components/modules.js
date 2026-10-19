@@ -6,6 +6,10 @@ export const RUNTIME_FILE = join(import.meta.dirname, 'runtime.js');
 
 const MATH_MODULE = 'bake/math';
 const MATH_FILE = join(import.meta.dirname, 'math.js');
+const KIT_MODULE = 'bake/kit';
+const KIT_DIR = join(import.meta.dirname, '../kit');
+const KIT_FILE = join(KIT_DIR, 'index.js');
+const KIT_SCRIPT = /\.jsx?$/;
 const PREAMBLE_MODULE = 'bake:preamble';
 const MATH_FONT_MODULE = 'bake:math-font';
 const LOADERS_MODULE = 'bake:component-loaders';
@@ -17,19 +21,25 @@ export function isMathJaxModule(id) {
 }
 
 export function nodeModules() {
-  return virtualModules('bake-node-modules', { [MATH_MODULE]: () => NODE_MATH_MODULE });
+  return virtualModules('bake-node-modules', { [MATH_MODULE]: () => NODE_MATH_MODULE }, { [KIT_MODULE]: KIT_FILE });
 }
 
 export function browserModules({ preamble, components }) {
-  return virtualModules(
+  const modules = virtualModules(
     'bake-browser-modules',
     {
       [PREAMBLE_MODULE]: () => `export const definitions = ${JSON.stringify(preamble.map((definition) => definition.tex))};\n`,
       [MATH_FONT_MODULE]: () => lazyImports('fontFiles', fontFiles()),
       [LOADERS_MODULE]: () => lazyImports('loaders', components.map((component) => [component.name, component.path])),
     },
-    { [MATH_MODULE]: MATH_FILE },
+    { [MATH_MODULE]: MATH_FILE, [KIT_MODULE]: KIT_FILE },
   );
+  return { ...modules, transform: markKitModulesSideEffectFree };
+}
+
+function markKitModulesSideEffectFree(code, id) {
+  if (!id.startsWith(`${KIT_DIR}/`) || !KIT_SCRIPT.test(id)) return null;
+  return { code, map: null, moduleSideEffects: false };
 }
 
 function virtualModules(name, sources, files = {}) {

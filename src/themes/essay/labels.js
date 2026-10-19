@@ -27,6 +27,9 @@ const CHINESE = {
   noPosts: '还没有文章',
   openOriginal: '点击跳转到原文',
   embedSource: { before: '出自《', after: '》' },
+  notFound: '这个页面不存在',
+  didYouMean: '你要找的可能是：',
+  backHome: '回到首页 →',
 };
 
 const ENGLISH = {
@@ -58,6 +61,9 @@ const ENGLISH = {
   noPosts: 'No posts yet',
   openOriginal: 'Click to open the original',
   embedSource: { before: 'From “', after: '”' },
+  notFound: 'This page does not exist',
+  didYouMean: 'You may be looking for:',
+  backHome: 'Back to the homepage →',
 };
 
 export function labelsFor(language) {
