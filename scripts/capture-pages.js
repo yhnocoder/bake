@@ -33,7 +33,7 @@ const out = resolve(outArgument);
 const pages = listPages(dist);
 mkdirSync(out, { recursive: true });
 const server = await serve(dist);
-const origin = `http://127.0.0.1:${server.address().port}`;
+const origin = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch();
 try {
   for (const variant of variants) {

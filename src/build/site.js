@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { bundleComponents } from '../components/bundle.js';
+import { bundlePageModules } from '../components/bundle.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
@@ -13,7 +13,7 @@ import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { listFiles } from './files.js';
 import { indexPages } from './links.js';
-import { FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
+import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
 import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
@@ -49,7 +49,7 @@ export async function updateSite(site, changedPaths = null) {
   checkDuplicateUrls(articles, errors);
   linkArticles(articles, errors);
   const published = articles.filter((article) => article.url !== null && (site.drafts || article.fields.draft !== true));
-  const [themes, bundle] = await Promise.all([compileThemes(site, published, settings.config, errors), compileComponents(site, published, errors)]);
+  const [themes, bundle] = await Promise.all([compileThemes(site, published, settings.config, errors), compilePageModules(site, published, errors)]);
   const { config } = settings;
   const assetFiles = assetOutputs(themes, bundle);
   const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, published, config, assetFiles, errors) : new Map();
@@ -61,6 +61,7 @@ export async function updateSite(site, changedPaths = null) {
   const siteFiles = [
     { path: FEED_PATH, render: () => feedXml(config, listed), owner: 'the RSS feed' },
     { path: SITEMAP_PATH, render: () => sitemapXml(config, listed), owner: 'the sitemap' },
+    { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, catalogEntries(published)), owner: 'the AI chat' },
     notFoundOutput(listed, site.base ?? sitePath(config.url), pageSettings, errors),
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
@@ -106,13 +107,21 @@ function siteProps(config) {
   return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
 }
 
-function homeOutput(entries, { config, themes }, errors) {
+function catalogEntries(published) {
+  return published
+    .filter((article) => article.fields.draft !== true)
+    .map((article) => ({ article, title: article.fields.title, date: article.fields.date }))
+    .sort(newestFirst)
+    .map(({ article }) => article);
+}
+
+function homeOutput(entries, { config, themes, bundle }, errors) {
   const html = renderSitePage(config, themes, 'the homepage', errors, (theme) =>
     theme.renderHome({
       site: siteProps(config),
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries,
-      assets: { root: './', styles: theme.styles, scripts: theme.scripts },
+      assets: { root: './', styles: theme.styles, scripts: theme.scripts, modules: bundle === null ? [] : [bundle.chat] },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -167,15 +176,14 @@ function themeOf(article, config) {
   return article.fields.theme ?? config.theme;
 }
 
-async function compileComponents(site, published, errors) {
+async function compilePageModules(site, published, errors) {
   const names = [...new Set(published.flatMap((article) => article.content?.components ?? []))].sort();
-  if (names.length === 0) return null;
   const key = names.join('\n');
   if (site.bundle?.key !== key) {
     const { root, settings } = site;
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors), errors: bundleErrors };
+    site.bundle = { key, bundle: await bundlePageModules(root, components, settings.preamble, bundleErrors), errors: bundleErrors };
   }
   errors.push(...site.bundle.errors);
   return site.bundle.bundle;
@@ -241,6 +249,7 @@ function articleOutputs(root, article, pageSettings, errors) {
       errors.push(errorAt(article.file, fileStart, 'index.html in the article folder conflicts with the page generated from index.md'));
     }
     const html = renderArticle(article, pageSettings, errors);
+    const source = { path: `${base}index.md`, render: () => article.content.source, owner: article.file };
     const images = article.content.images.map((image) => ({
       path: `${base}${image.path}`,
       render: () => convertedImage(join(root, article.dir, image.source), image),
@@ -248,7 +257,7 @@ function articleOutputs(root, article, pageSettings, errors) {
     }));
     const converted = new Set(article.content.images.flatMap((image) => (image.keepSource ? [image.path] : [image.path, image.source])));
     const copies = article.files.filter((file) => !converted.has(file)).map((file) => copy(file, file));
-    return [{ path: `${base}index.html`, render: () => html, owner: article.file }, ...images, ...copies];
+    return [{ path: `${base}index.html`, render: () => html, owner: article.file }, source, ...images, ...copies];
   }
   if (page !== 'index.html' && article.files.includes('index.html')) {
     errors.push(errorAt(article.file, article.positions.page, `page "${page}" is published as index.html, which conflicts with index.html in the article folder`));
@@ -287,7 +296,7 @@ function renderArticle(article, { config, themes, bundle, shareImages, mathStyle
       root,
       styles: theme.styles.map((path) => `${root}${path}`),
       scripts: theme.scripts.map((path) => `${root}${path}`),
-      modules: content.components.length === 0 || bundle === null ? [] : [`${root}${bundle.runtime}`],
+      modules: bundle === null ? [] : [...(content.components.length === 0 ? [] : [`${root}${bundle.runtime}`]), `${root}${bundle.chat}`],
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

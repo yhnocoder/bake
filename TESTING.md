@@ -8,7 +8,7 @@
 | `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
 | `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`) |
 | `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
-| `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://127.0.0.1:8000/ |
+| `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://localhost:8000/ |
 | `make dev` | Installs the dependencies when needed and runs `bake dev` in `examples/blog/`, which serves it at http://localhost:4321/ and updates the page on every save |
 | `make screenshots [BASE=ref]` | Screenshots of every page of `examples/blog/` built from the working tree, compared with the same pages built from `BASE` (default `origin/main`); the report is `test-out/screenshots/report/summary.md` |
 | `python3 scripts/check_comment.py [file...]` | Comment check on the given files, or on every tracked file |

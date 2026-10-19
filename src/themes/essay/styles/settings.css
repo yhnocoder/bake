@@ -1,5 +1,6 @@
 :root {
   --ui-bottom: 16px;
+  --chat-bottom: var(--ui-bottom);
   --ui-button-height: 34px;
   --ui-stack-gap: 8px;
   --ui-shadow:
@@ -141,8 +142,8 @@
 
 .bk-toast {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  right: 16px;
+  bottom: calc(var(--ui-bottom) + var(--ui-button-height) + 10px);
   z-index: 80;
   padding: 5px 12px;
   border-radius: 6px;
