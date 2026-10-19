@@ -2,6 +2,7 @@
 title: Error fixture
 slug: embed-overlap
 date: 2026-10-19
+category: writing
 ---
 
 :::embed

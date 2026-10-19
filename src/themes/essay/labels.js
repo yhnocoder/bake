@@ -20,6 +20,8 @@ const CHINESE = {
   allTags: '全部',
   posts: (count) => `${count} 篇`,
   noPosts: '还没有文章',
+  openOriginal: '点击跳转到原文',
+  embedSource: { before: '出自《', after: '》' },
 };
 
 const ENGLISH = {
@@ -44,6 +46,8 @@ const ENGLISH = {
   allTags: 'All',
   posts: (count) => `${count} ${count === 1 ? 'post' : 'posts'}`,
   noPosts: 'No posts yet',
+  openOriginal: 'Click to open the original',
+  embedSource: { before: 'From “', after: '”' },
 };
 
 export function labelsFor(language) {

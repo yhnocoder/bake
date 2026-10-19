@@ -14,8 +14,8 @@
   "image-width-tier.md": "image-width-tier.md:7:18 image width must be a positive number of pixels or a percentage, got \"wide\"; use :::{width=wide} around the image",
   "unknown-component-parameter.md": "unknown-component-parameter.md:7:16 unknown parameter \"bta\" for act-fn-plot",
   "component-parameter-range.md": "component-parameter-range.md:7:16 parameter \"range\" of act-fn-plot must be between 1 and 10, got 20",
-  "missing-link-target.md": "missing-link-target.md:7:2 link target /2026-10/syntax-linked/#chain does not exist",
-  "embed-self.md": "embed-self.md:8:1 :::embed cannot embed the article itself",
-  "embed-duplicate.md": "embed-duplicate.md:9:1 :::embed lists /2026-10/syntax-linked/#vjp twice",
-  "embed-overlap.md": "embed-overlap.md:9:1 :::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad"
+  "missing-link-target.md": "missing-link-target.md:8:2 link target /2026-10/syntax-linked/#chain does not exist",
+  "embed-self.md": "embed-self.md:9:1 :::embed cannot embed the article itself",
+  "embed-duplicate.md": "embed-duplicate.md:10:1 :::embed lists /2026-10/syntax-linked/#vjp twice",
+  "embed-overlap.md": "embed-overlap.md:10:1 :::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad"
 }
