@@ -207,12 +207,12 @@ describe(':::embed', () => {
     assert.equal(
       outline(article.intro[1].html),
       [
-        '<div class="embed"><div class="embed-part"><h2>Chain rule</h2>',
+        '<div class="embed"><div class="embed-part"><h2 data-attributes="{&#x22;id&#x22;:&#x22;chain-rule&#x22;}">Chain rule</h2>',
         '<p>Let $y = f(u)$ and $u = g(x)$, then</p>',
         '$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$',
         '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
         '<p>A fourth block.</p>',
-        '<h3>Inside</h3>',
+        '<h3 data-attributes="{&#x22;id&#x22;:&#x22;inside&#x22;}">Inside</h3>',
         '<p>Text inside.</p><p class="embed-source"><a href="../../2026-10/target/#chain-rule"><cite>Target</cite><span class="embed-number">1</span></a></p></div><div class="embed-part"><p>Intro paragraph.</p><p class="embed-source"><a href="../../2026-10/target/#opening"><cite>Target</cite></a></p></div></div>',
       ].join('\n'),
     );

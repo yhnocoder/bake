@@ -44,7 +44,7 @@ function handlers(context) {
   return {
     highlight: (state, node) => element('mark', {}, state.all(node)),
     heading(state, node) {
-      if (excerpt !== undefined) return element(`h${node.depth}`, {}, state.all(node));
+      if (excerpt !== undefined) return element(`h${node.depth}`, writtenAttributes(node.attributes), state.all(node));
       const result = defaultHandlers.heading(state, node);
       return { ...result, properties: { ...result.properties, ...writtenAttributes(node.attributes) } };
     },
