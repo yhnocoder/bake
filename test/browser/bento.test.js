@@ -63,7 +63,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   const english = mkdtempSync(join(tmpdir(), 'bake-bento-english-'));
   t.after(() => rmSync(english, { recursive: true, force: true }));
   writeFiles(english, {
-    'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', bento: { columns: 2 } };\n",
+    'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', bento: { columns: 2 } };\n",
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: 'Text before the first section.\n\n## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n' }),
   });
   const englishBuild = bake(english, 'build');
@@ -107,29 +107,45 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the settings button covers no card and not the text before the first section from 1000 pixels up, with a gap of 16 to 24 pixels', async () => {
-    const covered = [];
-    const gaps = [];
+  await t.test('the settings button and the AI chat button sit on one line in equal gutters and cover no card and not the text before the first section from 1000 pixels up', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    const page = await context.newPage();
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('WebAuthn.enable');
+    await cdp.send('WebAuthn.addVirtualAuthenticator', {
+      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
+    });
+    const problems = [];
+    const measure = () =>
+      page.evaluate(() => {
+        const settings = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
+        const chat = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher').getBoundingClientRect();
+        const boxes = [...document.querySelectorAll('.bt-card, .bt-intro')].map((element) => element.getBoundingClientRect());
+        const left = Math.min(...boxes.map((box) => box.left));
+        const right = Math.max(...boxes.map((box) => box.right));
+        const covers = (button) => boxes.some((box) => box.left < button.right && box.right > button.left);
+        return { settingsGap: left - settings.right, chatGap: chat.left - right, covered: covers(settings) || covers(chat), gutters: [left, document.documentElement.clientWidth - right], bottoms: [settings.bottom, chat.bottom] };
+      });
     for (const url of [`${origin}/2026-10/bento-cards/`, `${englishOrigin}/2026-10/cards/`]) {
-      const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-      await page.goto(url);
-      for (const width of [1440, 1340, 1339, 1100, 1000]) {
+      await page.goto(url.replace('127.0.0.1', 'localhost'));
+      await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
+      for (const width of [1440, 1340, 1339, 1100, 1000, 999, 375]) {
         await resize(page, width);
-        const { hits, gap } = await page.evaluate(() => {
-          const button = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
-          const boxes = [...document.querySelectorAll('.bt-card, .bt-intro')].map((element) => ({ name: element.className, box: element.getBoundingClientRect() }));
-          return {
-            hits: boxes.filter(({ box }) => box.left < button.right && box.right > button.left).map(({ name }) => name),
-            gap: Math.min(...boxes.map(({ box }) => box.left)) - button.right,
-          };
-        });
-        if (hits.length > 0) covered.push(`${url} at ${width}px: ${[...new Set(hits)].join(', ')}`);
-        if (gap < 16 || gap > 24) gaps.push(`${url} at ${width}px: ${gap}px`);
+        const { settingsGap, chatGap, covered, gutters, bottoms } = await measure();
+        const at = `${url} at ${width}px`;
+        if (Math.abs(bottoms[0] - bottoms[1]) > 0.5) problems.push(`${at}: the buttons end at ${bottoms.join(' and ')}`);
+        if (width < 1000) continue;
+        if (covered) problems.push(`${at}: a button covers a card or the intro`);
+        if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
+        if (chatGap < 16 || chatGap > 24) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
+        if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
       }
-      await page.close();
     }
-    assert.deepEqual(covered, []);
-    assert.deepEqual(gaps, []);
+    await page.goto(`${englishOrigin.replace('127.0.0.1', 'localhost')}/`);
+    await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
+    assert.equal(await page.locator('.bk-home').count(), 1);
+    assert.deepEqual(problems, []);
+    await context.close();
   });
 
   await t.test('a card is as tall as its content and its sidenotes follow its last block', async () => {

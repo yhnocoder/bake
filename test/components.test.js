@@ -287,7 +287,7 @@ describe('building components', () => {
     const runtime = assets.find((name) => /^components-[\w-]+\.js$/.test(name));
     const rope = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
     assert.match(rope, new RegExp(`<script type="module" src="../../assets/${runtime}"></script>`));
-    assert.doesNotMatch(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /type="module"/);
+    assert.doesNotMatch(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /components-[\w-]+\.js/);
     assert.ok(assets.some((name) => /^fn-plot-[\w-]+\.js$/.test(name)));
     assert.ok(assets.some((name) => /^fn-plot-[\w-]+\.css$/.test(name)));
     assert.ok(assets.some((name) => /^grid-view-[\w-]+\.js$/.test(name)));

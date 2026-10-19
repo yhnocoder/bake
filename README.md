@@ -317,6 +317,14 @@ A blog that deploys with GitHub Actions installs Chromium and the system librari
 
 The cache step is optional: it keeps the Chromium download between runs, and `npx playwright install` skips the download when the cached browser is already there. A fresh checkout has no `dist/`, so every deploy draws every card again; only local builds reuse the cards in `dist/`.
 
+## AI chat
+
+Every article page and the homepage have a button in the bottom right corner that opens a chat with DeepSeek. On an article page the reader asks about that article, whose Markdown source goes with every question, or switches to the whole blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, formulas are typeset with the macros of `preamble.sty`, and a switch turns DeepSeek's thinking mode on and off.
+
+There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. The menu of the chat clears the key. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
+
+Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads only when the reader asks about the whole blog. A page without scripts shows nothing of the chat.
+
 ## Themes
 
 A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number.
@@ -340,4 +348,4 @@ A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake 
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands. `make example` builds the example blog in `examples/blog/` and serves it at http://127.0.0.1:8000/, and `make dev` runs `bake dev` on the example blog.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands. `make example` builds the example blog in `examples/blog/` and serves it at http://localhost:8000/, and `make dev` runs `bake dev` on the example blog.

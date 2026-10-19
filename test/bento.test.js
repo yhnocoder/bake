@@ -93,7 +93,7 @@ test('the bento theme renders each ## section as a card whose span follows its w
   assert.match(html, /<button type="button" class="bk-copy-source">/);
 });
 
-test('the bento theme writes the homepage, the 404 page and the theme stylesheet when it is the site theme and reads the column count from bake.config.js', (t) => {
+test('the bento theme writes the homepage, the 404 page and the theme stylesheet when it is the site theme, loads the AI chat, is listed in the chat catalog and reads the column count from bake.config.js', (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: '## One\n\nText.\n' }),
@@ -104,6 +104,15 @@ test('the bento theme writes the homepage, the 404 page and the theme stylesheet
   assert.match(readFileSync(join(dir, 'dist/404.html'), 'utf8'), /<li data-url="2026-10\/cards\/" hidden>/);
   assert.match(readFileSync(join(dir, 'dist/feed.xml'), 'utf8'), /<link>https:\/\/example.com\/2026-10\/cards\/<\/link>/);
   assert.match(readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8'), /--bg:/);
+  assert.match(readFileSync(join(dir, 'dist/index.html'), 'utf8'), /<script type="module" src="assets\/chat-[\w-]+\.js">/);
+  const page = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  assert.match(page, /<script type="module" src="\.\.\/\.\.\/assets\/chat-[\w-]+\.js">/);
+  assert.equal(readFileSync(join(dir, 'dist/2026-10/cards/index.md'), 'utf8'), readFileSync(join(dir, 'content/posts/cards/index.md'), 'utf8'));
+  const catalog = JSON.parse(readFileSync(join(dir, 'dist/_bake/articles.json'), 'utf8'));
+  assert.deepEqual(
+    catalog.articles.map(({ url, source, sections }) => ({ url, source, sections })),
+    [{ url: '2026-10/cards/', source: '2026-10/cards/index.md', sections: [{ id: 'one', number: '01', title: 'One', subsections: [] }] }],
+  );
   assert.match(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'), /<div class="bt-grid" data-columns="4" style="--bt-columns:4;--bt-columns-narrow:2">/);
 });
 
