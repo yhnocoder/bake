@@ -37,9 +37,14 @@ export default function Page(props) {
           <Article content={article.content} labels={labels} />
         </div>
         <PreviewTemplates previews={article.content.previews} labels={labels} />
+        <script type="application/json" class="bk-source" data-region="source" innerHTML={sourceJson(article.content.source)} />
       </body>
     </html>
   );
+}
+
+function sourceJson(source) {
+  return JSON.stringify(source).replaceAll('<', '\\u003c');
 }
 
 function labelStyle(labels) {

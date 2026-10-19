@@ -1,23 +1,10 @@
-import { createSignal } from 'solid-js';
-import { render } from 'solid-js/web';
 import { labelsFor } from '../labels.js';
 import { openFoldsAround } from './folds.js';
 import { flash, reducedMotion } from './motion.js';
+import { showToast } from './toast.jsx';
 
 const JUMP_MARGIN = 24;
-const TOAST_DURATION = 1400;
 const FLASHED = 'h1, h2, h3, h4, h5, h6, p, li, aside, .bk-block';
-
-const [toastText, setToastText] = createSignal('');
-const [toastShown, setToastShown] = createSignal(false);
-let toastTimer;
-
-export function showToast(text) {
-  setToastText(text);
-  setToastShown(true);
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => setToastShown(false), TOAST_DURATION);
-}
 
 export function jumpTo(target, { smooth = true } = {}) {
   openFoldsAround(target);
@@ -28,9 +15,6 @@ export function jumpTo(target, { smooth = true } = {}) {
 
 export function startHeadingLinks() {
   const labels = labelsFor(document.documentElement.lang);
-  const host = document.createElement('div');
-  document.body.append(host);
-  render(() => <Toast />, host);
   document.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest('a[href^="#"]');
@@ -66,13 +50,5 @@ function copyLink(hash, labels) {
   copied.then(
     () => showToast(labels.linkCopied),
     () => showToast(url),
-  );
-}
-
-function Toast() {
-  return (
-    <div class="bk-toast" classList={{ 'is-on': toastShown() }} role="status">
-      {toastText()}
-    </div>
   );
 }

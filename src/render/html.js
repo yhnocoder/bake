@@ -44,8 +44,9 @@ function handlers(context) {
   return {
     highlight: (state, node) => element('mark', {}, state.all(node)),
     heading(state, node) {
-      if (excerpt === undefined) return defaultHandlers.heading(state, node);
-      return element(`h${node.depth}`, {}, state.all(node));
+      if (excerpt !== undefined) return element(`h${node.depth}`, {}, state.all(node));
+      const result = defaultHandlers.heading(state, node);
+      return { ...result, properties: { ...result.properties, ...writtenAttributes(node.attributes) } };
     },
     paragraph(state, node) {
       if (excerpt === undefined) return defaultHandlers.paragraph(state, node);
@@ -162,7 +163,7 @@ function blockElement(state, node, context) {
 
 function componentElement(state, node, context) {
   const { frame, frameWidth, height, narrowHeight } = node.component;
-  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)) };
+  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
   if (!frame) properties.dataFrame = 'none';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
   const boxStyle = [
@@ -174,6 +175,10 @@ function componentElement(state, node, context) {
   const box = element('div', { className: ['component-box'], style: boxStyle }, []);
   const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
   return element('figure', properties, [box, ...caption]);
+}
+
+function writtenAttributes(attributes) {
+  return attributes === undefined || Object.keys(attributes).length === 0 ? {} : { dataAttributes: JSON.stringify(attributes) };
 }
 
 function componentParams({ params, fileParams }, excerpt) {

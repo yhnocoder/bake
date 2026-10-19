@@ -72,7 +72,7 @@ describe('bake dev', () => {
       html.endsWith(`<script src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}"></script></body></html>\n`),
       html.slice(-400),
     );
-    assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7">/);
+    assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7" data-end-line="7">/);
     assert.match(await (await get('/2026-10/gelu/')).text(), /<span class="bk-draft">Draft<\/span>/);
     assert.equal(await (await get('/robots.txt')).text(), 'User-agent: *\n');
     assert.equal((await get('/__bake/client.js')).status, 200);

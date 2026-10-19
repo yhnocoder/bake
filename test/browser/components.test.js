@@ -471,7 +471,7 @@ test('the example components run on the syntax page', async (t) => {
           return { id: section.querySelector('h2').id, top: rect.top + scrollY, width: rect.width, height: rect.height };
         }),
       );
-      assert.equal(sections.length, 15);
+      assert.equal(sections.length, 16);
       for (const { id, top, width: sectionWidth, height } of sections) {
         assert.ok(sectionWidth > 0 && height > 0, `${width}px ${id}: the section is ${sectionWidth}x${height}`);
         const image = await sectionScreenshot(page, Math.round(top), Math.round(height), width);
