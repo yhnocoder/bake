@@ -1,6 +1,8 @@
 export const FEED_PATH = 'feed.xml';
 export const SITEMAP_PATH = 'sitemap.xml';
 export const NOT_FOUND_PATH = '404.html';
+export const CHAT_CATALOG_PATH = '_bake/articles.json';
+export const CHAT_PREAMBLE_PATH = '_bake/preamble.json';
 
 export function siteLink(url) {
   return `${new URL(url).origin}${sitePath(url)}`;
@@ -55,6 +57,25 @@ export function sitemapXml(config, entries) {
     '</urlset>',
     '',
   ].join('\n');
+}
+
+export function chatCatalogJson(config, articles) {
+  const entries = articles.map(({ url, fields, content }) => ({
+    url: url.slice(1),
+    title: fields.title,
+    date: fields.date,
+    summary: fields.summary,
+    tags: fields.tags ?? [],
+    category: config.categories.find((category) => category.id === fields.category)?.name,
+    source: fields.page === undefined ? `${url.slice(1)}index.md` : undefined,
+    sections: (content?.toc ?? []).map((section) => ({
+      id: section.id,
+      number: section.number,
+      title: section.title,
+      subsections: section.children.map((child) => ({ id: child.id, title: child.title })),
+    })),
+  }));
+  return `${JSON.stringify({ title: config.title, description: config.description, language: config.language, articles: entries })}\n`;
 }
 
 function element(name, text) {
