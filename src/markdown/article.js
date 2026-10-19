@@ -895,8 +895,14 @@ class ArticleParser {
 
   usedComponents(tree) {
     const names = new Set();
-    this.walkWithSidenotes(tree, (node) => {
+    const add = (node) => {
       if (node.type === 'bakeBlock' && node.component !== undefined) names.add(node.name);
+    };
+    this.walkWithSidenotes(tree, (node) => {
+      add(node);
+      for (const { address, page } of node.parts ?? []) {
+        for (const embedded of page.article.embedNodes(address.anchor)) walk(embedded, add);
+      }
     });
     return [...names].sort();
   }

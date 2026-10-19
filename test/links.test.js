@@ -52,6 +52,7 @@ const target = [
 const other = '## Far {#far}\n\nFar away.\n';
 const components = new Map([
   ['act-fn-plot', { name: 'act-fn-plot', valid: true, params: { fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu'], default: 'relu' } }, layout: { height: 360 } }],
+  ['data-view', { name: 'data-view', valid: true, params: { source: { label: 'Source', type: 'file', default: '' } }, layout: { height: 200 } }],
 ]);
 
 async function site(body, pages = []) {
@@ -246,6 +247,17 @@ describe(':::embed', () => {
       article.previews.map((preview) => preview.target),
       ['/2026-10/other/#far'],
     );
+  });
+
+  test('counts the components of embedded content as components of the page and points their file parameters into the source article', async () => {
+    const source = { url: '/2026-10/data/', title: 'Data', body: '## Data {#data}\n\n:::data-view{source=relu.svg}\n:::\n', folder: folder(fixturesDir) };
+    const { articles, errors } = await site('Text.\n\n:::embed\n/2026-10/data/#data\n:::\n', [source]);
+    assert.deepEqual(errors, []);
+    const host = articles['/2026-10/host/'];
+    assert.deepEqual(host.components, ['data-view']);
+    assert.match(host.intro[1].html, /data-component="data-view" data-params="{&#x22;source&#x22;:&#x22;..\/..\/2026-10\/data\/relu.svg&#x22;}"/);
+    assert.match(articles['/2026-10/data/'].sections[0].blocks[0].html, /data-params="{&#x22;source&#x22;:&#x22;relu.svg&#x22;}"/);
+    assert.deepEqual(articles['/2026-10/data/'].components, ['data-view']);
   });
 
   test('repeats no id of the page when the embedded content holds references and raw HTML, and points its citations to the source entries', async () => {

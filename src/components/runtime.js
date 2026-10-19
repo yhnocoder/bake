@@ -60,7 +60,6 @@ async function start(frame) {
   }
 }
 
-const frames = [...document.querySelectorAll(FRAME)];
 const observer = new IntersectionObserver(
   (entries) => {
     for (const entry of entries) {
@@ -71,5 +70,12 @@ const observer = new IntersectionObserver(
   },
   { rootMargin: NEAR_VIEWPORT },
 );
-for (const frame of frames) observer.observe(frame);
-addEventListener('beforeprint', () => frames.forEach(start));
+function observeFrames() {
+  for (const frame of document.querySelectorAll(FRAME)) {
+    if (frame.dataset.state === undefined) observer.observe(frame);
+  }
+}
+
+observeFrames();
+document.addEventListener('bake:content', observeFrames);
+addEventListener('beforeprint', () => document.querySelectorAll(FRAME).forEach(start));

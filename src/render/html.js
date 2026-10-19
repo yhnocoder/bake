@@ -140,15 +140,15 @@ function blockElement(state, node, context) {
     default:
       if (node.component !== undefined) {
         if (context.excerpt?.mode === 'preview') return node.children.length === 0 ? [] : element('div', { className: ['component-caption'] }, children());
-        return componentElement(state, node);
+        return componentElement(state, node, context);
       }
       return element('div', { dataBlock: node.name }, children());
   }
 }
 
-function componentElement(state, node) {
-  const { params, frame, frameWidth, height, narrowHeight } = node.component;
-  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(params) };
+function componentElement(state, node, context) {
+  const { frame, frameWidth, height, narrowHeight } = node.component;
+  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)) };
   if (!frame) properties.dataFrame = 'none';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
   const boxStyle = [
@@ -160,6 +160,11 @@ function componentElement(state, node) {
   const box = element('div', { className: ['component-box'], style: boxStyle }, []);
   const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
   return element('figure', properties, [box, ...caption]);
+}
+
+function componentParams({ params, fileParams }, excerpt) {
+  if (excerpt === undefined) return params;
+  return Object.fromEntries(Object.entries(params).map(([name, value]) => [name, fileParams.includes(name) && value !== '' ? `${excerpt.base}${value}` : value]));
 }
 
 function embedElement(parts) {

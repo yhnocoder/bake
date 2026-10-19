@@ -201,6 +201,30 @@ describe('preview updates', () => {
     assert.match(indexHtml(preview, '/2026-10/rope/'), /<div class="embed">[\s\S]*Second text\./);
   });
 
+  test('a change in components/ reads the components again and bundles them again', async (t) => {
+    const chart = (text) => `export const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = '${text}';\n  }\n}\n`;
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/demo-chart.js': chart('first text'),
+      'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }),
+    });
+    const preview = createPreview(dir);
+    const chunk = () => {
+      const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(indexHtml(preview, '/2026-10/rope/'))[1];
+      const name = /demo-chart-[\w-]+\.js/.exec(preview.find(runtime).output.render())[0];
+      return preview.find(`assets/${name}`).output.render();
+    };
+    assert.deepEqual((await preview.update()).problems, []);
+    assert.match(chunk(), /first text/);
+    writeFiles(dir, { 'components/demo-chart.js': chart('second text') });
+    const changed = await preview.update(['components/demo-chart.js']);
+    assert.deepEqual([changed.problems, changed.reload], [[], 'all']);
+    assert.match(chunk(), /second text/);
+    writeFiles(dir, { 'components/demo-chart.js': 'export default class DemoChart extends HTMLElement {}\n' });
+    const broken = await preview.update(['components/demo-chart.js']);
+    assert.deepEqual([broken.applied, broken.problems.map(formatError)], [false, ['components/demo-chart.js:1:1 demo-chart: layout must be an object with at least height, for example export const layout = { height: 360 }, got undefined']]);
+  });
+
   test('front matter changes reload the page, other files reload every page and config errors keep every page', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

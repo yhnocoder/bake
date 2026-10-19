@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -111,6 +111,8 @@ ${spacer}
   }),
   'content/posts/gelu/index.md': article({ slug: 'gelu', body: ':::grid-view\n:::\n' }),
   'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
+  'content/posts/source/index.md': article({ slug: 'source', body: '## Grid {#grid}\n\n:::grid-view{mode=far}\n:::\n' }),
+  'content/posts/embedder/index.md': article({ slug: 'embedder', body: 'An article without components of its own.\n\n:::embed\n/2026-10/source/#grid\n:::\n' }),
   'content/posts/text/index.md': article({ slug: 'text', body: 'An article paragraph.\n\n### An article heading\n\n:::text-view\n:::\n' }),
 };
 
@@ -257,6 +259,14 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
+  await t.test('a component in embedded content runs on the page that embeds it', async () => {
+    const page = await open('embedder');
+    await waitForReady(page);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.embed grid-view')].map((element) => element.textContent)), ['grid far']);
+    assert.deepEqual(page.problems, []);
+    await page.close();
+  });
+
   await t.test('pixel and percent widths measure their width, are centred and never exceed the screen', async () => {
     for (const width of [1440, 1100, 375]) {
       const page = await open('rope', { viewport: { width, height: 800 } });
@@ -369,6 +379,21 @@ function formulaShifts() {
   return shifts;
 }
 
+async function sectionScreenshot(page, top, height, width) {
+  const image = new PNG({ width, height });
+  const viewport = page.viewportSize().height;
+  for (let offset = 0; offset < height; offset += viewport) {
+    const scrolled = await page.evaluate((y) => {
+      scrollTo({ top: y, behavior: 'instant' });
+      return scrollY;
+    }, top + offset);
+    const slice = Math.min(viewport, height - offset);
+    const shot = PNG.sync.read(await page.screenshot({ clip: { x: 0, y: top + offset - scrolled, width, height: slice } }));
+    PNG.bitblt(shot, image, 0, 0, width, slice, 0, offset);
+  }
+  return image;
+}
+
 function distinctColors({ data }) {
   const colors = new Set();
   for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
@@ -449,8 +474,8 @@ test('the example components run on the syntax page', async (t) => {
       assert.equal(sections.length, 15);
       for (const { id, top, width: sectionWidth, height } of sections) {
         assert.ok(sectionWidth > 0 && height > 0, `${width}px ${id}: the section is ${sectionWidth}x${height}`);
-        const clip = { x: 0, y: top, width, height };
-        const image = PNG.sync.read(await page.screenshot({ fullPage: true, clip, path: join(screenshotDir, `${width}-${id}.png`) }));
+        const image = await sectionScreenshot(page, Math.round(top), Math.round(height), width);
+        writeFileSync(join(screenshotDir, `${width}-${id}.png`), PNG.sync.write(image));
         assert.ok(distinctColors(image) > 1, `${width}px ${id}: the screenshot has one color`);
       }
       assert.deepEqual(problems, [], `${width}px`);

@@ -103,7 +103,8 @@ export function resolveComponent(name, component, attributes, files) {
   }
   const width = componentWidth(name, component.layout, attributes.width, report);
   const heights = componentHeights(name, component.layout, attributes.height, params, report);
-  return { params, ...width, ...heights, frame: component.layout.frame !== false, problems };
+  const fileParams = Object.keys(component.params).filter((param) => component.params[param].type === 'file');
+  return { params, fileParams, ...width, ...heights, frame: component.layout.frame !== false, problems };
 }
 
 function componentWidth(name, layout, written, report) {
