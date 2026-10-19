@@ -10,6 +10,7 @@ const TYPES = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
+  '.xml': 'application/xml',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
 };
@@ -21,13 +22,25 @@ export async function serve(t, dir) {
     let path = resolve(join(root, pathname));
     if (statSync(path, { throwIfNoEntry: false })?.isDirectory()) path = join(path, 'index.html');
     if (!path.startsWith(`${root}${sep}`) || !statSync(path, { throwIfNoEntry: false })?.isFile()) {
-      response.writeHead(404).end();
+      const notFound = join(root, '404.html');
+      if (!statSync(notFound, { throwIfNoEntry: false })?.isFile()) {
+        response.writeHead(404).end();
+        return;
+      }
+      response.writeHead(404, { 'content-type': TYPES['.html'] });
+      createReadStream(notFound).pipe(response);
       return;
     }
     response.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream' });
     createReadStream(path).pipe(response);
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  t.after(() => new Promise((done) => server.close(done)));
+  t.after(
+    () =>
+      new Promise((done) => {
+        server.close(done);
+        server.closeAllConnections();
+      }),
+  );
   return `http://127.0.0.1:${server.address().port}`;
 }

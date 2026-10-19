@@ -57,6 +57,19 @@ describe('themes', () => {
     assert.ok(assets.some((name) => /^essay-[\w-]+\.css$/.test(name)));
   });
 
+  test('a theme page script imports the copy module as bake/copy', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
+      'themes/plain/page.jsx': plainPage.replace('<For each={props.assets.styles}>', '<For each={props.assets.scripts}>{(src) => <script defer src={src} />}</For>\n        <For each={props.assets.styles}>'),
+      'themes/plain/client.jsx': "import { startCopy } from 'bake/copy';\n\nstartCopy(document.querySelector('main'), { copied: () => {} });\n",
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const script = readdirSync(join(dir, 'dist/assets')).find((name) => /^plain-[\w-]+\.js$/.test(name));
+    assert.match(readFileSync(join(dir, 'dist/assets', script), 'utf8'), /text\/plain/);
+  });
+
   test('reports a theme folder without page.jsx or client.jsx', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

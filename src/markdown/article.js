@@ -861,7 +861,7 @@ class ArticleParser {
     let recapTarget = null;
     for (const node of tree.children) {
       if (node.type === 'heading' && node.depth === 2) {
-        const section = { ...this.headingFields(node), number: String(sections.length + 1).padStart(2, '0'), width: node.attributes.width, line: node.position.start.line, blocks: [], subsections: [] };
+        const section = { ...this.headingFields(node), number: String(sections.length + 1).padStart(2, '0'), width: node.attributes.width, line: node.position.start.line, endLine: node.position.end.line, blocks: [], subsections: [] };
         sections.push(section);
         recapTarget = section;
         continue;
@@ -874,7 +874,7 @@ class ArticleParser {
       const block = this.block(node);
       (current?.blocks ?? intro).push(block);
       if (node.type === 'heading' && node.depth === 3 && current) {
-        const subsection = { id: block.id, title: block.title, text: block.text, toc: block.toc, line: block.line };
+        const subsection = { id: block.id, title: block.title, text: block.text, toc: block.toc, line: block.line, endLine: block.endLine };
         current.subsections.push(subsection);
         recapTarget = subsection;
       }
@@ -882,7 +882,9 @@ class ArticleParser {
     const sidenotes = [...this.sidenotes.values()].map(({ number, definition }) => ({
       number,
       id: `sidenote-${number}`,
+      label: definition.label,
       line: definition.position.start.line,
+      endLine: definition.position.end.line,
       html: renderChildrenHtml(definition.children, this.context),
     }));
     const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: `reference-${entry.key}`, html: renderInlineHtml(entry.children, this.context) }));
@@ -896,7 +898,20 @@ class ArticleParser {
     }));
     const html = [...intro, ...sections.flatMap((section) => section.blocks), ...sidenotes, ...previews].map((entry) => entry.html);
     const glyphs = addGlyphs(this.glyphs, [...this.borrowed].map((source) => source.glyphs), html);
-    return { intro, sections, sidenotes, references, toc, previews, words: countWords(tree), glyphs, images: [...this.images.values()], image: this.image, components: this.usedComponents(tree) };
+    return {
+      source: this.source,
+      intro,
+      sections,
+      sidenotes,
+      references,
+      toc,
+      previews,
+      words: countWords(tree),
+      glyphs,
+      images: [...this.images.values()],
+      image: this.image,
+      components: this.usedComponents(tree),
+    };
   }
 
   usedComponents(tree) {

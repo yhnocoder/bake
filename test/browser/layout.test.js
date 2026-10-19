@@ -156,19 +156,14 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('every table of contents style places the table of contents and the body where the notes style does', async () => {
-    const positions = async (path) => {
-      const page = await open(path);
-      const result = await page.evaluate(() => ({
-        toc: Math.round(document.querySelector('.bk-toc-list').getBoundingClientRect().width),
-        body: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
-      }));
+  await t.test('the notes style keeps the left column for the table of contents and the other styles centre the text right of the rail', async () => {
+    const left = async (path, width) => {
+      const page = await open(path, { viewport: { width, height: 900 } });
+      const result = await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left));
       await page.close();
       return result;
     };
-    const notes = await positions('notes');
-    assert.ok(notes.toc >= 180, `the notes table of contents is ${notes.toc}px wide`);
-    assert.deepEqual(await positions('tabs'), notes);
+    assert.deepEqual([await left('notes', 1440), await left('tabs', 1440), await left('notes', 1024), await left('tabs', 1024)], [290, 198, 88, 88]);
   });
 
   await t.test('examples show the source beside the result where there is room and above it on phones', async () => {
@@ -213,6 +208,25 @@ test('the essay theme lays out articles', async (t) => {
       { text: 'layout', font: true, background: 'rgb(238, 240, 236)' },
       { text: 'stress', font: true, background: 'rgb(238, 240, 236)' },
     ]);
+    await page.close();
+  });
+
+  await t.test('no separator of the masthead meta line starts a line on a phone', async () => {
+    const page = await open('syntax', { viewport: { width: 375, height: 800 } });
+    const items = await page.evaluate(() => {
+      const meta = document.querySelector('.bk-meta').getBoundingClientRect();
+      return [...document.querySelectorAll('.bk-meta :is(time, .bk-words, .bk-tags, .bk-copy)')].map((item) => {
+        const box = item.getBoundingClientRect();
+        return { text: item.textContent, top: Math.round(box.top), separatorShown: box.left >= meta.left - 1 };
+      });
+    });
+    const lines = [...new Set(items.map((item) => item.top))];
+    assert.ok(lines.length >= 2, `the meta line does not wrap at 375 px: ${JSON.stringify(items)}`);
+    const startsLine = (item, index) => index === 0 || items[index - 1].top !== item.top;
+    assert.deepEqual(
+      items.filter((item, index) => startsLine(item, index) === item.separatorShown).map((item) => item.text),
+      [],
+    );
     await page.close();
   });
 

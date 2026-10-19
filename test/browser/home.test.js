@@ -18,7 +18,7 @@ const config = `export default {
 `;
 
 const recordingPreview = `export default function preview(element) {
-  const name = element.closest('.bk-card').querySelector('.bk-card-title').textContent;
+  const name = element.closest('.bk-card')?.querySelector('.bk-card-title').textContent ?? 'share image';
   element.dataset.drawn = 'yes';
   element.textContent = 'first frame';
   window.previewLog ??= [];
@@ -48,7 +48,7 @@ const files = {
   'content/posts/gate/index.md': post('Gate', '2026-10-12', 'ml', ['激活'], 'preview: preview.js\n'),
   'content/posts/gate/preview.js': recordingPreview,
   'content/posts/broken/index.md': post('Broken', '2026-10-10', 'ml', ['激活'], 'preview: preview.js\n'),
-  'content/posts/broken/preview.js': "export default function preview() {\n  throw new Error('cannot draw');\n}\n",
+  'content/posts/broken/preview.js': "export default function preview(element) {\n  if (element.closest('.bk-card')) throw new Error('cannot draw');\n  return { start() {}, stop() {} };\n}\n",
   'content/posts/norm/index.md': post('Norm', '2026-10-08', 'ml', ['归一化']),
   'content/posts/chain/index.md': article({ title: 'Chain', slug: 'chain', date: '2026-09-20', extra: 'category: math\ntags: [梯度]\n', body: '![](plot.svg)\n' }),
   'content/posts/chain/plot.svg': svg,
@@ -275,6 +275,25 @@ test('the essay homepage', async (t) => {
     assert.deepEqual(shown, { groupings: ['category'], cards: 7, controls: false, tags: false, chips: 2, image: '2026-09/chain/plot.svg' });
     await page.locator('.bk-chip[data-target="category-math"]').click();
     assert.match(page.url(), /#category-math$/);
+    await context.close();
+  });
+
+  await t.test('the settings panel on the homepage offers the theme and the body font with their current values', async () => {
+    const { context, page } = await open();
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.reload();
+      await page.getByRole('button', { name: '设置' }).click();
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
+      const panel = await page.evaluate(() => ({
+        rows: [...document.querySelectorAll('.bk-settings-row')].filter((row) => row.checkVisibility()).map((row) => row.querySelector('.bk-settings-label').textContent),
+        pressed: [...document.querySelectorAll('.bk-settings-panel [aria-pressed="true"]')].map((button) => button.textContent),
+        handles: document.querySelectorAll('.bk-toc-handle').length,
+        gap: Math.round(document.querySelector('.bk-settings-toggle').getBoundingClientRect().top - document.querySelector('.bk-settings-panel').getBoundingClientRect().bottom),
+      }));
+      assert.deepEqual(panel, { rows: ['主题', '正文'], pressed: ['跟随系统', '黑体'], handles: 0, gap: 8 }, `at ${width} pixels`);
+      await page.keyboard.press('Escape');
+    }
     await context.close();
   });
 

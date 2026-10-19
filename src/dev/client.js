@@ -19,6 +19,8 @@
   let serverId = null;
   let refreshing = null;
   let refreshAgain = false;
+  const pageNodes = new WeakSet();
+  for (const region of document.querySelectorAll('[data-region]')) for (const node of region.childNodes) rememberPageNode(node);
 
   const ui = createInterface();
   let barControls = null;
@@ -153,11 +155,11 @@
         const plan = [];
         if (before !== null && planChildren(before, region, live, plan)) {
           for (const step of plan) {
-            if (step.frame === undefined) step.live.replaceWith(document.importNode(step.next, true));
+            if (step.frame === undefined) step.live.replaceWith(importPageNode(step.next));
             else kept.push(keepFrame(step));
           }
         } else {
-          live.replaceChildren(...[...region.childNodes].map((node) => document.importNode(node, true)));
+          live.replaceChildren(...[...region.childNodes].map(importPageNode));
         }
       }
       replaced = true;
@@ -165,11 +167,22 @@
     return { replaced, kept };
   }
 
+  function rememberPageNode(node) {
+    pageNodes.add(node);
+    for (const child of node.childNodes) rememberPageNode(child);
+  }
+
+  function importPageNode(node) {
+    const copy = document.importNode(node, true);
+    rememberPageNode(copy);
+    return copy;
+  }
+
   function planChildren(old, next, live, plan) {
     const oldNodes = [...old.childNodes];
     const nextNodes = [...next.childNodes];
-    const liveNodes = [...live.childNodes].filter((node) => !(node instanceof Element && node.hasAttribute('data-bake-dev')));
-    if (oldNodes.length !== nextNodes.length || liveNodes.length < oldNodes.length) return false;
+    const liveNodes = [...live.childNodes].filter((node) => pageNodes.has(node));
+    if (oldNodes.length !== nextNodes.length || liveNodes.length !== oldNodes.length) return false;
     const steps = [];
     for (const [index, node] of oldNodes.entries()) {
       if (!sameNode(node, liveNodes[index])) return false;
@@ -210,6 +223,7 @@
     const strip = (frame) => {
       const copy = frame.cloneNode(true);
       copy.removeAttribute('data-params');
+      copy.removeAttribute('data-attributes');
       copy.querySelector(':scope > .component-box')?.removeAttribute('style');
       return copy.outerHTML;
     };
@@ -217,7 +231,7 @@
     const params = JSON.parse(next.dataset.params);
     const shown = barControls?.shown(live) ?? JSON.parse(old.dataset.params);
     if (!sameValues(shown, params)) return null;
-    return { frame: live, params: next.dataset.params, boxStyle: next.querySelector(':scope > .component-box')?.getAttribute('style') ?? null };
+    return { frame: live, params: next.dataset.params, attributes: next.dataset.attributes, boxStyle: next.querySelector(':scope > .component-box')?.getAttribute('style') ?? null };
   }
 
   function sameValues(a, b) {
@@ -225,8 +239,10 @@
     return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key]);
   }
 
-  function keepFrame({ frame, params, boxStyle }) {
+  function keepFrame({ frame, params, attributes, boxStyle }) {
     frame.dataset.params = params;
+    if (attributes === undefined) delete frame.dataset.attributes;
+    else frame.dataset.attributes = attributes;
     const box = frame.querySelector(':scope > .component-box');
     if (box !== null && boxStyle !== null) box.setAttribute('style', boxStyle);
     barControls?.rebase(frame);
@@ -239,7 +255,10 @@
 
   function signature(element) {
     const copy = element.cloneNode(true);
-    for (const part of [copy, ...copy.querySelectorAll('[data-line]')]) part.removeAttribute('data-line');
+    for (const part of [copy, ...copy.querySelectorAll('[data-line]')]) {
+      part.removeAttribute('data-line');
+      part.removeAttribute('data-end-line');
+    }
     return copy.outerHTML;
   }
 

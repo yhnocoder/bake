@@ -1,0 +1,190 @@
+import assert from 'node:assert/strict';
+import { cpSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { chromium } from 'playwright';
+import { bake, createBlog } from '../blog.js';
+import { serve } from './server.js';
+
+const exampleBlog = join(import.meta.dirname, '../../examples/blog');
+const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
+const lines = source.split('\n');
+const linkedLines = readFileSync(join(exampleBlog, 'content/posts/syntax-linked/index.md'), 'utf8').split('\n');
+
+function sourceLines(first, last) {
+  const start = lines.findIndex((line) => line.startsWith(first));
+  const end = lines.findIndex((line, index) => index >= start && line === last);
+  assert.ok(start !== -1 && end !== -1, `the syntax article has no lines from "${first}" to "${last}"`);
+  return lines.slice(start, end + 1).join('\n');
+}
+
+function sourceLine(start) {
+  return lines.find((line) => line.startsWith(start));
+}
+
+function select(page, start, end) {
+  return page.evaluate(
+    ([start, end]) => {
+      const point = ({ selector, contains, text, after = false, last = false }) => {
+        const element = [...document.querySelectorAll(selector)].find((candidate) => candidate.textContent.includes(contains ?? text ?? ''));
+        if (element === undefined) throw new Error(`no ${selector} contains ${contains ?? text}`);
+        if (text === undefined) return [element, after ? element.childNodes.length : 0];
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        let found = null;
+        while (walker.nextNode()) {
+          const index = walker.currentNode.data.indexOf(text);
+          if (index === -1) continue;
+          found = [walker.currentNode, index + (after ? text.length : 0)];
+          if (!last) break;
+        }
+        if (found === null) throw new Error(`"${text}" is not inside one text node of ${selector}`);
+        return found;
+      };
+      const range = document.createRange();
+      range.setStart(...point(start));
+      range.setEnd(...point(end));
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    },
+    [start, end],
+  );
+}
+
+async function copied(page) {
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await page.keyboard.press('Control+C');
+  return page.evaluate(async () => {
+    const [item] = await navigator.clipboard.read();
+    const read = async (type) => (item.types.includes(type) ? (await item.getType(type)).text() : null);
+    return { text: await read('text/plain'), html: await read('text/html') };
+  });
+}
+
+test('copying from an article gives the Markdown source of the selection', async (t) => {
+  const dir = createBlog(t, {});
+  cpSync(exampleBlog, dir, { recursive: true, filter: (path) => path !== join(exampleBlog, 'dist') });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/syntax/`);
+  await page.waitForFunction(() => document.querySelector('.bk-notes-layer') !== null);
+  const copyChapter = '#copy ~ .bk-block';
+
+  await t.test('part of a paragraph keeps highlights, math and the footnote, and the definition is appended', async () => {
+    await select(page, { selector: copyChapter, text: '只选中一部分的块' }, { selector: copyChapter, contains: '附在末尾', text: '。', after: true, last: true });
+    const paragraph = sourceLine('完整选中的块');
+    const expected = `${paragraph.slice(paragraph.indexOf('只选中一部分的块'))}\n\n${sourceLine('[^copy-notes]:')}`;
+    assert.equal((await copied(page)).text, expected);
+  });
+
+  await t.test('a sidenote number inside an example becomes the reference with its label and its definition', async () => {
+    await select(page, { selector: '#sidenotes ~ .bk-block .example-result', text: '推理时' }, { selector: '#sidenotes ~ .bk-block .example-result', text: '不额外占带宽', after: true });
+    assert.equal((await copied(page)).text, `推理时这个逐元素操作要能融合进 GEMM 的 epilogue[^gemm]，不额外占带宽\n\n${sourceLine('[^gemm]:')}`);
+    assert.equal(await page.evaluate(() => document.querySelector('.bk-article > section .bk-sidenote[data-sidenote="1"]').dataset.label), 'gemm');
+  });
+
+  await t.test('whole blocks are copied as their source lines, and a component counts as whole when part of it is selected', async () => {
+    await select(page, { selector: copyChapter, text: '章节编号' }, { selector: `${copyChapter} figcaption`, text: '选中', after: true });
+    assert.equal((await copied(page)).text, sourceLines('- 章节编号', ':::'));
+  });
+
+  await t.test('a selection inside a list item gives its inline Markdown, and one across items gives list items', async () => {
+    await select(page, { selector: `${copyChapter} li`, text: '标题旁的' }, { selector: `${copyChapter} li code`, text: '#', after: true });
+    assert.equal((await copied(page)).text, '标题旁的 `#`');
+    await select(page, { selector: `${copyChapter} li`, text: '页边的旁注编号' }, { selector: `${copyChapter} li`, text: '选区从文章外面开始时', after: true });
+    assert.equal((await copied(page)).text, '- 页边的旁注编号可以选中，复制的内容里没有它们。\n- 选区从文章外面开始时');
+  });
+
+  await t.test('a partly selected example converts its result, with the math and images of list-table cells', async () => {
+    await select(page, { selector: '#tables ~ .bk-block .example-result .list-table', text: '激活函数' }, { selector: '#tables ~ .bk-block .example-result .list-table', text: '负半轴梯度为 0', after: true });
+    assert.equal((await copied(page)).text, [':::list-table', '* - 激活函数', '  - 公式', '  - 特点', '  - 曲线', '* - ReLU', '  - $\\max(0, x)$', '  - - 计算只需要一次比较', '    - 负半轴梯度为 0', '  - ![](relu.svg){width=64px}', ':::'].join('\n'));
+  });
+
+  await t.test('a selection that starts outside the article copies the article part', async () => {
+    await select(page, { selector: '.bk-title', text: 'Bake' }, { selector: '.bk-article > .bk-block', text: '先改这篇文章。', after: true });
+    assert.equal((await copied(page)).text, sourceLine('这篇文章列出 Bake 的全部写法'));
+  });
+
+  await t.test('section numbers and heading links are left out of the Markdown and the HTML, and math is TeX in the HTML', async () => {
+    await select(page, { selector: '#copy .bk-heading-text', text: 'Markdown' }, { selector: copyChapter, text: '只选中一部分的块从页面内容转换：', after: true });
+    const partial = await copied(page);
+    assert.equal(partial.text, `${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n完整选中的块按 \`index.md\` 里的原文复制。只选中一部分的块从页面内容转换：`);
+    await select(page, { selector: '#copy', text: '15' }, { selector: copyChapter, contains: '附在末尾', text: '。', after: true, last: true });
+    const whole = await copied(page);
+    assert.ok(whole.text.startsWith(`${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n${sourceLine('完整选中的块')}`), whole.text);
+    assert.ok(whole.text.endsWith(`\n\n${sourceLine('[^copy-notes]:')}`), whole.text);
+    assert.doesNotMatch(whole.html, />15<|>#<|<mjx-container|<svg|<div|<section|<span|<aside|\sclass=|\sdata-|\sstyle=/);
+    assert.match(whole.html, /<mark>重点标记<\/mark>/);
+    assert.match(whole.html, /公式 \$\\sigma\(x\)\$ 写成/);
+    assert.match(whole.html, /<h2>复制为 Markdown<\/h2>/);
+    assert.match(whole.html, /附在末尾<sup><a href="[^"]*#footnote-3">3<\/a><\/sup>。/);
+    assert.match(whole.html, /<hr><ol><li value="3" id="footnote-3"><p>每个脚注的定义只附一次，按 <code>index.md<\/code> 里的原文复制。<\/p><\/li><\/ol>$/);
+  });
+
+  await t.test('the HTML has absolute addresses for links and images', async () => {
+    await select(page, { selector: '#links ~ .bk-block .example-result', text: 'SwiGLU' }, { selector: '#links ~ .bk-block .example-result', text: '被引用的文章', after: true });
+    const links = await copied(page);
+    assert.match(links.html, new RegExp(`<a href="${base}/2026-10/syntax-linked/#chain-rule">链式法则</a>`));
+    assert.match(links.text, /\[链式法则\]\(\/2026-10\/syntax-linked\/#chain-rule\)/);
+    await select(page, { selector: '#images ~ .bk-block .example-result figure' }, { selector: '#images ~ .bk-block .example-result figure', after: true });
+    assert.match((await copied(page)).html, new RegExp(`<img src="${base}/2026-10/syntax/ffn-shapes.svg"`));
+  });
+
+  await t.test('a converted heading and component keep the attributes written in the source', async () => {
+    await select(page, { selector: '#headings ~ .bk-block .example-source', text: '三级标题' }, { selector: '#headings ~ .bk-block .example-result h3', text: '三级标题', after: true });
+    assert.equal((await copied(page)).text, '三级标题 {#third-level toc="短标题"}\n\n### 三级标题 {#third-level toc="短标题"}');
+    await select(page, { selector: '#components ~ .bk-block .example-source', text: 'width=body}' }, { selector: '#components ~ .bk-block .example-result figure[data-attributes*="body"]', after: true });
+    assert.equal((await copied(page)).text, 'width=body}\n:::\n\n:::act-fn-plot{fn=silu range=6 beta=2 width=body}\n:::');
+  });
+
+  await t.test('a selection of only the title of a fold gives the title', async () => {
+    await page.evaluate(() => {
+      const fold = [...document.querySelectorAll('.example-result details.fold')].find((details) => details.textContent.includes('GELU 的导数'));
+      const range = document.createRange();
+      range.setStart(fold, 0);
+      range.setEnd(fold, 1);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+    assert.equal((await copied(page)).text, '推导：GELU 的导数');
+  });
+
+  await t.test('a whole sidenote in the margin is copied as its text without its number', async () => {
+    await select(page, { selector: '.bk-notes-layer .bk-sidenote-body', text: '每个脚注' }, { selector: '.bk-notes-layer .bk-sidenote-body', text: '原文复制。', after: true });
+    assert.equal((await copied(page)).text, sourceLine('[^copy-notes]:').replace('[^copy-notes]: ', ''));
+  });
+
+  await t.test('headings and a component in embedded content are copied as the lines of the embedded article', async () => {
+    const embed = '.embed-part';
+    await select(page, { selector: `${embed} h2`, contains: '向量与雅可比矩阵的乘积' }, { selector: `${embed} figcaption`, contains: 'SiLU', after: true });
+    const start = linkedLines.findIndex((line) => line.startsWith('## 向量与雅可比矩阵的乘积'));
+    const end = linkedLines.findIndex((line, index) => index > start && line === ':::');
+    assert.equal((await copied(page)).text, linkedLines.slice(start, end + 1).join('\n'));
+  });
+
+  await t.test('copying shows one toast with the Markdown message', async () => {
+    await page.waitForFunction(() => !document.querySelector('.bk-toast').classList.contains('is-on'));
+    await select(page, { selector: copyChapter, text: '只选中' }, { selector: copyChapter, text: '只选中', after: true });
+    await copied(page);
+    await page.waitForFunction(() => document.querySelector('.bk-toast').classList.contains('is-on'));
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.bk-toast')].map((toast) => toast.textContent)), ['已复制为 Markdown']);
+  });
+
+  await t.test('the copy button copies the whole index.md, uses the pointer cursor and shows the toast', async () => {
+    await page.evaluate(() => getSelection().removeAllRanges());
+    await page.waitForFunction(() => !document.querySelector('.bk-toast').classList.contains('is-on'));
+    const button = page.locator('.bk-header .bk-copy-source');
+    assert.equal(await button.textContent(), '复制为 Markdown');
+    assert.equal(await button.evaluate((element) => getComputedStyle(element).cursor), 'pointer');
+    await button.click();
+    await page.waitForFunction(() => document.querySelector('.bk-toast').classList.contains('is-on'));
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), source);
+    assert.equal(await page.locator('.bk-toast').textContent(), '已复制为 Markdown');
+  });
+
+  await context.close();
+});

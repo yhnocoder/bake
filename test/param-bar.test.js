@@ -134,7 +134,7 @@ describe('the parameter endpoint of bake dev', () => {
     assert.equal(version, sourceVersion(read()));
     const components = JSON.stringify({ 'label-view': { text: { label: 'Text', type: 'text', default: 'none' }, size: { label: 'Size', type: 'number', min: 1, max: 9, default: 3 } } });
     assert.ok(page.includes(` data-components="${components.replaceAll('"', '&quot;')}"`), page.slice(-600));
-    assert.match(page, /<figure class="component" data-component="label-view" data-params="[^"]*" data-line="9">/);
+    assert.match(page, /<figure class="component" data-component="label-view" data-params="[^"]*" data-attributes="[^"]*" data-line="9">/);
   });
 
   test('returns the rewritten line for Copy without writing the file', async (t) => {

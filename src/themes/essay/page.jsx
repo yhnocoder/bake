@@ -1,20 +1,22 @@
 import { Article } from './article.jsx';
 import { Header } from './header.jsx';
 import { labelsFor } from './labels.js';
+import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
-import { prepaintScript } from './settings.js';
+import { prepaintScript, settingAttributes } from './settings.js';
 import { Toc } from './toc.jsx';
 
 export default function Page(props) {
   const { site, article, assets } = props;
   const labels = labelsFor(site.language);
   return (
-    <html lang={site.language} data-toc={article.toc}>
+    <html lang={site.language} {...settingAttributes('article', article)} data-default-toc={article.toc}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
+        <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
         <script innerHTML={prepaintScript} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
@@ -31,13 +33,20 @@ export default function Page(props) {
         {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region="glyphs" innerHTML={article.content.glyphs} />}
         <div class="bk-shell">
           <Header site={site} article={article} home={assets.root} labels={labels} />
-          <Toc toc={article.content.toc} labels={labels} />
-          <Article content={article.content} labels={labels} />
+          <main class="bk-main">
+            <Toc toc={article.content.toc} labels={labels} />
+            <Article content={article.content} labels={labels} />
+          </main>
         </div>
         <PreviewTemplates previews={article.content.previews} labels={labels} />
+        <script type="application/json" class="bk-source" data-region="source" innerHTML={sourceJson(article.content.source)} />
       </body>
     </html>
   );
+}
+
+function sourceJson(source) {
+  return JSON.stringify(source).replaceAll('<', '\\u003c');
 }
 
 function labelStyle(labels) {

@@ -21,8 +21,8 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      - run: make check
       - run: npx playwright install --with-deps chromium
+      - run: make check
       - run: npm run test:browser
 
   screenshots:
