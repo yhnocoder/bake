@@ -4,27 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>纯 HTML 页面：正弦波的相位 · Bake Example</title>
+<link rel="stylesheet" href="../../_bake/theme.css">
 <style>
-:root { color-scheme: light dark; --bg: #f5f6f4; --ink: #161a1d; --ink-2: #4f575e; --line: #dde1dc; --wave: #1baf7a; }
-@media (prefers-color-scheme: dark) { :root { --bg: #111413; --ink: #e9ece7; --ink-2: #b4bab5; --line: #2c312e; --wave: #199e70; } }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.8 system-ui, sans-serif; }
+body { line-height: 1.8; }
 main { max-width: 720px; margin: 0 auto; padding: 48px 16px; }
-h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.3; }
+h1 { margin: 0 0 12px; font-family: var(--font-heading); font-size: 30px; line-height: 1.3; }
 p { color: var(--ink-2); }
 svg { display: block; width: 100%; height: auto; }
 label { display: flex; align-items: center; gap: 12px; font-variant-numeric: tabular-nums; }
-input { flex: 1; }
-a { color: inherit; }
+input { flex: 1; accent-color: var(--series-3); }
+a { color: var(--accent); }
 </style>
 </head>
 <body>
 <main>
 <p><a href="../../">返回首页</a></p>
 <h1>纯 HTML 页面：正弦波的相位</h1>
-<p>这个页面由 front matter 的 <code>page: page.html</code> 原样发布，不经过 Markdown。拖动滑块改变正弦波 y = sin(x + φ) 的相位 φ。</p>
+<p>这个页面由 front matter 的 <code>page: page.html</code> 原样发布，不经过 Markdown。它引用站点主题的 <code>_bake/theme.css</code>，因此使用主题的字体、颜色和深色模式。拖动滑块改变正弦波 y = sin(x + φ) 的相位 φ。</p>
 <svg id="plot" viewBox="0 0 640 240" role="img" aria-label="正弦波">
-  <line x1="0" y1="120" x2="640" y2="120" stroke="var(--line)" stroke-width="2"/>
-  <path id="wave" fill="none" stroke="var(--wave)" stroke-width="3" stroke-linejoin="round"/>
+  <line x1="0" y1="120" x2="640" y2="120" stroke="var(--line-2)" stroke-width="2"/>
+  <path id="wave" fill="none" stroke="var(--series-3)" stroke-width="3" stroke-linejoin="round"/>
 </svg>
 <label>φ <input id="phase" type="range" min="0" max="6.28" step="0.01" value="0"> <output id="value">0.00</output></label>
 </main>

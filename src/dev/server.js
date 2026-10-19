@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { contentType } from '../build/content-types.js';
 import { errorCount, formatError } from '../report.js';
 import { escapeHtml, missingPage } from './missing.js';
 import { createPreview } from './preview.js';
@@ -13,28 +14,6 @@ export const DEFAULT_PORT = 4321;
 const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
 const CLIENT_FILES = { 'client.js': 'text/javascript; charset=utf-8', 'client.css': 'text/css; charset=utf-8' };
-
-const CONTENT_TYPES = {
-  '.avif': 'image/avif',
-  '.css': 'text/css; charset=utf-8',
-  '.gif': 'image/gif',
-  '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.pdf': 'application/pdf',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ttf': 'font/ttf',
-  '.txt': 'text/plain; charset=utf-8',
-  '.webp': 'image/webp',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.xml': 'application/xml',
-};
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = console.log } = {}) {
   const root = resolve(blogRoot);
@@ -92,7 +71,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
     const { output, page } = found;
     const body = output.from === undefined ? await output.render() : readFileSync(output.from);
     if (extname(output.path) === '.html') return sendHtml(response, 200, injectClient(String(body), clientData(root, page)));
-    response.writeHead(200, { 'content-type': CONTENT_TYPES[extname(output.path)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
+    response.writeHead(200, { 'content-type': contentType(output.path), 'cache-control': 'no-store' });
     response.end(body);
   }
 
@@ -193,7 +172,7 @@ function injectClient(html, data) {
 }
 
 function sendHtml(response, status, html) {
-  response.writeHead(status, { 'content-type': CONTENT_TYPES['.html'], 'cache-control': 'no-store' });
+  response.writeHead(status, { 'content-type': contentType('index.html'), 'cache-control': 'no-store' });
   response.end(html);
 }
 
