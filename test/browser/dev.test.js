@@ -122,6 +122,15 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await page.waitForFunction(() => !document.querySelector('details.fold').open);
     await page.click('details.fold > summary');
     await page.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    edit('gives a width.\n```\n', 'gives a width.\n```\n\nSee [the far section](/2026-10/live/#far).\n');
+    const link = page.locator('.bk-article a.internal-link', { hasText: 'the far section' });
+    await link.waitFor();
+    await link.hover();
+    const card = page.locator('.bk-preview.is-on');
+    await card.waitFor();
+    assert.match(await card.textContent(), /Far away/);
+    await page.mouse.move(0, 0);
+    await card.waitFor({ state: 'hidden' });
   });
 
   await t.test('a change above the screen keeps the visible text in place and names the introduction', async () => {

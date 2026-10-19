@@ -9,6 +9,7 @@ import { createSite, updateSite } from '../src/build/site.js';
 import { createPreview } from '../src/dev/preview.js';
 import { startDevServer } from '../src/dev/server.js';
 import { isWatched } from '../src/dev/watch.js';
+import { formatError } from '../src/report.js';
 import { article, createBlog, readTree, validConfig, writeFiles } from './blog.js';
 
 const pngBytes = Buffer.from(
@@ -175,6 +176,29 @@ describe('preview updates', () => {
     assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
     assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
     assert.match(indexHtml(preview, '/2026-10/gelu/'), /GELU changed\./);
+  });
+
+  test('a change in one article checks the links of every article again and updates the sections embedded elsewhere', async (t) => {
+    const gelu = (heading, text) => article({ title: 'GELU', slug: 'gelu', body: `## ${heading}\n\n${text}\n` });
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ body: 'See [the rule](/2026-10/gelu/#chain-rule).\n\n:::embed\n/2026-10/gelu/#chain-rule\n:::\n' }),
+      'content/posts/gelu/index.md': gelu('Chain rule', 'First text.'),
+    });
+    const preview = createPreview(dir);
+    assert.deepEqual((await preview.update()).problems, []);
+    writeFiles(dir, { 'content/posts/gelu/index.md': gelu('Product rule', 'First text.') });
+    const renamed = await preview.update(['content/posts/gelu/index.md']);
+    assert.deepEqual(renamed.problems.map(formatError), [
+      'content/posts/rope/index.md:7:5 link target /2026-10/gelu/#chain-rule does not exist',
+      'content/posts/rope/index.md:10:1 :::embed target /2026-10/gelu/#chain-rule does not exist',
+    ]);
+    writeFiles(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'First text.') });
+    assert.deepEqual((await preview.update(['content/posts/gelu/index.md'])).problems, []);
+    writeFiles(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'Second text.') });
+    const changed = await preview.update(['content/posts/gelu/index.md']);
+    assert.deepEqual([changed.problems, changed.reload, changed.refresh], [[], [], ['/2026-10/gelu/', '/2026-10/rope/']]);
+    assert.match(indexHtml(preview, '/2026-10/rope/'), /<div class="embed">[\s\S]*Second text\./);
   });
 
   test('front matter changes reload the page, other files reload every page and config errors keep every page', async (t) => {

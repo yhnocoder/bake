@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images and writes one page per article in the `essay` theme. `bake dev` serves the same pages and updates them on every save. The `bento` theme, the homepage, the table of contents styles other than `notes`, components, links between articles and `:::embed` blocks are not built yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` theme. `bake dev` serves the same pages and updates them on every save. The `bento` theme, the homepage, the table of contents styles other than `notes` and components are not built yet.
 
 ## Commands
 
@@ -24,7 +24,7 @@ You write Markdown in the text editor of your choice, and `bake dev` shows each 
 
 Bake watches the blog folder and rebuilds what changed each time you save a file:
 
-- Saving the Markdown of an article replaces the article text on the open page in place. The scroll position, the table of contents and the open or closed state of every fold stay as they were. Each changed block is highlighted in light yellow for one second. When no changed block is on the screen, a notice at the bottom of the page names the section of the change, and clicking the notice scrolls there.
+- Saving the Markdown of an article replaces the article text on the open page in place. The scroll position, the table of contents and the open or closed state of every fold stay as they were. Each changed block is highlighted in light yellow for one second. When no changed block is on the screen, a notice at the bottom of the page names the section of the change, and clicking the notice scrolls there. Bake checks the links of every article again after each save, so the pages of other articles that link to the changed article or embed one of its sections are updated in the same way, and a link that no longer finds its target is reported.
 - Changing the front matter of an article, `bake.config.js`, `preamble.sty` or a file in `themes/` generates the page again, and the browser reloads it at the same scroll position.
 - Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
 
@@ -158,6 +158,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 | `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
 | `:::list-table` | A table written as a nested list, see below. |
 | `:::example` | Shows the Markdown source of its content next to the result, see below. |
+| `:::embed` | Shows sections or paragraphs of other articles, see [Embedding other articles](#embedding-other-articles). |
 | `:::{width=wide}` | Sets the width of the one block inside it to `body`, `wide` or `page`. |
 
 Any other block name without a `-` is an error, and so is an attribute the block does not know. A name with a `-` is an interactive component.
@@ -233,6 +234,31 @@ Gated variants lower the loss [@shazeer2020].
 ```
 
 A footnote reference without a definition, a definition that is never used and a citation that is not in `:::references` are errors.
+
+### Links between articles
+
+A link whose address is the address of an article on the site, `/YYYY-MM/slug/`, optionally followed by `#anchor`, is an internal link. The anchor names a heading, the `^name` of a paragraph, a sidenote such as `sidenote-2`, a reference entry such as `reference-shazeer2020`, or an equation by its label or its `eq-` anchor:
+
+```markdown
+The backward pass follows the [chain rule](/2026-07/matrix-calculus/#chain-rule).
+```
+
+Bake checks every internal link after it has read all articles. A link to an article or an anchor that does not exist is an error. When an article with the same slug exists under another month, the error gives its current address, because such a link usually broke when the date of the article changed; the address of a draft is never given. An address written without the trailing slash or with `index.html`, such as `/2026-07/matrix-calculus` or `/2026-07/matrix-calculus/index.html#chain-rule`, is an error that gives the address to write. A query string is kept in the link and does not change the check. A link from a published article to a draft is an error. A link to an anchor on the same page, such as `[see above](#act-fns)`, may name the same kinds of anchors and must exist in the article. Addresses with a scheme, such as `https://…`, are not checked. Bake writes internal links relative to the page, so the site also works when it is published under a sub-path.
+
+In the `essay` theme, when the reader rests the pointer on an internal link or moves the keyboard focus to it, a card shows the title of the target article, the number and title of the section, and the content at the target with its formulas: the first paragraphs of a section, the paragraph, the formula of an equation or the text of a sidenote. A link to a reference entry shows the entry, as a citation does. A click on the card opens the target. On a touch screen there is no card, and a tap on the link opens the target.
+
+### Embedding other articles
+
+`:::embed` lists internal addresses, one per line, and shows their content in this article in the order of the lines:
+
+```markdown
+:::embed
+/2026-07/matrix-calculus/#chain-rule
+/2026-09/autodiff/#vjp
+:::
+```
+
+The address of a heading embeds its section up to the next heading of the same or a higher level, and the address of a paragraph anchor embeds that paragraph. All parts of one `:::embed` form one block, and each part ends with a line that names its article and section and links to them. Embedded content keeps its layout, its equation numbers and its components. Its headings do not enter the table of contents or the section numbering of this article, its sidenotes are not shown, and an `:::embed` inside it is shown as a link. Bake reads the embedded content on every build, so a change in the source article reaches every article that embeds it. Embedding the article itself, an address without an anchor, a target that does not exist or is not a heading or a paragraph, the same address twice and an address whose section contains another address of the same block are errors.
 
 ## Themes
 
