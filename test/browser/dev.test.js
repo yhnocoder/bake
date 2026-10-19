@@ -347,6 +347,13 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await frame.scrollIntoViewIfNeeded();
     await page.waitForFunction((selector) => document.querySelector(selector).dataset.state === 'ready', frameSelector);
   };
+  let beforeParams = null;
+  // why: Playwright loses requests that are in flight while page.unroute runs, so this route stays until the page closes
+  await page.route('**/__bake/params', (route) => {
+    const handle = beforeParams;
+    beforeParams = null;
+    return handle === null ? route.continue() : handle(route);
+  });
   await open();
 
   await t.test('the bar shows one control per parameter above the component without changing the height of its box', async () => {
@@ -502,16 +509,15 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const refuseThenWrite = async (range, text, waitForRefresh) => {
     await control('range').locator('.number').fill(String(range));
     let edited = null;
-    await page.route('**/__bake/params', async (route) => {
+    beforeParams = async (route) => {
       edit('全部写法，', `全部写法，${text}，`);
       edited = readFileSync(file, 'utf8');
       const response = await route.fetch();
       if (waitForRefresh) await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
       await route.fulfill({ response });
-    });
+    };
     await bar.locator('.write').click();
     await message.filter({ hasText: refused }).waitFor();
-    await page.unroute('**/__bake/params');
     await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
     await page.waitForTimeout(300);
     assert.deepEqual([await message.isVisible(), await message.getAttribute('data-kind'), await message.textContent()], [true, 'error', refused]);
