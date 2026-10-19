@@ -1,6 +1,6 @@
 (() => {
   const script = document.currentScript;
-  const { source, missing } = script.dataset;
+  const { source, missing, file } = script.dataset;
   const scrollKey = `bake-dev-scroll:${location.pathname}`;
   const pagePath = location.pathname.replace(/index\.html$/, '');
   const BLOCKS = '[data-region] [data-line]';
@@ -9,14 +9,18 @@
   const HIGHLIGHT_DURATION = 1000;
   const NOTICE_DURATION = 8000;
   const COPIED_DURATION = 1200;
+  const BARS_KEY = 'bake-dev-param-bars';
 
   let pristine = null;
   let outline = JSON.parse(script.dataset.outline ?? '[]');
+  let version = script.dataset.version;
+  let components = JSON.parse(script.dataset.components ?? '{}');
   let serverId = null;
   let refreshing = null;
   let refreshAgain = false;
 
   const ui = createInterface();
+  const bars = file === undefined ? null : startBars();
   restoreScroll();
   const loaded =
     missing === undefined
@@ -43,6 +47,36 @@
       else if (refresh.includes(pagePath)) queueRefresh();
     });
     return connected;
+  }
+
+  function startBars() {
+    const shown = barsShown();
+    ui.showBarSwitch(shown, (value) => {
+      try {
+        localStorage.setItem(BARS_KEY, value ? 'shown' : 'hidden');
+      } catch {}
+      bars.then((module) => module.setShown(value));
+    });
+    return import('/__bake/param-bar.js').then((module) =>
+      module.startParamBars({
+        file,
+        version: () => version,
+        setVersion: (next) => {
+          version = next;
+        },
+        components: () => components,
+        copyText,
+        shown,
+      }),
+    );
+  }
+
+  function barsShown() {
+    try {
+      return localStorage.getItem(BARS_KEY) !== 'hidden';
+    } catch {
+      return true;
+    }
   }
 
   async function fetchPage() {
@@ -78,7 +112,10 @@
     const details = detailsState();
     const replaced = replaceRegions(pristine, next);
     pristine = next;
-    outline = JSON.parse(next.querySelector('script[data-bake-dev]')?.dataset.outline ?? '[]');
+    const data = next.querySelector('script[data-bake-dev]')?.dataset ?? {};
+    outline = JSON.parse(data.outline ?? '[]');
+    version = data.version;
+    components = JSON.parse(data.components ?? '{}');
     if (!replaced) return;
     restoreDetails(details);
     document.dispatchEvent(new CustomEvent('bake:content'));
@@ -184,7 +221,8 @@
 
   function showChanges(lines) {
     const changed = new Set(lines);
-    const elements = [...document.querySelectorAll(BLOCKS)].filter((element) => changed.has(element.dataset.line));
+    const lineElements = [...document.querySelectorAll(BLOCKS)].filter((element) => changed.has(element.dataset.line));
+    const elements = lineElements.filter((element) => !lineElements.some((other) => other !== element && other.contains(element)));
     elements.forEach(highlight);
     const shown = elements.filter(isShown);
     if (shown.length === 0) return;
@@ -245,6 +283,7 @@
 
   function openInEditor(event) {
     if (source === undefined || !(event.target instanceof Element) || event.target.closest('input, textarea, select') !== null) return;
+    if (event.composedPath().some((target) => target instanceof Element && target.matches('bake-param-bar'))) return;
     const block = event.target.closest(BLOCKS);
     if (block === null) return;
     window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
@@ -273,7 +312,7 @@
       '<button type="button" class="notice" hidden></button>',
       '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',
       '<section class="problems" data-state="clear" hidden aria-label="Problems">',
-      '<header><span class="title">No problems</span><button type="button" class="close" aria-label="Close the problems list">×</button></header>',
+      '<header><span class="title">No problems</span><label class="bars" hidden><input type="checkbox" role="switch" class="switch">Parameter bars</label><button type="button" class="close" aria-label="Close the problems list">×</button></header>',
       '<ol class="list"></ol>',
       '</section>',
       '</div>',
@@ -345,6 +384,13 @@
           closedProblems = null;
           setOpen(false);
         }
+      },
+      showBarSwitch(shown, change) {
+        const label = shadow.querySelector('.bars');
+        const toggle = label.querySelector('input');
+        toggle.checked = shown;
+        toggle.addEventListener('change', () => change(toggle.checked));
+        label.hidden = false;
       },
       hideNotice() {
         clearTimeout(noticeTimer);

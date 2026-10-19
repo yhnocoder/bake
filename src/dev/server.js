@@ -1,18 +1,25 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { errorCount, formatError } from '../report.js';
+import { describeValue, errorCount, formatError } from '../report.js';
 import { escapeHtml, missingPage } from './missing.js';
+import { rewriteSource, sourceVersion } from './params.js';
 import { createPreview } from './preview.js';
 import { watchBlog } from './watch.js';
 
 export const DEFAULT_PORT = 4321;
 const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
-const CLIENT_FILES = { 'client.js': 'text/javascript; charset=utf-8', 'client.css': 'text/css; charset=utf-8' };
+const MAX_REQUEST_BYTES = 1024 * 1024;
+const CLIENT_FILES = {
+  'client.js': 'text/javascript; charset=utf-8',
+  'client.css': 'text/css; charset=utf-8',
+  'param-bar.js': 'text/javascript; charset=utf-8',
+  'param-bar.css': 'text/css; charset=utf-8',
+};
 
 const CONTENT_TYPES = {
   '.avif': 'image/avif',
@@ -72,6 +79,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
   async function respond(request, response) {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname === `${DEV_PREFIX}events`) return openEvents(request, response);
+    if (pathname === `${DEV_PREFIX}params`) return answerParams(request, response);
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
     if (clientFile !== null && Object.hasOwn(CLIENT_FILES, clientFile)) {
       response.writeHead(200, { 'content-type': CLIENT_FILES[clientFile], 'cache-control': 'no-store' });
@@ -102,6 +110,18 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
     send(response, 'problems', problemsData(preview.problems()));
     clients.add(response);
     request.on('close', () => clients.delete(response));
+  }
+
+  async function answerParams(request, response) {
+    if (request.method !== 'POST') return sendJson(response, 405, { error: 'send the parameters with POST' });
+    let body;
+    try {
+      body = JSON.parse(await readBody(request));
+    } catch (error) {
+      return sendJson(response, 400, { error: `cannot read the request: ${error.message}` });
+    }
+    const [status, data] = changeParams(root, preview, body);
+    sendJson(response, status, data);
   }
 
   let waiting = [];
@@ -180,7 +200,60 @@ async function listen(server, port) {
 
 function clientData(root, page) {
   if (page === null) return {};
-  return { source: pathToFileURL(join(root, page.file)).pathname, file: page.file, outline: JSON.stringify(page.outline) };
+  return {
+    source: pathToFileURL(join(root, page.file)).pathname,
+    file: page.file,
+    outline: JSON.stringify(page.outline),
+    version: page.version,
+    components: JSON.stringify(page.components),
+  };
+}
+
+function changeParams(root, preview, body) {
+  const { file, version, line, name, params, write } = isPlainObject(body) ? body : {};
+  const page = typeof file === 'string' ? preview.page(file) : null;
+  if (page === null) return [404, { error: `${describeValue(file)} is not an article that bake dev serves` }];
+  const component = typeof name === 'string' ? preview.component(name) : null;
+  if (component === null) return [400, { error: `unknown component ${describeValue(name)}` }];
+  if (!isPlainObject(params)) return [400, { error: 'params must map each parameter name to its value' }];
+  let source;
+  try {
+    source = readFileSync(join(root, file), 'utf8');
+  } catch {
+    source = null;
+  }
+  if (source === null || sourceVersion(source) !== version) return [409, { error: `${file} changed after this page was built; save it in your editor and try again` }];
+  const result = rewriteSource(source, line, name, component.params, params, page.files);
+  if (result.error !== undefined) return [400, { error: `${file}:${line} ${result.error}` }];
+  if (write === true && result.source !== source) writeFileSync(join(root, file), result.source);
+  return [200, { line: result.line, version: sourceVersion(write === true ? result.source : source) }];
+}
+
+function readBody(request) {
+  return new Promise((done, fail) => {
+    const chunks = [];
+    let size = 0;
+    request.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BYTES) {
+        fail(new Error('the request is larger than 1 MB'));
+        request.destroy();
+      } else {
+        chunks.push(chunk);
+      }
+    });
+    request.on('end', () => done(Buffer.concat(chunks).toString('utf8')));
+    request.on('error', fail);
+  });
+}
+
+function sendJson(response, status, data) {
+  response.writeHead(status, { 'content-type': CONTENT_TYPES['.json'], 'cache-control': 'no-store' });
+  response.end(JSON.stringify(data));
+}
+
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function injectClient(html, data) {

@@ -1,6 +1,7 @@
 import { posix } from 'node:path';
 import { POSTS_DIR } from '../build/articles.js';
 import { createSite, updateSite } from '../build/site.js';
+import { sourceVersion } from './params.js';
 
 export function createPreview(root) {
   const site = createSite(root, { drafts: true });
@@ -25,7 +26,7 @@ export function createPreview(root) {
       if (failed.has(article.file)) {
         if (pages.has(article.file)) next.set(article.file, pages.get(article.file));
       } else if (published.has(article.file)) {
-        next.set(article.file, servedPage(published.get(article.file)));
+        next.set(article.file, servedPage(published.get(article.file), site.settings.components));
       }
     }
     const nextHome = servedHome(result.home);
@@ -54,14 +55,19 @@ export function createPreview(root) {
     return articles.map((article) => ({ ...article, url: pages.get(article.file)?.url ?? null }));
   }
 
-  return { update, find, listing, problems: () => problems };
+  function component(name) {
+    const found = site.settings?.components?.get(name);
+    return found?.valid ? found : null;
+  }
+
+  return { update, find, listing, problems: () => problems, page: (file) => pages.get(file) ?? null, component };
 }
 
 function isArticleSource(path) {
   return path.startsWith(`${POSTS_DIR}/`) && posix.basename(path) === 'index.md';
 }
 
-function servedPage({ article, outputs }) {
+function servedPage({ article, outputs }, components) {
   const index = outputs.find((output) => output.path === `${article.url.slice(1)}index.html`);
   return {
     file: article.file,
@@ -69,12 +75,20 @@ function servedPage({ article, outputs }) {
     fields: JSON.stringify(article.fields),
     html: index?.render?.() ?? null,
     outline: outlineOf(article.content),
+    version: sourceVersion(article.source),
+    files: article.files,
+    components: componentParams(article.content, components),
     outputs: new Map(outputs.map((output) => [output.path, output])),
   };
 }
 
 function servedHome(output) {
   return { output, html: output.render() };
+}
+
+function componentParams(content, components) {
+  const used = (content?.components ?? []).map((name) => components.get(name)).filter((component) => component?.valid);
+  return Object.fromEntries(used.map((component) => [component.name, component.params]));
 }
 
 function outlineOf(content) {
@@ -94,7 +108,7 @@ function compare(before, after, reloadAll) {
     const [a, b] = [old.get(url), next.get(url)];
     if (a === b) continue;
     if (a === undefined || b === undefined || a.fields !== b.fields) reload.push(url);
-    else if (a.html !== b.html) refresh.push(url);
+    else if (a.html !== b.html || a.version !== b.version) refresh.push(url);
   }
   return { reload: reloadAll ? 'all' : reload.sort(), refresh: refresh.sort() };
 }

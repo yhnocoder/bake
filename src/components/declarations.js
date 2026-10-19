@@ -158,7 +158,7 @@ function readHeight(value) {
   return { height: 'auto', ratio: String(round(value.ratio, 4)) };
 }
 
-function convertAttribute(declaration, raw) {
+export function convertAttribute(declaration, raw) {
   let value = raw;
   if (declaration.type === 'number') {
     if (typeof raw !== 'string' || !NUMBER.test(raw)) return { problem: `must be a number, got ${describeAttribute(raw)}` };
@@ -173,7 +173,7 @@ function convertAttribute(declaration, raw) {
   return problem === null ? { value } : { problem };
 }
 
-function valueProblem(declaration, value) {
+export function valueProblem(declaration, value) {
   switch (declaration.type) {
     case 'number': {
       if (!Number.isFinite(value)) return `must be a number, got ${describeValue(value)}`;
@@ -192,7 +192,7 @@ function valueProblem(declaration, value) {
   }
 }
 
-function isFolderFile(value, files) {
+export function isFolderFile(value, files) {
   if (value.startsWith('/') || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value)) return false;
   return files.includes(posix.normalize(value));
 }

@@ -186,7 +186,7 @@ async function loadArticle(root, article, { rules, preamble, components }) {
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
   const folder = { path: join(root, article.dir), files: article.files };
   const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
-  return { ...article, fields, positions: frontMatter?.positions ?? {}, url, document, content: null, errors };
+  return { ...article, source, fields, positions: frontMatter?.positions ?? {}, url, document, content: null, errors };
 }
 
 function articleOutputs(root, article, pageSettings, errors) {

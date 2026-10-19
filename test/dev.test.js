@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { createSite, updateSite } from '../src/build/site.js';
+import { sourceVersion } from '../src/dev/params.js';
 import { createPreview } from '../src/dev/preview.js';
 import { startDevServer } from '../src/dev/server.js';
 import { isWatched } from '../src/dev/watch.js';
@@ -68,8 +69,11 @@ describe('bake dev', () => {
       { line: 9, title: '01 Rotation' },
       { line: 13, title: '01 Rotation › Angles' },
     ]).replaceAll('"', '&quot;');
+    const version = sourceVersion(readFileSync(join(dir, 'content/posts/rope/index.md'), 'utf8'));
     assert.ok(
-      html.endsWith(`<script src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}"></script></body></html>\n`),
+      html.endsWith(
+        `<script src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}" data-version="${version}" data-components="{}"></script></body></html>\n`,
+      ),
       html.slice(-400),
     );
     assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7">/);

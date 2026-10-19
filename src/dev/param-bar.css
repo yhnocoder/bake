@@ -1,0 +1,238 @@
+:host {
+  all: initial;
+  display: block;
+  margin: 0 0 12px;
+  --dev-bg: #ffffff;
+  --dev-text: #1f2328;
+  --dev-muted: #59636e;
+  --dev-line: #d1d9e0;
+  --dev-hover: #f3f4f6;
+  --dev-error: #cf222e;
+  --dev-accent: #0969da;
+  --dev-changed: #b45309;
+  --dev-shift: 0 4px;
+  font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--dev-text);
+  transition-property: opacity, display;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --dev-bg: #1f2328;
+    --dev-text: #e6edf3;
+    --dev-muted: #9198a1;
+    --dev-line: #3d444d;
+    --dev-hover: #2a3038;
+    --dev-error: #ff7b72;
+    --dev-accent: #4493f8;
+    --dev-changed: #f0a050;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    --dev-shift: 0 0;
+  }
+}
+
+:host([hidden]) {
+  display: none;
+  opacity: 0;
+}
+
+@starting-style {
+  :host {
+    opacity: 0;
+  }
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--dev-line);
+  border-radius: 8px;
+  background: var(--dev-bg);
+}
+
+.name {
+  font: 600 12px/1.5 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--dev-muted);
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  color: var(--dev-muted);
+  white-space: nowrap;
+  transition: color 150ms ease-out;
+}
+
+.control[data-changed] .label {
+  color: var(--dev-changed);
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+}
+
+.number,
+.text,
+.select {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--dev-line);
+  border-radius: 6px;
+  background: var(--dev-bg);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.number {
+  width: 72px;
+}
+
+.text {
+  width: 150px;
+}
+
+.control[data-changed] :is(.number, .text, .select) {
+  border-color: var(--dev-changed);
+  box-shadow: 0 0 0 1px var(--dev-changed);
+}
+
+.control[data-invalid] .number {
+  border-color: var(--dev-error);
+  box-shadow: 0 0 0 1px var(--dev-error);
+}
+
+.slider {
+  width: 120px;
+  margin: 0;
+  accent-color: var(--dev-accent);
+  cursor: pointer;
+}
+
+.control[data-changed] .slider {
+  accent-color: var(--dev-changed);
+}
+
+.switch {
+  appearance: none;
+  position: relative;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--dev-line);
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: translate 150ms ease-out;
+}
+
+.switch:checked {
+  background: var(--dev-accent);
+}
+
+.switch:checked::before {
+  translate: 12px 0;
+}
+
+.control[data-changed] .switch {
+  background: var(--dev-changed);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+button {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--dev-line);
+  border-radius: 6px;
+  background: var(--dev-bg);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease-out, opacity 150ms ease-out;
+}
+
+button:hover:not(:disabled) {
+  background: var(--dev-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+:is(input, select, button):focus-visible {
+  outline: 2px solid var(--dev-accent);
+  outline-offset: 1px;
+}
+
+.message {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--dev-muted);
+  overflow-wrap: anywhere;
+  transition-property: opacity, translate, display;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+.message[data-kind='error'] {
+  color: var(--dev-error);
+}
+
+.message[hidden] {
+  display: none;
+  opacity: 0;
+  translate: var(--dev-shift);
+}
+
+@starting-style {
+  .message {
+    opacity: 0;
+    translate: var(--dev-shift);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::before {
+    transition: none;
+  }
+
+  .message {
+    transition-property: opacity, display;
+  }
+}
