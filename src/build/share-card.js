@@ -1,3 +1,5 @@
+import { escapeMarkup } from './escape.js';
+
 const STYLE = `
 html,
 body {
@@ -97,23 +99,23 @@ body {
 `;
 
 export function cardHtml(card, stylesheet) {
-  const color = card.color === undefined ? '' : ` style="--c: ${escapeHtml(card.color)}"`;
-  const category = card.category === undefined ? '' : `<span class="category">${escapeHtml(card.category)}</span>`;
-  const summary = card.summary === undefined ? '' : `<p class="summary">${escapeHtml(card.summary)}</p>`;
+  const color = card.color === undefined ? '' : ` style="--c: ${escapeMarkup(card.color)}"`;
+  const category = card.category === undefined ? '' : `<span class="category">${escapeMarkup(card.category)}</span>`;
+  const summary = card.summary === undefined ? '' : `<p class="summary">${escapeMarkup(card.summary)}</p>`;
   const frame = card.preview === undefined ? '' : '<div class="frame"><div class="preview"></div></div>';
   return `<!doctype html>
-<html lang="${escapeHtml(card.language)}" data-theme="light">
+<html lang="${escapeMarkup(card.language)}" data-theme="light">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="${escapeHtml(stylesheet)}">
+<link rel="stylesheet" href="${escapeMarkup(stylesheet)}">
 <style>${STYLE}</style>
 </head>
 <body>
 <div class="card"${color}>
 <div class="strip"></div>
 <div class="text">
-<p class="site"><span>${escapeHtml(card.site)}</span>${category}</p>
-<h1 class="title">${escapeHtml(card.title)}</h1>
+<p class="site"><span>${escapeMarkup(card.site)}</span>${category}</p>
+<h1 class="title">${escapeMarkup(card.title)}</h1>
 ${summary}
 </div>
 ${frame}
@@ -121,8 +123,4 @@ ${frame}
 </body>
 </html>
 `;
-}
-
-function escapeHtml(text) {
-  return String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }

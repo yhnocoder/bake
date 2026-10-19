@@ -1,26 +1,8 @@
-import { createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { extname, join, relative, resolve, sep } from 'node:path';
+import { mkdirSync, readdirSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
 import { chromium } from 'playwright';
+import { serveStatic } from '../test/browser/server.js';
 import { variants } from './screenshot-variants.js';
-
-const contentTypes = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.json': 'application/json',
-  '.xml': 'application/xml',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.ttf': 'font/ttf',
-};
 
 const [distArgument, outArgument] = process.argv.slice(2);
 if (distArgument === undefined || outArgument === undefined) {
@@ -32,8 +14,7 @@ const out = resolve(outArgument);
 
 const pages = listPages(dist);
 mkdirSync(out, { recursive: true });
-const server = await serve(dist);
-const origin = `http://127.0.0.1:${server.address().port}`;
+const server = await serveStatic(dist);
 const browser = await chromium.launch();
 try {
   for (const variant of variants) {
@@ -44,7 +25,7 @@ try {
     });
     const page = await context.newPage();
     for (const { path, name } of pages) {
-      await page.goto(origin + path, { waitUntil: 'networkidle' });
+      await page.goto(server.origin + path, { waitUntil: 'networkidle' });
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({
         path: join(out, `${name}.${variant.name}.png`),
@@ -57,7 +38,7 @@ try {
   }
 } finally {
   await browser.close();
-  server.close();
+  await server.close();
 }
 console.log(`${pages.length * variants.length} screenshots of ${pages.length} pages written to ${relative(process.cwd(), out)}`);
 
@@ -82,24 +63,4 @@ function htmlFiles(dir) {
 function pageName(path) {
   const name = path.replace(/\.html$/, '').replace(/^\/+|\/+$/g, '').replace(/[^A-Za-z0-9._-]+/g, '-');
   return name === '' ? 'home' : name;
-}
-
-function serve(root) {
-  const server = createServer((request, response) => {
-    const file = resolveFile(root, decodeURIComponent(new URL(request.url, 'http://localhost').pathname));
-    if (file === undefined) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { 'content-type': contentTypes[extname(file)] ?? 'application/octet-stream' });
-    createReadStream(file).pipe(response);
-  });
-  return new Promise((done) => server.listen(0, '127.0.0.1', () => done(server)));
-}
-
-function resolveFile(root, pathname) {
-  const path = join(root, pathname);
-  if (path !== root && !path.startsWith(root + sep)) return undefined;
-  const file = existsSync(path) && statSync(path).isDirectory() ? join(path, 'index.html') : path;
-  return existsSync(file) && statSync(file).isFile() ? file : undefined;
 }

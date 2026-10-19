@@ -1,21 +1,9 @@
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, resolve, sep } from 'node:path';
+import { join, resolve, sep } from 'node:path';
+import { contentType } from '../../src/build/content-types.js';
 
-const TYPES = {
-  '.css': 'text/css',
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-  '.xml': 'application/xml',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-};
-
-export async function serve(t, dir) {
+export async function serveStatic(dir) {
   const root = resolve(dir);
   const server = createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
@@ -27,20 +15,26 @@ export async function serve(t, dir) {
         response.writeHead(404).end();
         return;
       }
-      response.writeHead(404, { 'content-type': TYPES['.html'] });
+      response.writeHead(404, { 'content-type': contentType(notFound) });
       createReadStream(notFound).pipe(response);
       return;
     }
-    response.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream' });
+    response.writeHead(200, { 'content-type': contentType(path) });
     createReadStream(path).pipe(response);
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  t.after(
-    () =>
+  return {
+    origin: `http://127.0.0.1:${server.address().port}`,
+    close: () =>
       new Promise((done) => {
         server.close(done);
         server.closeAllConnections();
       }),
-  );
-  return `http://127.0.0.1:${server.address().port}`;
+  };
+}
+
+export async function serve(t, dir) {
+  const server = await serveStatic(dir);
+  t.after(server.close);
+  return server.origin;
 }

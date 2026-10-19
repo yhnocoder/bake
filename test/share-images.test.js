@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { before, describe, test } from 'node:test';
 import { PNG } from 'pngjs';
 import sharp from 'sharp';
+import { INSTALL_CHROMIUM, SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH } from '../src/build/share-images.js';
 import { createSite, updateSite } from '../src/build/site.js';
 import { article, bake, cli, createBlog, readTree, writeFiles } from './blog.js';
 
@@ -97,11 +99,11 @@ describe('share images', () => {
     assert.deepEqual(pixel(raster, 200, 105), [0, 0, 255]);
 
     const card = PNG.sync.read(readFileSync(join(dir, 'dist/og', rope)));
-    assert.deepEqual([card.width, card.height], [1200, 630]);
+    assert.deepEqual([card.width, card.height], [SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT]);
     assert.deepEqual(pixel(card, 904, 315), MAGENTA);
     assert.deepEqual(pixel(card, 10, 315), [0x2a, 0x78, 0xd6]);
     const withoutPreview = PNG.sync.read(readFileSync(join(dir, 'dist/og', plain)));
-    assert.deepEqual([withoutPreview.width, withoutPreview.height], [1200, 630]);
+    assert.deepEqual([withoutPreview.width, withoutPreview.height], [SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT]);
     assert.deepEqual(pixel(withoutPreview, 904, 315), [0xf5, 0xf6, 0xf4]);
     assert.deepEqual(pixel(withoutPreview, 10, 315), [0x1b, 0xaf, 0x7a]);
 
@@ -114,7 +116,7 @@ describe('share images', () => {
       `<meta property="og:image:height" content="${height}">`,
       `<meta name="twitter:image" content="https://x.github.io/bake/og/${image}">`,
     ];
-    assert.deepEqual(imageTags(page('2026-10/rope/index.html')), tags(rope, 'image/png', 1200, 630));
+    assert.deepEqual(imageTags(page('2026-10/rope/index.html')), tags(rope, 'image/png', SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT));
     assert.deepEqual(imageTags(page('2026-10/covered/index.html')), tags(covered, 'image/png', 300, 200));
     assert.deepEqual(imageTags(page('2026-10/photo/index.html')), tags(photoImage, 'image/jpeg', 320, 180));
     assert.deepEqual(imageTags(page('2026-10/vector/index.html')), tags(vector, 'image/png', 400, 210));
@@ -146,6 +148,18 @@ describe('share images', () => {
     assert.notEqual(afterImport, afterPreview);
     const afterTitle = await pathAfter({ [ROPE]: article({ title: 'Rope 2', slug: 'rope', date: '2026-10-14', extra: 'category: ml\npreview: preview.js\nsummary: Rotary positions.\n' }) });
     assert.notEqual(afterTitle, afterImport);
+  });
+
+  test('the name of a cover ends with the first 12 hexadecimal digits of the SHA-256 of the cover file', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': config,
+      'content/posts/covered/index.md': article({ title: 'Covered', slug: 'covered', date: '2026-10-01', extra: 'category: notes\ncover: cover.png\n' }),
+    });
+    writeFileSync(join(dir, 'content/posts/covered/cover.png'), cover);
+    const result = await updateSite(createSite(dir, { shareImages: true }));
+    assert.deepEqual(result.errors, []);
+    const hash = createHash('sha256').update(cover).digest('hex').slice(0, 12);
+    assert.deepEqual(result.shareImages.map((image) => image.path), [`og/2026-10/covered-${hash}.png`]);
   });
 
   test('bake dev draws no share images and writes no image tags', async (t) => {
@@ -183,7 +197,7 @@ describe('share images', () => {
     const result = bakeWithoutChromium(t, dir);
     assert.match(
       result.stderr,
-      /^content\/posts\/plain\/index\.md:1:1 the share image needs Chromium, which cannot be launched \(.+\); install it with npx playwright install chromium\n1 error, dist\/ was not written\n$/,
+      new RegExp(`^content/posts/plain/index\\.md:1:1 the share image needs Chromium, which cannot be launched \\(.+\\); install it with ${INSTALL_CHROMIUM}\n1 error, dist/ was not written\n$`),
     );
     assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), ['marker.txt']);
   });

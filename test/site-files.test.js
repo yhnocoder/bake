@@ -80,7 +80,7 @@ describe('site files', () => {
         '<category>Notes</category>',
         '</item>',
         '<item>',
-        '<title>Rope &amp; &lt;&apos;angles&apos;&gt;</title>',
+        '<title>Rope &amp; &lt;&#x27;angles&#x27;&gt;</title>',
         '<link>https://x.github.io/bake/2026-10/rope/</link>',
         '<guid isPermaLink="true">https://x.github.io/bake/2026-10/rope/</guid>',
         '<pubDate>Wed, 14 Oct 2026 00:00:00 GMT</pubDate>',

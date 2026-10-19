@@ -18,7 +18,7 @@ import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
 import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
 
-export const PUBLIC_DIR = 'public';
+const PUBLIC_DIR = 'public';
 
 const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];

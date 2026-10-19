@@ -1,7 +1,6 @@
-import { MarkdownWriter, UI, isUi } from './markdown.js';
+import { MarkdownWriter, NOTE, UI, isUi, sidenoteElement } from './markdown.js';
 
 const SOURCE = 'script.bk-source';
-const NOTE = '[data-sidenote][data-line]';
 const REMOVED_FROM_HTML = `${UI}, ${NOTE}, .component-box, .embed-source, script, template, button, input, svg`;
 const KEPT_ELEMENTS = new Set(
   'p h1 h2 h3 h4 h5 h6 ul ol li blockquote pre code table thead tbody tfoot tr th td figure figcaption img a strong b em i mark del s sup sub br hr cite kbd'.split(' '),
@@ -16,17 +15,16 @@ const KEPT_ATTRIBUTES = {
 };
 
 export function articleSource() {
-  const element = document.querySelector(SOURCE);
-  return element === null ? null : JSON.parse(element.textContent);
+  return JSON.parse(document.querySelector(SOURCE).textContent);
 }
 
 export function copyArticle() {
-  const source = articleSource();
-  if (source === null || navigator.clipboard === undefined) return Promise.reject(new Error('the page has no source or no clipboard'));
-  return navigator.clipboard.writeText(source);
+  if (navigator.clipboard === undefined) return Promise.reject(new Error('the page has no clipboard'));
+  return navigator.clipboard.writeText(articleSource());
 }
 
 export function startCopy(article, { copied }) {
+  if (document.querySelector(SOURCE) === null) throw new Error('bake/copy needs the source of the article in script.bk-source');
   document.addEventListener('copy', (event) => {
     const selection = getSelection();
     if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) return;
@@ -39,11 +37,10 @@ export function startCopy(article, { copied }) {
   });
 }
 
-export function selectionMarkdown(range, article) {
+function selectionMarkdown(range, article) {
   const clamped = clampTo(range, article);
   if (clamped === null) return null;
-  const source = articleSource();
-  const lines = source === null ? null : source.split('\n').map((line) => line.replace(/\r$/, ''));
+  const lines = articleSource().split('\n').map((line) => line.replace(/\r$/, ''));
   const markdown = new MarkdownWriter(clamped, article, lines).write();
   if (markdown.trim() === '') return null;
   return { markdown, html: selectionHtml(clamped, article) };
@@ -79,8 +76,8 @@ function selectionHtml(range, article) {
   cleanHtml(container, numbers);
   const items = [];
   for (let index = 0; index < numbers.length; index += 1) {
-    const note = [...article.querySelectorAll(NOTE)].find((candidate) => candidate.dataset.sidenote === numbers[index] && candidate.closest(UI) === null);
-    if (note === undefined) continue;
+    const note = sidenoteElement(article, numbers[index]);
+    if (note === null) continue;
     const item = document.createElement('li');
     item.value = Number(numbers[index]);
     item.append(...note.cloneNode(true).childNodes);

@@ -1,3 +1,6 @@
+import { escapeMarkup } from '../build/escape.js';
+import { compareText } from '../report.js';
+
 const STYLE = `
 :root { color-scheme: light dark; }
 body { margin: 0; font: 15px/1.6 system-ui, sans-serif; background: Canvas; color: CanvasText; }
@@ -14,11 +17,11 @@ export function missingPage(pathname, articles) {
   const items = articles
     .toSorted((a, b) => compareText(b.date ?? '', a.date ?? '') || compareText(a.file, b.file))
     .map((article) => {
-      const title = escapeHtml(article.title ?? article.file);
-      const name = article.url === null ? `<span>${title}</span>` : `<a href="${escapeHtml(article.url)}">${title}</a>`;
-      const date = article.date === undefined ? '' : `<span class="date">${escapeHtml(article.date)}</span>`;
+      const title = escapeMarkup(article.title ?? article.file);
+      const name = article.url === null ? `<span>${title}</span>` : `<a href="${escapeMarkup(article.url)}">${title}</a>`;
+      const date = article.date === undefined ? '' : `<span class="date">${escapeMarkup(article.date)}</span>`;
       const draft = article.draft ? '<span class="draft">Draft</span>' : '';
-      return `<li>${name}${date}${draft}<span class="file">${escapeHtml(article.file)}</span></li>`;
+      return `<li>${name}${date}${draft}<span class="file">${escapeMarkup(article.file)}</span></li>`;
     });
   const intro = items.length === 0 ? 'No article has a page yet.' : 'These are all articles of the blog, drafts included.';
   return [
@@ -32,7 +35,7 @@ export function missingPage(pathname, articles) {
     '</head>',
     '<body>',
     '<main>',
-    `<h1>No page at ${escapeHtml(pathname)}</h1>`,
+    `<h1>No page at ${escapeMarkup(pathname)}</h1>`,
     `<p>${intro}</p>`,
     items.length === 0 ? '' : `<ol>${items.join('')}</ol>`,
     '</main>',
@@ -40,12 +43,4 @@ export function missingPage(pathname, articles) {
     '</html>',
     '',
   ].join('\n');
-}
-
-export function escapeHtml(text) {
-  return String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-}
-
-function compareText(a, b) {
-  return a < b ? -1 : a > b ? 1 : 0;
 }
