@@ -79,12 +79,15 @@ function blockElement(state, node, context) {
       return element('details', { className: ['fold'] }, [element('summary', {}, [text(node.attributes.title ?? '')]), ...children()]);
     case 'recap':
       return element('div', { className: ['recap'] }, children());
-    case 'references':
-      return element(
-        'ol',
-        { className: ['references'] },
-        context.references().map((entry) => element('li', { id: `reference-${entry.key}`, value: entry.number }, state.all({ type: 'paragraph', children: entry.children }))),
-      );
+    case 'references': {
+      const item = (entry) => element('li', { id: `reference-${entry.key}`, value: entry.number }, state.all({ type: 'paragraph', children: entry.children }));
+      const cited = context.references().filter((entry) => entry.number !== undefined);
+      const uncited = context.references().filter((entry) => entry.number === undefined);
+      return [
+        ...(cited.length === 0 ? [] : [element('ol', { className: ['references'] }, cited.map(item))]),
+        ...(uncited.length === 0 ? [] : [element('ul', { className: ['references', 'uncited'] }, uncited.map(item))]),
+      ];
+    }
     case 'example':
       return element('div', { className: ['example'] }, [
         element('div', { className: ['example-source'] }, [highlightCode(context.highlighter, node.sourceText, 'markdown')]),

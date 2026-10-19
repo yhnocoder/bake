@@ -54,6 +54,8 @@ const MATH_MIN_WIDTH = /min-width: ([\d.]+ex)/;
 const MATH_WIDTH = /<svg [^>]*?width="([\d.]+ex)"/;
 const WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/u;
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+const HAN_CHARACTER = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
+const WORD = /[\p{L}\p{N}]+/gu;
 
 export async function parseArticle(file, source, errors, { folder = null, preamble = [] } = {}) {
   const article = new ArticleParser(file, source, errors, folder, preamble);
@@ -517,8 +519,7 @@ class ArticleParser {
       }
     });
     const uncited = [...entries.values()].filter((entry) => !this.citations.has(entry.key));
-    for (const entry of uncited) this.citations.set(entry.key, this.citations.size + 1);
-    this.references = [...cited, ...uncited].map((entry) => ({ ...entry, number: this.citations.get(entry.key) }));
+    this.references = [...cited.map((entry) => ({ ...entry, number: this.citations.get(entry.key) })), ...uncited];
   }
 
   readReferenceEntries(block, entries) {
@@ -583,7 +584,7 @@ class ArticleParser {
       recap: section.recap,
       children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.toc, recap: subsection.recap })),
     }));
-    return { intro, sections, sidenotes, references, toc, glyphs: this.glyphs, images: [...this.images.values()] };
+    return { intro, sections, sidenotes, references, toc, words: countWords(tree), glyphs: this.glyphs, images: [...this.images.values()] };
   }
 
   headingFields(node) {
@@ -640,6 +641,15 @@ function naturalWidth(node) {
     return boxWidth.endsWith('px') ? boxWidth : undefined;
   }
   return undefined;
+}
+
+function countWords(tree) {
+  const texts = [];
+  walk(tree, (node) => {
+    if (node.type === 'text' || node.type === 'inlineCode') texts.push(node.value);
+  });
+  const text = texts.join(' ');
+  return (text.match(HAN_CHARACTER)?.length ?? 0) + (text.replace(HAN_CHARACTER, ' ').match(WORD)?.length ?? 0);
 }
 
 function textColumns(line) {

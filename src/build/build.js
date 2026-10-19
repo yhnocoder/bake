@@ -7,33 +7,56 @@ import { availableThemes } from '../config/rules.js';
 import { parseArticle } from '../markdown/article.js';
 import { convertImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
-import { renderPlaceholderPage } from '../render/placeholder-page.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { writeDist } from './dist.js';
 import { listFiles } from './files.js';
+import { compileTheme } from './theme.js';
 import { articleUrl, checkDuplicateUrls } from './urls.js';
 
 const PUBLIC_DIR = 'public';
 
 export async function build(root) {
   const errors = [];
-  const themes = availableThemes(root);
-  const config = await loadBakeConfig(root, themes, errors);
+  const themeNames = availableThemes(root);
+  const config = await loadBakeConfig(root, themeNames, errors);
   if (config === null) return { errors: sortErrors(errors) };
   const preamble = await readMathPreamble(root, errors);
   if (errors.length > 0) return { errors: sortErrors(errors) };
-  const rules = { themes, categories: config.categories.map((category) => category.id) };
+  const rules = { themes: themeNames, categories: config.categories.map((category) => category.id) };
   const articles = [];
   for (const article of findArticles(root)) articles.push(await readArticle(root, article, { rules, preamble }, errors));
   checkDuplicateUrls(articles, errors);
   const published = articles.filter((article) => article.url !== null && article.fields.draft !== true);
-  const pageSettings = { language: config.language, mathStyles: await mathStyles() };
+  const themes = await compileThemes(root, published, config, errors);
+  const pageSettings = { config, themes, mathStyles: await mathStyles() };
   const outputs = published.flatMap((article) => articleOutputs(root, article, pageSettings, errors));
+  outputs.push(...themeOutputs(themes));
   outputs.push(...publicOutputs(root, outputs, errors));
   if (errors.length > 0) return { errors: sortErrors(errors) };
   await writeDist(root, outputs);
   return { errors: [], pages: published.length };
+}
+
+async function compileThemes(root, published, config, errors) {
+  const names = new Set(published.filter((article) => article.content !== null).map((article) => themeOf(article, config)));
+  const themes = new Map();
+  for (const name of [...names].sort()) themes.set(name, await compileTheme(root, name, errors));
+  return themes;
+}
+
+function themeOf(article, config) {
+  return article.fields.theme ?? config.theme;
+}
+
+function themeOutputs(themes) {
+  const outputs = new Map();
+  for (const [name, theme] of themes) {
+    for (const file of theme?.files ?? []) {
+      if (!outputs.has(file.path)) outputs.set(file.path, { path: file.path, render: () => file.source, owner: `the ${name} theme` });
+    }
+  }
+  return [...outputs.values()];
 }
 
 async function readMathPreamble(root, errors) {
@@ -64,7 +87,7 @@ function articleOutputs(root, article, pageSettings, errors) {
     if (article.files.includes('index.html')) {
       errors.push(errorAt(article.file, fileStart, 'index.html in the article folder conflicts with the page generated from index.md'));
     }
-    const render = () => renderPlaceholderPage({ ...pageSettings, title: article.fields.title, summary: article.fields.summary, content: article.content });
+    const html = renderArticle(article, pageSettings, errors);
     const images = article.content.images.map((image) => ({
       path: `${base}${image.path}`,
       render: () => convertImage(join(root, article.dir, image.source), image),
@@ -72,12 +95,47 @@ function articleOutputs(root, article, pageSettings, errors) {
     }));
     const converted = new Set(article.content.images.flatMap((image) => (image.keepSource ? [image.path] : [image.path, image.source])));
     const copies = article.files.filter((file) => !converted.has(file)).map((file) => copy(file, file));
-    return [{ path: `${base}index.html`, render, owner: article.file }, ...images, ...copies];
+    return [{ path: `${base}index.html`, render: () => html, owner: article.file }, ...images, ...copies];
   }
   if (page !== 'index.html' && article.files.includes('index.html')) {
     errors.push(errorAt(article.file, article.positions.page, `page "${page}" is published as index.html, which conflicts with index.html in the article folder`));
   }
   return article.files.map((file) => copy(file, file === page ? 'index.html' : file));
+}
+
+function renderArticle(article, { config, themes, mathStyles }, errors) {
+  const name = themeOf(article, config);
+  const theme = themes.get(name);
+  if (theme === null) return '';
+  const { fields, content } = article;
+  const root = '../'.repeat(article.url.split('/').length - 2);
+  const props = {
+    site: { title: config.title, url: config.url, language: config.language },
+    article: {
+      title: fields.title,
+      summary: fields.summary,
+      date: fields.date,
+      tags: fields.tags ?? [],
+      category: fields.category,
+      draft: fields.draft === true,
+      toc: fields.toc ?? config.toc,
+      url: article.url,
+      words: content.words,
+      content,
+    },
+    assets: {
+      root,
+      styles: theme.styles.map((path) => `${root}${path}`),
+      scripts: theme.scripts.map((path) => `${root}${path}`),
+      mathStyles: content.glyphs === undefined ? undefined : mathStyles,
+    },
+  };
+  try {
+    return `<!doctype html>\n${theme.render(props)}\n`;
+  } catch (error) {
+    errors.push(errorAt(article.file, fileStart, `the ${name} theme cannot render this article: ${error instanceof Error ? error.message : String(error)}`));
+    return '';
+  }
 }
 
 function publicOutputs(root, articleOutputs, errors) {
