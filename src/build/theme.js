@@ -14,6 +14,7 @@ const BAKE_ROOT = join(import.meta.dirname, '../..');
 const RENDER_ENTRY = 'bake:render';
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const SHARED_PACKAGES = ['solid-js'];
+const LOCATION_SUFFIX = / \(\d+:\d+\)$/;
 
 export async function compileTheme(root, name, errors) {
   const folders = themeFolders(root, name);
@@ -127,7 +128,10 @@ function outputOf(result) {
 function compileError(root, name, error) {
   const cause = error.errors?.[0] ?? error;
   const file = cause.loc?.file ?? cause.id;
-  const message = String(cause.message ?? cause).split('\n')[0];
+  const message = String(cause.message ?? cause)
+    .split('\n')[0]
+    .replace(`${file}: `, '')
+    .replace(LOCATION_SUFFIX, '');
   if (file === undefined || !resolve(file).startsWith(`${resolve(root)}${sep}`)) {
     return errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" cannot be built: ${message}`);
   }

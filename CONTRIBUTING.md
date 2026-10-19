@@ -8,7 +8,7 @@ This repository contains only the tool: the CLI, the Markdown pipeline, the buil
 
 ## Planned layout
 
-The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/`, `src/markdown/`, `src/build/` and `src/render/` exist. `src/config/` reads `bake.config.js`, front matter and `preamble.sty`, `src/markdown/` parses the article body into the article structure, `src/build/` writes `dist/`, and `src/render/` typesets math, highlights code, reads and converts images, turns Markdown nodes into HTML and holds a placeholder article page that shows the article structure until the essay theme is added.
+The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/`, `src/markdown/`, `src/build/`, `src/render/` and `src/themes/essay/` exist. `src/config/` reads `bake.config.js`, front matter and `preamble.sty`, `src/markdown/` parses the article body into the article structure, `src/render/` typesets math, highlights code, reads and converts images and turns Markdown nodes into HTML, `src/build/` compiles the themes and writes `dist/`, and `src/themes/essay/` is the essay theme.
 
 | Path | Contents |
 |---|---|
@@ -40,7 +40,8 @@ The article structure is the interface between Bake and the themes. `parseArticl
 | `subsections` | One entry per `###` heading in the section: `id`, `title`, `text`, `toc`, `line` and `recap`. |
 | `toc` | The table of contents: for each section `id`, `number`, `title`, `recap` and `children`, and for each `###` heading in `children` its `id`, `title` and `recap`. The titles are plain text. |
 | `sidenotes` | The footnotes, numbered by their first reference: `number`, `id` (`sidenote-1`), `line` of the definition and `html`. |
-| `references` | The entries of `:::references`, numbered by their first citation, with uncited entries numbered after the cited ones: `key`, `number`, `id` (`reference-key`) and `html`. |
+| `references` | The entries of `:::references`, numbered by their first citation: `key`, `number`, `id` (`reference-key`) and `html`. Entries the article never cites follow the cited ones and have no `number`. |
+| `words` | The length of the article: every Chinese character and every other word of the text and inline code counts as one. Code blocks, math and sidenotes are not counted. |
 | `images` | The images that the build converts to WebP: `source` (the path in the article folder), `path` (the published path), `width`, `lossless` and `keepSource`, which is true when a link, raw HTML or a component attribute in the article refers to the original file so that it is published too. Images published unchanged are copied with the other files of the folder. |
 | `glyphs` | When the article has math: an HTML fragment with a hidden `<svg>` that holds the glyph paths of every formula in the article. Formulas refer to these paths, so the page includes the fragment once, together with the MathJax styles. |
 
@@ -56,7 +57,7 @@ The HTML marks the parts a theme styles or moves:
 | Quote with a source | `<figure class="quote">` holding the `<blockquote>` and a `<figcaption>` |
 | Aside | `<aside class="aside">`, with `<p class="aside-title">` when it has a title |
 | Fold | `<details class="fold">` with the title in `<summary>` |
-| Reference list | `<ol class="references">` with one `<li id="reference-key" value="1">` per entry |
+| Reference list | `<ol class="references">` with one `<li id="reference-key" value="1">` per cited entry, followed by `<ul class="references uncited">` with one `<li id="reference-key">` per uncited entry |
 | Width inside another block | `<div data-width="wide">` |
 | Block that a later task renders (`embed`, components) | `<div data-block="name">` around its content |
 | Math | `<mjx-container class="MathJax" jax="SVG" data-tex="…">` holding an SVG, with `display="true"` for a display formula. The styles from `mathStyles()` in `src/render/math.js` lay it out. |
@@ -68,6 +69,26 @@ The HTML marks the parts a theme styles or moves:
 | Image | `<img>` with `width`, `height`, `loading="lazy"` and `decoding="async"`; an inline image also has `style` with its width when the article sets a size |
 | Figure | `<figure class="figure">` holding the `<img>` and a `<figcaption>`, with `style="width:560px"` when the article sets a size and `data-float="left"` or `data-float="right"` when it sets `float`. The theme makes the image fill the figure and centres the figure in the column. |
 | Example | `<div class="example">` holding `<div class="example-source">` with the highlighted Markdown and `<div class="example-result">` with the rendered content |
+
+## Themes
+
+A theme is a folder with two entry files. `page.jsx` default-exports a SolidJS component that returns the whole `<html>` element of an article page; `client.jsx` is the page script and imports the theme's stylesheets, fonts and other files. The built-in themes live in `src/themes/`. A blog adds a theme with a folder `themes/<name>/`, and replaces single files of a built-in theme with files of the same relative path in a folder of the same name, such as `themes/essay/header.jsx`; every import inside a theme folder is looked up in the blog's folder first and in the built-in folder second. A theme imports `solid-js` from Bake, so a blog does not install it.
+
+`src/build/theme.js` compiles each theme that a published article uses with Vite and `vite-plugin-solid`. `page.jsx` is compiled for the server and rendered to static HTML with Solid's `renderToString`, without hydration. `client.jsx` is compiled into one classic script and one stylesheet, which together with the fonts and images they refer to are written to `dist/assets/` under names that contain a content hash. A theme that cannot be compiled is reported at the file and position of the error, and an article that the theme throws on is reported at the article.
+
+The page component receives these props:
+
+| Prop | Contents |
+|---|---|
+| `site` | `title`, `url` and `language` from `bake.config.js`. |
+| `article` | `title`, `summary`, `date`, `tags` (a list, empty when not set), `category`, `draft`, `toc` (the table of contents style of the article or the site), `url`, `words` and `content`, the article structure described above. |
+| `assets` | `root`, the relative path from the page to the site root such as `../../`; `styles` and `scripts`, the paths of the compiled stylesheet and script relative to the page; `mathStyles`, the MathJax stylesheet when the article has math. |
+
+### The essay theme
+
+`page.jsx` writes the document head, `header.jsx` the masthead, `toc.jsx` the table of contents and `article.jsx` the body. Every block of the article structure is wrapped in `<div class="bk-block" data-type="…">`; blocks that can be wider than the text also have `data-width` (`body`, `wide`, `page`, or `auto` when the article sets no width) and the natural width as `--natural-width`. Each sidenote is rendered once, after the top-level block that first refers to it, as `<aside class="bk-sidenote" data-sidenote="1">`; the page script places it in the margin on wide screens and opens it under the block on narrow ones. UI text comes from `labels.js`, in Chinese when the site language starts with `zh` and in English otherwise.
+
+The reader settings are defined in `settings.js`: each setting has its values and its initial value, the choice is stored in `localStorage` as `bk-<name>`, and an inline script in the head sets `data-<name>` on `<html>` before the first paint. Page scripts that change the layout dispatch the `bk:layout` event on `document`, and the scripts that measure the layout listen to it.
 
 ## Error reports
 
@@ -89,6 +110,8 @@ The format is `file:line:col message`, with the path relative to the blog root a
 - Math is typeset by MathJax 4 (`@mathjax/src`) into SVG with the New Computer Modern font. Each article is typeset in its own MathJax document, so macros defined in one article do not reach another, and every formula is compiled twice so that `\eqref` can refer to a later label.
 - Code is highlighted by Shiki with a theme created by `createCssVariablesTheme`, so the colors are CSS variables that themes and dark mode set.
 - Images are read and converted by sharp. Size values such as `560px` and `70%` are parsed by `parseSize` and checked by `sizeProblem` in `src/config/rules.js`, which every syntax with a pixel or percent size uses.
+- Themes are compiled by Vite with `vite-plugin-solid`, and their page structure and page scripts are written with SolidJS.
+- The essay theme self-hosts LXGW WenKai from `lxgw-wenkai-webfont`, whose stylesheet splits the font into files by character range so that a page only downloads the files for the characters it shows, and JetBrains Mono from `@fontsource/jetbrains-mono`.
 - Browser tests use Playwright, pinned to the exact version that matches the Chromium preinstalled in the cloud environment.
 
 ## Clean code
@@ -112,5 +135,6 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Math is typeset with numbering, references and errors; `preamble.sty` accepts only macro definitions | `test/math.test.js`, `test/preamble.test.js` |
 | Code, tables, `:::list-table`, `:::example` and images render as described above, with their errors | `test/code.test.js`, `test/blocks.test.js`, `test/images.test.js` |
 | Raster images are published as WebP, originals only when linked, and `preamble.sty` errors stop the build | `test/build.test.js` |
+| A blog can add a theme or replace files of the essay theme, theme errors are reported at their position, and a build leaves no cache in the blog | `test/theme.test.js` |
 | Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph | `test/browser/math.test.js` |
 | Figures with a pixel or percent width have that width, stay inside the screen and are centred | `test/browser/images.test.js` |

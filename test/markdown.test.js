@@ -58,7 +58,7 @@ describe('markdown fixtures', () => {
     assert.deepEqual(article.toc[1].children, [{ id: 'recap', title: '小节要点', recap: undefined }]);
     assert.equal(article.sections[11].width, 'wide');
     assert.deepEqual(article.sidenotes.map((note) => note.number), [1, 2]);
-    assert.deepEqual(article.references.map((entry) => `${entry.number} ${entry.key}`), ['1 shazeer2020', '2 gelu']);
+    assert.deepEqual(article.references.map((entry) => `${entry.number} ${entry.key}`), ['1 shazeer2020', '2 gelu', 'undefined vaswani2017']);
   });
 });
 
@@ -282,6 +282,19 @@ describe('citations', () => {
     assert.equal(article.intro[1].html, '<ol class="references"><li id="reference-b" value="1">Author B. 2021.</li><li id="reference-a" value="2">Author A. <em>Title A</em>. 2020.</li><li id="reference-c" value="3">Author C. 2022.</li></ol>');
   });
 
+  test('lists uncited entries after the cited ones without a number', async () => {
+    const article = await parsed(`See [@b].\n\n${references}`);
+    assert.deepEqual(article.references.map(({ number, key }) => [number, key]), [
+      [1, 'b'],
+      [undefined, 'a'],
+      [undefined, 'c'],
+    ]);
+    assert.equal(
+      article.intro[1].html,
+      '<ol class="references"><li id="reference-b" value="1">Author B. 2021.</li></ol><ul class="references uncited"><li id="reference-a">Author A. <em>Title A</em>. 2020.</li><li id="reference-c">Author C. 2022.</li></ul>',
+    );
+  });
+
   test('reports citations missing from :::references and malformed reference lists', async () => {
     assert.deepEqual((await parse('See [@x].\n')).errors, ['index.md:7:5 citation "x" is not in :::references']);
     assert.deepEqual((await parse(':::references\n- [@a] One.\n- Two.\n- [@a] Three.\n:::\n\n:::references\nText.\n:::\n')).errors, [
@@ -331,5 +344,12 @@ describe('blocks', () => {
     const errors = [];
     await parseArticle('index.md', frontMatter.replaceAll('\n', '\r\n') + 'Text.\r\n\r\n## A {#a}\r\n\r\nB[^x] ^a\r\n', errors);
     assert.deepEqual(sortErrors(errors).map(formatError), ['index.md:11:2 footnote "x" has no definition', 'index.md:11:7 duplicate anchor "a", first defined at 9:6']);
+  });
+});
+
+describe('word count', () => {
+  test('counts every Chinese character and every other word of the text and inline code, but not code blocks or math', async () => {
+    const article = await parsed('激活函数 GELU 的近似[^n]，用 `tanh` 计算 $x^2$。\n\n```python\nprint(1)\n```\n\n## 二 Two words\n\n[^n]: 旁注不计入。\n');
+    assert.equal(article.words, 15);
   });
 });

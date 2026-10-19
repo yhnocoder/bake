@@ -9,6 +9,10 @@ import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
+function articleFiles(tree) {
+  return Object.keys(tree).filter((path) => !path.startsWith('assets/'));
+}
+
 function stagingFolders(dir) {
   return readdirSync(dir).filter((name) => name.startsWith('.dist-'));
 }
@@ -37,7 +41,7 @@ describe('bake build', () => {
     assert.equal(result.stdout, '4 pages\ndist/ written\n');
     assert.equal(result.status, 0);
     const tree = readTree(join(dir, 'dist'));
-    assert.deepEqual(Object.keys(tree), [
+    assert.deepEqual(articleFiles(tree), [
       'CNAME',
       '2026-08/demo/demo.js',
       '2026-08/demo/index.html',
@@ -49,26 +53,18 @@ describe('bake build', () => {
       '2026-10/rope/index.html',
       'icons/favicon.svg',
     ].sort());
-    assert.equal(
-      tree['2026-10/rope/index.html'].toString().replace(/<style>[\s\S]*?<\/style>\n/, ''),
-      [
-        '<!doctype html>',
-        '<html lang="en">',
-        '<head>',
-        '<meta charset="utf-8">',
-        '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        '<title>RoPE &#60;&#38;&#62; &#34;quotes&#34;</title>',
-        '</head>',
-        '<body>',
-        '<h1>RoPE &#60;&#38;&#62; &#34;quotes&#34;</h1>',
-        '<p>Rotary &#38; &#39;position&#39; &#60;embeddings&#62;</p>',
-        '<p>Text.</p>',
-        '</body>',
-        '</html>',
-        '',
-      ].join('\n'),
-    );
-    assert.match(tree['2026-09/series/index.html'].toString(), /<h1>Series<\/h1>\n<p>Text\.<\/p>\n<\/body>/);
+    const page = tree['2026-10/rope/index.html'].toString();
+    assert.match(page, /^<!doctype html>\n<html lang="en"/);
+    assert.match(page, /<title>RoPE &lt;&amp;> "quotes" · Test Blog<\/title>/);
+    assert.match(page, /<meta name="description" content="Rotary &amp; 'position' <embeddings>">/);
+    assert.match(page, /<h1 class="bk-title">RoPE &lt;&amp;> "quotes"<\/h1>/);
+    assert.match(page, /<p class="bk-summary">Rotary &amp; 'position' &lt;embeddings><\/p>/);
+    assert.match(page, /<p>Text\.<\/p>/);
+    assert.match(tree['2026-09/series/index.html'].toString(), /<h1 class="bk-title">Series<\/h1>/);
+    const assets = Object.keys(tree).filter((path) => path.startsWith('assets/'));
+    assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.js$/.test(path)).length, 1);
+    assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.css$/.test(path)).length, 1);
+    for (const path of assets.filter((asset) => /\.(js|css)$/.test(asset))) assert.ok(page.includes(`../../${path}`), `the page links ${path}`);
     assert.deepEqual(tree['2026-10/rope/figure.png'], pngBytes);
     assert.equal(tree['2026-08/demo/index.html'].toString(), '<!doctype html><p>demo</p>\n');
     assert.equal(tree.CNAME.toString(), 'example.com\n');
@@ -224,7 +220,7 @@ describe('bake build', () => {
     assert.equal(result.stderr, '');
     assert.equal(result.stdout, '2 pages\ndist/ written\n');
     const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
-    assert.match(page, /<h1>Bake 写法一览<\/h1>/);
+    assert.match(page, /<h1 class="bk-title">Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
     assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
@@ -242,7 +238,7 @@ describe('bake build', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     const tree = readTree(join(dir, 'dist'));
-    assert.deepEqual(Object.keys(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/small.jpg', '2026-10/rope/small.webp']);
+    assert.deepEqual(articleFiles(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/small.jpg', '2026-10/rope/small.webp']);
     assert.deepEqual(tree['2026-10/rope/small.jpg'], small);
     assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
     assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
@@ -296,7 +292,7 @@ describe('bake build', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     assert.equal(result.status, 0);
-    assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), [
+    assert.deepEqual(articleFiles(readTree(join(dir, 'dist'))), [
       '.nojekyll',
       '.well-known/security.txt',
       '2026-10/rope/figure.svg',
