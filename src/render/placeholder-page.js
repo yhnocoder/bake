@@ -1,4 +1,4 @@
-export function renderPlaceholderPage({ language, title, summary }) {
+export function renderPlaceholderPage({ language, title, summary, content }) {
   const lines = [
     '<!doctype html>',
     `<html lang="${escapeHtml(language)}">`,
@@ -10,6 +10,14 @@ export function renderPlaceholderPage({ language, title, summary }) {
     '<body>',
     `<h1>${escapeHtml(title)}</h1>`,
     ...(summary === undefined ? [] : [`<p>${escapeHtml(summary)}</p>`]),
+    ...content.intro.map((block) => block.html),
+    ...content.sections.flatMap((section) => [
+      `<section id="${escapeHtml(section.id)}">`,
+      `<h2>${section.number} ${section.title}</h2>`,
+      ...section.blocks.map((block) => block.html),
+      '</section>',
+    ]),
+    ...(content.sidenotes.length === 0 ? [] : ['<ol class="sidenotes">', ...content.sidenotes.map((note) => `<li id="${note.id}">${note.html}</li>`), '</ol>']),
     '</body>',
     '</html>',
   ];

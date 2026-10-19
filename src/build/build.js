@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
+import { parseArticle } from '../markdown/article.js';
 import { availableThemes } from '../config/rules.js';
 import { renderPlaceholderPage } from '../render/placeholder-page.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
@@ -29,10 +30,12 @@ export async function build(root) {
 }
 
 function readArticle(root, article, rules, errors) {
-  const frontMatter = readFrontMatter(article.file, readFileSync(join(root, article.file), 'utf8'), { ...rules, files: article.files }, errors);
+  const source = readFileSync(join(root, article.file), 'utf8');
+  const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
-  return { ...article, fields, positions: frontMatter?.positions ?? {}, url };
+  const content = fields?.page === undefined ? parseArticle(article.file, source, errors) : null;
+  return { ...article, fields, positions: frontMatter?.positions ?? {}, url, content };
 }
 
 function articleOutputs(root, article, config, errors) {
@@ -43,7 +46,7 @@ function articleOutputs(root, article, config, errors) {
     if (article.files.includes('index.html')) {
       errors.push(errorAt(article.file, fileStart, 'index.html in the article folder conflicts with the page generated from index.md'));
     }
-    const render = () => renderPlaceholderPage({ language: config.language, title: article.fields.title, summary: article.fields.summary });
+    const render = () => renderPlaceholderPage({ language: config.language, title: article.fields.title, summary: article.fields.summary, content: article.content });
     return [{ path: `${base}index.html`, render, owner: article.file }, ...article.files.map((file) => copy(file, file))];
   }
   if (page !== 'index.html' && article.files.includes('index.html')) {

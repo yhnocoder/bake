@@ -61,12 +61,13 @@ describe('bake build', () => {
         '<body>',
         '<h1>RoPE &#60;&#38;&#62; &#34;quotes&#34;</h1>',
         '<p>Rotary &#38; &#39;position&#39; &#60;embeddings&#62;</p>',
+        '<p>Text.</p>',
         '</body>',
         '</html>',
         '',
       ].join('\n'),
     );
-    assert.doesNotMatch(tree['2026-09/series/index.html'].toString(), /<p>/);
+    assert.match(tree['2026-09/series/index.html'].toString(), /<h1>Series<\/h1>\n<p>Text\.<\/p>\n<\/body>/);
     assert.deepEqual(tree['2026-10/rope/figure.png'], pngBytes);
     assert.equal(tree['2026-08/demo/index.html'].toString(), '<!doctype html><p>demo</p>\n');
     assert.equal(tree.CNAME.toString(), 'example.com\n');
@@ -129,8 +130,9 @@ describe('bake build', () => {
         'content/posts/b/index.md:5:6 toc must be notes, tabs, dots or ticks, got "sidebar"',
         'content/posts/b/index.md:6:1 unknown front matter field "layout"',
         'content/posts/c/index.md:1:1 index.md must start with front matter between two --- lines',
+        'content/posts/c/index.md:1:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##',
         'public/2026-10/d/index.html:1:1 dist/2026-10/d/index.html is also written by content/posts/d/index.md',
-        '7 errors, dist/ was not written',
+        '8 errors, dist/ was not written',
         '',
       ].join('\n'),
     );
