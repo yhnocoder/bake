@@ -38,7 +38,7 @@ export function tabsView(ctx) {
     if (!root.contains(event.relatedTarget)) leave();
   });
   ctx.host.append(root, index.element);
-  cardKeyboard({ entries: items.map((item) => item.tab), card: index.element, shown: () => (index.shown() ? hovered : -1), leave: () => leave() });
+  cardKeyboard({ groups: items.map((item) => [item.tab]), card: index.element, shown: () => (index.shown() ? hovered : -1), leave: () => leave() });
   let shownCurrent = null;
   let hovered = -1;
   let shownState = '';

@@ -337,19 +337,20 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('the keyboard reaches the tabs and the dots first, and moves from each one into the links of its card and on to the next', async () => {
-    for (const style of ['tabs', 'dots']) {
+  await t.test('the keyboard reaches the tabs, dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter', async () => {
+    for (const style of ['tabs', 'dots', 'ticks']) {
       const { page, context } = await open({ style });
-      const entry = style === 'tabs' ? 'bk-tab' : 'bk-dot-item';
+      const entry = { tabs: 'bk-tab', dots: 'bk-dot-item', ticks: 'bk-tick' }[style];
       const focused = () =>
         page.evaluate(() => {
           const element = document.activeElement;
           return `${element.closest('.bk-index, .bk-popover') === null ? element.classList[0] : 'card'} ${decodeURIComponent(element.getAttribute('href') ?? '')}`;
         });
-      const expected = [
-        [`${entry} #one`, 'card #one', 'card #one-a', 'card #one-b'],
-        ...[2, 3, 4, 5, 6].map((number) => [`${entry} #chapter-${number}`, `card #chapter-${number}`, `card #chapter-${number}-a`]),
-      ].flat();
+      const chapters = [
+        ['one', 'one-a', 'one-b'],
+        ...[2, 3, 4, 5, 6].map((number) => [`chapter-${number}`, `chapter-${number}-a`]),
+      ];
+      const expected = chapters.flatMap((ids) => [...(style === 'ticks' ? ids : ids.slice(0, 1)).map((id) => `${entry} #${id}`), ...ids.map((id) => `card #${id}`)]);
       const seen = [];
       for (let step = 0; step < expected.length; step += 1) {
         await page.keyboard.press('Tab');
@@ -358,7 +359,7 @@ test('the table of contents', async (t) => {
       assert.deepEqual(seen, expected, style);
       await page.keyboard.press('Shift+Tab');
       await page.keyboard.press('Shift+Tab');
-      assert.equal(await focused(), `${entry} #chapter-6`, `${style}: shift and tab go back from the card to its entry`);
+      assert.equal(await focused(), style === 'ticks' ? `${entry} #chapter-6-a` : `${entry} #chapter-6`, `${style}: shift and tab go back from the card to the last entry of its chapter`);
       await context.close();
     }
   });

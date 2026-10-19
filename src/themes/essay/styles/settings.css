@@ -12,7 +12,7 @@
   z-index: 70;
   font-family: var(--font-ui);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
   color: var(--ink-2);
   user-select: none;
   -webkit-user-select: none;
@@ -107,7 +107,7 @@
   background: none;
   color: var(--ink);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
   text-align: left;
   transition: background-color 0.12s;
 }

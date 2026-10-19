@@ -39,7 +39,7 @@ export function dotsView(ctx) {
     if (!root.contains(event.relatedTarget)) leave();
   });
   ctx.host.append(root, card);
-  cardKeyboard({ entries: items.map((entry) => entry.item), card, shown: () => (card.classList.contains('is-on') ? hovered : -1), leave: () => leave() });
+  cardKeyboard({ groups: items.map((entry) => [entry.item]), card, shown: () => (card.classList.contains('is-on') ? hovered : -1), leave: () => leave() });
   let shownCurrent = null;
   let hovered = -1;
   let shownState = '';

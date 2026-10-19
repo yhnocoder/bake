@@ -122,10 +122,10 @@ export function hoverIntent(delay) {
   };
 }
 
-export function cardKeyboard({ entries, card, shown, leave }) {
+export function cardKeyboard({ groups, card, shown, leave }) {
   const links = () => [...card.querySelectorAll('.bk-toc-card a[href]')];
-  for (const [index, entry] of entries.entries()) {
-    entry.addEventListener('keydown', (event) => {
+  for (const [index, group] of groups.entries()) {
+    group.at(-1).addEventListener('keydown', (event) => {
       if (event.key !== 'Tab' || event.shiftKey || shown() !== index) return;
       const first = links()[0];
       if (first === undefined) return;
@@ -140,12 +140,13 @@ export function cardKeyboard({ entries, card, shown, leave }) {
     if (index < 0) return;
     if (event.shiftKey && event.target === all[0]) {
       event.preventDefault();
-      entries[index].focus({ preventScroll: true });
-    } else if (!event.shiftKey && event.target === all.at(-1) && index + 1 < entries.length) {
+      groups[index].at(-1).focus({ preventScroll: true });
+    } else if (!event.shiftKey && event.target === all.at(-1) && index + 1 < groups.length) {
       event.preventDefault();
-      entries[index + 1].focus({ preventScroll: true });
+      groups[index + 1][0].focus({ preventScroll: true });
     }
   });
+  const entries = groups.flat();
   const inside = (element) => element instanceof Node && (card.contains(element) || entries.some((entry) => entry.parentElement.contains(element)));
   for (const element of [card, ...entries]) {
     element.addEventListener('focusout', (event) => {

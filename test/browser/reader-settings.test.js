@@ -77,6 +77,11 @@ test('reader settings', async (t) => {
       ],
     });
     assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="theme"] button').allTextContents(), ['跟随系统', '浅', '深']);
+    const heights = await panel.evaluate((element) => {
+      const height = (selector) => Math.round(element.querySelector(selector).getBoundingClientRect().height * 100) / 100;
+      return { label: height('.bk-settings-label'), choice: height('.bk-settings-choice'), option: height('.bk-settings-options button') };
+    });
+    assert.deepEqual(heights, { label: 17.25, choice: 48.75, option: 26.75 });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).visibility === 'hidden');
     await page.getByRole('button', { name: '设置' }).click();

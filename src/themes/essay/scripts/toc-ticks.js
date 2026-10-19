@@ -1,5 +1,5 @@
 import { reducedMotion } from './motion.js';
-import { chapterCard, clamp, el, floorFor, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
+import { cardKeyboard, chapterCard, clamp, el, floorFor, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 70;
 const MARGIN = 140;
@@ -16,7 +16,7 @@ export function ticksColumn(ctx, { rail = false, hover, leave, click } = {}) {
     row.setAttribute('aria-label', entry.level === 2 ? `${chapter.number} ${chapter.title}` : chapter.sections[entry.section].title);
     row.append(el('span', 'bk-tick-line'));
     row.addEventListener('pointerenter', () => hover?.(index));
-    row.addEventListener('focus', () => hover?.(index));
+    row.addEventListener('focus', () => hover?.(index, row.matches(':focus-visible')));
     if (click !== undefined) {
       row.addEventListener('click', (event) => {
         event.preventDefault();
@@ -60,7 +60,7 @@ export function ticksView(ctx) {
   let shownState = '';
   let pointed = -1;
   const ticks = ticksColumn(ctx, {
-    hover: (index) => point(index, true),
+    hover: (index, now) => point(index, true, now),
     leave(event) {
       if (!card.contains(event.relatedTarget)) leave();
     },
@@ -74,6 +74,12 @@ export function ticksView(ctx) {
     if (row !== null) point(Number(row.dataset.index), false);
   });
   ctx.host.append(ticks.element, card);
+  cardKeyboard({
+    groups: ctx.outline.chapters.map((chapter, chapterIndex) => ticks.rows.filter((row, index) => ctx.outline.entries[index].chapter === chapterIndex)),
+    card,
+    shown: () => (card.classList.contains('is-on') ? shownChapter : -1),
+    leave: () => leave(),
+  });
 
   function render(chapterIndex) {
     const scrollTop = chapterIndex === shownChapter ? card.scrollTop : 0;
@@ -99,7 +105,7 @@ export function ticksView(ctx) {
       if (on && reveal) keepVisible(card, node, !reducedMotion.matches);
     }
   }
-  function point(index, fromTicks) {
+  function point(index, fromTicks, now = false) {
     pointed = index;
     ticks.hover(index);
     intent.enter(() => {
@@ -112,7 +118,7 @@ export function ticksView(ctx) {
       card.getBoundingClientRect();
       card.classList.remove('is-snap');
       card.classList.add('is-on');
-    });
+    }, now);
   }
   function leave() {
     intent.leave(() => {
