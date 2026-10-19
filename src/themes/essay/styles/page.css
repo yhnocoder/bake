@@ -208,6 +208,7 @@ button {
   background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: 12px;
+  font-variant-ligatures: none;
   color: var(--ink-2);
   letter-spacing: 0;
 }
@@ -243,6 +244,7 @@ button {
   background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: 0.82em;
+  font-variant-ligatures: none;
 }
 
 .bk-article sup,

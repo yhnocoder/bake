@@ -76,6 +76,7 @@
   font-family: var(--font-mono);
   font-size: 13.5px;
   line-height: 1.65;
+  font-variant-ligatures: none;
   tab-size: 4;
   white-space: pre;
   overflow-wrap: normal;
