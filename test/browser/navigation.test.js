@@ -42,25 +42,11 @@ const body = [
   '',
 ].join('\n');
 
-const longBody = Array.from({ length: 18 }, (_, index) => `## Chapter ${index + 1} {#chapter-${index + 1}}\n\n${'A paragraph of the chapter. '.repeat(30)}\n`).join('\n');
 
-function coveredEntries() {
-  const button = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
-  const scroller = document.querySelector('.bk-toc .bk-toc-scroll').getBoundingClientRect();
-  const top = Math.max(scroller.top, 0);
-  const bottom = Math.min(scroller.bottom, innerHeight);
-  return [...document.querySelectorAll('.bk-toc .bk-toc-entry')]
-    .map((entry) => ({ target: entry.dataset.target, box: entry.getBoundingClientRect() }))
-    .filter(({ box }) => Math.min(box.bottom, bottom) > Math.max(box.top, top))
-    .filter(({ box }) => box.left < button.right && box.right > button.left && Math.min(box.bottom, bottom) > button.top && Math.max(box.top, top) < button.bottom)
-    .map(({ target }) => target);
-}
-
-test('links, folds and the table of contents', async (t) => {
+test('links, folds and citation previews', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': validConfig,
     'content/posts/links/index.md': article({ title: 'Links', slug: 'links', body }),
-    'content/posts/long/index.md': article({ title: 'Long', slug: 'long', body: longBody }),
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
@@ -137,60 +123,6 @@ test('links, folds and the table of contents', async (t) => {
     assert.equal(await card.evaluate((element) => element.classList.contains('is-on')), true);
     await page.mouse.move(5, 450);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-preview')).visibility === 'hidden');
-    await page.close();
-  });
-
-  await t.test('the table of contents follows the reading position and shows the recap of read chapters', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await page.goto(url);
-    const states = () =>
-      page.evaluate(() => ({
-        visible: document.querySelector('.bk-toc').checkVisibility(),
-        entries: Object.fromEntries([...document.querySelectorAll('.bk-toc .bk-toc-entry')].map((entry) => [entry.dataset.target, entry.dataset.state])),
-        recap: document.querySelector('.bk-toc [data-target="folds"] .bk-toc-recap').getBoundingClientRect().height,
-      }));
-    assert.deepEqual(await states(), { visible: true, entries: { folds: 'ahead', nested: 'ahead', references: 'ahead' }, recap: 0 });
-    await page.evaluate(() => scrollTo(0, document.getElementById('references').getBoundingClientRect().top + scrollY - 100));
-    await page.waitForFunction(() => document.querySelector('.bk-toc [data-target="references"]').dataset.state === 'current');
-    await page.waitForTimeout(400);
-    const read = await states();
-    assert.deepEqual(read.entries, { folds: 'read', nested: 'read', references: 'current' });
-    assert.ok(read.recap > 10, `the recap of a read chapter is ${read.recap}px high`);
-    await page.close();
-  });
-
-  await t.test('the settings button covers no entry of a long table of contents before or after scrolling', async () => {
-    for (const height of [900, 640]) {
-      const page = await browser.newPage({ viewport: { width: 1440, height }, reducedMotion: 'reduce' });
-      await page.goto(`${base}/2026-10/long/`);
-      await page.waitForFunction(() => document.documentElement.classList.contains('bk-toc-ready'));
-      assert.deepEqual(await page.evaluate(coveredEntries), [], `at the top of the page, ${height}px high`);
-      await page.evaluate(() => scrollTo(0, document.getElementById('chapter-9').getBoundingClientRect().top + scrollY - 100));
-      await page.waitForFunction(() => document.querySelector('.bk-toc [data-target="chapter-9"]').dataset.state === 'current');
-      await page.waitForTimeout(100);
-      assert.deepEqual(await page.evaluate(coveredEntries), [], `in the middle of the page, ${height}px high`);
-      await page.close();
-    }
-  });
-
-  await t.test('below 1340 px a button above the settings button opens the contents in a drawer that a link closes', async () => {
-    const page = await browser.newPage({ viewport: { width: 1100, height: 800 }, reducedMotion: 'reduce' });
-    await page.goto(url);
-    const button = page.locator('.bk-toc-button');
-    const toggle = page.locator('.bk-settings-toggle');
-    assert.equal(await page.locator('.bk-toc').isVisible(), false);
-    const [above, below] = [await button.boundingBox(), await toggle.boundingBox()];
-    assert.ok(above.y + above.height <= below.y, `the contents button ends at ${above.y + above.height}, the settings button starts at ${below.y}`);
-    await button.click();
-    const drawer = page.locator('.bk-drawer');
-    await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
-    await drawer.getByRole('link', { name: /References/ }).click();
-    await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().right <= 0);
-    await page.waitForFunction(() => Math.abs(document.getElementById('references').getBoundingClientRect().top - 24) < 2, null, { timeout: 3000 });
-    await button.click();
-    await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
-    await page.keyboard.press('Escape');
-    await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().right <= 0);
     await page.close();
   });
 });

@@ -62,7 +62,7 @@ test('reader settings', async (t) => {
     assert.equal(await panel.isVisible(), false);
     await page.getByRole('button', { name: '设置' }).click();
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
-    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['主题', '正文']);
+    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录', '主题', '正文', '按钮']);
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).visibility === 'hidden');
     await page.getByRole('button', { name: '设置' }).click();
@@ -76,7 +76,7 @@ test('reader settings', async (t) => {
     const page = await context.newPage();
     await page.goto(url);
     const initial = await readSettledPage(page);
-    assert.deepEqual([initial.theme, initial.font, initial.stored], [null, null, [null, null]]);
+    assert.deepEqual([initial.theme, initial.font, initial.stored], ['system', 'sans', [null, null]]);
     assert.doesNotMatch(initial.bodyFont, /LXGW WenKai/);
 
     await page.getByRole('button', { name: '设置' }).click();
@@ -105,7 +105,7 @@ test('reader settings', async (t) => {
     await page.getByRole('button', { name: '跟随系统' }).click();
     await page.getByRole('button', { name: '黑体' }).click();
     const reset = await readSettledPage(page);
-    assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], [null, null, [null, null], initial.background]);
+    assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], ['system', 'sans', ['system', 'sans'], initial.background]);
     await context.close();
   });
 

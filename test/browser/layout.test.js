@@ -155,19 +155,14 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('every table of contents style places the table of contents and the body where the notes style does', async () => {
-    const positions = async (path) => {
-      const page = await open(path);
-      const result = await page.evaluate(() => ({
-        toc: Math.round(document.querySelector('.bk-toc-list').getBoundingClientRect().width),
-        body: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
-      }));
+  await t.test('the notes style keeps the left column for the table of contents and the other styles centre the text right of the rail', async () => {
+    const left = async (path, width) => {
+      const page = await open(path, { viewport: { width, height: 900 } });
+      const result = await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left));
       await page.close();
       return result;
     };
-    const notes = await positions('notes');
-    assert.ok(notes.toc >= 180, `the notes table of contents is ${notes.toc}px wide`);
-    assert.deepEqual(await positions('tabs'), notes);
+    assert.deepEqual([await left('notes', 1440), await left('tabs', 1440), await left('notes', 1024), await left('tabs', 1024)], [290, 198, 88, 88]);
   });
 
   await t.test('examples show the source beside the result where there is room and above it on phones', async () => {

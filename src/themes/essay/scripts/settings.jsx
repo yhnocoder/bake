@@ -7,24 +7,22 @@ import { layoutChanged } from './motion.js';
 export const SETTING_EVENT = 'bk:setting';
 
 export const settingRows = [
+  { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], changesLayout: true },
   { name: 'theme', label: (labels) => labels.theme, option: (labels, value) => labels.themes[value] },
   { name: 'font', label: (labels) => labels.font, option: (labels, value) => labels.fonts[value], changesLayout: true },
+  { name: 'buttons', label: (labels) => labels.buttons, toggle: { on: 'autohide', off: 'always', text: (labels) => labels.hideButtons } },
 ];
 
-const values = Object.fromEntries(Object.keys(SETTINGS).map((name) => [name, createSignal(appliedValue(name))]));
+const values = Object.fromEntries(Object.keys(SETTINGS).map((name) => [name, createSignal(document.documentElement.dataset[name])]));
 
 export function settingValue(name) {
   return values[name][0]();
 }
 
 export function chooseSetting(name, value) {
-  const { initial } = SETTINGS[name];
-  const root = document.documentElement;
-  if (value === initial) delete root.dataset[name];
-  else root.dataset[name] = value;
+  document.documentElement.dataset[name] = value;
   try {
-    if (value === initial) localStorage.removeItem(storageKey(name));
-    else localStorage.setItem(storageKey(name), value);
+    localStorage.setItem(storageKey(name), value);
   } catch {}
   values[name][1](value);
   document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
@@ -36,11 +34,6 @@ export function startSettings() {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <Settings labels={labels} />, host);
-}
-
-function appliedValue(name) {
-  const value = document.documentElement.dataset[name];
-  return SETTINGS[name].values.includes(value) ? value : SETTINGS[name].initial;
 }
 
 function Settings(props) {
@@ -67,23 +60,41 @@ function Settings(props) {
         <span>{labels.settings}</span>
       </button>
       <div class="bk-settings-panel" id="bk-settings-panel" role="group" aria-label={labels.settings}>
-        <For each={settingRows}>
-          {(row) => (
-            <div class="bk-settings-row" data-setting={row.name}>
-              <span class="bk-settings-label">{row.label(labels)}</span>
-              <div class="bk-settings-options" role="group" aria-label={row.label(labels)}>
-                <For each={SETTINGS[row.name].values}>
-                  {(value) => (
-                    <button type="button" data-value={value} aria-pressed={String(settingValue(row.name) === value)} onClick={() => chooseSetting(row.name, value)}>
-                      {row.option(labels, value)}
-                    </button>
-                  )}
-                </For>
-              </div>
-            </div>
+        <For each={settingRows}>{(row) => (row.toggle === undefined ? <OptionsRow row={row} labels={labels} /> : <ToggleRow row={row} labels={labels} />)}</For>
+      </div>
+    </div>
+  );
+}
+
+function OptionsRow(props) {
+  const { row, labels } = props;
+  return (
+    <div class="bk-settings-row" data-setting={row.name}>
+      <span class="bk-settings-label">{row.label(labels)}</span>
+      <div class="bk-settings-options" role="group" aria-label={row.label(labels)}>
+        <For each={SETTINGS[row.name].values}>
+          {(value) => (
+            <button type="button" data-value={value} aria-pressed={String(settingValue(row.name) === value)} onClick={() => chooseSetting(row.name, value)}>
+              {row.option(labels, value)}
+            </button>
           )}
         </For>
       </div>
+    </div>
+  );
+}
+
+function ToggleRow(props) {
+  const { row, labels } = props;
+  const { on, off, text } = row.toggle;
+  const checked = () => settingValue(row.name) === on;
+  return (
+    <div class="bk-settings-row" data-setting={row.name}>
+      <span class="bk-settings-label">{row.label(labels)}</span>
+      <button type="button" class="bk-settings-switch" role="switch" aria-checked={String(checked())} onClick={() => chooseSetting(row.name, checked() ? off : on)}>
+        <span>{text(labels)}</span>
+        <i aria-hidden="true" />
+      </button>
     </div>
   );
 }

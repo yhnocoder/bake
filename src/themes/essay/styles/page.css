@@ -12,6 +12,12 @@
   --page-shift: calc(var(--toc-left) - var(--body-left));
 }
 
+@media (min-width: 1340px) {
+  :root[data-script]:not([data-toc='notes']) {
+    --body-left: calc(var(--rail-width) + (100cqw - var(--rail-width) - var(--wide-width)) / 2);
+  }
+}
+
 @media (max-width: 1339.98px) {
   :root {
     --notes-width: 200px;

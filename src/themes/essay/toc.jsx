@@ -3,22 +3,36 @@ export function Toc(props) {
   if (toc.length === 0) return null;
   return (
     <nav class="bk-toc" aria-label={labels.toc}>
-      <div class="bk-toc-sticky">
-        <p class="bk-toc-label">{labels.notes}</p>
-        <div class="bk-toc-scroll">
-          <ol class="bk-toc-list">
+      <div class="bk-toc-column">
+        <p class="bk-toc-label">
+          <span class="bk-toc-label-static">{labels.toc}</span>
+          <span class="bk-toc-label-notes">{labels.notes}</span>
+        </p>
+        <div class="bk-toc-list">
+          <ol class="bk-toc-chapters">
             {toc.map((chapter) => (
-              <li class="bk-toc-chapter" data-state="ahead">
-                <TocEntry entry={chapter} number={chapter.number} />
-                {chapter.children.length === 0 ? null : (
-                  <div class="bk-toc-sections">
-                    <ol class="bk-toc-sections-list">
-                      {chapter.children.map((section) => (
-                        <li class="bk-toc-section">
-                          <TocEntry entry={section} />
-                        </li>
-                      ))}
-                    </ol>
+              <li class="bk-toc-chapter" data-target={chapter.id} data-state="ahead">
+                <a class="bk-toc-chapter-title" href={`#${encodeURIComponent(chapter.id)}`}>
+                  <span class="bk-toc-number">{chapter.number}</span>
+                  <span class="bk-toc-text">{chapter.title}</span>
+                </a>
+                {chapter.recap === undefined && chapter.children.length === 0 ? null : (
+                  <div class="bk-toc-fold">
+                    <div>
+                      {chapter.recap === undefined ? null : <Recap html={chapter.recap} chapter />}
+                      {chapter.children.length === 0 ? null : (
+                        <ol class="bk-toc-sections">
+                          {chapter.children.map((section) => (
+                            <li class="bk-toc-section" data-target={section.id} data-state="ahead">
+                              <a class="bk-toc-section-title" href={`#${encodeURIComponent(section.id)}`}>
+                                {section.title}
+                              </a>
+                              {section.recap === undefined ? null : <Recap html={section.recap} />}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
                   </div>
                 )}
               </li>
@@ -30,20 +44,12 @@ export function Toc(props) {
   );
 }
 
-function TocEntry(props) {
-  const { entry, number } = props;
+function Recap(props) {
   return (
-    <div class="bk-toc-entry" data-target={entry.id} data-state="ahead">
-      <a class="bk-toc-link" href={`#${encodeURIComponent(entry.id)}`}>
-        {number === undefined ? null : <span class="bk-toc-number">{number}</span>}
-        {entry.title}
-      </a>
-      <span class="bk-toc-progress" />
-      {entry.recap === undefined ? null : (
-        <div class="bk-toc-recap">
-          <div class="bk-toc-recap-text" innerHTML={entry.recap} />
-        </div>
-      )}
+    <div class={props.chapter ? 'bk-toc-recap bk-toc-chapter-recap' : 'bk-toc-recap'}>
+      <div>
+        <div class="bk-toc-recap-text" innerHTML={props.html} />
+      </div>
     </div>
   );
 }
