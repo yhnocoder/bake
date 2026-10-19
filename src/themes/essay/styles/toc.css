@@ -5,6 +5,15 @@
   z-index: 20;
   width: var(--toc-width);
   pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.bk-toc.is-yielding {
+  opacity: 0;
+}
+
+.bk-toc.is-yielding * {
+  pointer-events: none !important;
 }
 
 .bk-toc-sticky {

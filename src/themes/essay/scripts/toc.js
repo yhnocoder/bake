@@ -16,9 +16,10 @@ export function startToc(article) {
   const views = [list, copy].map(readView);
   const headings = views[0].entries.map((entry) => document.getElementById(entry.dataset.target));
   let current = null;
+  let crossing = [];
 
   const update = oncePerFrame(() => {
-    placeNav(nav, article);
+    nav.classList.toggle('is-yielding', crossing.some(isOnScreen));
     const state = readingState(headings, article);
     for (const view of views) showState(view, state);
     if (state.index !== current) {
@@ -27,12 +28,31 @@ export function startToc(article) {
       setTimeout(() => views.forEach((view) => follow(view, !first)), first ? 0 : FOLLOW_DELAY);
     }
   });
-  update();
+  const layout = oncePerFrame(() => {
+    placeNav(nav, article);
+    crossing = blocksCrossing(nav, article);
+    update();
+  });
+  layout();
   requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.add('bk-toc-ready')));
   addEventListener('scroll', update, { passive: true });
-  addEventListener('resize', update);
-  document.addEventListener(LAYOUT_EVENT, update);
-  new ResizeObserver(update).observe(article);
+  addEventListener('resize', layout);
+  document.addEventListener(LAYOUT_EVENT, layout);
+  new ResizeObserver(layout).observe(article);
+}
+
+function blocksCrossing(nav, article) {
+  const column = nav.getBoundingClientRect();
+  if (column.width === 0) return [];
+  return [...article.querySelectorAll('.bk-block')].filter((block) => {
+    const box = block.getBoundingClientRect();
+    return box.height > 0 && box.left < column.right && box.right > column.left;
+  });
+}
+
+function isOnScreen(block) {
+  const box = block.getBoundingClientRect();
+  return box.bottom > 0 && box.top < innerHeight;
 }
 
 function readView(list) {
