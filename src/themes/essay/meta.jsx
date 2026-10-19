@@ -1,5 +1,5 @@
 export function PageMeta(props) {
-  const { site, type, title, description, link, root } = props;
+  const { site, type, title, description, link, image, root } = props;
   return (
     <>
       <link rel="canonical" href={link} />
@@ -11,6 +11,14 @@ export function PageMeta(props) {
       <meta property="og:site_name" content={site.title} />
       <meta property="og:locale" content={site.language.replace('-', '_')} />
       <meta name="twitter:card" content="summary_large_image" />
+      {image === undefined ? null : (
+        <>
+          <meta property="og:image" content={image.link} />
+          <meta property="og:image:width" content={String(image.width)} />
+          <meta property="og:image:height" content={String(image.height)} />
+          <meta name="twitter:image" content={image.link} />
+        </>
+      )}
     </>
   );
 }

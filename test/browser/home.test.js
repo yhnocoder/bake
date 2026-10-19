@@ -18,7 +18,7 @@ const config = `export default {
 `;
 
 const recordingPreview = `export default function preview(element) {
-  const name = element.closest('.bk-card').querySelector('.bk-card-title').textContent;
+  const name = element.closest('.bk-card')?.querySelector('.bk-card-title').textContent ?? 'share image';
   element.dataset.drawn = 'yes';
   element.textContent = 'first frame';
   window.previewLog ??= [];
@@ -48,7 +48,7 @@ const files = {
   'content/posts/gate/index.md': post('Gate', '2026-10-12', 'ml', ['激活'], 'preview: preview.js\n'),
   'content/posts/gate/preview.js': recordingPreview,
   'content/posts/broken/index.md': post('Broken', '2026-10-10', 'ml', ['激活'], 'preview: preview.js\n'),
-  'content/posts/broken/preview.js': "export default function preview() {\n  throw new Error('cannot draw');\n}\n",
+  'content/posts/broken/preview.js': "export default function preview(element) {\n  if (element.closest('.bk-card')) throw new Error('cannot draw');\n  return { start() {}, stop() {} };\n}\n",
   'content/posts/norm/index.md': post('Norm', '2026-10-08', 'ml', ['归一化']),
   'content/posts/chain/index.md': article({ title: 'Chain', slug: 'chain', date: '2026-09-20', extra: 'category: math\ntags: [梯度]\n', body: '![](plot.svg)\n' }),
   'content/posts/chain/plot.svg': svg,
