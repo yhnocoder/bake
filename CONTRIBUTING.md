@@ -23,7 +23,7 @@ The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/
 | `src/kit/` | Optional parts for writing components |
 | `test/` | Unit and integration tests, see TESTING.md |
 | `examples/blog/` | The example blog: the syntax article and the posts it links to |
-| `scripts/` | Repository checks |
+| `scripts/` | Repository checks and the screenshot scripts for pull requests |
 
 ## Themes interpret, they never add syntax
 

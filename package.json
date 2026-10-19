@@ -33,5 +33,10 @@
     "remark-parse": "^11.0.0",
     "unified": "^11.0.5",
     "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "pixelmatch": "^7.2.0",
+    "playwright": "1.56.1",
+    "pngjs": "^7.0.0"
   }
 }
