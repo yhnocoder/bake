@@ -1,5 +1,5 @@
 import { readdirSync, statSync, watch } from 'node:fs';
-import { join, sep } from 'node:path';
+import { basename, dirname, join, sep } from 'node:path';
 
 const IGNORED_FOLDERS = new Set(['node_modules']);
 const IGNORED_ROOT_FOLDERS = new Set(['dist']);
@@ -33,6 +33,7 @@ export function watchBlog(root, onChange, onError) {
     stopped = true;
     clearTimeout(timer);
     watcher.close();
+    parentWatcher.close();
   };
   const fail = (error) => {
     if (stopped) return;
@@ -50,6 +51,11 @@ export function watchBlog(root, onChange, onError) {
     timer = setTimeout(flush, SETTLE_TIME);
   });
   watcher.on('error', fail);
+  const parentWatcher = watch(dirname(root), (_event, filename) => {
+    if (stopped || filename?.toString() !== basename(root)) return;
+    if (statSync(root, { throwIfNoEntry: false }) === undefined) fail(new Error('the folder no longer exists'));
+  });
+  parentWatcher.on('error', fail);
   return stop;
 }
 
