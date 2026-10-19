@@ -1,0 +1,212 @@
+import { readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parse } from 'acorn';
+import { describeValue, errorAt, fileStart } from '../report.js';
+import { TOC_STYLES, choiceProblem, slugProblem } from './rules.js';
+
+export const CONFIG_FILE = 'bake.config.js';
+
+const FIELDS = ['title', 'url', 'language', 'theme', 'toc', 'bento', 'home', 'categories'];
+const BENTO_FIELDS = ['columns'];
+const HOME_FIELDS = ['columns', 'groupBy'];
+const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
+const HOME_COLUMNS = [3, 4, 5];
+const GROUP_BY = ['category', 'month'];
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export function configNotFoundError() {
+  return errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} not found, run bake from the blog root`);
+}
+
+export function hasConfig(root) {
+  return statSync(join(root, CONFIG_FILE), { throwIfNoEntry: false })?.isFile() ?? false;
+}
+
+export async function loadBakeConfig(root, themes, errors) {
+  if (!hasConfig(root)) {
+    errors.push(configNotFoundError());
+    return null;
+  }
+  const path = join(root, CONFIG_FILE);
+  let program;
+  try {
+    program = parse(readFileSync(path, 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+  } catch (error) {
+    errors.push(errorAt(CONFIG_FILE, { line: error.loc.line, column: error.loc.column + 1 }, error.message.replace(/ \(\d+:\d+\)$/, '')));
+    return null;
+  }
+  let exported;
+  try {
+    exported = (await import(pathToFileURL(path).href)).default;
+  } catch (error) {
+    errors.push(errorAt(CONFIG_FILE, fileStart, firstLine(error instanceof Error ? error.message : String(error))));
+    return null;
+  }
+  const locate = sourceLocator(program);
+  const count = errors.length;
+  const config = validateConfig(exported, themes, (path, part, message) => errors.push(errorAt(CONFIG_FILE, locate(path, part), message)));
+  return errors.length === count ? deepFreeze(config) : null;
+}
+
+function validateConfig(value, themes, report) {
+  if (!isPlainObject(value)) {
+    report([], 'value', `the default export of ${CONFIG_FILE} must be an object, got ${describeValue(value)}`);
+    return null;
+  }
+  reportUnknownFields(value, FIELDS, [], report);
+  const field = (path, problem) => {
+    if (problem) report(path, 'value', problem);
+  };
+  const required = (name, problem) => {
+    if (value[name] === undefined) report([name], 'key', `config is missing "${name}"`);
+    else field([name], problem(value[name]));
+  };
+  required('title', (title) => textProblem('title', title));
+  required('url', urlProblem);
+  required('language', (language) => textProblem('language', language));
+  const theme = value.theme ?? 'essay';
+  field(['theme'], choiceProblem('theme', themes, theme));
+  const toc = value.toc ?? 'notes';
+  field(['toc'], choiceProblem('toc', TOC_STYLES, toc));
+  const categories = validateCategories(value.categories ?? [], report);
+  const bento = section(value, 'bento', BENTO_FIELDS, report);
+  const bentoColumns = bento.columns ?? 4;
+  field(['bento', 'columns'], Number.isInteger(bentoColumns) && bentoColumns > 0 ? null : `bento.columns must be a positive integer, got ${describeValue(bentoColumns)}`);
+  const home = section(value, 'home', HOME_FIELDS, report);
+  const homeColumns = home.columns ?? 3;
+  field(['home', 'columns'], choiceProblem('home.columns', HOME_COLUMNS, homeColumns));
+  const groupBy = home.groupBy ?? (categories.length > 0 ? 'category' : 'month');
+  field(['home', 'groupBy'], choiceProblem('home.groupBy', GROUP_BY, groupBy));
+  if (groupBy === 'category' && categories.length === 0) {
+    report(['home', 'groupBy'], 'value', `home.groupBy is "category" but ${CONFIG_FILE} defines no categories`);
+  }
+  return {
+    title: value.title,
+    url: value.url,
+    language: value.language,
+    theme,
+    toc,
+    bento: { columns: bentoColumns },
+    home: { columns: homeColumns, groupBy },
+    categories,
+  };
+}
+
+function section(config, name, fields, report) {
+  const value = config[name] ?? {};
+  if (!isPlainObject(value)) {
+    report([name], 'value', `${name} must be an object, got ${describeValue(value)}`);
+    return {};
+  }
+  reportUnknownFields(value, fields, [name], report);
+  return value;
+}
+
+function validateCategories(categories, report) {
+  if (!Array.isArray(categories)) {
+    report(['categories'], 'value', `categories must be a list, got ${describeValue(categories)}`);
+    return [];
+  }
+  const firstIndex = new Map();
+  return categories.map((category, index) => {
+    const path = ['categories', index];
+    const label = `categories[${index}]`;
+    if (!isPlainObject(category)) {
+      report(path, 'value', `${label} must be an object, got ${describeValue(category)}`);
+      return null;
+    }
+    reportUnknownFields(category, CATEGORY_FIELDS, path, report);
+    const check = (name, problem) => {
+      if (category[name] === undefined) report([...path, name], 'key', `config is missing "${label}.${name}"`);
+      else if (problem) report([...path, name], 'value', problem);
+    };
+    const { id, name, color, desc = '' } = category;
+    check('id', slugProblem(`${label}.id`, id));
+    if (typeof id === 'string' && firstIndex.has(id)) {
+      report([...path, 'id'], 'value', `${label}.id ${JSON.stringify(id)} is already used by categories[${firstIndex.get(id)}]`);
+    } else if (typeof id === 'string') {
+      firstIndex.set(id, index);
+    }
+    check('name', textProblem(`${label}.name`, name));
+    check('color', typeof color === 'string' && HEX_COLOR.test(color) ? null : `${label}.color must be a hex color in the form #rrggbb, got ${describeValue(color)}`);
+    if (typeof desc !== 'string') report([...path, 'desc'], 'value', `${label}.desc must be a string, got ${describeValue(desc)}`);
+    return { id, name, color, desc };
+  });
+}
+
+function reportUnknownFields(object, fields, path, report) {
+  for (const name of Object.keys(object)) {
+    if (!fields.includes(name)) report([...path, name], 'key', `unknown config field "${[...labelPath(path), name].join('.')}"`);
+  }
+}
+
+function labelPath(path) {
+  return path.reduce((parts, segment) => (typeof segment === 'number' ? [...parts.slice(0, -1), `${parts.at(-1)}[${segment}]`] : [...parts, segment]), []);
+}
+
+function textProblem(label, value) {
+  return typeof value === 'string' && value.trim() !== '' ? null : `${label} must be a non-empty string, got ${describeValue(value)}`;
+}
+
+function urlProblem(value) {
+  const problem = `url must be an absolute http or https URL, got ${describeValue(value)}`;
+  if (typeof value !== 'string' || !URL.canParse(value)) return problem;
+  return ['http:', 'https:'].includes(new URL(value).protocol) ? null : problem;
+}
+
+function isPlainObject(value) {
+  if (typeof value !== 'object' || value === null) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function deepFreeze(value) {
+  if (typeof value === 'object' && value !== null) {
+    Object.values(value).forEach(deepFreeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function firstLine(text) {
+  return text.split('\n')[0];
+}
+
+function sourceLocator(program) {
+  const statement = program.body.find((node) => node.type === 'ExportDefaultDeclaration');
+  return (path, part) => {
+    if (!statement) return fileStart;
+    if (statement.declaration.type !== 'ObjectExpression') return startOf(statement);
+    let node = statement.declaration;
+    let key = null;
+    for (const segment of path) {
+      const child = childNode(node, segment);
+      if (!child) return startOf(node);
+      ({ node, key } = child);
+    }
+    return startOf(part === 'key' && key ? key : node);
+  };
+}
+
+function childNode(node, segment) {
+  if (node.type === 'ObjectExpression') {
+    const index = node.properties.findLastIndex((property) => property.type === 'Property' && !property.computed && propertyName(property.key) === segment);
+    if (index === -1 || node.properties.slice(index + 1).some((property) => property.type === 'SpreadElement')) return null;
+    return { node: node.properties[index].value, key: node.properties[index].key };
+  }
+  if (node.type === 'ArrayExpression' && typeof segment === 'number') {
+    const elements = node.elements.slice(0, segment + 1);
+    if (elements.length <= segment || elements.some((element) => element === null || element.type === 'SpreadElement')) return null;
+    return { node: elements[segment], key: null };
+  }
+  return null;
+}
+
+function propertyName(key) {
+  return key.type === 'Identifier' ? key.name : String(key.value);
+}
+
+function startOf(node) {
+  return { line: node.loc.start.line, column: node.loc.start.column + 1 };
+}
