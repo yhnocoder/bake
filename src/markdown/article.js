@@ -9,11 +9,13 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
+import { createSite } from '../build/links.js';
+import { addressHref, pageRoot, parseAddress } from '../build/urls.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
-import { renderChildrenHtml, renderHtml, renderInlineHtml } from '../render/html.js';
+import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml } from '../render/html.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
-import { EQUATION_ID_PREFIX, typesetMath } from '../render/math.js';
+import { EQUATION_ID_PREFIX, addGlyphs, typesetMath } from '../render/math.js';
 import { parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
 import { citationsAndMissingFootnotes } from './bracket-syntax.js';
@@ -56,19 +58,35 @@ const WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\uf
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const HAN_CHARACTER = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
 const WORD = /[\p{L}\p{N}]+/gu;
+const HTML_ID = /\sid=["']([^"']+)["']/g;
+const PREVIEW_BLOCKS = 3;
+const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
 
-export async function parseArticle(file, source, errors, { folder = null, preamble = [] } = {}) {
-  const article = new ArticleParser(file, source, errors, folder, preamble);
-  return article.parse();
+export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null } = {}) {
+  const article = new ArticleParser(file, source, errors, folder, preamble, url);
+  await article.parse();
+  return article;
+}
+
+export async function parseArticle(file, source, errors, options = {}) {
+  const article = await readArticle(file, source, errors, options);
+  article.link(createSite([{ url: article.url, title: '', draft: false, article }]));
+  return article.structure();
 }
 
 class ArticleParser {
-  constructor(file, source, errors, folder, preamble) {
+  constructor(file, source, errors, folder, preamble, url) {
     this.file = file;
     this.source = source;
     this.errors = errors;
     this.folder = folder;
     this.preamble = preamble;
+    this.url = url;
+    this.tree = null;
+    this.targets = new Map();
+    this.places = new Map();
+    this.linked = new Map();
+    this.borrowed = new Set();
     this.equations = new Map();
     this.equationIds = new Map();
     this.glyphs = undefined;
@@ -85,6 +103,10 @@ class ArticleParser {
       references: () => this.references,
       equation: (label) => this.equations.get(label),
       highlighter: null,
+      root: url === null ? '' : pageRoot(url),
+      excerpt: undefined,
+      linked: (target) => this.linked.set(target.address.text, target),
+      embed: (node) => this.embedParts(node),
     };
   }
 
@@ -115,7 +137,224 @@ class ArticleParser {
     this.assignHeadingIds(tree);
     await this.loadCodeLanguages(tree);
     await this.readImages(tree);
-    return this.buildStructure(tree);
+    this.tree = tree;
+    this.indexTargets(tree);
+  }
+
+  structure() {
+    return this.buildStructure(this.tree);
+  }
+
+  indexTargets(tree) {
+    let section = null;
+    let subsection = null;
+    let sections = 0;
+    let subsections = 0;
+    for (const top of tree.children) {
+      if (top.type === 'heading' && top.depth === 2) {
+        section = { number: String(++sections), heading: top };
+        subsection = null;
+        subsections = 0;
+      } else if (top.type === 'heading' && top.depth === 3 && section !== null) {
+        subsection = { number: `${section.number}.${++subsections}`, heading: top };
+      }
+      this.places.set(top, subsection ?? section);
+      walk(
+        top,
+        (node, parent) => {
+          const id = node.type === 'heading' ? node.id : node.type === 'paragraph' ? node.anchor : undefined;
+          if (id !== undefined && !this.targets.has(id)) this.targets.set(id, { node, parent, top });
+        },
+        tree,
+      );
+    }
+  }
+
+  hasTarget(anchor) {
+    return this.targets.has(anchor);
+  }
+
+  pageIds() {
+    const ids = new Set([...this.targets.keys(), ...this.generatedIds().keys()]);
+    walk(this.tree, (node) => {
+      if (node.type === 'html') for (const [, id] of node.value.matchAll(HTML_ID)) ids.add(id);
+    });
+    return ids;
+  }
+
+  link(site) {
+    const ids = this.pageIds();
+    this.walkWithSidenotes(this.tree, (node) => {
+      if (node.type === 'link') this.checkLink(node, site, ids);
+      if (node.type === 'bakeBlock' && node.name === 'embed') {
+        this.readEmbed(node, site);
+        return false;
+      }
+    });
+  }
+
+  checkLink(node, site, ids) {
+    if (node.url.startsWith('#')) {
+      if (node.url === '#') return;
+      let id;
+      try {
+        id = decodeURIComponent(node.url.slice(1));
+      } catch {
+        id = node.url.slice(1);
+      }
+      if (!ids.has(id)) this.report(node.position.start, `link target #${id} does not exist`);
+      return;
+    }
+    const address = parseAddress(node.url);
+    if (address === null) return;
+    const found = site.find(address, this);
+    if (found.problem !== undefined) this.report(node.position.start, `link target ${address.text} ${found.problem}`);
+    else node.target = { address, page: found.page };
+  }
+
+  readEmbed(node, site) {
+    const start = node.position.start;
+    const lines = this.embedLines(node);
+    if (node.children.length === 0) this.report(start, `:::embed lists no address; write one site address per line, ${EMBED_EXAMPLE}`);
+    const parts = [];
+    const seen = new Set();
+    for (const { text, position } of lines) {
+      const address = parseAddress(text);
+      if (address === null) {
+        this.report(position, `:::embed line "${text}" is not a site address ${EMBED_EXAMPLE}`);
+        continue;
+      }
+      if (address.path === this.url) {
+        this.report(position, ':::embed cannot embed the article itself');
+        continue;
+      }
+      if (seen.has(address.text)) {
+        this.report(position, `:::embed lists ${address.text} twice`);
+        continue;
+      }
+      seen.add(address.text);
+      if (address.anchor === undefined) {
+        this.report(position, `:::embed address ${address.text} has no anchor; it must point to a heading or a paragraph ${EMBED_EXAMPLE}`);
+        continue;
+      }
+      const found = site.find(address, this);
+      if (found.problem !== undefined) {
+        this.report(position, `:::embed target ${address.text} ${found.problem}`);
+        continue;
+      }
+      parts.forEach((earlier) => {
+        if (earlier.page !== found.page) return;
+        const source = found.page.article;
+        if (source.contains(earlier.address.anchor, address.anchor)) this.report(position, `:::embed address ${earlier.address.text} contains ${address.text}`);
+        else if (source.contains(address.anchor, earlier.address.anchor)) this.report(position, `:::embed address ${address.text} contains ${earlier.address.text}`);
+      });
+      parts.push({ address, page: found.page });
+    }
+    node.parts = parts;
+  }
+
+  embedLines(node) {
+    const sourceLines = this.source.split('\n');
+    const lines = [];
+    for (const child of node.children) {
+      if (child.type !== 'paragraph') {
+        this.report(child.position.start, `:::embed holds only site addresses, one per line, ${EMBED_EXAMPLE}`);
+        continue;
+      }
+      toString(child)
+        .split('\n')
+        .forEach((value, index) => {
+          const text = value.trim();
+          if (text === '') return;
+          const line = child.position.start.line + index;
+          lines.push({ text, position: { line, column: Math.max(0, sourceLines[line - 1].indexOf(text)) + 1 } });
+        });
+    }
+    return lines;
+  }
+
+  contains(anchor, other) {
+    const inner = this.targets.get(other).node;
+    let found = false;
+    for (const node of this.embedNodes(anchor)) {
+      walk(node, (candidate) => {
+        if (candidate === inner) found = true;
+      });
+    }
+    return found;
+  }
+
+  embedNodes(anchor) {
+    const { node, parent } = this.targets.get(anchor);
+    if (node.type === 'paragraph') return [node];
+    return [node, ...this.followingNodes(parent.children, node, (next) => next.type === 'heading' && next.depth <= node.depth)];
+  }
+
+  previewNodes(anchor) {
+    const atHeading = (next) => next.type === 'heading';
+    if (anchor === undefined) return this.followingNodes(this.tree.children, null, atHeading).slice(0, PREVIEW_BLOCKS);
+    const { node, parent } = this.targets.get(anchor);
+    if (node.type === 'paragraph') return [node];
+    return this.followingNodes(parent.children, node, atHeading).slice(0, PREVIEW_BLOCKS);
+  }
+
+  followingNodes(siblings, start, ends) {
+    const nodes = [];
+    for (const next of siblings.slice(siblings.indexOf(start) + 1)) {
+      if (ends(next)) break;
+      if (next.type === 'bakeBlock' && next.name === 'recap') continue;
+      nodes.push(next);
+    }
+    return nodes;
+  }
+
+  targetHeading(anchor, context) {
+    if (anchor === undefined) return {};
+    const { node, top } = this.targets.get(anchor);
+    const place = this.places.get(top);
+    const heading = node.type === 'heading' ? node : place?.heading;
+    return { number: place?.number, title: heading === undefined ? undefined : renderInlineHtml(heading.children, context), text: heading === undefined ? undefined : toString(heading) };
+  }
+
+  excerptContext(mode, host) {
+    const { root } = host.context;
+    return {
+      ...this.context,
+      root,
+      excerpt: { mode, base: addressHref(root, this.url) },
+      linked: mode === 'embed' ? host.context.linked : () => {},
+      embedLinks: (node) => this.embedLinks(node, root, mode === 'embed' ? host.context.linked : null),
+    };
+  }
+
+  embedParts(node) {
+    return (node.parts ?? []).map(({ address, page }) => {
+      const source = page.article;
+      const context = source.excerptContext('embed', this);
+      this.borrowed.add(source);
+      return {
+        children: renderHast(source.embedNodes(address.anchor), context).children,
+        href: addressHref(this.context.root, address.path, address.anchor),
+        article: page.title,
+        number: source.targetHeading(address.anchor, context).number,
+      };
+    });
+  }
+
+  embedLinks(node, root, linked) {
+    return (node.parts ?? []).map((target) => {
+      linked?.(target);
+      const { address, page } = target;
+      return { href: addressHref(root, address.path, address.anchor), target: address.text, text: page.article.targetHeading(address.anchor, this.context).text ?? page.title };
+    });
+  }
+
+  preview(target, host) {
+    const { address, page } = target;
+    const context = this.excerptContext('preview', host);
+    host.borrowed.add(this);
+    const { number, title } = this.targetHeading(address.anchor, context);
+    return { target: address.text, href: addressHref(host.context.root, address.path, address.anchor), article: page.title, number, title, html: renderChildrenHtml(this.previewNodes(address.anchor), context) };
   }
 
   readBlock(node) {
@@ -577,6 +816,7 @@ class ArticleParser {
       html: renderChildrenHtml(definition.children, this.context),
     }));
     const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: `reference-${entry.key}`, html: renderInlineHtml(entry.children, this.context) }));
+    const previews = [...this.linked.values()].filter((target) => target.page.article !== null).map((target) => target.page.article.preview(target, this));
     const toc = sections.map((section) => ({
       id: section.id,
       number: section.number,
@@ -584,7 +824,9 @@ class ArticleParser {
       recap: section.recap,
       children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.toc, recap: subsection.recap })),
     }));
-    return { intro, sections, sidenotes, references, toc, words: countWords(tree), glyphs: this.glyphs, images: [...this.images.values()] };
+    const html = [...intro, ...sections.flatMap((section) => section.blocks), ...sidenotes, ...previews].map((entry) => entry.html);
+    const glyphs = addGlyphs(this.glyphs, [...this.borrowed].map((source) => source.glyphs), html);
+    return { intro, sections, sidenotes, references, toc, previews, words: countWords(tree), glyphs, images: [...this.images.values()] };
   }
 
   headingFields(node) {
@@ -645,6 +887,7 @@ function naturalWidth(node) {
 function countWords(tree) {
   const texts = [];
   walk(tree, (node) => {
+    if (node.type === 'bakeBlock' && node.name === 'embed') return false;
     if (node.type === 'text' || node.type === 'inlineCode') texts.push(node.value);
   });
   const text = texts.join(' ');

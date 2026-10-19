@@ -12,6 +12,8 @@ const CHINESE = {
   copyLink: '复制本节链接',
   linkCopied: '已复制本节链接',
   sidenote: (number) => `旁注 ${number}`,
+  openOriginal: '点击跳转到原文',
+  embedSource: { before: '出自《', after: '》' },
 };
 
 const ENGLISH = {
@@ -28,6 +30,8 @@ const ENGLISH = {
   copyLink: 'Copy the link to this section',
   linkCopied: 'Link copied',
   sidenote: (number) => `Sidenote ${number}`,
+  openOriginal: 'Click to open the original',
+  embedSource: { before: 'From “', after: '”' },
 };
 
 export function labelsFor(language) {

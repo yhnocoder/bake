@@ -9,7 +9,7 @@ import { bake } from '../blog.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 
-test('formulas in the syntax article render in Chromium without errors', async (t) => {
+test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bake-browser-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
@@ -45,6 +45,8 @@ test('formulas in the syntax article render in Chromium without errors', async (
       missingGlyphs: [...document.querySelectorAll('mjx-container use')]
         .map((use) => use.getAttribute('href') ?? use.getAttribute('xlink:href'))
         .filter((href) => document.getElementById(href.slice(1)) === null),
+      embedded: document.querySelectorAll('.embed mjx-container').length,
+      duplicateIds: [...document.querySelectorAll('[id]')].map((element) => element.id).filter((id, index, ids) => ids.indexOf(id) !== index),
     };
   });
   assert.ok(report.count > 20, `expected the syntax article to contain formulas, found ${report.count}`);
@@ -53,6 +55,28 @@ test('formulas in the syntax article render in Chromium without errors', async (
   assert.ok(report.notesWithMath.length > 0, 'expected a sidenote with a formula in the syntax article');
   assert.deepEqual(report.notesWithoutCopy, []);
   assert.deepEqual(report.missingGlyphs, []);
+  assert.ok(report.embedded > 0, 'expected an embed with formulas in the syntax article');
+  assert.deepEqual(report.duplicateIds, []);
+
+  const link = page.locator('a.internal-link[data-target="/2026-10/syntax-linked/#chain-rule"]').first();
+  await link.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(100);
+  await link.hover();
+  await page.waitForFunction(() => document.querySelector('.bk-preview').classList.contains('is-on'));
+  const card = await page.evaluate(() => {
+    const containers = [...document.querySelectorAll('.bk-preview mjx-container')];
+    const ids = [...document.querySelectorAll('[id]')].map((element) => element.id);
+    return {
+      count: containers.length,
+      empty: containers.filter((container) => container.querySelector('svg').getBoundingClientRect().width === 0).map((container) => container.dataset.tex),
+      missingGlyphs: containers.flatMap((container) => [...container.querySelectorAll('use')].map((use) => use.getAttribute('xlink:href')).filter((href) => document.getElementById(href.slice(1)) === null)),
+      duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
+    };
+  });
+  assert.ok(card.count > 0, 'expected formulas in the preview card of the chain rule');
+  assert.deepEqual(card.empty, []);
+  assert.deepEqual(card.missingGlyphs, []);
+  assert.deepEqual(card.duplicateIds, []);
 
   const phone = await browser.newPage({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
   await phone.goto(pathToFileURL(join(dir, 'dist/2026-10/syntax/index.html')).href);
