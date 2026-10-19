@@ -3,9 +3,6 @@
   --ui-button-height: 34px;
   --ui-stack-gap: 8px;
   --ui-reserve: calc(var(--ui-bottom) + var(--ui-button-height) + var(--ui-stack-gap));
-  --ui-shadow:
-    0 0 0 0.5px color-mix(in srgb, var(--ink) 16%, transparent),
-    0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .bk-settings {
@@ -28,36 +25,40 @@
 }
 
 .bk-settings-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  place-items: center;
+  width: 34px;
   height: var(--ui-button-height);
-  padding: 0 12px 0 10px;
+  padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-radius: 17px;
+  background: var(--surface);
   color: var(--ink-2);
-  font-size: 12.5px;
-  box-shadow: var(--ui-shadow);
-  backdrop-filter: blur(8px);
+  box-shadow:
+    0 0 0 0.5px var(--hair),
+    0 2px 8px -2px rgba(0, 0, 0, 0.12);
   transition:
     color 0.15s,
     scale 0.12s;
 }
 
-.bk-settings-toggle:hover,
-.bk-settings-toggle[aria-expanded="true"] {
-  color: var(--accent);
+.bk-settings-toggle:hover {
+  color: var(--ink);
 }
 
 .bk-settings-toggle:active {
-  scale: 0.97;
-  transition-duration: 0s;
+  scale: 0.95;
+  transition: none;
+}
+
+.bk-settings-toggle svg {
+  width: 17px;
+  height: 17px;
 }
 
 .bk-settings-panel {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + var(--ui-stack-gap));
   left: 0;
   width: max-content;
   max-width: calc(100vw - 32px);
@@ -399,46 +400,28 @@
   margin-top: 6px;
 }
 
-@media (max-width: 1339.98px) {
-  :root {
-    --ui-bottom: 24px;
-  }
-
-  .bk-settings {
-    left: 0;
-  }
-
-  .bk-settings-toggle {
-    padding: 0 12px 0 10px;
-    border: 1px solid var(--line-2);
-    border-left: 0;
-    border-radius: 0 6px 6px 0;
-    background: var(--surface);
-    font-size: 13.5px;
-    box-shadow: var(--shadow);
-    backdrop-filter: none;
-  }
-
-  .bk-settings-panel {
-    left: 8px;
-  }
-}
-
 @media (max-width: 999.98px) {
   :root {
+    --ui-bottom: 24px;
     --ui-button-height: 38px;
   }
 
   .bk-settings {
+    left: 0;
     transition:
       transform 0.25s var(--ease-out),
       opacity 0.2s;
   }
 
   .bk-settings-toggle {
-    border: 0;
+    width: 40px;
     border-radius: 0 11px 11px 0;
     box-shadow: var(--card-shadow);
+  }
+
+  .bk-settings-panel {
+    bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
+    left: 10px;
   }
 }
 

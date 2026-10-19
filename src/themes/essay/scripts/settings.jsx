@@ -51,13 +51,26 @@ function Settings(props) {
   });
   return (
     <div class="bk-settings" classList={{ 'is-open': open() }} ref={root}>
-      <button type="button" class="bk-settings-toggle" aria-expanded={String(open())} aria-controls="bk-settings-panel" onClick={() => setOpen(!open())} ref={toggle}>
-        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M2 4h7M13 4h1M2 12h1M7 12h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          <circle cx="11" cy="4" r="2" fill="none" stroke="currentColor" stroke-width="1.5" />
-          <circle cx="5" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+      <button
+        type="button"
+        class="bk-settings-toggle"
+        aria-label={labels.settings}
+        title={labels.settings}
+        aria-expanded={String(open())}
+        aria-controls="bk-settings-panel"
+        onClick={() => setOpen(!open())}
+        ref={toggle}
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+            d="M8.6 2.5h2.8l.4 2.1 1.5.9 2-.8 1.4 2.4-1.6 1.4v1.8l1.6 1.4-1.4 2.4-2-.8-1.5.9-.4 2.1H8.6l-.4-2.1-1.5-.9-2 .8-1.4-2.4 1.6-1.4V8.6L3.3 7.1l1.4-2.4 2 .8 1.5-.9z"
+          />
+          <circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.5" />
         </svg>
-        <span>{labels.settings}</span>
       </button>
       <div class="bk-settings-panel" id="bk-settings-panel" role="group" aria-label={labels.settings}>
         <For each={settingRows}>{(row) => (row.toggle === undefined ? <OptionsRow row={row} labels={labels} /> : <ToggleRow row={row} labels={labels} />)}</For>

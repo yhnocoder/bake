@@ -71,6 +71,36 @@ test('reader settings', async (t) => {
     await page.close();
   });
 
+  await t.test('the settings button is a round gear from 1000 pixels up and a tab on the left edge of a phone, labelled without visible text', async () => {
+    const page = await browser.newPage();
+    const read = () =>
+      page.evaluate(() => {
+        const button = document.querySelector('.bk-settings-toggle');
+        const box = button.getBoundingClientRect();
+        const style = getComputedStyle(button);
+        return {
+          box: [box.left, innerHeight - box.bottom, box.width, box.height],
+          radius: style.borderRadius,
+          text: button.textContent.trim(),
+          label: [button.getAttribute('aria-label'), button.title],
+          icon: button.querySelector('svg').getBoundingClientRect().width,
+        };
+      });
+    const expected = { text: '', label: ['设置', '设置'], icon: 17 };
+    for (const width of [1440, 1024]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(url);
+      assert.deepEqual(await read(), { box: [16, 16, 34, 34], radius: '17px', ...expected }, `at ${width} pixels`);
+    }
+    await page.setViewportSize({ width: 375, height: 700 });
+    await page.goto(url);
+    assert.deepEqual(await read(), { box: [0, 24, 40, 38], radius: '0px 11px 11px 0px', ...expected });
+    const before = await page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
+    await page.hover('.bk-settings-toggle');
+    await page.waitForFunction((color) => getComputedStyle(document.querySelector('.bk-settings-toggle')).color !== color, before);
+    await page.close();
+  });
+
   await t.test('theme and body font change the page at once, survive a reload and are applied before the page script runs', async () => {
     const context = await browser.newContext();
     const page = await context.newPage();
