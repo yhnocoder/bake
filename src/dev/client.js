@@ -374,6 +374,7 @@
 
   function copyText(text) {
     if (navigator.clipboard !== undefined) return navigator.clipboard.writeText(text);
+    // why: navigator.clipboard exists only in secure contexts, and bake dev opened from another device on the local network is plain http
     const field = document.createElement('textarea');
     field.value = text;
     field.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
