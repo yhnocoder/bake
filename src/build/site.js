@@ -11,15 +11,17 @@ import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { listFiles } from './files.js';
 import { indexPages } from './links.js';
-import { THEMES_DIR, compileTheme } from './theme.js';
+import { FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
+import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
 import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
 
 export const PUBLIC_DIR = 'public';
 
 const convertedImages = new WeakMap();
+const RESERVED_DIR = posix.dirname(THEME_STYLES_PATH);
 
-export function createSite(root, { drafts = false } = {}) {
-  return { root, drafts, settings: null, articles: new Map(), themes: new Map() };
+export function createSite(root, { drafts = false, base } = {}) {
+  return { root, drafts, base, settings: null, articles: new Map(), themes: new Map() };
 }
 
 export async function updateSite(site, changedPaths = null) {
@@ -31,7 +33,7 @@ export async function updateSite(site, changedPaths = null) {
     site.articles.clear();
   }
   const { settings } = site;
-  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], themeFiles: [], publicFiles: [] };
+  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], themeFiles: [], publicFiles: [] };
   const articles = [];
   for (const found of findArticles(root)) {
     const cached = site.articles.get(found.file);
@@ -44,12 +46,20 @@ export async function updateSite(site, changedPaths = null) {
   linkArticles(articles, errors);
   const published = articles.filter((article) => article.url !== null && (site.drafts || article.fields.draft !== true));
   const themes = await compileThemes(site, published, settings.config, errors);
-  const pageSettings = { config: settings.config, themes, mathStyles: await mathStyles() };
+  const { config } = settings;
+  const pageSettings = { config, themes, mathStyles: await mathStyles() };
   const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
-  const home = homeOutput(published, pageSettings, errors);
+  const entries = published.map((article) => homeEntry(article, config)).sort(newestFirst);
+  const listed = entries.filter((entry) => !entry.draft);
+  const home = homeOutput(entries, pageSettings, errors);
+  const siteFiles = [
+    { path: FEED_PATH, render: () => feedXml(config, listed), owner: 'the RSS feed' },
+    { path: SITEMAP_PATH, render: () => sitemapXml(config, listed), owner: 'the sitemap' },
+    notFoundOutput(listed, site.base ?? sitePath(config.url), pageSettings, errors),
+  ];
   const themeFiles = themeOutputs(themes);
-  const publicFiles = publicOutputs(root, [...pages.flatMap((page) => page.outputs), home], errors);
-  return { errors: sortErrors(errors), articles, pages, home, themeFiles, publicFiles };
+  const publicFiles = publicOutputs(root, [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...themeFiles], errors);
+  return { errors: sortErrors(errors), articles, pages, home, siteFiles, themeFiles, publicFiles };
 }
 
 async function readSettings(root) {
@@ -65,10 +75,10 @@ async function compileThemes(site, published, config, errors) {
   const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
   const themes = new Map();
   for (const name of [...names].sort()) {
-    const home = name === config.theme;
-    if (site.themes.get(name)?.home !== home) {
+    const siteTheme = name === config.theme;
+    if (site.themes.get(name)?.siteTheme !== siteTheme) {
       const themeErrors = [];
-      site.themes.set(name, { theme: await compileTheme(site.root, name, { home }, themeErrors), home, errors: themeErrors });
+      site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
     }
     const { theme, errors: themeErrors } = site.themes.get(name);
     errors.push(...themeErrors);
@@ -78,27 +88,40 @@ async function compileThemes(site, published, config, errors) {
 }
 
 function siteProps(config) {
-  return { title: config.title, url: config.url, language: config.language, description: config.description };
+  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
 }
 
-function homeOutput(published, { config, themes }, errors) {
-  const theme = themes.get(config.theme);
-  const html = theme === null ? '' : renderHome(theme, published, config, errors);
+function homeOutput(entries, { config, themes }, errors) {
+  const html = renderSitePage(config, themes, 'the homepage', errors, (theme) =>
+    theme.renderHome({
+      site: siteProps(config),
+      home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
+      articles: entries,
+      assets: { root: './', styles: theme.styles, scripts: theme.scripts },
+    }),
+  );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
 }
 
-function renderHome(theme, published, config, errors) {
-  const props = {
-    site: siteProps(config),
-    home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
-    articles: published.map((article) => homeEntry(article, config)).sort(newestFirst),
-    assets: { root: './', styles: theme.styles, scripts: theme.scripts },
-  };
+function notFoundOutput(entries, base, { config, themes }, errors) {
+  const html = renderSitePage(config, themes, 'the 404 page', errors, (theme) =>
+    theme.renderNotFound({
+      site: siteProps(config),
+      articles: entries.map((entry) => ({ title: entry.title, url: entry.url })),
+      assets: { root: base, styles: theme.styles.map((path) => `${base}${path}`), scripts: theme.scripts.map((path) => `${base}${path}`) },
+    }),
+  );
+  return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
+}
+
+function renderSitePage(config, themes, label, errors, render) {
+  const theme = themes.get(config.theme);
+  if (theme === null) return '';
   try {
-    return `<!doctype html>\n${theme.renderHome(props)}\n`;
+    return `<!doctype html>\n${render(theme)}\n`;
   } catch (error) {
     const folder = posix.join(THEMES_DIR, config.theme);
-    errors.push(errorAt(folder, fileStart, `the ${config.theme} theme cannot render the homepage: ${error instanceof Error ? error.message : String(error)}`));
+    errors.push(errorAt(folder, fileStart, `the ${config.theme} theme cannot render ${label}: ${error instanceof Error ? error.message : String(error)}`));
     return '';
   }
 }
@@ -214,6 +237,7 @@ function renderArticle(article, { config, themes, mathStyles }, errors) {
       draft: fields.draft === true,
       toc: fields.toc ?? config.toc,
       url: article.url,
+      link: absoluteLink(config, article.url.slice(1)),
       words: content.words,
       content,
     },
@@ -232,8 +256,8 @@ function renderArticle(article, { config, themes, mathStyles }, errors) {
   }
 }
 
-function publicOutputs(root, articleOutputs, errors) {
-  const owners = new Map(articleOutputs.map((output) => [output.path, output.owner]));
+function publicOutputs(root, outputs, errors) {
+  const owners = new Map(outputs.map((output) => [output.path, output.owner]));
   return listFiles(join(root, PUBLIC_DIR), (name) => name !== '.DS_Store').map((path) => {
     const message = publicConflict(path, owners);
     if (message) errors.push(errorAt(posix.join(PUBLIC_DIR, path), fileStart, message));
@@ -243,6 +267,7 @@ function publicOutputs(root, articleOutputs, errors) {
 
 function publicConflict(path, owners) {
   if (owners.has(path)) return `dist/${path} is also written by ${owners.get(path)}`;
+  if (path.startsWith(`${RESERVED_DIR}/`)) return `dist/${RESERVED_DIR}/ is reserved for the files Bake writes`;
   for (const [other, owner] of owners) {
     if (other.startsWith(`${path}/`) || path.startsWith(`${other}/`)) return `dist/${path} conflicts with dist/${other} written by ${owner}`;
   }

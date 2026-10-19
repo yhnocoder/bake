@@ -27,6 +27,8 @@ const probeTheme = {
   'themes/probe/probe.css': 'body {\n  margin: 0;\n}\n',
   'themes/probe/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props.site)} /></body></html>;\n}\n',
   'themes/probe/home.jsx': 'export default function Home(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props)} /></body></html>;\n}\n',
+  'themes/probe/not-found.jsx': 'export default function NotFound(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props)} /></body></html>;\n}\n',
+  'themes/probe/theme.css': 'body {\n  color: black;\n}\n',
 };
 
 function buildHome(t, files) {
@@ -83,7 +85,7 @@ describe('homepage', () => {
     assert.match(styles[0], /^assets\/probe-[\w-]+\.css$/);
     assert.ok(scripts.every((path) => /^assets\/probe-[\w-]+\.js$/.test(path)));
     assert.deepEqual(props, {
-      site: { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.' },
+      site: { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/' },
       home: {
         groupBy: 'category',
         columns: 4,
@@ -111,7 +113,7 @@ describe('homepage', () => {
       ],
       assets: { root: './', styles, scripts },
     });
-    assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.' });
+    assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/' });
     assert.equal(readFileSync(join(dir, 'dist/2026-09/demo/anim/preview.js'), 'utf8'), 'export default () => ({ start() {}, stop() {} });\n');
   });
 
@@ -182,7 +184,7 @@ describe('homepage', () => {
   test('the essay theme shows a draft badge at the top of the card of a draft', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const errors = [];
-    const theme = await compileTheme(dir, 'essay', { home: true }, errors);
+    const theme = await compileTheme(dir, 'essay', { siteTheme: true }, errors);
     assert.deepEqual(errors, []);
     const entry = { title: 'Rope', date: '2026-10-19', tags: [], draft: true, url: '2026-10/rope/' };
     const html = theme.renderHome({
@@ -200,7 +202,7 @@ describe('homepage', () => {
   test('the essay theme says in Chinese that a Chinese blog has no posts yet', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const errors = [];
-    const theme = await compileTheme(dir, 'essay', { home: true }, errors);
+    const theme = await compileTheme(dir, 'essay', { siteTheme: true }, errors);
     assert.deepEqual(errors, []);
     const html = theme.renderHome({
       site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
@@ -225,11 +227,20 @@ describe('homepage', () => {
     assert.equal(bake(dir, 'build').stderr, 'public/index.html:1:1 dist/index.html is also written by the homepage\n1 error, dist/ was not written\n');
   });
 
-  test('reports a site theme without home.jsx, and needs no home.jsx in a theme that only articles use', (t) => {
-    const { 'themes/probe/home.jsx': home, ...withoutHome } = probeTheme;
-    assert.ok(home);
+  test('reports a site theme without home.jsx, not-found.jsx or theme.css, and needs none of them in a theme that only articles use', (t) => {
+    const { 'themes/probe/home.jsx': home, 'themes/probe/not-found.jsx': notFound, 'themes/probe/theme.css': styles, ...withoutHome } = probeTheme;
+    assert.ok(home && notFound && styles);
     const missing = createBlog(t, { 'bake.config.js': validConfig.replace("language: 'en'", "language: 'en', theme: 'probe'"), ...withoutHome });
-    assert.equal(bake(missing, 'build').stderr, 'themes/probe:1:1 theme "probe" has no home.jsx\n1 error, dist/ was not written\n');
+    assert.equal(
+      bake(missing, 'build').stderr,
+      [
+        'themes/probe:1:1 theme "probe" has no home.jsx',
+        'themes/probe:1:1 theme "probe" has no not-found.jsx',
+        'themes/probe:1:1 theme "probe" has no theme.css',
+        '3 errors, dist/ was not written',
+        '',
+      ].join('\n'),
+    );
     const articleOnly = createBlog(t, { 'bake.config.js': validConfig, ...withoutHome, 'content/posts/rope/index.md': article({ extra: 'theme: probe\n' }) });
     const result = bake(articleOnly, 'build');
     assert.equal(result.stderr, '');

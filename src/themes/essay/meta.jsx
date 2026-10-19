@@ -1,0 +1,16 @@
+export function PageMeta(props) {
+  const { site, type, title, description, link, root } = props;
+  return (
+    <>
+      <link rel="canonical" href={link} />
+      <link rel="alternate" type="application/rss+xml" href={`${root}feed.xml`} title={site.title} />
+      <meta property="og:type" content={type} />
+      <meta property="og:title" content={title} />
+      {description === undefined ? null : <meta property="og:description" content={description} />}
+      <meta property="og:url" content={link} />
+      <meta property="og:site_name" content={site.title} />
+      <meta property="og:locale" content={site.language.replace('-', '_')} />
+      <meta name="twitter:card" content="summary_large_image" />
+    </>
+  );
+}
