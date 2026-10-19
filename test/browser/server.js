@@ -35,6 +35,12 @@ export async function serve(t, dir) {
     createReadStream(path).pipe(response);
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  t.after(() => new Promise((done) => server.close(done)));
+  t.after(
+    () =>
+      new Promise((done) => {
+        server.close(done);
+        server.closeAllConnections();
+      }),
+  );
   return `http://127.0.0.1:${server.address().port}`;
 }

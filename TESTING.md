@@ -6,7 +6,7 @@
 |---|---|
 | `make check` | Comment check, shellcheck on shell scripts (when installed), unit tests |
 | `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
-| `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`) |
+| `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`), each test with a time limit of 120 seconds, so a test that never ends fails with its name |
 | `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
 | `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://localhost:8000/ |
 | `make dev` | Installs the dependencies when needed and runs `bake dev` in `examples/blog/`, which serves it at http://localhost:4321/ and updates the page on every save |
@@ -37,7 +37,7 @@ Today CI installs Playwright's Chromium, runs `make check` and then `npm run tes
 
 ## Browsers
 
-Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. A browser test builds its blog into a temporary directory and serves `dist/` over HTTP on a free port with `test/browser/server.js`, so the page loads its scripts and fonts the way a published site does. Like GitHub Pages, the server answers an address without a file with `dist/404.html` and status 404. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On macOS, `make browser` downloads Playwright's Chromium; run it once before the first `make check`, `make example` or `make screenshots`, because `bake build` draws share images with Chromium.
+Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. A browser test builds its blog into a temporary directory and serves `dist/` over HTTP on a free port with `test/browser/server.js`, so the page loads its scripts and fonts the way a published site does. When the test ends, the server closes every connection that is still open, because Chromium can hold a connection on which it has not sent a request yet, and `server.close()` waits for such a connection. Like GitHub Pages, the server answers an address without a file with `dist/404.html` and status 404. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On macOS, `make browser` downloads Playwright's Chromium; run it once before the first `make check`, `make example` or `make screenshots`, because `bake build` draws share images with Chromium.
 
 ## Screenshots in pull requests
 

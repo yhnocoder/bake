@@ -1,6 +1,6 @@
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
-import { HOME_COLUMNS, homePrepaintScript, prepaintScript } from './settings.js';
+import { HOME_COLUMNS, homePrepaintScript, prepaintScript, settingAttributes } from './settings.js';
 
 export default function Home(props) {
   const { site, home, articles, assets } = props;
@@ -11,7 +11,7 @@ export default function Home(props) {
   const groupBy = groups.includes(home.groupBy) ? home.groupBy : 'month';
   const tags = [...new Set(articles.flatMap((article) => article.tags))];
   return (
-    <html lang={site.language} data-group={groupBy} data-columns={String(home.columns)}>
+    <html lang={site.language} data-group={groupBy} data-columns={String(home.columns)} {...settingAttributes('home')}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

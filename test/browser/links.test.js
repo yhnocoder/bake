@@ -219,7 +219,7 @@ test('internal links, preview cards and embeds', async (t) => {
         citations: [...embed.querySelectorAll('a.citation')].map((link) => link.getAttribute('href')),
         missingGlyphs: [...embed.querySelectorAll('use')].map((use) => use.getAttribute('xlink:href')).filter((href) => document.getElementById(href.slice(1)) === null),
         duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
-        toc: [...document.querySelectorAll('.bk-toc .bk-toc-entry')].map((entry) => entry.dataset.target),
+        toc: [...document.querySelectorAll('.bk-toc [data-target]')].map((entry) => entry.dataset.target),
       };
     });
     assert.deepEqual(report.parts, ['Chain rule', 'Order']);

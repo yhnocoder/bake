@@ -157,7 +157,7 @@ describe('site files', () => {
   test('the essay theme writes a 404 page with absolute asset paths, a hidden list of candidates and a link home', (t) => {
     const { read } = built(t, blogFiles);
     const html = read('404.html');
-    assert.match(html, /^<!doctype html>\n<html lang="en">/);
+    assert.match(html, /^<!doctype html>\n<html lang="en" data-theme="system" data-font="sans">/);
     assert.match(html, /<meta name="robots" content="noindex"><title>This page does not exist · Notes &amp; &lt;Models><\/title>/);
     assert.match(html, /<link rel="stylesheet" href="\/bake\/assets\/essay-[\w-]+\.css">/);
     assert.match(html, /<script defer src="\/bake\/assets\/essay-[\w-]+\.js"><\/script>/);
