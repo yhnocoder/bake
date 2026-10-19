@@ -4,15 +4,16 @@ import { loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
-import { parseArticle } from '../markdown/article.js';
+import { readArticle } from '../markdown/article.js';
 import { convertImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { writeDist } from './dist.js';
 import { listFiles } from './files.js';
+import { createSite } from './links.js';
 import { compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls } from './urls.js';
+import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
 
 const PUBLIC_DIR = 'public';
 
@@ -25,8 +26,9 @@ export async function build(root) {
   if (errors.length > 0) return { errors: sortErrors(errors) };
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id) };
   const articles = [];
-  for (const article of findArticles(root)) articles.push(await readArticle(root, article, { rules, preamble }, errors));
+  for (const article of findArticles(root)) articles.push(await loadArticle(root, article, { rules, preamble }, errors));
   checkDuplicateUrls(articles, errors);
+  linkArticles(articles);
   const published = articles.filter((article) => article.url !== null && article.fields.draft !== true);
   const themes = await compileThemes(root, published, config, errors);
   const pageSettings = { config, themes, mathStyles: await mathStyles() };
@@ -69,14 +71,22 @@ async function readMathPreamble(root, errors) {
   return definitions;
 }
 
-async function readArticle(root, article, { rules, preamble }, errors) {
+function linkArticles(articles) {
+  const site = createSite(
+    articles.map(({ url, fields, document }) => ({ url, title: fields?.title ?? '', draft: fields?.draft === true, article: document })),
+  );
+  for (const article of articles) article.document?.link(site);
+  for (const article of articles) article.content = article.document?.structure() ?? null;
+}
+
+async function loadArticle(root, article, { rules, preamble }, errors) {
   const source = readFileSync(join(root, article.file), 'utf8');
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
   const folder = { path: join(root, article.dir), files: article.files };
-  const content = fields?.page === undefined ? await parseArticle(article.file, source, errors, { folder, preamble }) : null;
-  return { ...article, fields, positions: frontMatter?.positions ?? {}, url, content };
+  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url }) : null;
+  return { ...article, fields, positions: frontMatter?.positions ?? {}, url, document, content: null };
 }
 
 function articleOutputs(root, article, pageSettings, errors) {
@@ -108,7 +118,7 @@ function renderArticle(article, { config, themes, mathStyles }, errors) {
   const theme = themes.get(name);
   if (theme === null) return '';
   const { fields, content } = article;
-  const root = '../'.repeat(article.url.split('/').length - 2);
+  const root = pageRoot(article.url);
   const props = {
     site: { title: config.title, url: config.url, language: config.language },
     article: {

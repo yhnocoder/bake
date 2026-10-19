@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
-import { parseArticle } from '../src/markdown/article.js';
+import { createSite } from '../src/build/links.js';
+import { parseArticle, readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
 
 export const frontMatter = '---\ntitle: T\nslug: t\ndate: 2026-10-19\n---\n\n';
@@ -15,6 +16,19 @@ export async function parsed(body, options) {
   const { article, errors } = await parse(body, options);
   assert.deepEqual(errors, []);
   return article;
+}
+
+export async function parseSite(pages, options = {}) {
+  const errors = [];
+  const entries = [];
+  for (const { url, title = 'Title', draft = false, body, folder = null } of pages) {
+    const article = await readArticle(`${url.split('/')[2]}.md`, frontMatter + body, errors, { ...options, folder, url });
+    entries.push({ url, title, draft, article });
+  }
+  const site = createSite(entries);
+  for (const { article } of entries) article.link(site);
+  const articles = Object.fromEntries(entries.map(({ url, article }) => [url, article.structure()]));
+  return { articles, errors: sortErrors(errors).map(formatError) };
 }
 
 export async function html(body, options) {

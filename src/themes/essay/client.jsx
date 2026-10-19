@@ -6,10 +6,10 @@ import './styles/notes.css';
 import './styles/toc.css';
 import './styles/settings.css';
 import './styles/print.css';
-import { startCitations } from './scripts/citations.jsx';
 import { startFolds } from './scripts/folds.js';
 import { startHeadingLinks } from './scripts/heading-links.jsx';
 import { startNotes } from './scripts/notes.js';
+import { startPreviewCard } from './scripts/preview-card.jsx';
 import { startSettings } from './scripts/settings.jsx';
 import { startToc } from './scripts/toc.js';
 import { startWidths } from './scripts/widths.js';
@@ -21,6 +21,6 @@ if (article !== null) {
   startFolds(article);
   startNotes(article);
   startHeadingLinks(article);
-  startCitations(article);
+  startPreviewCard(article);
   startToc(article);
 }

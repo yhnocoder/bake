@@ -1,9 +1,12 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
+import { addressHref } from '../build/urls.js';
 import { highlightCode } from './code.js';
-import { equationHref } from './math.js';
+import { equationHref, relocateMath } from './math.js';
 
 const ATTRIBUTION_PREFIX = '— ';
+const ID_ATTRIBUTE = /\sid\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+const RELATIVE_URL = /^(?![A-Za-z][A-Za-z0-9+.-]*:|\/|\?)/;
 
 export function renderHtml(node, context) {
   const tree = toHast(node, { allowDangerousHtml: true, handlers: handlers(context) });
@@ -14,15 +17,46 @@ export function renderChildrenHtml(children, context) {
   return renderHtml({ type: 'root', children }, context);
 }
 
+export function renderHast(children, context) {
+  return toHast({ type: 'root', children }, { allowDangerousHtml: true, handlers: handlers(context) });
+}
+
 export function renderInlineHtml(children, context) {
   const paragraph = toHast({ type: 'paragraph', children }, { allowDangerousHtml: true, handlers: handlers(context) });
   return toHtml({ type: 'root', children: paragraph.children }, { allowDangerousHtml: true });
 }
 
 function handlers(context) {
+  const { excerpt } = context;
+  const relocate = (href) => (excerpt === undefined ? href : `${excerpt.base}${href}`);
   return {
     highlight: (state, node) => element('mark', {}, state.all(node)),
+    heading(state, node) {
+      if (excerpt === undefined) return defaultHandlers.heading(state, node);
+      return element(`h${node.depth}`, {}, state.all(node));
+    },
+    paragraph(state, node) {
+      if (excerpt === undefined) return defaultHandlers.paragraph(state, node);
+      return element('p', {}, state.all(node));
+    },
+    html: (state, node) => raw(excerpt === undefined ? node.value : node.value.replace(ID_ATTRIBUTE, '')),
+    link(state, node) {
+      const result = defaultHandlers.link(state, node);
+      const target = node.target ?? (excerpt !== undefined && node.url.startsWith('#') ? excerpt.target(decodeAnchor(node.url.slice(1))) : undefined);
+      if (target !== undefined) {
+        const { address, page } = target;
+        result.properties = { className: ['internal-link'], ...result.properties, href: addressHref(context.root, address.path, address.anchor, address.query) };
+        if (page.article !== null) {
+          result.properties.dataTarget = address.text;
+          context.linked(target);
+        }
+      } else if (excerpt !== undefined && RELATIVE_URL.test(node.url)) {
+        result.properties.href = relocate(result.properties.href);
+      }
+      return result;
+    },
     footnoteReference(state, node) {
+      if (excerpt !== undefined) return undefined;
       const number = context.sidenoteNumber(node.identifier);
       const link = element('a', { href: `#sidenote-${number}` }, [text(String(number))]);
       return element('sup', { className: ['sidenote-ref'], dataSidenote: number }, [link]);
@@ -31,25 +65,27 @@ function handlers(context) {
     citation(state, node) {
       const number = context.citationNumber(node.key);
       if (number === undefined) return text(`[@${node.key}]`);
-      return element('a', { className: ['citation'], href: `#reference-${node.key}` }, [text(`[${number}]`)]);
+      const target = excerpt?.target(`reference-${node.key}`);
+      const properties = target === undefined ? {} : { dataTarget: target.address.text };
+      return element('a', { className: ['citation'], href: relocate(`#reference-${node.key}`), ...properties }, [text(`[${number}]`)]);
     },
     eqref(state, node) {
       const equation = context.equation(node.label);
       if (equation === undefined) return text(node.value);
-      return element('a', { className: ['eqref'], href: equationHref(equation.id) }, [text(`(${equation.tag})`)]);
+      return element('a', { className: ['eqref'], href: relocate(equationHref(equation.id)) }, [text(`(${equation.tag})`)]);
     },
-    inlineMath: (state, node) => raw(node.rendered),
-    math: (state, node) => raw(node.rendered),
+    inlineMath: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
+    math: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
     code: (state, node) => highlightCode(context.highlighter, node.value, node.lang ?? undefined),
     table: (state, node) => element('div', { className: ['table-scroll'] }, [defaultHandlers.table(state, node)]),
-    image: (state, node) => imageElement(node, true),
+    image: (state, node) => imageElement(node, true, relocate),
     figure(state, node) {
       const [image, caption] = node.children;
       const float = image.attributes.float === undefined ? {} : { dataFloat: image.attributes.float };
       const figcaption = caption === undefined ? [] : [element('figcaption', {}, state.all(caption))];
       const { boxWidth } = image.published;
       const style = boxWidth === undefined ? {} : { style: `width:${boxWidth}` };
-      return element('figure', { className: ['figure'], ...float, ...style }, [imageElement(image, false), ...figcaption]);
+      return element('figure', { className: ['figure'], ...float, ...style }, [imageElement(image, false, relocate), ...figcaption]);
     },
     blockquote(state, node) {
       const last = node.children.at(-1);
@@ -80,7 +116,8 @@ function blockElement(state, node, context) {
     case 'recap':
       return element('div', { className: ['recap'] }, children());
     case 'references': {
-      const item = (entry) => element('li', { id: `reference-${entry.key}`, value: entry.number }, state.all({ type: 'paragraph', children: entry.children }));
+      const id = (entry) => (context.excerpt === undefined ? { id: `reference-${entry.key}` } : {});
+      const item = (entry) => element('li', { ...id(entry), value: entry.number }, state.all({ type: 'paragraph', children: entry.children }));
       const cited = context.references().filter((entry) => entry.number !== undefined);
       const uncited = context.references().filter((entry) => entry.number === undefined);
       return [
@@ -96,11 +133,30 @@ function blockElement(state, node, context) {
     case 'list-table':
       if (node.rows === undefined) return element('div', { dataBlock: node.name }, children());
       return element('div', { className: ['table-scroll'] }, [listTable(state, node.rows)]);
+    case 'embed':
+      return context.excerpt === undefined ? embedElement(context.embed(node)) : embedLinks(context.embedLinks(node));
     case '':
       return element('div', { dataWidth: node.attributes.width }, children());
     default:
+      if (context.excerpt?.mode === 'preview' && node.name.includes('-')) return node.children.length === 0 ? [] : element('div', { className: ['component-caption'] }, children());
       return element('div', { dataBlock: node.name }, children());
   }
+}
+
+function embedElement(parts) {
+  return element(
+    'div',
+    { className: ['embed'] },
+    parts.map((part) => {
+      const number = part.number === undefined ? [] : [element('span', { className: ['embed-number'] }, [text(part.number)])];
+      const source = element('p', { className: ['embed-source'] }, [element('a', { href: part.href }, [element('cite', {}, [text(part.article)]), ...number])]);
+      return element('div', { className: ['embed-part'] }, [...part.children, source]);
+    }),
+  );
+}
+
+function embedLinks(links) {
+  return links.map((link) => element('p', { className: ['embed-link'] }, [element('a', { className: ['internal-link'], href: link.href, dataTarget: link.target }, [text(link.text)])]));
 }
 
 function listTable(state, [header, ...rows]) {
@@ -117,8 +173,9 @@ function cellContent(state, cell) {
   return state.wrap(state.all(cell), true);
 }
 
-function imageElement(node, sized) {
-  const { src, width, height, boxWidth } = node.published;
+function imageElement(node, sized, relocate) {
+  const { width, height, boxWidth } = node.published;
+  const src = RELATIVE_URL.test(node.published.src) ? relocate(node.published.src) : node.published.src;
   const style = sized && boxWidth !== undefined ? { style: `width:${boxWidth};height:auto` } : {};
   return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...style }, []);
 }
@@ -133,4 +190,12 @@ function text(value) {
 
 function raw(value) {
   return { type: 'raw', value };
+}
+
+function decodeAnchor(anchor) {
+  try {
+    return decodeURIComponent(anchor);
+  } catch {
+    return anchor;
+  }
 }
