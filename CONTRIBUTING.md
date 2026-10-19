@@ -23,7 +23,7 @@ The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/config/
 | `src/kit/` | Optional parts for writing components |
 | `test/` | Unit and integration tests, see TESTING.md |
 | `examples/blog/` | The example blog: the syntax article and the posts it links to |
-| `scripts/` | Repository checks |
+| `scripts/` | Repository checks and the screenshot scripts for pull requests |
 
 ## Themes interpret, they never add syntax
 
@@ -138,3 +138,5 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | A blog can add a theme or replace files of the essay theme, theme errors are reported at their position, and a build leaves no cache in the blog | `test/theme.test.js` |
 | Every formula of the syntax article renders in Chromium without a MathJax error or a missing glyph | `test/browser/math.test.js` |
 | Figures with a pixel or percent width have that width, stay inside the screen and are centred | `test/browser/images.test.js` |
+| The screenshots section replaces only the marked part of a pull request description, gives the same result when written twice and keeps `$` literally | `test/screenshot-section.test.js` |
+| Every screenshot image in a pull request description is at most 880 pixels wide, changes are cropped to the changed area, and identical light and dark images are drawn once | `test/compare-screenshots.test.js` |
