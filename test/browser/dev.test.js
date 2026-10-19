@@ -82,6 +82,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
       window.devTransitions = [];
     });
   const fades = (name) => page.waitForFunction((expected) => window.devTransitions.includes(expected), `${name} opacity`);
+  const settled = (name) => page.waitForFunction((selector) => document.querySelector('#bake-dev').shadowRoot.querySelector(selector).getAnimations().length === 0, `.${name}`);
   const dot = page.locator('#bake-dev .dot');
   const panel = page.locator('#bake-dev .problems');
 
@@ -179,6 +180,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   await t.test('closing the problems list leaves a dot with the count that opens it again', async () => {
     edit('says goodbye again.', 'says goodbye again[^missing].');
     await panel.waitFor();
+    await settled('problems');
     await clearTransitions();
     await page.click('#bake-dev .close');
     await fades('problems');
@@ -217,6 +219,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await notice.waitFor();
     assert.equal(await notice.textContent(), 'Changed below in 03 Far away');
     assert.equal(await scrollPosition(), before);
+    await settled('notice');
     await clearTransitions();
     await notice.click();
     await fades('notice');

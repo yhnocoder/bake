@@ -9,8 +9,10 @@ import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
+const siteFiles = ['404.html', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
+
 function articleFiles(tree) {
-  return Object.keys(tree).filter((path) => !path.startsWith('assets/'));
+  return Object.keys(tree).filter((path) => !path.startsWith('assets/') && !path.startsWith('og/') && !siteFiles.includes(path));
 }
 
 function stagingFolders(dir) {
@@ -41,6 +43,13 @@ describe('bake build', () => {
     assert.equal(result.stdout, '4 pages\ndist/ written\n');
     assert.equal(result.status, 0);
     const tree = readTree(join(dir, 'dist'));
+    assert.ok(siteFiles.every((path) => Object.hasOwn(tree, path)));
+    assert.deepEqual(
+      Object.keys(tree)
+        .filter((path) => path.startsWith('og/'))
+        .map((path) => path.replace(/-[0-9a-f]{12}\.png$/, '')),
+      ['og/2026-09/part-1', 'og/2026-09/series', 'og/2026-10/rope'],
+    );
     assert.deepEqual(articleFiles(tree), [
       'CNAME',
       'index.html',

@@ -1,4 +1,5 @@
 import { labelsFor } from './labels.js';
+import { PageMeta } from './meta.jsx';
 import { HOME_COLUMNS, homePrepaintScript, prepaintScript, settingAttributes } from './settings.js';
 
 export default function Home(props) {
@@ -16,6 +17,7 @@ export default function Home(props) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{site.title}</title>
         {site.description === undefined ? null : <meta name="description" content={site.description} />}
+        <PageMeta site={site} type="website" title={site.title} description={site.description} link={site.link} root={assets.root} />
         <script innerHTML={prepaintScript + homePrepaintScript(groups)} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />

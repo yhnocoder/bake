@@ -1,7 +1,7 @@
 export const SETTINGS = {
   toc: { pages: ['article'], values: ['notes', 'tabs', 'dots', 'ticks'], initial: (article) => article.toc },
-  theme: { pages: ['article', 'home'], values: ['system', 'light', 'dark'], initial: () => 'system' },
-  font: { pages: ['article', 'home'], values: ['sans', 'wenkai'], initial: () => 'sans' },
+  theme: { pages: ['article', 'home', 'not-found'], values: ['system', 'light', 'dark'], initial: () => 'system' },
+  font: { pages: ['article', 'home', 'not-found'], values: ['sans', 'wenkai'], initial: () => 'sans' },
   buttons: { pages: ['article'], values: ['autohide', 'always'], initial: () => 'autohide' },
 };
 
