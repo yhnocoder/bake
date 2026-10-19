@@ -424,8 +424,8 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal(readFileSync(file, 'utf8'), original.replace(directive, `:::act-fn-plot{fn=silu range=6 beta=${beta} width=body}`));
     await page.waitForFunction(([selector, expected]) => JSON.parse(document.querySelector(selector).dataset.params).beta === expected, [frameSelector, beta]);
     await page.waitForTimeout(300);
-    assert.deepEqual(await page.evaluate(() => [window.highlighted, window.states]), [[], []]);
     assert.deepEqual(await unmarked(), []);
+    assert.deepEqual(await page.evaluate(() => [window.highlighted, window.states]), [[], []]);
     assert.equal(await top(), before);
     assert.equal(await message.isVisible(), true);
     assert.equal(await control('beta').getAttribute('data-changed'), null);
