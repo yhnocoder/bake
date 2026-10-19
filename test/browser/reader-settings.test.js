@@ -6,7 +6,21 @@ import { article, bake, createBlog } from '../blog.js';
 import { serve } from './server.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
-const body = ['正文第一段，说明激活函数的作用。', '', '## 门控单元', '', '门控单元把两路投影逐元素相乘。', '', '### 小节', '', '小节里的正文。', ''].join('\n');
+const motionBox = `export const layout = { height: 80 };
+
+export default class MotionBox extends HTMLElement {
+  connectedCallback() {
+    this.style.transition = 'opacity 0.25s';
+    this.innerHTML = '<span style="transition: opacity 0.3s">动效</span>';
+  }
+}
+`;
+const body = ['正文第一段，说明激活函数的作用。', '', ':::motion-box', ':::', '', '## 门控单元', '', '门控单元把两路投影逐元素相乘。', '', '### 小节', '', '小节里的正文。', ''].join('\n');
+
+const sharedShadowLayers = (light, dark) => {
+  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
+  return layers(light).filter((layer) => layers(dark).includes(layer));
+};
 
 function readPage() {
   return {
@@ -48,7 +62,7 @@ function wenkaiFaces() {
 }
 
 test('reader settings', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': config, 'content/posts/gate/index.md': article({ title: '门控激活函数', slug: 'gate', body }) });
+  const dir = createBlog(t, { 'bake.config.js': config, 'content/posts/gate/index.md': article({ title: '门控激活函数', slug: 'gate', body }), 'components/motion-box.js': motionBox });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const url = `${await serve(t, join(dir, 'dist'))}/2026-10/gate/`;
@@ -156,6 +170,54 @@ test('reader settings', async (t) => {
     await page.getByRole('button', { name: '黑体' }).click();
     const reset = await readSettledPage(page);
     assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], ['system', 'sans', ['system', 'sans'], initial.background]);
+    await context.close();
+  });
+
+  await t.test('the shadows of the settings button, the chosen option and the switch follow dark mode', async () => {
+    const shadows = {};
+    for (const colorScheme of ['light', 'dark']) {
+      const page = await browser.newPage({ colorScheme });
+      await page.goto(url);
+      shadows[colorScheme] = await page.evaluate(() => [
+        getComputedStyle(document.querySelector('.bk-settings-toggle')).boxShadow,
+        getComputedStyle(document.querySelector('.bk-settings-options button[aria-pressed="true"]')).boxShadow,
+        getComputedStyle(document.querySelector('.bk-settings-switch i'), '::after').boxShadow,
+      ]);
+      await page.close();
+    }
+    const shared = ['button', 'option', 'switch'].map((name, index) => [name, sharedShadowLayers(shadows.light[index], shadows.dark[index])]);
+    assert.deepEqual(shared, [['button', []], ['option', []], ['switch', []]]);
+  });
+
+  await t.test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async () => {
+    const context = await browser.newContext({ reducedMotion: 'reduce' });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => document.querySelector('.component')?.dataset.state === 'ready');
+    const motion = (selector) =>
+      page.locator(selector).evaluate((element) => {
+        const style = getComputedStyle(element);
+        const durations = style.transitionDuration.split(', ');
+        const properties = style.transitionProperty.split(', ');
+        return { opacity: durations[properties.indexOf('opacity')] ?? null, translate: style.translate };
+      });
+    const fade = (shown) => shown.opacity !== null && parseFloat(shown.opacity) > 0 && shown.translate === '0px';
+    const panel = await motion('.bk-settings-panel');
+    assert.ok(fade(panel), `the closed panel has ${JSON.stringify(panel)}`);
+    await page.getByRole('button', { name: '设置' }).click();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
+    const open = await motion('.bk-settings-panel');
+    assert.ok(fade(open), `the open panel has ${JSON.stringify(open)}`);
+    await page.keyboard.press('Escape');
+    const toast = await motion('.bk-toast');
+    assert.ok(fade(toast), `the toast has ${JSON.stringify(toast)}`);
+    await page.evaluate(() => document.querySelector('.bk-toast').classList.add('is-on'));
+    const shown = await motion('.bk-toast');
+    assert.ok(fade(shown), `the shown toast has ${JSON.stringify(shown)}`);
+    assert.deepEqual(
+      await page.evaluate(() => [document.querySelector('motion-box'), document.querySelector('motion-box span')].map((element) => getComputedStyle(element).transitionDuration)),
+      ['0.25s', '0.3s'],
+    );
     await context.close();
   });
 

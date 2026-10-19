@@ -112,6 +112,11 @@ function cardReport(selector) {
   };
 }
 
+const sharedShadowLayers = (light, dark) => {
+  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
+  return layers(light).filter((layer) => layers(dark).includes(layer));
+};
+
 async function settle(page) {
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -332,6 +337,22 @@ test('the table of contents', async (t) => {
       assert.deepEqual(drawer, { ahead: ink, close: ink, settings: ink }, `${colorScheme} on a phone`);
       await phone.context.close();
     }
+  });
+
+  await t.test('the shadows of the current tab and of the phone handle follow dark mode', async () => {
+    const shadows = {};
+    for (const colorScheme of ['light', 'dark']) {
+      const desk = await open({ style: 'tabs', colorScheme });
+      await scrollToHeading(desk.page, 'chapter-2');
+      const tab = await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-tab.is-current')).boxShadow);
+      await desk.context.close();
+      const phone = await open({ style: 'tabs', colorScheme, viewport: { width: 375, height: 760 } });
+      const handle = await phone.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle.is-tab')).boxShadow);
+      await phone.context.close();
+      shadows[colorScheme] = { tab, handle };
+    }
+    assert.deepEqual(sharedShadowLayers(shadows.light.tab, shadows.dark.tab), [], 'the current tab');
+    assert.deepEqual(sharedShadowLayers(shadows.light.handle, shadows.dark.handle), [], 'the handle');
   });
 
   await t.test('the notes style keeps the top padding of the first chapter', async () => {
@@ -622,6 +643,20 @@ test('the table of contents', async (t) => {
       if (viewport.width === 1440) assert.equal(shown.left, 290, `${path} keeps the left column for the table of contents`);
       await page.locator('.bk-toc a', { hasText: '第4章的小节' }).click();
       await page.waitForFunction(() => location.hash === '#chapter-4-a' && Math.abs(document.getElementById('chapter-4-a').getBoundingClientRect().top - 24) < 2);
+      await context.close();
+    }
+  });
+
+  await t.test('without scripts the section titles of the table of contents have the secondary ink colour', async () => {
+    for (const [colorScheme, ink2] of [
+      ['light', 'rgb(79, 87, 94)'],
+      ['dark', 'rgb(180, 186, 181)'],
+    ]) {
+      const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
+      const page = await context.newPage();
+      await page.goto(url);
+      const colors = await page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-toc-section-title')].map((title) => getComputedStyle(title).color))]);
+      assert.deepEqual(colors, [ink2], colorScheme);
       await context.close();
     }
   });
