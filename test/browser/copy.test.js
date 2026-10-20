@@ -331,7 +331,7 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   await context.close();
 });
 
-test('the module that writes a selection as Markdown loads when the reader selects, opens a context menu or holds a shortcut key, and a copy before it arrives still writes Markdown', async (t) => {
+test('the module that writes a selection as Markdown loads when the reader selects, opens a context menu or holds a shortcut key, and a copy before it arrives is the browser copy', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': validConfig,
     'content/posts/rope/index.md': article({ body: 'Some **bold** text and ==marked== words.\n' }),
@@ -351,18 +351,6 @@ test('the module that writes a selection as Markdown loads when the reader selec
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
     await page.mouse.up();
   };
-  const copiedLater = async (page) => {
-    await page.evaluate(() => navigator.clipboard.writeText(''));
-    await page.keyboard.press('Control+C');
-    return page.evaluate(async () => {
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        const value = await navigator.clipboard.readText();
-        if (value !== '') return value;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      return '';
-    });
-  };
   const opened = async (url) => {
     const page = await context.newPage();
     const requested = [];
@@ -372,24 +360,36 @@ test('the module that writes a selection as Markdown loads when the reader selec
     return { page, requested };
   };
 
-  await t.test('a copy before the module arrives writes the Markdown once it arrives and shows the toast', async () => {
+  await t.test('a copy before the module arrives is the browser copy, and a copy after it arrives is Markdown with the toast', async () => {
     const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
     await page.route(
       (url) => isSelectionChunk(url.href),
       async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await held;
         await route.continue();
       },
     );
     await page.goto(`${base}/2026-10/rope/`);
     await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
     await selectWords(page);
-    assert.equal(await copiedLater(page), '**bold** text and ==marked==');
+    const early = await copied(page);
+    assert.equal(early.text, 'bold text and marked');
+    assert.match(early.html, /<strong[^>]*>bold<\/strong>/);
+    assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
+    const loaded = page.waitForResponse((response) => isSelectionChunk(response.url()));
+    release();
+    await selectionModuleReady(page, (await loaded).url());
+    assert.equal((await copied(page)).text, '**bold** text and ==marked==');
     await page.locator('.bk-toast.is-on').waitFor({ state: 'attached', timeout: 5000 });
+    assert.deepEqual(errors, []);
     await page.close();
   });
 
-  await t.test('when the module cannot be loaded, a copy is the plain text without a toast, the masthead button still copies the source and the page reports no error', async () => {
+  await t.test('when the module cannot be loaded, every copy is the browser copy without a toast, the masthead button still copies the source and the page reports no error', async () => {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -404,8 +404,7 @@ test('the module that writes a selection as Markdown loads when the reader selec
     await page.goto(`${base}/2026-10/rope/`);
     await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
     await selectWords(page);
-    assert.equal(await copiedLater(page), 'bold text and marked');
-    await page.waitForTimeout(1500);
+    assert.equal((await copied(page)).text, 'bold text and marked');
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await dragAcross(page);
       await selectWords(page);
