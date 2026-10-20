@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, createBlog } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const config = `export default {
   title: '测试博客',
@@ -26,8 +25,7 @@ test('the 404 page and the theme stylesheet', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   const open = async (path, options = {}) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...options });

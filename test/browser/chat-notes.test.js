@@ -6,7 +6,8 @@ import { CHAT_RULES } from '../../src/chat/context.js';
 import { chatLabels } from '../../src/chat/labels.js';
 import { noteRules } from '../../src/chat/note.js';
 import { exampleBlog } from '../blog.js';
-import { API_KEY, QUESTION, ask, buildExample, openBrowser, setUpKey, storage, text } from './chat-page.js';
+import { serveExample } from './browser.js';
+import { API_KEY, QUESTION, ask, openBrowser, setUpKey, storage, text } from './chat-page.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
@@ -54,7 +55,7 @@ const NOTE = [
 ].join('\n');
 
 test('the history, the notes and the instructions of the AI chat', async (t) => {
-  const base = await buildExample(t);
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('conversations are saved in this browser as they go, listed per article on article pages and grouped by article on the homepage, and can be opened, continued and deleted', async (t) => {
     const { page, api, problems } = await openBrowser(t, base);

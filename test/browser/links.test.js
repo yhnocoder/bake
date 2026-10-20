@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, createBlog, validConfig } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const filler = (topic) => Array.from({ length: 4 }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(5)}`).join('\n\n');
 
@@ -76,8 +75,7 @@ test('internal links, preview cards and embeds', async (t) => {
   assert.equal(result.stderr, '');
   const base = await serve(t, dir);
   const url = `${base}/dist/2026-10/host/`;
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   const desktop = async ({ clock = false } = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

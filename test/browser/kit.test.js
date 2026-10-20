@@ -2,10 +2,9 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const PLOT = 'figure.component[data-component="act-fn-plot"]';
 
@@ -132,11 +131,6 @@ function setSlider({ index, label, value }) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-async function settled() {
-  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-  await Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {})));
-}
-
 function nextFrames() {
   return new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
 }
@@ -166,8 +160,7 @@ function colorCount({ data }) {
 test('the kit draws the example function plot', async (t) => {
   const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   const open = async (options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, ...options });
@@ -183,7 +176,7 @@ test('the kit draws the example function plot', async (t) => {
     await page.evaluate(async () => {
       await document.fonts.ready;
     });
-    await page.evaluate(settled);
+    await settle(page);
     return { page, problems };
   };
 
@@ -229,10 +222,10 @@ test('the kit draws the example function plot', async (t) => {
         };
       });
     await page.mouse.move(svg.x + svg.width * 0.3, svg.y + svg.height / 2);
-    await page.evaluate(settled);
+    await settle(page);
     const left = await readout();
     await page.mouse.move(svg.x + svg.width * 0.7, svg.y + svg.height / 2);
-    await page.evaluate(settled);
+    await settle(page);
     const right = await readout();
     assert.equal(left.visible, '1');
     assert.equal(left.otherReadout, '0');
@@ -246,7 +239,7 @@ test('the kit draws the example function plot', async (t) => {
     assert.ok(right.left !== left.left, 'the readout moves with the pointer');
     assert.ok(right.left + 112 <= svg.width + 1 && right.left >= 0);
     await page.mouse.move(svg.x + svg.width / 2, svg.y - 120);
-    await page.evaluate(settled);
+    await settle(page);
     const gone = await readout();
     assert.equal(gone.visible, '0');
     assert.ok(Number.isNaN(gone.crosshair));
@@ -401,7 +394,7 @@ test('the kit draws the example function plot', async (t) => {
         await frame.scrollIntoViewIfNeeded();
         const svg = await frame.locator('.bk-kit-plot-svg').first().boundingBox();
         await page.mouse.move(svg.x + svg.width * 0.6, svg.y + svg.height / 2);
-        await page.evaluate(settled);
+        await settle(page);
         const image = await frame.screenshot();
         const file = join(screenshotDir, `act-fn-plot-${width}-${colorScheme}.png`);
         writeFileSync(file, image);
@@ -430,8 +423,7 @@ test('the kit works for any component that imports it', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   await t.test('a plot with only a width fills the height of its parent, and a plot with only a height fills its width', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

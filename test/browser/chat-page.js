@@ -1,7 +1,4 @@
-import { join } from 'node:path';
-import { chromium } from 'playwright';
-import { exampleBuild } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser } from './browser.js';
 
 export const API_KEY = 'sk-test-0123456789abcdef';
 export const PETS = 'https://pets.example';
@@ -18,13 +15,8 @@ export function text(content, size = 6) {
   return events(chunks);
 }
 
-export async function buildExample(t) {
-  return (await serve(t, join(exampleBuild(), 'dist'))).replace('127.0.0.1', 'localhost');
-}
-
 export async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], ...contextOptions });
   const api = { requests: [], answers: [], models: { status: 200, body: '{"object":"list","data":[]}' }, pets: {}, petRequests: [] };
   await context.route(

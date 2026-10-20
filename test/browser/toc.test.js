@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, createBlog } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
 const STYLES = ['notes', 'tabs', 'dots', 'ticks'];
@@ -117,13 +116,6 @@ const sharedShadowLayers = (light, dark) => {
   return layers(light).filter((layer) => layers(dark).includes(layer));
 };
 
-async function settle(page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    for (let frame = 0; frame < 3; frame += 1) await new Promise((done) => requestAnimationFrame(done));
-  });
-}
-
 async function pointAt(page, locator) {
   const box = await locator.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 2 });
@@ -181,8 +173,7 @@ test('the table of contents', async (t) => {
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
   const url = `${base}/2026-10/toc/`;
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const open = async ({ style, path = 'toc', viewport = { width: 1440, height: 900 }, ...options } = {}) => {
     const context = await browser.newContext({ viewport, reducedMotion: 'reduce', ...options });
     if (style !== undefined) await context.addInitScript((value) => localStorage.setItem('bk-toc', value), style);

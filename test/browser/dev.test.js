@@ -4,9 +4,9 @@ import { createConnection, createServer } from 'node:net';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { chromium } from 'playwright';
 import { startDevServer } from '../../src/dev/server.js';
 import { article, copyExample, createBlog, validConfig } from '../blog.js';
+import { launchBrowser } from './browser.js';
 
 const filler = (topic, count = 4) => Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
@@ -59,8 +59,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   const edit = (from, to) => writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   await context.addInitScript(() => {
     window.open = (url, target) => {
@@ -348,8 +347,7 @@ test('bake dev updates a page with a save that it made while the event stream wa
   t.after(() => server.close());
   const proxy = await startConnectionProxy(new URL(server.url));
   t.after(() => proxy.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto(`${proxy.url}2026-10/live/`);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
@@ -385,8 +383,7 @@ export default class LabelView extends HTMLElement {
   const file = join(dir, ARTICLE);
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`${server.url}2026-10/live/`);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
@@ -411,8 +408,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const line = lineOf(original, directive);
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   await context.addInitScript(() => {
     window.open = (url, target) => {
@@ -747,8 +743,7 @@ test('bake dev rebuilds every table of contents style from the saved headings an
   const file = join(dir, ARTICLE);
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   const url = `${server.url}2026-10/live/`;
   const snapshot = (view) =>
@@ -828,8 +823,7 @@ test('bake dev starts an embedded component again when its source article change
   const file = join(dir, 'content/posts/rope/index.md');
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`${server.url}2026-10/host/`);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
@@ -846,8 +840,7 @@ test('the bake dev dot and problems list leave the chat button and the settings 
   const file = join(dir, ARTICLE);
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   for (const width of [1440, 375]) {
     const context = await browser.newContext({ viewport: { width, height: width < 600 ? 812 : 900 } });

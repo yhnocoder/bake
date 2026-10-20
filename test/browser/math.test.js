@@ -1,16 +1,11 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { exampleBuild } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serveExample } from './browser.js';
 
 test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async (t) => {
-  const dir = exampleBuild();
-  const origin = await serve(t, join(dir, 'dist'));
+  const origin = await serveExample(t);
 
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`${origin}/2026-10/syntax/`);
   await page.evaluate(() => document.fonts.ready);

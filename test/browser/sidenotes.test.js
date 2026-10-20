@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, copyExample, writeFiles } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const NOTE_GAP = 12;
 const LINE_TOLERANCE = 4;
@@ -122,19 +121,18 @@ test('sidenotes', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const wide = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   await t.test('never overlap and align with the line of their number at 1440 px in the syntax article', async () => {
     await wide.goto(`${base}/2026-10/syntax/`);
-    await wide.evaluate(() => document.fonts.ready);
+    await settle(wide);
     checkNotes(await wide.evaluate(measureNotes), 'syntax article');
   });
 
   await t.test('move below earlier notes and wide blocks and hide while their number is in a closed fold', async () => {
     await wide.goto(`${base}/2026-10/stress/`);
-    await wide.evaluate(() => document.fonts.ready);
+    await settle(wide);
     const closed = await wide.evaluate(measureNotes);
     const reasons = checkNotes(closed, 'stress article');
     assert.ok(reasons.includes('aligned'), `no sidenote is aligned with its number: ${reasons}`);
@@ -145,8 +143,8 @@ test('sidenotes', async (t) => {
       ['6'],
     );
     await wide.click('details.fold > summary');
-    await wide.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
-    await wide.waitForTimeout(50);
+    await wide.waitForFunction(() => document.querySelector('details.fold').open);
+    await settle(wide);
     const opened = await wide.evaluate(measureNotes);
     checkNotes(opened, 'stress article with the fold open');
     assert.deepEqual(

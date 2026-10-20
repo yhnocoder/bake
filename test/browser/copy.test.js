@@ -2,12 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { parse } from '../article.js';
-import { article, bake, createBlog, exampleBlog, exampleBuild, validConfig } from '../blog.js';
+import { article, bake, createBlog, exampleBlog, validConfig } from '../blog.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
-import { serve } from './server.js';
+import { launchBrowser, serve, serveExample } from './browser.js';
 
 const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const lines = source.split('\n');
@@ -63,10 +62,8 @@ async function copied(page) {
 }
 
 test('copying from an article gives the Markdown source of the selection', async (t) => {
-  const dir = exampleBuild();
-  const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const base = await serveExample(t);
+  const browser = await launchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   await openWithSelectionModule(page, `${base}/2026-10/syntax/`);
@@ -250,8 +247,7 @@ test('a converted citation, reference entry and internal link keep a key or an a
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   await openWithSelectionModule(page, `${base}/2026-10/rope/`);
@@ -275,8 +271,7 @@ test('a converted image keeps the address and the attributes written in the sour
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   const images = (address) => `ots ![dot](${address}){width=40px height=10px} and ![dot](${address}){height=12px} inline.\n\n![Figure](${address}){width=200px float=left}\n\nAft`;
@@ -295,8 +290,7 @@ test('a converted paragraph escapes an ending that reads as a paragraph anchor, 
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   await openWithSelectionModule(page, `${base}/2026-10/rope/`);
@@ -314,8 +308,7 @@ test('a citation and a reference list without data-key, which only raw HTML can 
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   await openWithSelectionModule(page, `${base}/2026-10/rope/`);
@@ -354,8 +347,7 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   await openWithSelectionModule(page, `${base}/2026-10/escapes/`);
@@ -382,8 +374,7 @@ test('the module that writes a selection as Markdown loads when the reader selec
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const paragraph = '.bk-article p';
   const selectWords = (page) => select(page, { selector: paragraph, text: 'bold' }, { selector: paragraph, text: 'marked', after: true });

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { chromium } from 'playwright';
 import { article, bake, createBlog, validConfig } from './blog.js';
-import { serve } from './browser/server.js';
+import { serve } from './browser/browser.js';
 
 const SHARED_DIR = new URL('../src/theme/', import.meta.url).pathname;
 const BUILT_IN_DIR = new URL('../src/themes/', import.meta.url).pathname;

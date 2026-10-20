@@ -2,10 +2,9 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
 
@@ -151,8 +150,7 @@ test('components run in the browser', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const open = async (path, options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 800 }, ...options });
     const problems = [];
@@ -576,8 +574,7 @@ function componentOverflow() {
 test('the example components run on the syntax page', async (t) => {
   const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   const start = async (options, path = '2026-10/syntax/') => {
     const page = await browser.newPage(options);

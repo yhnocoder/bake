@@ -3,10 +3,9 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { article, bake, createBlog } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
 const motionBox = `export const layout = { height: 80 };
@@ -98,8 +97,7 @@ test('reader settings', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const url = `${await serve(t, join(dir, 'dist'))}/2026-10/gate/`;
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   await t.test('the panel opens from the settings button and closes on Escape and on a click outside', async () => {
     const page = await browser.newPage();

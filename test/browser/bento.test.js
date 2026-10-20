@@ -3,11 +3,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { article, bake, copyExample, exampleBlog, writeFiles } from '../blog.js';
 import { openWithSelectionModule } from './selection-module.js';
-import { serve } from './server.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const widths = [1440, 1100, 375];
 const activationsSource = readFileSync(join(exampleBlog, 'content/posts/activations/index.md'), 'utf8');
@@ -67,7 +66,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.equal(result.status, 0);
-  const origin = await serve(t, join(dir, 'dist'));
+  const origin = await serve(t, join(dir, 'dist'), { localhost: true });
 
   const english = mkdtempSync(join(tmpdir(), 'bake-bento-english-'));
   t.after(() => rmSync(english, { recursive: true, force: true }));
@@ -77,10 +76,9 @@ test('the bento theme lays out sections as cards', async (t) => {
   });
   const englishBuild = bake(english, 'build');
   assert.equal(englishBuild.stderr, '');
-  const englishOrigin = await serve(t, join(english, 'dist'));
+  const englishOrigin = await serve(t, join(english, 'dist'), { localhost: true });
 
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const open = async (path, options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', ...options });
     await page.goto(`${origin}/2026-10/${path}/`);
@@ -138,7 +136,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         return { settingsGap: left - settings.right, chatGap: chat.left - right, covered: covers(settings) || covers(chat), gutters: [left, document.documentElement.clientWidth - right], bottoms: [settings.bottom, chat.bottom] };
       });
     for (const url of [`${origin}/2026-10/bento-cards/`, `${englishOrigin}/2026-10/cards/`]) {
-      await page.goto(url.replace('127.0.0.1', 'localhost'));
+      await page.goto(url);
       await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
       for (const width of [1440, 1340, 1339, 1100, 1000, 999, 375]) {
         await resize(page, width);
@@ -152,7 +150,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         if (Math.abs(chatGap - 12) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
       }
     }
-    await page.goto(`${englishOrigin.replace('127.0.0.1', 'localhost')}/`);
+    await page.goto(`${englishOrigin}/`);
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
     assert.equal(await page.locator('.bk-home').count(), 1);
     assert.deepEqual(problems, []);
@@ -544,13 +542,6 @@ function gridLayout() {
     }),
   );
   return { columns, spans, starts, inOrder };
-}
-
-async function settle(page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    for (let frame = 0; frame < 3; frame += 1) await new Promise((done) => requestAnimationFrame(done));
-  });
 }
 
 function largestDifference(first, second) {

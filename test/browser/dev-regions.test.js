@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const page = (article, outside = '<header>Site</header>') => `<!doctype html><html><body>${outside}<article data-region="article">${article}</article><script data-bake-dev data-version="1"></script></body></html>`;
 
 async function openRegions(t) {
   const origin = await serve(t, join(import.meta.dirname, '../../src/dev/client'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const tab = await browser.newPage();
   await tab.goto(`${origin}/regions.js`);
   return (run, ...args) => tab.evaluate(async ([body, args]) => new Function('regions', 'parse', 'args', `return (async () => { ${body} })()`)(await import('/regions.js'), (html) => new DOMParser().parseFromString(html, 'text/html'), args), [run, args]);

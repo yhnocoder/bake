@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { exampleBuild } from '../blog.js';
-import { serve } from '../browser/server.js';
+import { launchBrowser, serveExample } from '../browser/browser.js';
 import { describe, frameProblem, frameStats, openPage, paced, record, settle } from './frames.js';
 
 const everyInteraction = process.env.BAKE_FRAMES === 'all';
@@ -207,10 +204,8 @@ test('every known failure names a measured case', () => {
 });
 
 test('interactions draw every frame within the 60 fps budget on a CPU twice as slow', async (t) => {
-  const blog = exampleBuild();
-  const base = (await serve(t, join(blog, 'dist'))).replace('127.0.0.1', 'localhost');
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const base = await serveExample(t, { localhost: true });
+  const browser = await launchBrowser();
   for (const interaction of interactions.filter((entry) => everyInteraction || !entry.nightly)) {
     for (const device of interaction.devices) {
       const name = caseName(interaction, device);

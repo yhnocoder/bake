@@ -1,18 +1,13 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { exampleBuild } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serveExample } from './browser.js';
 
 const THROTTLE = 4;
 const FADE_FRAME_LIMIT = 150;
 
 test('switching the theme restyles the page once and fades on the compositor in the essay and bento themes', async (t) => {
-  const dir = exampleBuild();
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const origin = await serveExample(t);
+  const browser = await launchBrowser();
 
   for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) for (const width of [1440, 375]) {
     await t.test(`${theme} at ${width} pixels with ${THROTTLE}x CPU throttling`, async () => {
@@ -76,10 +71,8 @@ const fading = () => document.getAnimations().some((animation) => animation.play
 const notFading = () => !document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 
 test('a change of the system colour scheme fades without showing the new colours first, and a press during the fade ends it and keeps the settings open', async (t) => {
-  const dir = exampleBuild();
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const origin = await serveExample(t);
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
   await page.goto(`${origin}/2026-10/syntax/`);
   await page.evaluate(() => document.fonts.ready);
@@ -121,10 +114,8 @@ test('a change of the system colour scheme fades without showing the new colours
 });
 
 test('changing the text spacing fades on the compositor in the essay and bento themes', async (t) => {
-  const dir = exampleBuild();
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const origin = await serveExample(t);
+  const browser = await launchBrowser();
 
   for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) for (const width of [1440, 375]) {
     await t.test(`${theme} at ${width} pixels with ${THROTTLE}x CPU throttling`, async () => {

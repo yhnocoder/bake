@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import sharp from 'sharp';
 import { exampleBlog } from '../blog.js';
-import { API_KEY, CORS, KEY, PETS, QUESTION, ask, buildExample, events, openBrowser, setUpKey, storage, text } from './chat-page.js';
+import { serveExample } from './browser.js';
+import { API_KEY, CORS, KEY, PETS, QUESTION, ask, events, openBrowser, setUpKey, storage, text } from './chat-page.js';
 import { isSelectionChunk } from './selection-module.js';
 
 
@@ -112,7 +113,7 @@ function backdropRoots(chat) {
 }
 
 test('the AI chat on published pages', async (t) => {
-  const base = await buildExample(t);
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('the key is saved with a passkey, the browser stores only ciphertext, and the answer about the article streams with formulas and links', async (t) => {
     const { page, api, problems } = await openBrowser(t, base);
@@ -995,7 +996,7 @@ test('the AI chat on published pages', async (t) => {
 });
 
 test('the shadows and the speed of the AI chat on published pages', async (t) => {
-  const base = await buildExample(t);
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async (t) => {
     const seen = {};
@@ -1088,7 +1089,7 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
 });
 
 test('the pets and the colours of the AI chat on published pages', async (t) => {
-  const base = await buildExample(t);
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('a reader chooses a pet by the link of its pet.json, and a pet.json or a sheet that is too large or a sheet with the wrong size leaves the pet unchanged', async (t) => {
     const { page, api } = await openBrowser(t, base);

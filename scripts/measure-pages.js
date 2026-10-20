@@ -60,8 +60,8 @@ async function main(args) {
 
 export async function measureSite(dist) {
   const pages = listPages(dist);
-  const server = await serveStatic(dist, { gzip: true });
-  const origin = `http://localhost:${new URL(server.origin).port}`;
+  const server = await serveStatic(dist, { gzip: true, localhost: true });
+  const { origin } = server;
   const browser = await chromium.launch();
   const measurements = [];
   try {

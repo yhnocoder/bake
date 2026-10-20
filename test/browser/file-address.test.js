@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { chromium } from 'playwright';
 import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
+import { launchBrowser } from './browser.js';
 
 test('a page opened from a file address is the styled page without scripts', async (t) => {
   const dir = createBlog(t, {
@@ -12,8 +12,7 @@ test('a page opened from a file address is the styled page without scripts', asy
     'content/posts/rope/index.md': article({ body: 'A paragraph with a note.[^a]\n\n:::demo-box\n:::\n\n[^a]: The note.\n' }),
   });
   assert.equal(bake(dir, 'build').stderr, '');
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   await page.goto(pathToFileURL(join(dir, 'dist/2026-10/rope/index.html')).href);
@@ -51,8 +50,7 @@ test('a page opened from a file address is the styled page without scripts', asy
 
 test('the homepage and the articles of the example blog opened from file addresses load every stylesheet, font and image', async (t) => {
   const dir = exampleBuild();
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   for (const width of [1440, 375]) {
     for (const path of ['index.html', '2026-10/syntax/index.html', '2026-10/jacobian/index.html', '2026-09/llm-act-fns/index.html', '2026-09/matrix-calculus/index.html', '2026-10/activations/index.html']) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });

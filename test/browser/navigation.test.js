@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, createBlog, validConfig } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const filler = (topic) => Array.from({ length: 6 }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
@@ -52,8 +51,7 @@ test('links, folds and citation previews', async (t) => {
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
   const url = `${base}/2026-10/links/`;
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   await t.test('a fold fades its content in and out without animating its height, and ends fully open, then closed', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -170,8 +168,7 @@ test('a citation whose key holds a percent sign shows its entry in the preview c
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));

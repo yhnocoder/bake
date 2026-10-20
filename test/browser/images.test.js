@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, createBlog, validConfig } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve } from './browser.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="320" height="200" fill="#985b57"/></svg>';
 
@@ -17,8 +16,7 @@ test('figures with a pixel or percent width have that width, stay inside the scr
   assert.equal(result.stderr, '');
   const origin = await serve(t, join(dir, 'dist'));
 
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const measured = {};
   for (const width of [1440, 1100, 375]) {
     const page = await browser.newPage({ viewport: { width, height: 800 } });
@@ -63,8 +61,7 @@ test('a figure without a size stays inside the body column however wide its imag
   });
   assert.equal(bake(dir, 'build').stderr, '');
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 800 } });
   await page.goto(`${origin}/2026-10/rope/`);
   const { column, figures } = await page.evaluate(() => ({

@@ -2,10 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { article, bake, copyExample, writeFiles } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const overflowWidths = [375, 600, 1000, 1339, 1340, 1440];
 const WENKAI_TEXT = '.bk-site, .bk-title, .bk-article :is(h2, h3, h4, h5, h6)';
@@ -107,8 +106,7 @@ test('the essay theme lays out articles', async (t) => {
   assert.equal(result.status, 0);
   const origin = await serve(t, join(dir, 'dist'));
 
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const open = async (path, options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', ...options });
     await page.goto(`${origin}/2026-10/${path}/`);
@@ -531,13 +529,6 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(Object.entries(layouts).filter(([, count]) => count > 30), []);
   });
 });
-
-async function settle(page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    for (let frame = 0; frame < 3; frame += 1) await new Promise((done) => requestAnimationFrame(done));
-  });
-}
 
 function wenkaiSubsets(assets) {
   const css = readdirSync(assets)
