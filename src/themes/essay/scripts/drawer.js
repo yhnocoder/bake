@@ -1,3 +1,4 @@
+import { closeOnEscape } from './escape.js';
 import { chapterCard, createElement } from './toc-card.js';
 
 const CLOSE_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -6,8 +7,6 @@ export function drawerView(context) {
   const { outline, labels } = context;
   const root = document.documentElement;
   const dots = root.dataset.toc === 'dots';
-  const abort = new AbortController();
-  const { signal } = abort;
   const handle = createElement('button', dots ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab');
   handle.type = 'button';
   handle.setAttribute('aria-label', labels.openToc);
@@ -73,15 +72,11 @@ export function drawerView(context) {
     setOpen(false);
     handle.focus();
   });
-  addEventListener(
-    'keydown',
-    (event) => {
-      if (event.key !== 'Escape' || !isOpen()) return;
-      setOpen(false);
-      handle.focus();
-    },
-    { signal },
-  );
+  closeOnEscape(drawer, () => {
+    if (!isOpen()) return;
+    setOpen(false);
+    handle.focus();
+  });
 
   return {
     update(state) {
@@ -109,7 +104,6 @@ export function drawerView(context) {
       if (isOpen()) setOpen(false);
     },
     destroy() {
-      abort.abort();
       root.classList.remove('bk-drawer-open');
       handle.remove();
       scrim.remove();

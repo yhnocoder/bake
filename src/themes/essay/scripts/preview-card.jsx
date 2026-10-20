@@ -1,5 +1,6 @@
 import { createEffect, createSignal } from 'solid-js';
 import { render } from 'solid-js/web';
+import { closeOnEscape } from './escape.js';
 import { CONTENT_EVENT } from './motion.js';
 import { hoverWithFinePointer, notesColumnScreen } from './screens.js';
 
@@ -72,11 +73,6 @@ export function startPreviewCard(article) {
     clearTimeout(showTimer);
     close();
   });
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    clearTimeout(showTimer);
-    close();
-  });
   addEventListener(
     'scroll',
     () => {
@@ -89,6 +85,10 @@ export function startPreviewCard(article) {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <PreviewCard entry={entry()} shown={shown()} placed={placed()} onEnter={keep} onLeave={hide} />, host);
+  closeOnEscape(host, () => {
+    clearTimeout(showTimer);
+    close();
+  });
 }
 
 function readReference(link) {
