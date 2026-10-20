@@ -3,6 +3,7 @@ import { cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import { bake, createBlog } from '../blog.js';
 import { serve } from './server.js';
 
@@ -10,6 +11,7 @@ const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
 const API_KEY = 'sk-test-0123456789abcdef';
+const PETS = 'https://pets.example';
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST' };
 
 function events(chunks, finish = 'stop') {
@@ -35,12 +37,17 @@ async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {
   const browser = await chromium.launch();
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], ...contextOptions });
-  const api = { requests: [], answers: [], models: { status: 200, body: '{"object":"list","data":[]}' } };
+  const api = { requests: [], answers: [], models: { status: 200, body: '{"object":"list","data":[]}' }, pets: {}, petRequests: [] };
   await context.route(
     (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
     async (route) => {
       const request = route.request();
       const url = new URL(request.url());
+      if (url.origin === PETS) {
+        api.petRequests.push({ path: url.pathname, headers: request.headers() });
+        const file = api.pets[url.pathname];
+        return route.fulfill(file === undefined ? { status: 404, headers: CORS } : { status: 200, headers: CORS, body: file });
+      }
       if (url.origin !== 'https://api.deepseek.com') return route.abort();
       if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
       api.requests.push({ path: url.pathname, headers: request.headers(), body: request.postDataJSON() });
@@ -90,16 +97,92 @@ async function storage(page) {
   }));
 }
 
-async function setUpKey(page) {
-  await page.locator('.bk-chat-launcher').click();
-  await page.locator('.bk-chat-setup input[name="key"]').fill(API_KEY);
-  await page.locator('.bk-chat-setup .bk-chat-primary').click();
-  await page.locator('.bk-chat-composer textarea').waitFor();
+const QUESTION = '.bk-chat-composer input[name="question"]';
+const KEY = '.bk-chat-composer input[name="key"]';
+
+async function setUpKey(page, key = API_KEY) {
+  if ((await page.locator('.bk-chat-launcher').getAttribute('aria-expanded')) !== 'true') await page.locator('.bk-chat-launcher').click();
+  await page.locator(KEY).fill(key);
+  await page.locator(KEY).press('Enter');
+  await page.locator(QUESTION).waitFor();
 }
 
 async function ask(page, question) {
-  await page.locator('.bk-chat-composer textarea').fill(question);
-  await page.locator('.bk-chat-composer textarea').press('Enter');
+  await page.locator(QUESTION).fill(question);
+  await page.locator(QUESTION).press('Enter');
+}
+
+const PET_ROWS = {
+  idle: [0, 6, 'still'],
+  greet: [3, 4, 'once'],
+  open: [0, 6, 'once'],
+  unlocking: [6, 6, 'loop'],
+  answering: [7, 6, 'loop'],
+  reading: [8, 6, 'loop'],
+  answered: [4, 5, 'once'],
+  failed: [5, 8, 'hold'],
+};
+
+function petEntry(state, { reduced = false } = {}) {
+  const [row, frames, play] = PET_ROWS[state];
+  if (reduced) return { state, row, frames, animation: 'still', iterations: '1' };
+  return { state, row, frames, animation: { still: 'none', loop: 'loop', once: 'once', hold: 'once' }[play], iterations: play === 'loop' ? 'infinite' : '1' };
+}
+
+async function watchPet(page) {
+  await page.locator('.bk-chat-launcher .bk-chat-pet').waitFor();
+  await page.evaluate(() => {
+    const pet = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet');
+    const sheet = pet.querySelector('.bk-chat-pet-sheet');
+    const record = () => {
+      const box = pet.getBoundingClientRect();
+      const style = getComputedStyle(sheet);
+      window.bakeTest.pet.push({
+        state: pet.dataset.state,
+        row: Math.round((box.top - sheet.getBoundingClientRect().top) / box.height),
+        frames: Number(getComputedStyle(pet).getPropertyValue('--bk-chat-pet-frames')),
+        animation: style.animationName.replace(/^bk-chat-pet-/, '').replace(/-[01]$/, ''),
+        iterations: style.animationIterationCount,
+      });
+    };
+    window.bakeTest.pet = [];
+    record();
+    new MutationObserver(record).observe(pet, { attributes: true, attributeFilter: ['data-play'] });
+  });
+}
+
+async function petSeen(page, state) {
+  await page.waitForFunction((name) => window.bakeTest.pet.some((entry) => entry.state === name), state);
+  return page.evaluate((name) => window.bakeTest.pet.find((entry) => entry.state === name), state);
+}
+
+function lastPet(page) {
+  return page.evaluate(() => window.bakeTest.pet.at(-1).state);
+}
+
+function shadow(page, script, argument) {
+  return page.evaluate(({ script, argument }) => new Function('root', 'argument', script)(document.querySelector('[data-bake-chat]').shadowRoot, argument), { script, argument });
+}
+
+async function sheetTransforms(page) {
+  const seen = [];
+  for (let step = 0; step < 6; step += 1) {
+    seen.push(await shadow(page, "return getComputedStyle(root.querySelector('.bk-chat-pet-sheet')).transform;"));
+    await page.waitForTimeout(90);
+  }
+  return seen;
+}
+
+function petSheet(width, height, format = 'webp') {
+  return sharp({ create: { width, height, channels: 4, background: { r: 40, g: 120, b: 200, alpha: 1 } } })
+    [format]()
+    .toBuffer();
+}
+
+async function openSettings(page) {
+  if ((await page.locator('.bk-chat-launcher').getAttribute('aria-expanded')) !== 'true') await page.locator('.bk-chat-launcher').click();
+  await page.locator('.bk-chat-composer button[aria-label="对话设置"]').click();
+  await page.locator('.bk-chat-menu').waitFor();
 }
 
 test('the AI chat on published pages', async (t) => {
@@ -108,46 +191,60 @@ test('the AI chat on published pages', async (t) => {
   await t.test('the key is saved with a passkey, the browser stores only ciphertext, and the answer about the article streams with formulas and links', async (t) => {
     const { page, api, problems } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
-    await page.locator('.bk-chat-launcher').waitFor();
+    await page.locator('.bk-chat-launcher').click();
+    const setup = page.locator('.bk-chat-note').first();
+    await setup.filter({ hasText: 'DeepSeek API key' }).waitFor();
+    assert.equal(await setup.locator('a').getAttribute('href'), 'https://platform.deepseek.com/api_keys');
+    assert.equal(await page.locator(KEY).getAttribute('type'), 'password');
     await setUpKey(page);
-    assert.equal(await page.locator('.bk-chat-view').evaluate((element) => getComputedStyle(element).animationName), 'bk-chat-view-in');
     assert.deepEqual(
       api.requests.map((request) => [request.path, request.headers.authorization]),
       [['/models', `Bearer ${API_KEY}`]],
     );
+    await page.locator('.bk-chat-note').filter({ hasText: 'key 已保存' }).waitFor();
     const stored = await storage(page);
     assert.doesNotMatch(JSON.stringify(stored), new RegExp(API_KEY));
     assert.deepEqual(Object.keys(JSON.parse(stored.local['bk-chat-key'])).sort(), ['credential', 'data', 'iv', 'salt']);
+    assert.equal(await page.locator(QUESTION).getAttribute('placeholder'), '问这篇文章，打 @ 选范围…');
 
     api.answers.push({ body: text('标题见 [标题](#headings)。公式 $\\R^2$ 和\n\n$$\\frac{a}{b}$$\n\n结束。') });
     await ask(page, '这篇文章讲什么？');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '结束。' }).waitFor();
     await page.locator('.bk-chat-answer .bk-chat-math[data-state="ready"] svg').nth(1).waitFor();
     assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), '#headings');
+    assert.equal(await page.locator('.bk-chat-user').textContent(), '这篇文章讲什么？');
     const request = api.requests.at(-1);
     assert.equal(request.path, '/chat/completions');
     assert.equal(request.headers.authorization, `Bearer ${API_KEY}`);
     assert.equal(request.body.model, 'deepseek-flash');
     assert.equal(request.body.stream, true);
-    assert.equal(request.body.tools, undefined);
+    assert.deepEqual(
+      request.body.tools.map((tool) => tool.function.name),
+      ['read_article'],
+    );
     assert.equal(request.body.messages[0].role, 'system');
-    assert.ok(request.body.messages[0].content.includes(syntaxSource), 'the system message holds the article source');
-    assert.match(request.body.messages[0].content, /\n- #headings 标题与锚点\n  - #third-level 三级标题\n/);
+    assert.ok(request.body.messages[0].content.includes(`<article>\n${syntaxSource}\n</article>`), 'the system message holds the article source');
+    assert.match(request.body.messages[0].content, /\n- #headings 标题与锚点\n {2}- #third-level 三级标题\n/);
+    assert.match(request.body.messages[0].content, /"address":"\/2026-10\/jacobian\/","title":"雅可比矩阵"/);
     assert.deepEqual(request.body.messages.slice(1), [{ role: 'user', content: '这篇文章讲什么？' }]);
     assert.deepEqual(problems, []);
   });
 
-  await t.test('a reload asks for the passkey once and keeps the conversation going with the decrypted key', async (t) => {
+  await t.test('a reload unlocks the key with the passkey once when the chat opens and keeps the conversation going', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
     await page.reload();
+    await watchPet(page);
     await page.locator('.bk-chat-launcher').click();
-    await page.locator('.bk-chat-composer textarea').waitFor();
+    await page.locator('.bk-chat-note').filter({ hasText: '已解锁' }).waitFor();
+    await page.locator(QUESTION).waitFor();
+    assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
     api.answers.push({ body: text('好的。') });
     await ask(page, '再说一次');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
     assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
+    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 1);
   });
 
   await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {
@@ -156,11 +253,16 @@ test('the AI chat on published pages', async (t) => {
     page.on('request', (request) => fetched.push(new URL(request.url()).pathname));
     await page.goto(`${base}/`);
     await setUpKey(page);
-    assert.equal(await page.locator('.bk-chat-modes').count(), 0);
+    assert.equal(await page.locator(QUESTION).getAttribute('placeholder'), '问这个博客，打 @ 选范围…');
     const call = { index: 0, id: 'call_1', type: 'function', function: { name: 'read_article', arguments: '' } };
     api.answers.push({
       body: events(
-        [{ role: 'assistant', content: '' }, { tool_calls: [call] }, { tool_calls: [{ index: 0, function: { arguments: '{"address":' } }] }, { tool_calls: [{ index: 0, function: { arguments: '"/2026-10/jacobian/"}' } }] }],
+        [
+          { role: 'assistant', content: '' },
+          { tool_calls: [call] },
+          { tool_calls: [{ index: 0, function: { arguments: '{"address":' } }] },
+          { tool_calls: [{ index: 0, function: { arguments: '"/2026-10/jacobian/"}' } }] },
+        ],
         'tool_calls',
       ),
     });
@@ -177,6 +279,7 @@ test('the AI chat on published pages', async (t) => {
       ['read_article'],
     );
     assert.match(first.body.messages[0].content, /"address":"\/2026-10\/jacobian\/","title":"雅可比矩阵"/);
+    assert.doesNotMatch(first.body.messages[0].content, /<article>/);
     const tool = second.body.messages.at(-1);
     assert.deepEqual(tool, { role: 'tool', tool_call_id: 'call_1', content: jacobianSource });
     assert.deepEqual(second.body.messages.at(-2).tool_calls, [{ id: 'call_1', type: 'function', function: { name: 'read_article', arguments: '{"address":"/2026-10/jacobian/"}' } }]);
@@ -186,7 +289,8 @@ test('the AI chat on published pages', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
-    await page.locator('.bk-chat-panel button[aria-label="关闭"]').click();
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
     await page.evaluate(() => {
       const paragraph = document.querySelector('.bk-article > .bk-block[data-type="paragraph"] p');
       const range = document.createRange();
@@ -195,13 +299,15 @@ test('the AI chat on published pages', async (t) => {
       getSelection().addRange(range);
     });
     await page.locator('.bk-chat-ask').click();
-    const quote = await page.locator('.bk-chat-quote-text').textContent();
+    await page.locator('.bk-chat[data-open]').waitFor();
+    const quote = await page.locator('.bk-chat-composer .bk-chat-quote').getAttribute('title');
     assert.ok(quote.startsWith('这篇文章列出 Bake 的全部写法'), quote);
     api.answers.push({ body: text('这一段介绍了文章。') });
     await ask(page, '这段是什么意思？');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
     assert.equal(api.requests.at(-1).body.messages.at(-1).content, `> ${quote}\n\n这段是什么意思？`);
     assert.equal(await page.locator('.bk-chat-user blockquote').textContent(), quote);
+    assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
   });
 
   await t.test('DeepSeek errors are explained with a retry, and a cleared key leaves nothing in storage', async (t) => {
@@ -230,9 +336,10 @@ test('the AI chat on published pages', async (t) => {
     api.answers.push({ status: 400, body: '{"error":{"message":"This model\'s maximum context length is 131072 tokens. However, you requested 140000 tokens."}}' });
     await page.locator('.bk-chat-reply .bk-chat-problem button').click();
     await page.locator('.bk-chat-reply .bk-chat-problem').filter({ hasText: '新对话' }).waitFor();
-    await page.locator('.bk-chat-panel button[aria-label="更多"]').click();
-    await page.locator('.bk-chat-menu button[data-action="clear-key"]').click();
-    await page.locator('.bk-chat-setup input[name="key"]').waitFor();
+    await openSettings(page);
+    await page.locator('.bk-chat-menu-item[data-action="clear-key"]').click();
+    await page.locator(KEY).waitFor();
+    await page.locator('.bk-chat-note').filter({ hasText: 'key 已清除' }).waitFor();
     assert.equal((await storage(page)).local['bk-chat-key'], undefined);
   });
 
@@ -254,7 +361,10 @@ test('the AI chat on published pages', async (t) => {
     await ask(page, '接着说');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '继续。' }).waitFor();
     assert.deepEqual(
-      api.requests.at(-1).body.messages.slice(1).map(({ role, content }) => [role, content]),
+      api.requests
+        .at(-1)
+        .body.messages.slice(1)
+        .map(({ role, content }) => [role, content]),
       [
         ['user', '慢慢说'],
         ['assistant', '前半句'],
@@ -288,7 +398,10 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '第三答。' }).waitFor();
     assert.equal(await page.locator('.bk-chat-reply').count(), 3);
     assert.deepEqual(
-      api.requests.at(-1).body.messages.slice(1).map(({ role, content }) => [role, content]),
+      api.requests
+        .at(-1)
+        .body.messages.slice(1)
+        .map(({ role, content }) => [role, content]),
       [
         ['user', '第二问'],
         ['assistant', '前半句'],
@@ -302,11 +415,9 @@ test('the AI chat on published pages', async (t) => {
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
     const first = JSON.parse((await storage(page)).local['bk-chat-key']);
-    await page.locator('.bk-chat-panel button[aria-label="更多"]').click();
-    await page.locator('.bk-chat-menu button', { hasText: '更换 key' }).click();
-    await page.locator('.bk-chat-setup input[name="key"]').fill('sk-test-second-key');
-    await page.locator('.bk-chat-setup .bk-chat-primary').click();
-    await page.locator('.bk-chat-composer textarea').waitFor();
+    await openSettings(page);
+    await page.locator('.bk-chat-menu-item', { hasText: '更换 key' }).click();
+    await setUpKey(page, 'sk-test-second-key');
     const second = JSON.parse((await storage(page)).local['bk-chat-key']);
     assert.notEqual(second.credential, first.credential);
     assert.deepEqual(await page.evaluate(() => window.bakeTest.signals), [first.credential]);
@@ -331,9 +442,10 @@ test('the AI chat on published pages', async (t) => {
     api.models = { status: 401, body: '{"error":{"message":"Authentication Fails"}}' };
     await page.goto(`${base}/2026-10/syntax/`);
     await page.locator('.bk-chat-launcher').click();
-    await page.locator('.bk-chat-setup input[name="key"]').fill('sk-wrong');
-    await page.locator('.bk-chat-setup .bk-chat-primary').click();
-    await page.locator('.bk-chat-setup .bk-chat-problem').filter({ hasText: '不接受这个 key' }).waitFor();
+    await page.locator(KEY).fill('sk-wrong');
+    await page.locator(KEY).press('Enter');
+    await page.locator('.bk-chat-problem').filter({ hasText: '不接受这个 key' }).waitFor();
+    assert.equal(await page.locator(KEY).count(), 1);
     assert.equal((await storage(page)).local['bk-chat-key'], undefined);
   });
 
@@ -341,9 +453,9 @@ test('the AI chat on published pages', async (t) => {
     const { page } = await openBrowser(t, base, { prf: false });
     await page.goto(`${base}/2026-10/syntax/`);
     await page.locator('.bk-chat-launcher').click();
-    await page.locator('.bk-chat-setup input[name="key"]').fill(API_KEY);
-    await page.locator('.bk-chat-setup .bk-chat-primary').click();
-    await page.locator('.bk-chat-setup .bk-chat-problem').filter({ hasText: 'PRF' }).waitFor();
+    await page.locator(KEY).fill(API_KEY);
+    await page.locator(KEY).press('Enter');
+    await page.locator('.bk-chat-problem').filter({ hasText: 'PRF' }).waitFor();
     assert.deepEqual((await storage(page)).local, {});
     assert.equal((await page.evaluate(() => window.bakeTest.signals)).length, 1);
   });
@@ -363,9 +475,246 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
   });
 
+  await t.test('the pet shows its first frame until the pointer or the keyboard reaches it, waves once, and the chat opens and closes from it', async (t) => {
+    const { page } = await openBrowser(t, base);
+    const pets = [];
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url());
+      if (pathname.startsWith('/_bake/pet/')) pets.push(pathname);
+    });
+    await page.goto(`${base}/2026-10/syntax/`);
+    await page.waitForLoadState('networkidle');
+    assert.deepEqual(pets, ['/_bake/pet/frame.webp']);
+    const launcher = page.locator('.bk-chat-launcher');
+    assert.deepEqual(await launcher.evaluate((element) => [element.offsetWidth, element.offsetHeight, getComputedStyle(element).backgroundColor, getComputedStyle(element).cursor]), [
+      76,
+      82,
+      'rgba(0, 0, 0, 0)',
+      'pointer',
+    ]);
+    await watchPet(page);
+    assert.deepEqual(await page.evaluate(() => window.bakeTest.pet), [petEntry('idle')]);
+
+    await launcher.hover();
+    assert.deepEqual(await petSeen(page, 'greet'), petEntry('greet'));
+    await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
+    assert.deepEqual(pets, ['/_bake/pet/frame.webp', '/_bake/pet/spritesheet.webp']);
+    await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
+    await page.mouse.move(600, 10);
+
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await shadow(page, "return root.activeElement?.className + ' ' + getComputedStyle(root.activeElement).outlineStyle;"), 'bk-chat-launcher solid');
+    await page.waitForFunction(() => window.bakeTest.pet.filter((entry) => entry.state === 'greet').length === 2);
+    await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
+
+    const chat = page.locator('.bk-chat');
+    const closed = async () => {
+      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+      await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
+      assert.equal(await launcher.getAttribute('aria-expanded'), 'false');
+    };
+    await launcher.click();
+    await page.locator('.bk-chat[data-open]').waitFor();
+    assert.deepEqual(await petSeen(page, 'open'), petEntry('open'));
+    assert.equal(await launcher.getAttribute('aria-expanded'), 'true');
+    assert.match(await chat.evaluate((element) => getComputedStyle(element).transitionProperty), /opacity/);
+    const box = await chat.boundingBox();
+    const pet = await launcher.boundingBox();
+    assert.ok(box.x + box.width <= pet.x && box.width <= 290, JSON.stringify({ box, pet }));
+    await page.keyboard.press('Escape');
+    await closed();
+
+    await launcher.click();
+    await page.locator('.bk-chat[data-open]').waitFor();
+    await page.locator('.bk-article p').first().click();
+    await closed();
+
+    await launcher.click();
+    await page.locator('.bk-chat[data-open]').waitFor();
+    await launcher.click();
+    await closed();
+  });
+
+  await t.test('the pet waits while the key is saved, runs while an answer streams, jumps when it is done and holds the failed pose after an error', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await watchPet(page);
+    await setUpKey(page);
+    assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
+    await page.evaluate(() => (window.bakeTest.pet = []));
+    await page.evaluate(() => (window.bakeTest.hold = true));
+    await ask(page, '慢慢说');
+    await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
+    assert.deepEqual(await petSeen(page, 'answering'), petEntry('answering'));
+    assert.ok(new Set(await sheetTransforms(page)).size > 1, 'the running frames advance');
+    await page.locator('.bk-chat-send[data-action="stop"]').click();
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    await page.evaluate(() => (window.bakeTest.hold = false));
+
+    api.answers.push({ body: text('好的。') });
+    await ask(page, '你好');
+    await page.locator('.bk-chat-reply[data-done]').nth(1).waitFor();
+    assert.deepEqual(await petSeen(page, 'answered'), petEntry('answered'));
+    await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
+
+    api.answers.push({ status: 500, body: '{"error":{"message":"down"}}' });
+    await ask(page, '还在吗？');
+    await page.locator('.bk-chat-reply .bk-chat-problem').filter({ hasText: '暂时无法回答' }).waitFor();
+    assert.deepEqual(await petSeen(page, 'failed'), petEntry('failed'));
+    await page.waitForTimeout(1300);
+    assert.equal(await lastPet(page), 'failed');
+    assert.equal(await shadow(page, "return getComputedStyle(root.querySelector('.bk-chat-pet-sheet')).transform;"), 'matrix(1, 0, 0, 1, -504, 0)');
+  });
+
+  await t.test('with reduced motion the pet shows the first frame of every state', async (t) => {
+    const { page, api } = await openBrowser(t, base, { contextOptions: { reducedMotion: 'reduce' } });
+    await page.goto(`${base}/2026-10/syntax/`);
+    await watchPet(page);
+    await page.locator('.bk-chat-launcher').hover();
+    assert.deepEqual(await petSeen(page, 'greet'), petEntry('greet', { reduced: true }));
+    await setUpKey(page);
+    await page.evaluate(() => (window.bakeTest.hold = true));
+    await ask(page, '慢慢说');
+    await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
+    assert.deepEqual(await petSeen(page, 'answering'), petEntry('answering', { reduced: true }));
+    assert.deepEqual(new Set(await sheetTransforms(page)), new Set(['none']));
+    await page.locator('.bk-chat-send[data-action="stop"]').click();
+    await page.evaluate(() => (window.bakeTest.hold = false));
+    api.answers.push({ status: 500, body: '{"error":{"message":"down"}}' });
+    await ask(page, '还在吗？');
+    assert.deepEqual(await petSeen(page, 'failed'), petEntry('failed', { reduced: true }));
+    assert.deepEqual(new Set(await sheetTransforms(page)), new Set(['none']));
+  });
+
+  await t.test('@ lists articles, months and topics, and the chosen scopes go into the question and the prompt while the pet reviews', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await watchPet(page);
+    await setUpKey(page);
+    const input = page.locator(QUESTION);
+    const list = page.locator('.bk-chat-scopes[role="listbox"]');
+    const chips = () => page.locator('.bk-chat-composer .bk-chat-chip > span').allTextContents();
+    await input.pressSequentially('@');
+    await list.waitFor();
+    assert.deepEqual(await list.locator('.bk-chat-scopes-group').allTextContents(), ['文章', '月份', '主题（分类和标签）']);
+    await input.pressSequentially('数学');
+    assert.equal(await list.locator('[aria-selected="true"] span').textContent(), '数学');
+    assert.deepEqual(await list.locator('.bk-chat-scopes-group').allTextContents(), ['主题（分类和标签）']);
+    await input.press('Enter');
+    assert.deepEqual(await chips(), ['@数学']);
+    assert.equal(await input.inputValue(), '');
+    assert.equal(await input.getAttribute('placeholder'), '问这些内容…');
+    await input.pressSequentially('@2026-09');
+    await list.locator('[role="option"]').first().waitFor();
+    await input.press('ArrowDown');
+    assert.equal(await list.locator('[aria-selected="true"] span').textContent(), '2026-09');
+    await input.press('Tab');
+    assert.deepEqual(await chips(), ['@数学', '@2026-09']);
+    await input.press('Backspace');
+    assert.deepEqual(await chips(), ['@数学']);
+    await input.pressSequentially('@雅可');
+    await list.locator('[role="option"]').first().waitFor();
+    await input.press('ArrowDown');
+    await input.press('Enter');
+    assert.deepEqual(await chips(), ['@数学', '@雅可比矩阵']);
+    await input.pressSequentially('@');
+    await list.waitFor();
+    await input.press('Escape');
+    await list.waitFor({ state: 'detached' });
+    assert.equal(await page.locator('.bk-chat[data-open]').count(), 1);
+    await input.press('Backspace');
+
+    await page.evaluate(() => (window.bakeTest.pet = []));
+    api.answers.push({ body: text('都读了。') });
+    await ask(page, '讲了什么？');
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    assert.deepEqual(await petSeen(page, 'reading'), petEntry('reading'));
+    assert.deepEqual(await page.locator('.bk-chat-user .bk-chat-chip').allTextContents(), ['@数学', '@雅可比矩阵']);
+    assert.deepEqual(await chips(), []);
+    const system = api.requests.at(-1).body.messages[0].content;
+    assert.match(system, /limited the question to 数学, 雅可比矩阵\./);
+    assert.ok(system.includes(`<article address="/2026-10/jacobian/" title="雅可比矩阵">\n${jacobianSource}\n</article>`), 'the chosen article is in the prompt');
+    assert.match(system, /"address":"\/2026-10\/syntax-linked\/"/);
+    assert.doesNotMatch(system, /"address":"\/2026-10\/activations\/"/);
+    assert.ok(!system.includes(syntaxSource), 'the article on the page is left out');
+    assert.deepEqual(api.requests.at(-1).body.messages.slice(1), [{ role: 'user', content: '讲了什么？' }]);
+  });
+
+  await t.test('older bubbles scroll inside a box of at most 230 pixels without a scrollbar and fade at the top', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    api.answers.push({ body: text(Array.from({ length: 24 }, (_, index) => `第 ${index + 1} 段。`).join('\n\n'), 40) });
+    await ask(page, '写长一点');
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    const bubbles = page.locator('.bk-chat-bubbles');
+    assert.ok((await bubbles.boundingBox()).height <= 230);
+    assert.equal(await bubbles.evaluate((element) => getComputedStyle(element).scrollbarWidth), 'none');
+    await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
+    await bubbles.evaluate((element) => (element.scrollTop = -element.scrollHeight));
+    await page.locator('.bk-chat-bubbles:not([data-faded])').waitFor();
+    await bubbles.evaluate((element) => (element.scrollTop = 0));
+    await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
+  });
+
+  await t.test('a reader chooses a pet by the link of its pet.json, and a link that is too large or has the wrong size leaves the pet unchanged', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    api.pets['/bun/pet.json'] = JSON.stringify({ id: 'bun', displayName: '<b>Bun</b>', spritesheetPath: 'art/sheet.webp', script: 'alert(1)' });
+    api.pets['/bun/art/sheet.webp'] = await petSheet(1536, 1872);
+    api.pets['/big/pet.json'] = JSON.stringify({ displayName: 'Big', spritesheetPath: 'sheet.png' });
+    api.pets['/big/sheet.png'] = Buffer.alloc(5 * 1024 * 1024 + 1);
+    api.pets['/wrong/pet.json'] = JSON.stringify({ displayName: 'Wrong', spritesheetPath: 'sheet.png' });
+    api.pets['/wrong/sheet.png'] = await petSheet(192, 208, 'png');
+    await page.goto(`${base}/2026-10/syntax/`);
+    const frame = () => shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-frame').src;");
+    const siteFrame = await frame();
+    assert.equal(siteFrame, `${base}/_bake/pet/frame.webp`);
+    await openSettings(page);
+    const credit = page.locator('.bk-chat-credit a');
+    assert.equal(await credit.textContent(), 'CRT Monitor，作者 wxy，CC BY 4.0，已裁成 9 行并转成有损 WebP');
+    assert.equal(await credit.getAttribute('href'), `${base}/_bake/pet/LICENSE.txt`);
+    const status = page.locator('.bk-chat-pet-status');
+    const choose = async (path) => {
+      await page.locator('.bk-chat-pet-form input[name="pet"]').fill(`${PETS}${path}`);
+      await page.locator('.bk-chat-pet-form button[type="submit"]').click();
+      await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…');
+    };
+    for (const [path, message] of [
+      ['/big/pet.json', '形象图片超过 5 MB。'],
+      ['/wrong/pet.json', '形象图片是 192x208 像素，需要 1536x1872 或 1536x2288。'],
+      ['/missing/pet.json', '读不到这个链接，对方网站可能不允许跨域请求。'],
+    ]) {
+      await choose(path);
+      assert.equal(await status.textContent(), message);
+      assert.equal(await status.getAttribute('data-failed'), '');
+      assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
+      assert.equal(await frame(), siteFrame);
+    }
+
+    await choose('/bun/pet.json');
+    assert.equal(await status.textContent(), '已换成 <b>Bun</b>。');
+    assert.equal(await status.getAttribute('data-failed'), null);
+    assert.match(await frame(), /^data:image\/webp;base64,/);
+    assert.equal(JSON.parse((await storage(page)).local['bk-chat-pet']).url, `${PETS}/bun/pet.json`);
+    assert.equal(await credit.count(), 0);
+    assert.ok(api.petRequests.length > 0 && api.petRequests.every((request) => request.headers.referer === undefined && request.headers.cookie === undefined), JSON.stringify(api.petRequests));
+
+    await page.reload();
+    assert.match(await frame(), /^data:image\/webp;base64,/);
+    await page.locator('.bk-chat-launcher').hover();
+    await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
+    assert.match(await shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-sheet').src;"), /^blob:/);
+    await openSettings(page);
+    await page.locator('.bk-chat-menu .bk-chat-link', { hasText: '换回默认' }).click();
+    assert.equal(await frame(), siteFrame);
+    assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
+    await credit.waitFor();
+  });
+
   for (const reducedMotion of ['no-preference', 'reduce']) {
     const moves = reducedMotion === 'reduce' ? 'fades where it is' : 'slides out';
-    await t.test(`on a phone the entry ${moves} with the essay buttons while the reader scrolls down and while the drawer is open`, async (t) => {
+    await t.test(`on a phone the pet ${moves} with the essay buttons while the reader scrolls down and while the drawer is open`, async (t) => {
       const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, hasTouch: true, reducedMotion } });
       await page.goto(`${base}/2026-10/syntax/`);
       const launcher = page.locator('.bk-chat-launcher');
@@ -405,19 +754,28 @@ test('the AI chat on published pages', async (t) => {
     });
   }
 
-  await t.test('the entry and the panel use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async (t) => {
+  await t.test('the pet and the bubbles use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async (t) => {
     const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, reducedMotion: 'reduce' } });
     await page.goto(`${base}/2026-10/syntax/`);
     const launcher = page.locator('.bk-chat-launcher');
     assert.equal(await launcher.evaluate((element) => getComputedStyle(element).cursor), 'pointer');
     await launcher.click();
-    const panel = page.locator('.bk-chat-panel.is-open');
-    await panel.waitFor();
-    const box = await panel.boundingBox();
+    const chat = page.locator('.bk-chat[data-open]');
+    await chat.waitFor();
+    await page.locator('.bk-chat-note').first().waitFor();
+    const box = await chat.boundingBox();
     assert.ok(box.x >= 0 && box.x + box.width <= 375 && box.y >= 0 && box.y + box.height <= 700, JSON.stringify(box));
-    assert.equal(await panel.evaluate((element) => getComputedStyle(element).transform), 'none');
-    assert.equal(await page.locator('.bk-chat-view').evaluate((element) => getComputedStyle(element).animationName), 'bk-chat-fade-in');
-    assert.equal(await page.locator('.bk-chat-primary').evaluate((element) => getComputedStyle(element).cursor), 'pointer');
+    assert.equal(await launcher.evaluate((element) => getComputedStyle(element).transform), 'none');
+    assert.equal(
+      await page
+        .locator('.bk-chat-bubble')
+        .first()
+        .evaluate((element) => getComputedStyle(element).translate),
+      'none',
+    );
+    assert.equal(await page.locator('.bk-chat-composer').evaluate((element) => getComputedStyle(element).translate), 'none');
+    await page.locator(KEY).fill(API_KEY);
+    for (const control of ['.bk-chat-send', '.bk-chat-icon']) assert.equal(await page.locator(control).evaluate((element) => getComputedStyle(element).cursor), 'pointer');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
   });
 });

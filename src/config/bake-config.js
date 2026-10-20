@@ -3,12 +3,14 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
+import { DEFAULT_PET, petSourceProblem } from '../chat/pet-files.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
 import { TOC_STYLES, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
 
-const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'bento', 'home', 'categories'];
+const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'bento', 'home', 'categories', 'chat'];
+const CHAT_FIELDS = ['pet'];
 const BENTO_FIELDS = ['columns'];
 const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
@@ -52,6 +54,11 @@ export async function loadBakeConfig(root, themes, errors) {
   return errors.length === count ? deepFreeze(config) : null;
 }
 
+export function configPosition(root, path) {
+  const program = parse(readFileSync(join(root, CONFIG_FILE), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+  return sourceLocator(program)(path, 'value');
+}
+
 function validateConfig(value, themes, report) {
   if (!isPlainObject(value)) {
     report([], 'value', `the default export of ${CONFIG_FILE} must be an object, got ${describeValue(value)}`);
@@ -77,6 +84,9 @@ function validateConfig(value, themes, report) {
   const bento = section(value, 'bento', BENTO_FIELDS, report);
   const bentoColumns = bento.columns ?? 4;
   field(['bento', 'columns'], Number.isInteger(bentoColumns) && bentoColumns >= 1 && bentoColumns <= MAX_BENTO_COLUMNS ? null : `bento.columns must be an integer from 1 to ${MAX_BENTO_COLUMNS}, got ${describeValue(bentoColumns)}`);
+  const chat = section(value, 'chat', CHAT_FIELDS, report);
+  const pet = chat.pet ?? DEFAULT_PET;
+  field(['chat', 'pet'], petSourceProblem(pet));
   const home = section(value, 'home', HOME_FIELDS, report);
   const homeColumns = home.columns ?? 3;
   field(['home', 'columns'], choiceProblem('home.columns', HOME_COLUMNS, homeColumns));
@@ -95,6 +105,7 @@ function validateConfig(value, themes, report) {
     bento: { columns: bentoColumns },
     home: { columns: homeColumns, groupBy },
     categories,
+    chat: { pet },
   };
 }
 

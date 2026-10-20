@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { chatBundle } from '../chat/bundle.js';
+import { petFolder, readPet } from '../chat/pet-files.js';
 import { bundleComponents } from '../components/bundle.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
-import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
+import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
@@ -32,7 +33,8 @@ export async function updateSite(site, changedPaths = null) {
   const { root } = site;
   const touches = (path) => changedPaths === null || changedPaths.some((changed) => changed === path || changed.startsWith(`${path}/`));
   if (touches(THEMES_DIR)) site.themes.clear();
-  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR)) {
+  const pet = site.settings?.config ? petFolder(site.settings.config.chat.pet) : null;
+  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR) || (pet !== null && touches(pet))) {
     site.settings = await readSettings(root);
     site.articles.clear();
     site.bundle = null;
@@ -68,6 +70,7 @@ export async function updateSite(site, changedPaths = null) {
     { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, catalogEntries(shown)), owner: 'the AI chat' },
     { path: CHAT_PREAMBLE_PATH, render: () => `${JSON.stringify(settings.preamble.map((definition) => definition.tex))}\n`, owner: 'the AI chat' },
     notFoundOutput(listed, site.base ?? sitePath(config.url), pageSettings, errors),
+    ...settings.pet.files.map((file) => ({ path: file.path, render: () => file.source, owner: 'the AI chat' })),
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
@@ -93,9 +96,10 @@ async function readSettings(root) {
   const config = await loadBakeConfig(root, themeNames, errors);
   if (config === null) return { errors };
   const preamble = await readMathPreamble(root, errors);
+  const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const componentErrors = [];
   const components = errors.length > 0 ? new Map() : await readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
-  return { errors, config, preamble, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
+  return { errors, config, preamble, pet, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
 }
 
 async function compileThemes(site, published, config, errors) {

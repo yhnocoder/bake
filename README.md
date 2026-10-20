@@ -80,6 +80,7 @@ export default {
 | `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
 | `bento` | no | `{ columns }`: number of card columns in the `bento` theme on wide screens, an integer from 1 to 6. The default is 4. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
+| `chat` | no | `{ pet }`: the pet of the AI chat, described in "The pet" below. The default is `crt-monitor`. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
 
 Any other field is an error.
@@ -319,11 +320,40 @@ The cache step is optional: it keeps the Chromium download between runs, and `np
 
 ## AI chat
 
-Every article page and the homepage have a button in the bottom right corner that opens a chat with DeepSeek. On an article page the reader asks about that article, whose Markdown source goes with every question, or switches to the whole blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, formulas are typeset with the macros of `preamble.sty`, and a switch turns DeepSeek's thinking mode on and off.
+Every article page and the homepage show a small animated pet in the bottom right corner. Clicking the pet opens a chat with DeepSeek: an input field and the latest messages appear as bubbles to the left of the pet. The answers of the model are on the right and the questions of the reader on the left. Escape, a click outside the chat or a second click on the pet closes it. On an article page a question is about that article, whose Markdown source goes with every question, and the model can also read other articles of the blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. Typing `@` in the input field opens a list of articles, months, categories and tags; the reader picks one or more of them to limit the question to those articles. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, and formulas are typeset with the macros of `preamble.sty`. A settings button in the input field starts a new chat, turns DeepSeek's thinking mode on and off, changes or clears the key and chooses another pet.
 
-There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. The menu of the chat clears the key. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
+There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
 
-Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads only when the reader asks about the whole blog. A page without scripts shows nothing of the chat.
+Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads when the reader sends the first question or types `@`. A page without scripts shows nothing of the chat.
+
+### The pet
+
+The pet uses the format of Codex pets: a folder with a `pet.json`, of which Bake reads only `displayName` and `spritesheetPath`, and a PNG or WebP spritesheet of 8 columns and 9 rows of 192 by 208 pixel frames, 1536 by 1872 pixels. Sheets of 1536 by 2288 pixels, which have two more rows, are accepted and cropped to the first 9 rows. The pet waves when the pointer or the keyboard reaches it, runs while an answer is written, reads while the model reads articles, waits while the passkey is used, jumps when an answer is done and shows a failed pose after an error. Readers who prefer reduced motion see the first frame of each pose.
+
+`chat.pet` in `bake.config.js` chooses the pet of the site:
+
+```js
+export default {
+  // ...
+  chat: { pet: 'miso' },
+};
+```
+
+| Value | Pet |
+|---|---|
+| `crt-monitor` | The built-in CRT Monitor. This is the default. |
+| `miso` | The built-in Miso, an otter. |
+| A folder of the blog, such as `pets/bun` | The pet in that folder. |
+| An `http` or `https` address of a `pet.json` | The pet at that address, which `bake build` downloads, checks and publishes with the site. |
+
+`bake build` publishes the pet in `_bake/pet/`, together with its first frame as a small image that the page shows until the pointer or the keyboard reaches the pet; the page downloads the whole spritesheet only then. A spritesheet of another size or one that is not a PNG or WebP image is reported as an error, and so is a downloaded spritesheet larger than 5 MB.
+
+Readers can choose their own pet in the chat settings by pasting the address of a `pet.json`. The browser downloads it without cookies and without the address of the page, refuses a spritesheet larger than 5 MB or of another size, shows the name of the pet only as text, and remembers the choice in this browser.
+
+The built-in pets have their own licenses, which the chat settings name in one line:
+
+- CRT Monitor, "CRT Monitor — Codex Pet" by wxy, from https://github.com/wxy/codex-pets, is licensed under CC BY 4.0. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license notice is `src/chat/pets/crt-monitor/LICENSE`.
+- Miso, by gaerae, from https://github.com/gaerae/playpets, is licensed under the MIT license. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license is `src/chat/pets/miso/LICENSE`.
 
 ## Themes
 

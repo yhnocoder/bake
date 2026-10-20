@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { blogPrompt, blogTools, readArticle, READ_ARTICLE, articlePrompt } from '../src/chat/context.js';
+import { chatTools, matchingScopes, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
+import { chatLabels } from '../src/chat/labels.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
 import { linkTarget, normalizeMath, replyHtml } from '../src/chat/reply.js';
@@ -158,10 +159,10 @@ describe('DeepSeek streaming', () => {
       ),
     );
     const partials = [];
-    const result = await complete({ key: 'test-key', messages: [{ role: 'user', content: 'Hi' }], tools: blogTools, thinking: true, fetch, onDelta: (message) => partials.push(message.reasoning_content) });
+    const result = await complete({ key: 'test-key', messages: [{ role: 'user', content: 'Hi' }], tools: chatTools, thinking: true, fetch, onDelta: (message) => partials.push(message.reasoning_content) });
     assert.equal(requests[0].url, 'https://api.deepseek.com/chat/completions');
     assert.equal(requests[0].init.headers.authorization, 'Bearer test-key');
-    assert.deepEqual(requests[0].body, { model: 'deepseek-flash', messages: [{ role: 'user', content: 'Hi' }], stream: true, thinking: { type: 'enabled' }, tools: blogTools, tool_choice: 'auto' });
+    assert.deepEqual(requests[0].body, { model: 'deepseek-flash', messages: [{ role: 'user', content: 'Hi' }], stream: true, thinking: { type: 'enabled' }, tools: chatTools, tool_choice: 'auto' });
     assert.deepEqual(partials.slice(0, 2), ['Think ', 'Think more.']);
     assert.deepEqual(result, {
       finish: 'tool_calls',
@@ -193,7 +194,7 @@ describe('AI chat conversation', () => {
       key: 'k',
       system: 'System.',
       history: [{ role: 'user', content: 'What is rope?' }],
-      tools: blogTools,
+      tools: chatTools,
       thinking: true,
       fetch,
       runTool: async (name, args) => {
@@ -219,7 +220,7 @@ describe('AI chat conversation', () => {
     const toolRound = () => stream(delta({ tool_calls: [{ index: 0, id: 'c', function: { name: READ_ARTICLE, arguments: 'not json' } }] }, 'tool_calls'));
     const { fetch, requests } = fakeFetch(...Array.from({ length: MAX_TOOL_ROUNDS }, toolRound), stream(delta({ content: 'Done.' }, 'stop')));
     const seen = [];
-    const { turn } = await answer({ key: 'k', system: 'S', history: [], tools: blogTools, thinking: false, fetch, runTool: async (name, args) => (seen.push(args), { content: 'x', label: 'X' }) });
+    const { turn } = await answer({ key: 'k', system: 'S', history: [], tools: chatTools, thinking: false, fetch, runTool: async (name, args) => (seen.push(args), { content: 'x', label: 'X' }) });
     assert.deepEqual(
       requests.map((request) => request.body.tool_choice),
       [...Array(MAX_TOOL_ROUNDS).fill('auto'), 'none'],
@@ -240,22 +241,57 @@ describe('AI chat context', () => {
     ],
   };
 
+  const page = { address: '/2026-10/rope/', title: 'Rope', article: { source: '# Source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }, { id: 'pairs', depth: 3, title: 'Pairs' }] } };
+
   test('lists every article with its address and sections in the prompt for the whole blog', () => {
-    const prompt = blogPrompt({ address: '/', title: 'Test Blog', article: null }, catalog);
+    const prompt = systemPrompt({ page: { address: '/', title: 'Test Blog', article: null }, catalog });
     assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is on the page \/\./);
     assert.ok(prompt.includes('{"address":"/2026-10/rope/","title":"Rope","date":"2026-10-19","summary":"Rotary.","sections":["#angles 01 Angles | #pairs Pairs"]}'));
     assert.ok(prompt.includes('{"address":"/2026-09/demo/","title":"Demo","date":"2026-09-05","tags":["html"]}'));
+    assert.ok(!prompt.includes('<article'));
   });
 
-  test('puts the source and the headings of the article in the prompt for one article', () => {
-    const prompt = articlePrompt({
-      site: 'Test Blog',
-      title: 'Rope',
-      address: '/2026-10/rope/',
-      article: { source: '# Source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }, { id: 'pairs', depth: 3, title: 'Pairs' }] },
-    });
-    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog"\. The reader is reading the article "Rope" at \/2026-10\/rope\/\./);
-    assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>$/);
+  test('puts the source and the headings of the article and then the other articles in the prompt on an article page', () => {
+    const prompt = systemPrompt({ page, catalog });
+    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is reading the article "Rope" at \/2026-10\/rope\/\./);
+    assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>\n/);
+    assert.ok(prompt.indexOf('</article>') < prompt.indexOf('{"address":"/2026-09/demo/"'));
+  });
+
+  test('offers articles, months, categories and tags as scopes and filters them by the typed text', () => {
+    const options = scopeOptions({ ...catalog, articles: [...catalog.articles, { url: '2026-10/gelu/', title: 'GELU', date: '2026-10-02', category: 'ML', tags: ['html', 'act'], sections: [] }] }, chatLabels('zh-CN'));
+    assert.deepEqual(
+      options.map(({ kind, id, label, meta, urls }) => [kind, id, label, meta, urls.join(' ')]),
+      [
+        ['article', 'article:2026-10/rope/', 'Rope', '2026-10', '2026-10/rope/'],
+        ['article', 'article:2026-09/demo/', 'Demo', '2026-09', '2026-09/demo/'],
+        ['article', 'article:2026-10/gelu/', 'GELU', '2026-10', '2026-10/gelu/'],
+        ['month', 'month:2026-10', '2026-10', '2 篇', '2026-10/rope/ 2026-10/gelu/'],
+        ['month', 'month:2026-09', '2026-09', '1 篇', '2026-09/demo/'],
+        ['topic', 'category:ML', 'ML', '分类 · 1 篇', '2026-10/gelu/'],
+        ['topic', 'tag:html', '#html', '标签 · 2 篇', '2026-09/demo/ 2026-10/gelu/'],
+        ['topic', 'tag:act', '#act', '标签 · 1 篇', '2026-10/gelu/'],
+      ],
+    );
+    assert.deepEqual(
+      matchingScopes(options, 'HTML', [options.find((option) => option.id === 'tag:html')]).map((option) => option.id),
+      [],
+    );
+    assert.deepEqual(
+      matchingScopes(options, '2026-09', []).map((option) => option.id),
+      ['article:2026-09/demo/', 'month:2026-09'],
+    );
+  });
+
+  test('limits the prompt to the chosen scopes, with the sources of chosen articles and the list of articles in chosen months and topics', () => {
+    const options = scopeOptions(catalog, chatLabels('en'));
+    const scopes = ['article:2026-10/rope/', 'month:2026-09'].map((id) => options.find((option) => option.id === id));
+    const prompt = systemPrompt({ page, catalog, scopes, sources: [{ url: '2026-10/rope/', title: 'Rope', content: '# Rope source' }] });
+    assert.match(prompt, /The reader limited the question to Rope, 2026-09\./);
+    assert.match(prompt, /<article address="\/2026-10\/rope\/" title="Rope">\n# Rope source\n<\/article>/);
+    assert.ok(prompt.includes('{"address":"/2026-09/demo/"'));
+    assert.ok(!prompt.includes('{"address":"/2026-10/rope/"'));
+    assert.ok(!prompt.includes('# Source'));
   });
 
   test('reads an article by its address in any common form and reports unknown addresses', async () => {

@@ -40,7 +40,8 @@ try {
       if (!chatShown && (await hasArticleChat(page))) {
         chatShown = true;
         await page.locator('.bk-chat-launcher').click();
-        await page.locator('.bk-chat-panel.is-open .bk-chat-view').waitFor();
+        await page.locator('.bk-chat[data-open] .bk-chat-bubble').first().waitFor();
+        await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
         await page.evaluate(() => document.fonts.ready);
         await page.screenshot({ path: join(out, `${name}-chat.${variant.name}.png`), animations: 'disabled', caret: 'hide' });
         count += 1;

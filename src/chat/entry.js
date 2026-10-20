@@ -1,6 +1,7 @@
 import styles from './entry.css?inline';
-import { createFigure } from './figure.js';
 import { chatLabels } from './labels.js';
+import petStyles from './pet.css?inline';
+import { createPet, petSource } from './pet.js';
 import { ARTICLE_REGION, selectedRange } from './selection.js';
 import { passkeysAvailable } from './vault.js';
 
@@ -15,22 +16,30 @@ function startChat(root) {
   host.dataset.bakeChat = '';
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
-  style.textContent = styles;
-  const figure = createFigure();
-  const launcher = button('bk-chat-launcher', labels.open);
+  style.textContent = `${styles}\n${petStyles}`;
+  const pet = createPet(petSource(root));
+  const launcher = document.createElement('button');
+  launcher.type = 'button';
+  launcher.className = 'bk-chat-launcher';
+  launcher.setAttribute('aria-label', labels.open);
   launcher.setAttribute('aria-haspopup', 'dialog');
-  launcher.prepend(figure.element);
+  launcher.append(pet.element);
   const ask = button('bk-chat-ask', labels.ask);
   ask.hidden = true;
   shadow.append(style, launcher, ask);
   document.body.append(host);
 
-  let panel = null;
-  const loadPanel = () => (panel ??= import('./panel.jsx').then((module) => module.createPanel({ shadow, root, labels, figure, launcher })));
-  launcher.addEventListener('click', async () => (await loadPanel()).open());
-  launcher.addEventListener('pointerenter', () => {
-    if (figure.element.dataset.state === 'idle') figure.setState('greet');
-  });
+  launcher.setAttribute('aria-expanded', 'false');
+  let chat = null;
+  const loadChat = () => (chat ??= import('./bubbles.jsx').then((module) => module.createChat({ shadow, root, labels, pet, petSource: () => petSource(root), launcher })));
+  const greet = () => {
+    pet.load();
+    loadChat();
+    if (launcher.getAttribute('aria-expanded') === 'false' && pet.element.dataset.state === 'idle') pet.setState('greet');
+  };
+  launcher.addEventListener('click', async () => (await loadChat()).toggle());
+  launcher.addEventListener('pointerenter', greet);
+  launcher.addEventListener('focus', greet);
 
   let range = null;
   let frame = 0;
@@ -59,7 +68,7 @@ function startChat(root) {
     if (range === null) return;
     const chosen = range.cloneRange();
     ask.hidden = true;
-    (await loadPanel()).ask(chosen);
+    (await loadChat()).ask(chosen);
   });
 }
 
