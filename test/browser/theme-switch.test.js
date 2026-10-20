@@ -1,23 +1,15 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
-import { bake } from '../blog.js';
+import { exampleBuild } from '../blog.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const THROTTLE = 4;
 const FADE_FRAME_LIMIT = 150;
 
 test('switching the theme restyles the page once and fades on the compositor in the essay and bento themes', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-theme-switch-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  assert.equal(result.status, 0);
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
   const browser = await chromium.launch();
   t.after(() => browser.close());
@@ -84,10 +76,7 @@ const fading = () => document.getAnimations().some((animation) => animation.play
 const notFading = () => !document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 
 test('a change of the system colour scheme fades without showing the new colours first, and a press during the fade ends it and keeps the settings open', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-theme-fade-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  assert.equal(bake(dir, 'build').status, 0);
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
   const browser = await chromium.launch();
   t.after(() => browser.close());
@@ -132,10 +121,7 @@ test('a change of the system colour scheme fades without showing the new colours
 });
 
 test('changing the text spacing fades on the compositor in the essay and bento themes', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-spacing-switch-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  assert.equal(bake(dir, 'build').status, 0);
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
   const browser = await chromium.launch();
   t.after(() => browser.close());

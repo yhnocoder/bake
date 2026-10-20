@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fromHtml } from 'hast-util-from-html';
 import sharp from 'sharp';
-import { article, bake, createBlog, readTree, validConfig } from './blog.js';
+import { article, bake, copyExample, createBlog, readTree, validConfig } from './blog.js';
 
-const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
 const plainPage = `import { For } from 'solid-js';
@@ -279,9 +277,7 @@ describe('bake build', () => {
   });
 
   test('builds the example blog', (t) => {
-    const dir = mkdtempSync(join(tmpdir(), 'bake-example-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
-    cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+    const dir = copyExample(t);
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     assert.equal(result.stdout, '7 pages\ndist/ written\n');

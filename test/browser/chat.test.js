@@ -4,7 +4,8 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import sharp from 'sharp';
-import { API_KEY, CORS, KEY, PETS, QUESTION, ask, buildExample, events, exampleBlog, openBrowser, setUpKey, storage, text } from './chat-page.js';
+import { exampleBlog } from '../blog.js';
+import { API_KEY, CORS, KEY, PETS, QUESTION, ask, buildExample, events, openBrowser, setUpKey, storage, text } from './chat-page.js';
 import { isSelectionChunk } from './selection-module.js';
 
 

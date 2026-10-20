@@ -1,21 +1,12 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
-import { bake } from '../blog.js';
+import { exampleBuild } from '../blog.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
-
 test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-browser-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  assert.equal(result.status, 0);
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
 
   const browser = await chromium.launch();

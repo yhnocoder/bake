@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict';
-import { cpSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
-import { article, bake, createBlog } from '../blog.js';
+import { article, bake, copyExample, writeFiles } from '../blog.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const NOTE_GAP = 12;
 const LINE_TOLERANCE = 4;
 
@@ -119,8 +117,8 @@ function checkNotes({ blocks, notes }, label) {
 }
 
 test('sidenotes', async (t) => {
-  const dir = createBlog(t, { 'content/posts/stress/index.md': stressArticle });
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+  const dir = copyExample(t);
+  writeFiles(dir, { 'content/posts/stress/index.md': stressArticle });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));

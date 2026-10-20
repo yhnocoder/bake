@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
-import { article, bake, createBlog, validConfig } from '../blog.js';
+import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
 
 const blog = {
@@ -576,11 +574,7 @@ function componentOverflow() {
 }
 
 test('the example components run on the syntax page', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-components-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
   const browser = await chromium.launch();
   t.after(() => browser.close());

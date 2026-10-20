@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
-import { article, bake, writeFiles } from '../blog.js';
+import { article, bake, copyExample, exampleBlog, writeFiles } from '../blog.js';
 import { openWithSelectionModule } from './selection-module.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const widths = [1440, 1100, 375];
 const activationsSource = readFileSync(join(exampleBlog, 'content/posts/activations/index.md'), 'utf8');
 
@@ -63,9 +62,7 @@ Last line.
 });
 
 test('the bento theme lays out sections as cards', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-bento-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+  const dir = copyExample(t);
   writeFiles(dir, { 'content/posts/bento-cards/index.md': cardsArticle });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');

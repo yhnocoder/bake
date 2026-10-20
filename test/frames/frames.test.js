@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
-import { bake } from '../blog.js';
+import { exampleBuild } from '../blog.js';
 import { serve } from '../browser/server.js';
 import { describe, frameProblem, frameStats, openPage, paced, record, settle } from './frames.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const everyInteraction = process.env.BAKE_FRAMES === 'all';
 
 const SYNTAX = '/2026-10/syntax/';
@@ -210,11 +207,7 @@ test('every known failure names a measured case', () => {
 });
 
 test('interactions draw every frame within the 60 fps budget on a CPU twice as slow', async (t) => {
-  const blog = mkdtempSync(join(tmpdir(), 'bake-frames-'));
-  t.after(() => rmSync(blog, { recursive: true, force: true }));
-  cpSync(exampleBlog, blog, { recursive: true, filter: (path) => !/[/\\](dist|node_modules)$/.test(path) });
-  const built = bake(blog, 'build');
-  assert.equal(built.status, 0, built.stdout + built.stderr);
+  const blog = exampleBuild();
   const base = (await serve(t, join(blog, 'dist'))).replace('127.0.0.1', 'localhost');
   const browser = await chromium.launch();
   t.after(() => browser.close());

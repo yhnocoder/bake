@@ -5,7 +5,8 @@ import { test } from 'node:test';
 import { CHAT_RULES } from '../../src/chat/context.js';
 import { chatLabels } from '../../src/chat/labels.js';
 import { noteRules } from '../../src/chat/note.js';
-import { API_KEY, QUESTION, ask, buildExample, exampleBlog, openBrowser, setUpKey, storage, text } from './chat-page.js';
+import { exampleBlog } from '../blog.js';
+import { API_KEY, QUESTION, ask, buildExample, openBrowser, setUpKey, storage, text } from './chat-page.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');

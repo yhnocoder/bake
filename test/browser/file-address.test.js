@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
-import { article, bake, createBlog, validConfig } from '../blog.js';
+import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
 
 test('a page opened from a file address is the styled page without scripts', async (t) => {
   const dir = createBlog(t, {
@@ -52,11 +50,7 @@ test('a page opened from a file address is the styled page without scripts', asy
 });
 
 test('the homepage and the articles of the example blog opened from file addresses load every stylesheet, font and image', async (t) => {
-  const exampleBlog = join(import.meta.dirname, '../../examples/blog');
-  const dir = mkdtempSync(join(tmpdir(), 'bake-file-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  assert.equal(bake(dir, 'build').stderr, '');
+  const dir = exampleBuild();
   const browser = await chromium.launch();
   t.after(() => browser.close());
   for (const width of [1440, 375]) {

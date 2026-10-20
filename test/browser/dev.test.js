@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import { startDevServer } from '../../src/dev/server.js';
-import { article, createBlog, validConfig } from '../blog.js';
+import { article, copyExample, createBlog, validConfig } from '../blog.js';
 
 const filler = (topic, count = 4) => Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
@@ -44,7 +43,6 @@ const body = [
 
 const ARTICLE = 'content/posts/live/index.md';
 const SYNTAX = 'content/posts/syntax/index.md';
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 
 function lineOf(source, text) {
   return source.slice(0, source.indexOf(text)).split('\n').length;
@@ -406,9 +404,7 @@ export default class LabelView extends HTMLElement {
 });
 
 test('bake dev shows a parameter bar on each component of the article that changes, writes, copies and resets its parameters', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-param-bar-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+  const dir = copyExample(t);
   const file = join(dir, SYNTAX);
   const original = readFileSync(file, 'utf8');
   const directive = ':::act-fn-plot{fn=silu range=6 beta=2 width=body}';

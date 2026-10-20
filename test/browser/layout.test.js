@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { article, bake, writeFiles } from '../blog.js';
+import { article, bake, copyExample, writeFiles } from '../blog.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const overflowWidths = [375, 600, 1000, 1339, 1340, 1440];
 const WENKAI_TEXT = '.bk-site, .bk-title, .bk-article :is(h2, h3, h4, h5, h6)';
 
@@ -95,9 +93,7 @@ A paragraph before the references.
 });
 
 test('the essay theme lays out articles', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-layout-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+  const dir = copyExample(t);
   writeFiles(dir, {
     'content/posts/stress/index.md': stressArticle,
     'content/posts/widths/index.md': widthsArticle,

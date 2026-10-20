@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { bake, writeFiles } from './blog.js';
+import { bake, copyExample, writeFiles } from './blog.js';
 import { folder, outline, parseSite } from './article.js';
 
 const fixturesDir = join(import.meta.dirname, 'fixtures/syntax-errors');
-const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const ID_ATTRIBUTE = new RegExp(' id="([^"]*)"', 'g');
 const linkFixtures = ['missing-link-target.md', 'embed-self.md', 'embed-duplicate.md', 'embed-overlap.md'];
 
@@ -362,9 +360,7 @@ describe(':::embed', () => {
 describe('link fixtures', () => {
   test('syntax error fixtures for links and embeds report the lines in expected.json', (t) => {
     const expected = JSON.parse(readFileSync(join(fixturesDir, 'expected.json'), 'utf8'));
-    const dir = mkdtempSync(join(tmpdir(), 'bake-links-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
-    cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+    const dir = copyExample(t);
     writeFiles(dir, Object.fromEntries(linkFixtures.map((name) => [`content/posts/fixtures/${name.replace('.md', '')}/index.md`, readFileSync(join(fixturesDir, name), 'utf8')])));
     const lines = bake(dir, 'build')
       .stderr.trim()

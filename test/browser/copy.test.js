@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict';
-import { cpSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { parse } from '../article.js';
-import { article, bake, createBlog, validConfig } from '../blog.js';
+import { article, bake, createBlog, exampleBlog, exampleBuild, validConfig } from '../blog.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const lines = source.split('\n');
 const linkedLines = readFileSync(join(exampleBlog, 'content/posts/syntax-linked/index.md'), 'utf8').split('\n');
@@ -64,10 +63,7 @@ async function copied(page) {
 }
 
 test('copying from an article gives the Markdown source of the selection', async (t) => {
-  const dir = createBlog(t, {});
-  cpSync(exampleBlog, dir, { recursive: true, filter: (path) => path !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  const dir = exampleBuild();
   const base = await serve(t, join(dir, 'dist'));
   const browser = await chromium.launch();
   t.after(() => browser.close());

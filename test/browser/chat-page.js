@@ -1,11 +1,7 @@
-import assert from 'node:assert/strict';
-import { cpSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { bake, createBlog } from '../blog.js';
+import { exampleBuild } from '../blog.js';
 import { serve } from './server.js';
-
-export const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 
 export const API_KEY = 'sk-test-0123456789abcdef';
 export const PETS = 'https://pets.example';
@@ -23,11 +19,7 @@ export function text(content, size = 6) {
 }
 
 export async function buildExample(t) {
-  const dir = createBlog(t, {});
-  cpSync(exampleBlog, dir, { recursive: true, filter: (path) => path !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  return (await serve(t, join(dir, 'dist'))).replace('127.0.0.1', 'localhost');
+  return (await serve(t, join(exampleBuild(), 'dist'))).replace('127.0.0.1', 'localhost');
 }
 
 export async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {

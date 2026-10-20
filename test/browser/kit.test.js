@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
-import { article, bake, createBlog, validConfig } from '../blog.js';
+import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
 import { serve } from './server.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const PLOT = 'figure.component[data-component="act-fn-plot"]';
 
 const kitBlog = {
@@ -166,11 +164,7 @@ function colorCount({ data }) {
 }
 
 test('the kit draws the example function plot', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-kit-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
   const browser = await chromium.launch();
   t.after(() => browser.close());

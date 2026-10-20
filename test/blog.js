@@ -1,9 +1,14 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 export const cli = join(import.meta.dirname, '../src/cli.js');
+export const exampleBlog = join(import.meta.dirname, '../examples/blog');
+
+const EXAMPLE_OUTPUTS = new Set(['dist', '.dist-staging', '.dist-previous', 'node_modules']);
+let builtExample = null;
 
 export const validConfig = "export default { title: 'Test Blog', url: 'https://example.com', language: 'en' };\n";
 
@@ -12,6 +17,29 @@ export function createBlog(t, files) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFiles(dir, files);
   return dir;
+}
+
+export function copyExample(t) {
+  const dir = createBlog(t, {});
+  copyExampleTo(dir);
+  return dir;
+}
+
+function copyExampleTo(dir) {
+  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => !EXAMPLE_OUTPUTS.has(relative(exampleBlog, source)) });
+}
+
+export function exampleBuild() {
+  if (builtExample === null) {
+    const dir = mkdtempSync(join(tmpdir(), 'bake-example-'));
+    process.once('exit', () => rmSync(dir, { recursive: true, force: true }));
+    copyExampleTo(dir);
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    assert.equal(result.status, 0);
+    builtExample = dir;
+  }
+  return builtExample;
 }
 
 export function writeFiles(dir, files) {
