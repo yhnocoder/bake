@@ -207,7 +207,7 @@ export class MarkdownWriter {
     if (element.matches('a.citation[data-key]')) return [{ type: 'citation', key: element.dataset.key }];
     if (element.matches('a.eqref')) return [{ type: 'eqref', label: idOfFragment(hashOf(element.getAttribute('href'))) }];
     if (element.matches('br')) return [{ type: 'break' }];
-    if (element.matches('img')) return [image(element, element.style.width === '' ? {} : { width: element.style.width })];
+    if (element.matches('img')) return [image(element)];
     if (element.matches('code')) return [{ type: 'inlineCode', value: this.selectedText(element) }];
     const inner = this.inline(element);
     if (inner.every(isBlank)) return inner;
@@ -257,11 +257,8 @@ export class MarkdownWriter {
     const element = figure.querySelector('img');
     const caption = figure.querySelector(':scope > figcaption');
     if (element === null) return this.blocks(figure);
-    const attributes = {};
-    if (figure.style.width !== '') attributes.width = figure.style.width;
-    if (figure.dataset.float !== undefined) attributes.float = figure.dataset.float;
     const title = caption === null ? null : tidy(serializeMarkdown({ type: 'root', children: paragraph(this.whole(caption, () => this.inline(caption))) }));
-    return [{ type: 'paragraph', children: [{ ...image(element, attributes), title }] }];
+    return [{ type: 'paragraph', children: [{ ...image(element), title }] }];
   }
 
   fold(details) {
@@ -354,8 +351,9 @@ function tightList(children) {
   return { type: 'list', ordered: false, spread: false, children };
 }
 
-function image(element, attributes) {
-  return { type: 'image', url: element.getAttribute('src'), alt: element.getAttribute('alt') ?? '', attributes };
+function image(element) {
+  const url = element.dataset.src ?? new URL(element.getAttribute('src'), element.baseURI).href;
+  return { type: 'image', url, alt: element.getAttribute('alt') ?? '', attributes: writtenAttributes(element) };
 }
 
 function paragraph(nodes) {

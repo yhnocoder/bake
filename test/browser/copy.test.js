@@ -3,6 +3,7 @@ import { cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import { parse } from '../article.js';
 import { article, bake, createBlog, validConfig } from '../blog.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
@@ -264,6 +265,31 @@ test('a converted citation, reference entry and internal link keep a key or an a
   await openWithSelectionModule(page, `${base}/2026-10/host/`);
   await select(page, { selector: '.embed li', contains: 'First', text: 'irst' }, { selector: '.embed li', contains: 'Second', text: 'Sec', after: true });
   assert.equal((await copied(page)).text, ':::references\n- [@a%zz] irst.\n- [@b%20c] Sec\n:::');
+  await context.close();
+});
+
+test('a converted image keeps the address and the attributes written in the source, and an embedded image links to its published file', async (t) => {
+  const body = '## Dots\n\n:::aside\nDots ![dot](dot.png){width=40px height=10px} and ![dot](dot.png){height=12px} inline.\n\n![Figure](dot.png){width=200px float=left}\n\nAfter the figure.\n:::\n';
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body }),
+    'content/posts/rope/dot.png': await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer(),
+    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: ':::embed\n/2026-10/rope/#dots\n:::\n' }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  const images = (address) => `ots ![dot](${address}){width=40px height=10px} and ![dot](${address}){height=12px} inline.\n\n![Figure](${address}){width=200px float=left}\n\nAft`;
+  await openWithSelectionModule(page, `${base}/2026-10/rope/`);
+  await select(page, { selector: '.aside p', contains: 'Dots', text: 'ots' }, { selector: '.aside p', contains: 'After', text: 'Aft', after: true });
+  assert.equal((await copied(page)).text, `:::aside\n${images('dot.png')}\n:::`);
+  await openWithSelectionModule(page, `${base}/2026-10/host/`);
+  await select(page, { selector: '.embed .aside p', contains: 'Dots', text: 'ots' }, { selector: '.embed .aside p', contains: 'After', text: 'Aft', after: true });
+  assert.equal((await copied(page)).text, `:::aside\n${images(`${base}/2026-10/rope/dot.webp`)}\n:::`);
   await context.close();
 });
 
