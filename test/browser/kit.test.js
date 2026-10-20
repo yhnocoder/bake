@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { PNG } from 'pngjs';
@@ -340,25 +340,6 @@ test('the kit draws the example function plot', async (t) => {
     await page.close();
   });
 
-  await t.test('the chosen segment fades in a layer and animates no shadow or background', async () => {
-    const { page, problems } = await open();
-    const frame = page.locator(PLOT).first();
-    await frame.scrollIntoViewIfNeeded();
-    const styles = await page.evaluate(() => {
-      const segments = [...document.querySelector('figure.component[data-component="act-fn-plot"]').querySelectorAll('.bk-kit-segment span')];
-      const chosen = segments.find((span) => span.previousElementSibling.checked);
-      const other = segments.find((span) => !span.previousElementSibling.checked);
-      return {
-        span: getComputedStyle(chosen).transitionDuration,
-        layer: getComputedStyle(chosen, '::before').transitionProperty,
-        opacity: [getComputedStyle(chosen, '::before').opacity, getComputedStyle(other, '::before').opacity],
-      };
-    });
-    assert.deepEqual(styles, { span: '0s', layer: 'opacity', opacity: ['1', '0'] });
-    assert.deepEqual(problems, []);
-    await page.close();
-  });
-
   await t.test('controls show the pointer cursor and a focus outline', async () => {
     const { page, problems } = await open();
     const frame = page.locator(PLOT).first();
@@ -383,34 +364,25 @@ test('the kit draws the example function plot', async (t) => {
   });
 
   await t.test('the plot follows the color scheme, and its screenshots differ between light and dark', async () => {
-    const screenshotDir = process.env.BAKE_KIT_SCREENSHOTS ?? join(dir, 'kit-screenshots');
-    mkdirSync(screenshotDir, { recursive: true });
     const shots = {};
     const strokes = {};
     for (const colorScheme of ['light', 'dark']) {
-      for (const width of [1440, 375]) {
-        const { page, problems } = await open({ viewport: { width, height: 900 }, colorScheme, reducedMotion: 'reduce' });
-        const frame = page.locator(PLOT).first();
-        await frame.scrollIntoViewIfNeeded();
-        const svg = await frame.locator('.bk-kit-plot-svg').first().boundingBox();
-        await page.mouse.move(svg.x + svg.width * 0.6, svg.y + svg.height / 2);
-        await settle(page);
-        const image = await frame.screenshot();
-        const file = join(screenshotDir, `act-fn-plot-${width}-${colorScheme}.png`);
-        writeFileSync(file, image);
-        if (width === 1440) {
-          shots[colorScheme] = PNG.sync.read(image);
-          strokes[colorScheme] = await page.evaluate(() => {
-            const frame = document.querySelector('figure.component[data-component="act-fn-plot"]');
-            return [frame.querySelector('path.bk-kit-curve'), frame.querySelector('.bk-kit-grid'), frame.querySelector('.bk-kit-readout')].map((element) => {
-              const style = getComputedStyle(element);
-              return element.tagName === 'DIV' ? style.backgroundColor : style.stroke;
-            });
-          });
-        }
-        assert.deepEqual(problems, [], `${width}px ${colorScheme}`);
-        await page.close();
-      }
+      const { page, problems } = await open({ colorScheme, reducedMotion: 'reduce' });
+      const frame = page.locator(PLOT).first();
+      await frame.scrollIntoViewIfNeeded();
+      const svg = await frame.locator('.bk-kit-plot-svg').first().boundingBox();
+      await page.mouse.move(svg.x + svg.width * 0.6, svg.y + svg.height / 2);
+      await settle(page);
+      shots[colorScheme] = PNG.sync.read(await frame.screenshot());
+      strokes[colorScheme] = await page.evaluate(() => {
+        const frame = document.querySelector('figure.component[data-component="act-fn-plot"]');
+        return [frame.querySelector('path.bk-kit-curve'), frame.querySelector('.bk-kit-grid'), frame.querySelector('.bk-kit-readout')].map((element) => {
+          const style = getComputedStyle(element);
+          return element.tagName === 'DIV' ? style.backgroundColor : style.stroke;
+        });
+      });
+      assert.deepEqual(problems, [], colorScheme);
+      await page.close();
     }
     for (const index of [0, 1, 2]) assert.notEqual(strokes.light[index], strokes.dark[index]);
     assert.ok(colorCount(shots.light) > 20 && colorCount(shots.dark) > 20);

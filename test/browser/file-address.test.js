@@ -20,7 +20,6 @@ test('a page opened from a file address is the styled page without scripts', asy
     const paragraph = document.querySelector('.bk-article .bk-block[data-type="paragraph"]');
     const note = document.querySelector('.bk-article .bk-sidenote[data-sidenote="1"]');
     return {
-      script: document.documentElement.dataset.script ?? null,
       background: getComputedStyle(document.body).backgroundColor,
       columnWidth: paragraph.getBoundingClientRect().width,
       noteVisible: note.checkVisibility(),
@@ -30,7 +29,6 @@ test('a page opened from a file address is the styled page without scripts', asy
     };
   });
   assert.deepEqual(articlePage, {
-    script: null,
     background: 'rgb(245, 246, 244)',
     columnWidth: 820,
     noteVisible: true,
@@ -41,11 +39,10 @@ test('a page opened from a file address is the styled page without scripts', asy
 
   await page.goto(pathToFileURL(join(dir, 'dist/index.html')).href);
   const homepage = await page.evaluate(() => ({
-    script: document.documentElement.dataset.script ?? null,
     background: getComputedStyle(document.body).backgroundColor,
     controlsVisible: document.querySelector('.bk-home-controls').checkVisibility(),
   }));
-  assert.deepEqual(homepage, { script: null, background: 'rgb(245, 246, 244)', controlsVisible: false });
+  assert.deepEqual(homepage, { background: 'rgb(245, 246, 244)', controlsVisible: false });
 });
 
 test('the homepage and the articles of the example blog opened from file addresses load every stylesheet, font and image', async (t) => {
@@ -67,13 +64,12 @@ test('the homepage and the articles of the example blog opened from file address
         await Promise.all([...document.images].map((image) => image.decode().catch(() => {})));
         await document.fonts.ready;
         return {
-          script: document.documentElement.dataset.script ?? null,
           brokenImages: [...document.images].filter((image) => image.naturalWidth === 0).map((image) => image.src),
           visibleControls: [...document.querySelectorAll('button, input, select')].filter((control) => control.checkVisibility()).length,
           overflow: document.documentElement.scrollWidth > innerWidth,
         };
       });
-      assert.deepEqual({ ...state, failed }, { script: null, brokenImages: [], visibleControls: 0, overflow: false, failed: [] }, `${path} at ${width} pixels`);
+      assert.deepEqual({ ...state, failed }, { brokenImages: [], visibleControls: 0, overflow: false, failed: [] }, `${path} at ${width} pixels`);
       await page.close();
     }
   }

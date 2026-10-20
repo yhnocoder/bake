@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { PNG } from 'pngjs';
@@ -617,8 +616,6 @@ test('the example components run on the syntax page', async (t) => {
   });
 
   await t.test('every chapter of the syntax article renders a screenshot with content at 1440 and 375 pixels', async () => {
-    const screenshotDir = process.env.BAKE_SECTION_SCREENSHOTS ?? join(dir, 'section-screenshots');
-    mkdirSync(screenshotDir, { recursive: true });
     for (const width of [1440, 375]) {
       const { page, problems } = await start({ viewport: { width, height: 900 } });
       const sections = await page.evaluate(() =>
@@ -631,7 +628,6 @@ test('the example components run on the syntax page', async (t) => {
       for (const { id, top, width: sectionWidth, height } of sections) {
         assert.ok(sectionWidth > 0 && height > 0, `${width}px ${id}: the section is ${sectionWidth}x${height}`);
         const image = await sectionScreenshot(page, Math.round(top), Math.round(height), width);
-        writeFileSync(join(screenshotDir, `${width}-${id}.png`), PNG.sync.write(image));
         assert.ok(distinctColors(image) > 1, `${width}px ${id}: the screenshot has one color`);
       }
       assert.deepEqual(problems, [], `${width}px`);

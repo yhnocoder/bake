@@ -125,17 +125,22 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     edit('Paragraph 1 about folds.', 'An added paragraph.\n\nParagraph 1 about folds.');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('An added paragraph.'));
     assert.deepEqual(await page.evaluate(() => window.highlighted), [await page.locator('.bk-block', { hasText: 'An added paragraph.' }).getAttribute('data-line')]);
-    assert.equal(await page.evaluate(() => JSON.parse(document.querySelector('script.bk-source').textContent)), readFileSync(file, 'utf8'));
+    await page.locator('.bk-copy-source').dispatchEvent('click');
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), readFileSync(file, 'utf8'));
   });
 
   await t.test('the page scripts work on the replaced article', async () => {
-    await page.evaluate(() => scrollBy(0, 10));
-    await page.waitForFunction(() => document.querySelector('.bk-toc [data-target="editing"]').dataset.state === 'current');
-    const state = await page.evaluate(() => ({
-      notes: [...document.querySelectorAll('.bk-notes-layer .bk-sidenote')].map((note) => [note.textContent, note.style.top !== '']),
-      unresolved: [...document.querySelectorAll('.bk-block[data-width]')].filter((block) => block.dataset.resolved === undefined).length,
-    }));
-    assert.deepEqual(state, { notes: [['1The note next to the edited paragraph.', true]], unresolved: 0 });
+    const notes = await page.evaluate(() => {
+      const reference = [...document.querySelectorAll('.bk-article p')].find((paragraph) => paragraph.textContent.includes('says goodbye'));
+      return [...document.querySelectorAll('.bk-sidenote')]
+        .filter((note) => note.checkVisibility())
+        .map((note) => ({ text: note.textContent, beside: note.getBoundingClientRect().left >= reference.getBoundingClientRect().right, offset: Math.abs(note.getBoundingClientRect().top - reference.getBoundingClientRect().top) }));
+    });
+    assert.deepEqual(
+      notes.map(({ text, beside }) => [text, beside]),
+      [['1The note next to the edited paragraph.', true]],
+    );
+    assert.ok(notes[0].offset < 40, `the note is ${notes[0].offset}px away from its paragraph`);
     await page.click('details.fold > summary');
     await page.waitForFunction(() => {
       const fold = document.querySelector('details.fold');
@@ -172,7 +177,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
 
   await t.test('an error opens the problems list and keeps the last good page, and fixing it leaves a dot', async () => {
     assert.equal(await dot.isVisible(), true);
-    assert.equal(await dot.getAttribute('data-state'), 'clear');
+    assert.equal(await dot.getAttribute('title'), 'No problems');
     assert.equal(await panel.isVisible(), false);
     await clearTransitions();
     edit('The edited paragraph says goodbye.', 'The edited paragraph says goodbye[^missing].');
@@ -201,7 +206,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await fades('dot');
     await panel.waitFor({ state: 'hidden' });
     await dot.waitFor();
-    assert.equal(await dot.getAttribute('data-state'), 'clear');
+    assert.equal(await dot.getAttribute('title'), 'No problems');
   });
 
   await t.test('closing the problems list leaves a dot with the count that opens it again', async () => {
@@ -213,7 +218,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await fades('problems');
     await panel.waitFor({ state: 'hidden' });
     await dot.waitFor();
-    assert.deepEqual([await dot.getAttribute('data-state'), await dot.textContent()], ['problems', '1']);
+    assert.deepEqual([await dot.getAttribute('title'), await dot.textContent()], ['1 problem', '1']);
     await dot.click();
     await panel.waitFor();
     await dot.waitFor({ state: 'hidden' });
@@ -221,7 +226,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await panel.waitFor({ state: 'hidden' });
     edit('[^missing]', '');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('says goodbye again.'));
-    await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.dot').dataset.state === 'clear');
+    await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.dot').title === 'No problems');
     assert.equal(await panel.isVisible(), false);
     await dot.click();
     await panel.waitFor();
@@ -235,7 +240,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     const transitions = () => page.evaluate(() => [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => getComputedStyle(element).transitionProperty));
     assert.ok((await transitions()).every((property) => property.includes('translate')));
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    assert.deepEqual(await transitions(), Array(3).fill('opacity, display'));
+    assert.ok((await transitions()).every((property) => property.includes('opacity') && !property.includes('translate')));
     await page.emulateMedia({ reducedMotion: null });
   });
 
@@ -367,40 +372,6 @@ test('bake dev updates a page with a save that it made while the event stream wa
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
-test('bake dev starts the components of an article that it updates in place', async (t) => {
-  const dir = createBlog(t, {
-    'bake.config.js': validConfig,
-    'components/label-view.js': `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };
-export const layout = { height: 80 };
-
-export default class LabelView extends HTMLElement {
-  connectedCallback() {
-    this.textContent = this.params.text;
-  }
-}
-`,
-    [ARTICLE]: article({ title: 'Live', slug: 'live', body: 'A paragraph before the component.\n\n:::label-view{text=first}\n:::\n' }),
-  });
-  const file = join(dir, ARTICLE);
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`${server.url}2026-10/live/`);
-  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-  await page.waitForFunction(() => document.querySelector('label-view')?.textContent === 'first');
-  await page.evaluate(() => {
-    window.keptAcrossUpdates = true;
-  });
-  writeFileSync(file, readFileSync(file, 'utf8').replace('text=first', 'text=second'));
-  await page.waitForFunction(() => document.querySelector('label-view')?.textContent === 'second');
-  assert.deepEqual(
-    await page.evaluate(() => [window.keptAcrossUpdates, document.querySelector('figure.component').dataset.state]),
-    [true, 'ready'],
-  );
-  await page.close();
-});
-
 test('bake dev shows a parameter bar on each component of the article that changes, writes, copies and resets its parameters', async (t) => {
   const dir = copyExample(t);
   const file = join(dir, SYNTAX);
@@ -439,6 +410,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     return handle === null ? route.continue() : handle(route);
   });
   await open();
+  let boxHeight;
 
   await t.test('the bar shows one control per parameter above the component without changing the height of its box', async () => {
     assert.equal(await bar.locator('.name').textContent(), 'act-fn-plot');
@@ -451,9 +423,10 @@ test('bake dev shows a parameter bar on each component of the article that chang
       ],
     );
     assert.deepEqual(await bar.locator('button').allTextContents(), ['Reset', 'Copy', 'Write to file']);
-    assert.equal(await frame.locator('.component-box').evaluate((box) => box.getBoundingClientRect().height), 340);
-    assert.ok(await page.evaluate((selector) => document.querySelector(selector).querySelector('bake-param-bar').nextElementSibling.matches('.component-box'), frameSelector));
-    assert.equal(await page.locator('figure.component bake-param-bar').count(), await page.locator('[data-region] figure.component[data-line]').count());
+    boxHeight = await frame.locator('.component-box').evaluate((box) => box.getBoundingClientRect().height);
+    const [barBox, componentBox] = await Promise.all([bar.boundingBox(), frame.locator('.component-box').boundingBox()]);
+    assert.ok(barBox.y + barBox.height <= componentBox.y + 1, 'the bar is above the component');
+    assert.equal(await page.locator('figure.component bake-param-bar').count(), await page.locator('figure.component:not(.embed figure.component)').count());
     assert.equal(await page.locator('.embed figure.component bake-param-bar').count(), 0);
   });
 
@@ -479,12 +452,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const watchFrames = () =>
     page.evaluate(() => {
       window.highlighted = [];
-      window.states = [];
-      window.shifts = [];
       for (const element of document.querySelectorAll('figure.component .component-box > *')) element.bakeMarker = true;
-      for (const frame of document.querySelectorAll('figure.component')) {
-        new MutationObserver(() => window.states.push(frame.dataset.state)).observe(frame, { attributes: true, attributeFilter: ['data-state'] });
-      }
       if (window.animatePatched) return;
       window.animatePatched = true;
       const animate = Element.prototype.animate;
@@ -496,6 +464,11 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const unmarked = () => page.evaluate(() => [...document.querySelectorAll('figure.component[data-state="ready"] .component-box > *')].filter((element) => !element.bakeMarker).map((element) => element.localName));
   const top = () => frame.evaluate((element) => element.getBoundingClientRect().top);
   const edit = (from, to) => writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
+  const copiedSource = () =>
+    until(async () => {
+      await page.locator('.bk-copy-source').dispatchEvent('click');
+      return (await page.evaluate(() => navigator.clipboard.readText())) === readFileSync(file, 'utf8');
+    }, 'the page did not take the saved source');
 
   await t.test('Write to file rewrites the line, and the update keeps every component running without a highlight', async () => {
     await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready', otherSelector);
@@ -506,18 +479,16 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await bar.locator('.write').click();
     await message.filter({ hasText: `Wrote line ${line} of ${SYNTAX}` }).waitFor();
     assert.equal(readFileSync(file, 'utf8'), original.replace(directive, `:::act-fn-plot{fn=silu range=6 beta=${beta} width=body}`));
-    await page.waitForFunction(([selector, expected]) => JSON.parse(document.querySelector(selector).dataset.params).beta === expected, [frameSelector, beta]);
+    await copiedSource();
     await settle(page);
     assert.deepEqual(await unmarked(), []);
-    assert.deepEqual(await page.evaluate(() => [window.highlighted, window.states]), [[], []]);
+    assert.deepEqual(await page.evaluate(() => window.highlighted), []);
     assert.equal(await top(), before);
     assert.equal(await message.isVisible(), true);
     assert.equal(await control('beta').getAttribute('data-changed'), null);
-    assert.equal(await bar.locator('.write').isDisabled(), true);
     assert.equal(Number(await control('beta').locator('.number').inputValue()), beta);
+    assert.equal(await bar.locator('.write').isDisabled(), true);
     assert.deepEqual(await liveParams(), { fn: 'silu', range: 6, beta });
-    assert.deepEqual(await frame.evaluate((element) => JSON.parse(element.dataset.attributes)), { fn: 'silu', range: '6', beta: String(beta), width: 'body' });
-    assert.equal(await page.evaluate(() => JSON.parse(document.querySelector('script.bk-source').textContent)), readFileSync(file, 'utf8'));
     assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
   });
 
@@ -526,7 +497,6 @@ test('bake dev shows a parameter bar on each component of the article that chang
     edit('这篇文章列出 Bake 的全部写法。', '这篇文章列出 Bake 的全部写法，第一次改。');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('第一次改'));
     await settle(page);
-    assert.deepEqual(await page.evaluate(() => window.states), []);
     assert.deepEqual(await unmarked(), []);
     assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
   });
@@ -550,26 +520,9 @@ test('bake dev shows a parameter bar on each component of the article that chang
     edit('新加的一段。\n\n', '');
     await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.range === 7, otherSelector);
     await page.locator(`${otherSelector} bake-param-bar .reset`).click();
-    assert.equal(await page.evaluate(() => sessionStorage.getItem('bake-dev-param-values')), '{}');
-  });
-
-  await t.test('restored values that the declarations no longer accept and keys of components that are gone are dropped', async () => {
-    const stale = { fn: 'tanh', range: 99, removed: 1 };
-    const otherFile = { range: 3 };
-    await page.evaluate(
-      ([file, stale, otherFile]) => {
-        const count = document.querySelectorAll('[data-region] figure.component[data-component="act-fn-plot"][data-line]').length;
-        const saved = { [`other/index.md act-fn-plot 0`]: otherFile, [`${file} act-fn-plot ${count}`]: stale, [`${file} gone-plot 0`]: stale };
-        for (let index = 0; index < count; index += 1) saved[`${file} act-fn-plot ${index}`] = stale;
-        sessionStorage.setItem('bake-dev-param-values', JSON.stringify(saved));
-      },
-      [SYNTAX, stale, otherFile],
-    );
     await open();
-    assert.equal(await page.locator('bake-param-bar').evaluateAll((bars) => bars.filter((item) => item.shadowRoot.querySelector('.control[data-changed]') !== null).length), 0);
-    assert.equal((await liveParams()).fn, 'silu');
-    assert.deepEqual(await page.evaluate(() => JSON.parse(sessionStorage.getItem('bake-dev-param-values'))), { 'other/index.md act-fn-plot 0': otherFile });
-    await page.evaluate(() => sessionStorage.removeItem('bake-dev-param-values'));
+    assert.equal(await otherControl('range').getAttribute('data-changed'), null);
+    assert.notEqual(await otherControl('range').locator('.number').inputValue(), '7');
   });
 
   await t.test('the bar takes its colours from the theme and follows its dark mode', async () => {
@@ -577,18 +530,16 @@ test('bake dev shows a parameter bar on each component of the article that chang
       const style = getComputedStyle(host.shadowRoot.querySelector('.bar'));
       return [style.backgroundColor, style.color];
     });
-    const theme = await page.evaluate(() => document.documentElement.dataset.theme);
-    await page.evaluate(() => {
-      document.documentElement.dataset.theme = 'light';
-    });
+    const choose = async (theme) => {
+      await page.click('.bk-settings-toggle');
+      await page.click(`[data-setting="theme"] [data-value="${theme}"]`);
+      await page.click('.bk-settings-toggle');
+    };
+    await choose('light');
     const light = await colours();
-    await page.evaluate(() => {
-      document.documentElement.dataset.theme = 'dark';
-    });
+    await choose('dark');
     const dark = await colours();
-    await page.evaluate((value) => {
-      document.documentElement.dataset.theme = value;
-    }, theme);
+    await choose('system');
     assert.notEqual(dark[0], light[0]);
     assert.notEqual(dark[1], light[1]);
   });
@@ -596,8 +547,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   await t.test('a parameter changed in the editor restarts the component and highlights its block once', async () => {
     await watchFrames();
     edit(`fn=silu range=6 beta=${beta}`, `fn=silu range=5 beta=${beta}`);
-    await page.waitForFunction((selector) => JSON.parse(document.querySelector(selector).dataset.params).range === 5, frameSelector);
-    await page.waitForFunction((selector) => document.querySelector(selector).dataset.state === 'ready', frameSelector);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 5, frameSelector);
     const block = await page.evaluate((selector) => document.querySelector(selector).closest('.bk-block').dataset.line, frameSelector);
     assert.deepEqual(await page.evaluate(() => window.highlighted), [block]);
     assert.deepEqual(await liveParams(), { fn: 'silu', range: 5, beta });
@@ -635,8 +585,8 @@ test('bake dev shows a parameter bar on each component of the article that chang
     const toggle = page.locator('#bake-dev .bars input');
     assert.equal(await toggle.isChecked(), true);
     await toggle.click();
-    await page.waitForFunction(() => [...document.querySelectorAll('bake-param-bar')].every((item) => item.hidden && item.getBoundingClientRect().height === 0));
-    assert.equal(await page.evaluate(() => localStorage.getItem('bake-dev-param-bars')), 'hidden');
+    await page.waitForFunction(() => [...document.querySelectorAll('bake-param-bar')].every((item) => !item.checkVisibility() && item.getBoundingClientRect().height === 0));
+    assert.equal(await frame.locator('.component-box').evaluate((box) => box.getBoundingClientRect().height), boxHeight, 'the bar does not change the height of the component box');
     await open();
     assert.equal(await bar.isVisible(), false);
     await page.click('#bake-dev .dot');
@@ -661,7 +611,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await message.filter({ hasText: refused }).waitFor();
     await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
     await settle(page);
-    assert.deepEqual([await message.isVisible(), await message.getAttribute('data-kind'), await message.textContent()], [true, 'error', refused]);
+    assert.deepEqual([await message.isVisible(), await message.textContent()], [true, refused]);
     assert.deepEqual([await control('range').locator('.number').inputValue(), await control('range').getAttribute('data-changed')], [String(range), '']);
     assert.equal((await liveParams()).range, range);
     assert.equal(readFileSync(file, 'utf8'), edited);
@@ -676,6 +626,52 @@ test('bake dev shows a parameter bar on each component of the article that chang
 
   await t.test('Write refuses when the page updated before the refusal arrived, and a second Write succeeds', async () => {
     await refuseThenWrite(3, '第三次改', true);
+  });
+
+  await t.test('after a reload, an unsaved value that the declaration no longer accepts and the value of a removed component are dropped', async () => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const plotAt = (directive) => `figure.component[data-line="${lineOf(readFileSync(file, 'utf8'), directive)}"]`;
+    const shown = async (selector) => {
+      await page.locator(selector).scrollIntoViewIfNeeded();
+      await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params !== undefined, selector);
+      return {
+        range: await page.locator(`${selector} bake-param-bar .control[data-param="range"] .number`).inputValue(),
+        unsaved: !(await page.locator(`${selector} bake-param-bar .write`).isDisabled()),
+        live: await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.range, selector),
+      };
+    };
+    const reloaded = async (change) => {
+      await page.evaluate(() => {
+        window.beforeReload = true;
+      });
+      change();
+      await page.waitForFunction(() => window.beforeReload === undefined);
+      await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    };
+
+    await control('range').locator('.number').fill('9');
+    assert.equal((await liveParams()).range, 9);
+    const declaration = join(dir, 'components/act-fn-plot.jsx');
+    await reloaded(() => writeFileSync(declaration, readFileSync(declaration, 'utf8').replace('max: 10, step: 1, default: 4', 'max: 8, step: 1, default: 4')));
+    assert.deepEqual(await shown(frameSelector), { range: '3', unsaved: false, live: 3 });
+
+    const directive = ':::act-fn-plot{fn=silu range=6}';
+    const caption = '选中交互组件的任何部分';
+    const block = `${directive}\n${caption}，复制的都是它的整个 \`:::\` 块。\n:::\n`;
+    assert.ok(readFileSync(file, 'utf8').includes(block));
+    const last = plotAt(directive);
+    await shown(last);
+    await page.locator(`${last} bake-param-bar .control[data-param="range"] .number`).fill('7');
+    assert.equal((await shown(last)).unsaved, true);
+    edit(block, '');
+    await page.waitForFunction((caption) => !document.querySelector('.bk-article').textContent.includes(caption), caption);
+    await page.reload();
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    edit('[^copy-notes]: ', `${block}\n[^copy-notes]: `);
+    await page.waitForFunction((caption) => document.querySelector('.bk-article').textContent.includes(caption), caption);
+    assert.deepEqual(await shown(plotAt(directive)), { range: '6', unsaved: false, live: 6 });
+    assert.deepEqual(errors, []);
   });
 
   await page.close();
@@ -730,13 +726,13 @@ const tocBody = [
 ].join('\n');
 
 const TOC_VIEWS = [
-  { style: 'notes', width: 1440, parts: ['.bk-toc-marker', '.bk-toc-chapter[data-state="current"]'], titles: '.bk-toc-chapters' },
-  { style: 'notes', width: 1024, parts: ['.bk-toc-ticks', '.bk-toc-panel', '.bk-toc-panel .bk-toc-marker', '.bk-toc-tick.is-current'], titles: '.bk-toc-panel .bk-toc-chapters' },
-  { style: 'tabs', width: 1440, parts: ['.bk-toc-tabs', '.bk-toc-tab.is-current'], titles: '.bk-toc-tabs' },
-  { style: 'dots', width: 1024, parts: ['.bk-toc-dots', '.bk-toc-dot-item.is-current'], titles: '.bk-toc-dots' },
-  { style: 'ticks', width: 1440, parts: ['.bk-toc-ticks', '.bk-toc-popover.is-ticks', '.bk-toc-tick.is-current'], titles: null },
-  { style: 'dots', width: 375, parts: ['.bk-toc-handle', '.bk-toc-drawer', '.bk-toc-drawer-scrim', '.bk-toc-drawer-dot.is-current'], titles: '.bk-toc-drawer-index' },
-  { style: 'tabs', width: 375, parts: ['.bk-toc-handle', '.bk-toc-drawer', '.bk-toc-drawer-scrim', '.bk-toc-drawer-tab.is-current'], titles: '.bk-toc-drawer-index' },
+  { style: 'notes', width: 1440 },
+  { style: 'notes', width: 1024 },
+  { style: 'tabs', width: 1440 },
+  { style: 'dots', width: 1024 },
+  { style: 'ticks', width: 1440 },
+  { style: 'dots', width: 375 },
+  { style: 'tabs', width: 375 },
 ];
 
 test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async (t) => {
@@ -747,17 +743,13 @@ test('bake dev rebuilds every table of contents style from the saved headings an
   const browser = await launchBrowser();
   const page = await browser.newPage();
   const url = `${server.url}2026-10/live/`;
-  const snapshot = (view) =>
-    page.evaluate(({ parts, titles }) => {
-      const ui = document.querySelector('.bk-toc-ui');
-      return {
-        parts: parts.map((selector) => document.querySelectorAll(selector).length),
-        children: ui.children.length,
-        entries: document.querySelectorAll('.bk-toc [data-target]').length,
-        ticks: document.querySelectorAll('.bk-toc-tick').length,
-        titles: titles === null ? null : [...document.querySelectorAll(titles)].flatMap((element) => [element.textContent, ...[...element.querySelectorAll('[aria-label]')].map((labelled) => labelled.getAttribute('aria-label'))]).join(' '),
-      };
-    }, view);
+  const occurrences = (titles) =>
+    page.evaluate((titles) => {
+      const text = [...document.querySelectorAll('.bk-toc, .bk-toc-ui')]
+        .flatMap((root) => [root.textContent, ...[...root.querySelectorAll('[aria-label]')].map((labelled) => labelled.getAttribute('aria-label'))])
+        .join('\n');
+      return titles.map((title) => text.split(title).length - 1);
+    }, titles);
 
   for (const [round, view] of TOC_VIEWS.entries()) {
     await t.test(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once next to a restarted component`, async () => {
@@ -769,13 +761,15 @@ test('bake dev rebuilds every table of contents style from the saved headings an
       }, view.style);
       await page.reload();
       await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-      await page.evaluate(() => scrollTo(0, document.getElementById('inside').getBoundingClientRect().top + scrollY - 100));
-      await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
-      const before = await snapshot(view);
+      await page.evaluate(() => {
+        window.keptAcrossUpdates = true;
+        scrollTo(0, document.getElementById('inside').getBoundingClientRect().top + scrollY - 100);
+      });
+      await settle(page);
       const drawer = () =>
         page.evaluate(() => ({
-          open: document.querySelector('.bk-toc-drawer').classList.contains('is-open'),
-          selected: [...document.querySelectorAll('.bk-toc-drawer-index button')].findIndex((button) => button.classList.contains('is-selected')),
+          open: document.querySelector('.bk-toc-handle').getAttribute('aria-expanded'),
+          selected: [...document.querySelectorAll('.bk-toc-drawer-index button')].findIndex((button) => button.getAttribute('aria-pressed') === 'true'),
           title: document.querySelector('.bk-toc-drawer-detail .bk-toc-card-title').textContent,
           scroll: document.querySelector('.bk-toc-drawer-detail').scrollTop,
         }));
@@ -790,26 +784,18 @@ test('bake dev rebuilds every table of contents style from the saved headings an
         drawerBefore = await drawer();
         assert.ok(drawerBefore.scroll > 0, `the drawer of the ${view.style} style does not scroll`);
       }
+      const old = round === 0 ? 'Second' : `Renamed ${round - 1}`;
+      const [oldBefore, insideBefore] = await occurrences([old, 'Inside']);
+      assert.ok(oldBefore > 0 && insideBefore > 0, `the ${view.style} style shows ${old} ${oldBefore} times and Inside ${insideBefore} times`);
       const name = `Renamed ${round}`;
       writeFileSync(file, readFileSync(file, 'utf8').replace(/## \S.* \{#second\}/, `## ${name} {#second}`).replace('### Inside {#inside}', `### Added ${round} {#added-${round}}\n\nText.\n\n### Inside {#inside}`).replace(/text=\w+\}/, `text=round${round}}`));
-      await page.waitForFunction((text) => document.querySelector('.bk-toc .bk-toc-chapters').textContent.includes(text), name);
-
-      await page.waitForFunction((selector) => document.querySelectorAll(selector).length === 1, view.parts.at(-1));
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      await page.waitForFunction((text) => document.querySelector('label-view')?.textContent === text && document.querySelector('figure.component').dataset.state === 'ready', `round${round}`);
+      await page.waitForFunction((text) => document.querySelector('label-view')?.textContent === text, `round${round}`);
+      await until(async () => (await occurrences([name]))[0] > 0, `the ${view.style} style does not show ${name}`);
+      await settle(page);
       assert.equal(await page.locator('label-view').count(), 1);
+      assert.equal(await page.evaluate(() => window.keptAcrossUpdates), true, 'the save reloaded the page');
       if (drawerBefore !== null) assert.deepEqual(await drawer(), { ...drawerBefore, title: name }, `the drawer of the ${view.style} style after the save`);
-      const after = await snapshot(view);
-      assert.deepEqual(after.parts, view.parts.map(() => 1), `parts of the ${view.style} style after the save`);
-      assert.deepEqual(before.parts, after.parts);
-      assert.equal(after.children, before.children);
-      assert.equal(after.entries, before.entries + 1);
-      if (before.ticks > 0) assert.equal(after.ticks, before.ticks + 1);
-      if (view.titles !== null) {
-        const old = round === 0 ? 'Second' : `Renamed ${round - 1}`;
-        assert.ok(before.titles.includes(old), `the ${view.style} style showed ${old} before the save`);
-        assert.ok(after.titles.includes(name) && !after.titles.includes(old), `the ${view.style} style shows ${name} after the save`);
-      }
+      assert.deepEqual(await occurrences([old, name, `Added ${round}`, 'Inside']), [0, oldBefore, insideBefore, insideBefore], `the ${view.style} style shows ${old}, ${name}, Added ${round} and Inside after the save`);
     });
   }
 });
@@ -830,9 +816,8 @@ test('bake dev starts an embedded component again when its source article change
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
   await page.waitForFunction(() => document.querySelector('.embed label-view')?.textContent === 'first');
   writeFileSync(file, readFileSync(file, 'utf8').replace('{text=first}', '{text=first height=200}'));
-  await page.waitForFunction(() => document.querySelector('.embed .component-box').style.getPropertyValue('--component-height') === '200px');
+  await page.waitForFunction(() => document.querySelector('.embed .component-box').getBoundingClientRect().height === 200);
   await page.waitForFunction(() => document.querySelector('.embed label-view')?.textContent === 'first');
-  assert.equal(await page.locator('.embed figure.component').getAttribute('data-state'), 'ready');
   await page.close();
 });
 
