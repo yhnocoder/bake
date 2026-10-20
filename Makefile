@@ -1,6 +1,4 @@
-.PHONY: check browser example dev screenshots perf
-
-BASE ?= origin/main
+.PHONY: check browser example dev perf
 
 check: node_modules
 	scripts/test.sh
@@ -18,9 +16,6 @@ example: node_modules
 
 dev: node_modules
 	cd examples/blog && node ../../src/cli.js dev
-
-screenshots: node_modules
-	scripts/screenshots.sh $(BASE)
 
 perf: node_modules
 	cd examples/blog && node ../../src/cli.js build

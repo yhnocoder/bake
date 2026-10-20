@@ -82,8 +82,6 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "diff": "^9.0.0",
-    "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0"
   }
 }
