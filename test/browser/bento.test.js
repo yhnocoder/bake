@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 import { article, bake, writeFiles } from '../blog.js';
 import { serve } from './server.js';
 
@@ -239,6 +240,27 @@ test('the bento theme lays out sections as cards', async (t) => {
     await light.close();
   });
 
+  await t.test('a code block, a table or a display formula that fits its card shows no scroll shadow at its edges', async () => {
+    for (const colorScheme of ['light', 'dark']) {
+      const page = await open('activations', { colorScheme, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+      const boxes = page.locator('.bt-card :is(pre.shiki, .table-scroll, mjx-container[display])');
+      const leaks = [];
+      for (let index = 0; index < (await boxes.count()); index += 1) {
+        const box = boxes.nth(index);
+        if (await box.evaluate((element) => !element.checkVisibility() || element.scrollWidth > element.clientWidth)) continue;
+        await box.scrollIntoViewIfNeeded();
+        const shown = await box.screenshot();
+        await box.evaluate((element) => element.style.setProperty('--scroll-shadow', 'transparent'));
+        const plain = await box.screenshot();
+        await box.evaluate((element) => element.style.removeProperty('--scroll-shadow'));
+        const difference = largestDifference(PNG.sync.read(shown), PNG.sync.read(plain));
+        if (difference > 2) leaks.push(`${colorScheme}: ${await box.evaluate((element) => element.closest('.bt-card').querySelector('h2 .bk-heading-text').textContent)} ${index} differs by ${difference}`);
+      }
+      assert.deepEqual(leaks, []);
+      await page.close();
+    }
+  });
+
   await t.test('without scripts the cards keep their declared spans and every sidenote is shown', async () => {
     const page = await open('bento-cards', { javaScriptEnabled: false });
     const grid = await page.evaluate(gridLayout);
@@ -357,4 +379,13 @@ async function settle(page) {
     await document.fonts.ready;
     for (let frame = 0; frame < 3; frame += 1) await new Promise((done) => requestAnimationFrame(done));
   });
+}
+
+function largestDifference(first, second) {
+  const corner = 20;
+  let largest = 0;
+  for (let y = corner; y < first.height - corner; y += 1) {
+    for (let index = y * first.width * 4; index < (y + 1) * first.width * 4; index += 1) largest = Math.max(largest, Math.abs(first.data[index] - second.data[index]));
+  }
+  return largest;
 }

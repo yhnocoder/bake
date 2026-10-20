@@ -50,6 +50,15 @@ const stressArticle = article({
   ].join('\n'),
 });
 
+function highlightProperties() {
+  const timing = ['offset', 'computedOffset', 'easing', 'composite'];
+  const properties = document
+    .getAnimations()
+    .filter((animation) => animation.effect?.target?.matches('.sidenote-ref, .sidenote-ref *, .bk-sidenote, .bk-sidenote *, .bk-tintable'))
+    .flatMap((animation) => (animation.transitionProperty === undefined ? animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame)) : [animation.transitionProperty]));
+  return [...new Set(properties)].filter((property) => !timing.includes(property)).sort();
+}
+
 function measureNotes() {
   const layer = document.querySelector('.bk-notes-layer');
   const column = layer.getBoundingClientRect();
@@ -138,7 +147,7 @@ test('sidenotes', async (t) => {
       ['6'],
     );
     await wide.click('details.fold > summary');
-    await wide.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    await wide.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     await wide.waitForTimeout(50);
     const opened = await wide.evaluate(measureNotes);
     checkNotes(opened, 'stress article with the fold open');
@@ -148,8 +157,9 @@ test('sidenotes', async (t) => {
     );
   });
 
-  await t.test('highlight the number and the note and tint the paragraph on hover', async () => {
+  await t.test('highlight the number and the note and tint the paragraph on hover, animating only opacity', async () => {
     await wide.hover('.sidenote-ref[data-sidenote="5"] a');
+    assert.deepEqual(await wide.evaluate(highlightProperties), ['opacity']);
     const state = await wide.evaluate(() => ({
       reference: document.querySelector('.sidenote-ref[data-sidenote="5"]').classList.contains('is-active'),
       note: document.querySelector('.bk-notes-layer .bk-sidenote[data-sidenote="5"]').classList.contains('is-active'),
@@ -184,6 +194,11 @@ test('sidenotes', async (t) => {
     assert.equal(await phone.locator('.bk-notes-layer').isVisible(), false);
     assert.equal(await note.isVisible(), false);
     await phone.locator('.sidenote-ref[data-sidenote="2"] a').tap();
+    const opening = await phone.evaluate(() => {
+      const note = document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]');
+      return { properties: note.getAnimations().flatMap((animation) => animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame))), height: note.getBoundingClientRect().height };
+    });
+    assert.deepEqual([...new Set(opening.properties)].filter((property) => !['offset', 'computedOffset', 'easing', 'composite'].includes(property)).sort(), ['opacity', 'transform']);
     await phone.waitForFunction(() => {
       const element = document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]');
       return element.checkVisibility() && element.getAnimations().length === 0;
@@ -200,6 +215,7 @@ test('sidenotes', async (t) => {
       };
     });
     assert.ok(placement.height > 20, `the open note is ${placement.height}px high`);
+    assert.ok(Math.abs(opening.height - placement.height) < 1, `the note is ${opening.height}px high while it opens and ${placement.height}px when open`);
     assert.ok(placement.below >= 0 && placement.below < 30, `the note starts ${placement.below}px below its block`);
     assert.ok(placement.aboveNext >= 0, `the note overlaps the next block by ${-placement.aboveNext}px`);
     assert.equal(placement.hash, '');

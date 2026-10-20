@@ -65,4 +65,9 @@ describe('natural width', () => {
       ],
     );
   });
+
+  test('counts the code columns of wide characters with the Unicode East Asian Width table', async () => {
+    const blocks = (await parsed('```\n😀😀\n```\n\n```\n𠀀a\n```\n')).intro;
+    assert.deepEqual(blocks.map((block) => block.naturalWidth), ['4ch', '3ch']);
+  });
 });

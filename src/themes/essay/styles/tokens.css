@@ -32,6 +32,8 @@
   --tab-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   --hair: rgba(22, 26, 29, 0.13);
   --scroll-shadow: rgba(22, 26, 29, 0.1);
+  --bar-shade: rgba(22, 26, 29, 0.06);
+  --lift-shadow: 0 2px 4px -1px rgba(22, 26, 29, 0.06), 0 14px 30px -12px rgba(22, 26, 29, 0.24);
   --scrim: rgba(22, 26, 29, 0.26);
   --recap: #646c72;
   --ahead: #9aa1a6;
@@ -106,6 +108,8 @@
   --tab-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --hair: rgba(240, 240, 232, 0.12);
   --scroll-shadow: rgba(0, 0, 0, 0.55);
+  --bar-shade: rgba(0, 0, 0, 0.45);
+  --lift-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 16px 34px -12px rgba(0, 0, 0, 0.7);
   --scrim: rgba(0, 0, 0, 0.45);
   --recap: #9da39e;
   --ahead: #6c736e;
@@ -156,6 +160,8 @@
     --tab-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     --hair: rgba(240, 240, 232, 0.12);
     --scroll-shadow: rgba(0, 0, 0, 0.55);
+    --bar-shade: rgba(0, 0, 0, 0.45);
+    --lift-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 16px 34px -12px rgba(0, 0, 0, 0.7);
     --scrim: rgba(0, 0, 0, 0.45);
     --recap: #9da39e;
     --ahead: #6c736e;
