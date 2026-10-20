@@ -293,8 +293,8 @@ test('a converted image keeps the address and the attributes written in the sour
   await context.close();
 });
 
-test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list', async (t) => {
-  const body = '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n';
+test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list, and an image with unreadable data-attributes as a plain image', async (t) => {
+  const body = '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n\n<p>Raw shows <img src="q.png" alt="q" data-attributes="oops"> and <img src="r.png" alt="r" data-attributes="{&quot;x} y&quot;:&quot;1&quot;,&quot;width&quot;:{&quot;a&quot;:1},&quot;height&quot;:&quot;12px&quot;}"> here.</p>\n';
   const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
@@ -308,6 +308,8 @@ test('a citation and a reference list without data-key, which only raw HTML can 
   assert.equal((await copied(page)).text, 'cites [\\[1\\]](#keys) before');
   await select(page, { selector: '.bk-article li', contains: 'First', text: 'irst' }, { selector: '.bk-article li', contains: 'Second', text: 'Sec', after: true });
   assert.equal((await copied(page)).text, '1. irst plain entry.\n2. Sec');
+  await select(page, { selector: '.bk-article p', contains: 'shows', text: 'shows' }, { selector: '.bk-article p', contains: 'shows', text: ' here', after: true });
+  assert.equal((await copied(page)).text, `shows ![q](${base}/2026-10/rope/q.png) and ![r](${base}/2026-10/rope/r.png){height=12px} here`);
   await context.close();
 });
 

@@ -43,7 +43,8 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
     if (fileLocator(own)(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
-  const alias = [...publicModules('themes'), themeFileAlias(folders, locate, locateShared)];
+  const sources = new Set();
+  const alias = [...publicModules('themes'), themeFileAlias(folders, locate, locateShared, sources)];
   try {
     const fontsFile = locate(FONTS_FILE);
     const [server, client, styles, fonts] = await Promise.all([
@@ -61,6 +62,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
       styles: client.stylesheets,
       fonts: fonts?.files.filter((file) => STYLESHEET.test(file.path)).map((file) => file.path) ?? [],
       script: client.entry,
+      sources: new Set([...sources, ...[client, styles, fonts].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]),
     };
   } catch (error) {
     errors.push(missingExport(root, error, locateShared) ?? compileError(root, name, error));
@@ -78,7 +80,7 @@ function fileLocator(folders) {
   return (path) => folders.map((folder) => join(folder, path)).find((file) => existsSync(file)) ?? null;
 }
 
-function themeFileAlias(folders, locate, locateShared) {
+function themeFileAlias(folders, locate, locateShared, sources) {
   return {
     find: EVERY_IMPORT,
     replacement: '',
@@ -89,6 +91,7 @@ function themeFileAlias(folders, locate, locateShared) {
         return path === undefined ? null : locateShared(path);
       }
       if (!(RELATIVE_IMPORT.test(source) || STYLESHEET.test(importer))) return null;
+      sources.add(resolve(dirname(importer), source.replace(/[?#].*/, '')));
       const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
       if (folder === undefined) return null;
       const path = relative(folder, resolve(dirname(importer), source));

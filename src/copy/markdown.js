@@ -1,5 +1,8 @@
 import { fragmentOf, idOfFragment } from '../fragments.js';
+import { writeAttribute } from '../markdown/attributes.js';
 import { serializeMarkdown } from '../markdown/serialize.js';
+
+const ATTRIBUTE_NAME = /^[A-Za-z_][\w-]*$/;
 
 export const UI = '[data-ui]';
 
@@ -417,7 +420,14 @@ function alignmentOf(align) {
 }
 
 function writtenAttributes(element) {
-  return JSON.parse(element.dataset.attributes ?? '{}');
+  let attributes;
+  try {
+    attributes = JSON.parse(element.dataset.attributes ?? '{}');
+  } catch {
+    return {};
+  }
+  if (attributes === null || typeof attributes !== 'object' || Array.isArray(attributes)) return {};
+  return Object.fromEntries(Object.entries(attributes).filter(([name, value]) => ATTRIBUTE_NAME.test(name) && (value === true || typeof value === 'string') && writeAttribute(name, value) !== null));
 }
 
 function dedentDefinition(lines) {
