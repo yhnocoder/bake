@@ -436,4 +436,9 @@ describe('word count', () => {
     const article = await parsed('激活函数 GELU 的近似[^n]，用 `tanh` 计算 $x^2$。\n\n```python\nprint(1)\n```\n\n## 二 Two words\n\n[^n]: 旁注不计入。\n');
     assert.equal(article.words, 15);
   });
+
+  test('counts every character of the Han script as one word', async () => {
+    const article = await parsed('𠀀𠀁〇 word\n');
+    assert.equal(article.words, 4);
+  });
 });
