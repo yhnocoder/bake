@@ -294,6 +294,29 @@ describe('preview updates', () => {
     assert.doesNotMatch(served('index.html'), /href="2026-10\/rope\/"/);
   });
 
+  test('a slug change made while a component error discards the update keeps the site files pointing at the served page after the component is fixed', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
+    });
+    const preview = createPreview(dir);
+    await preview.update();
+    const served = (path) => preview.find(path).output.render();
+    const before = Object.fromEntries(['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json'].map((path) => [path, served(path)]));
+    writeFiles(dir, {
+      'components/demo-chart.js': 'export default class DemoChart extends HTMLElement {}\n',
+      'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }),
+    });
+    const discarded = await preview.update(['components/demo-chart.js', 'content/posts/rope/index.md']);
+    assert.deepEqual([discarded.applied, discarded.problems.map((problem) => problem.file)], [false, ['components/demo-chart.js']]);
+    rmSync(join(dir, 'components'), { recursive: true });
+    writeFiles(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope[^missing].\n' }) });
+    const result = await preview.update(['components/demo-chart.js', 'content/posts/rope/index.md']);
+    assert.deepEqual([result.applied, result.problems.map((problem) => problem.file)], [true, ['content/posts/rope/index.md']]);
+    assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
+    for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
+  });
+
   test('an article whose slug changes together with an error keeps its old address in the listings and in the link check of the articles that link to it', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
