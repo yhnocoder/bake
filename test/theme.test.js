@@ -74,6 +74,25 @@ describe('themes', () => {
     assert.match(readFileSync(join(dir, 'dist/assets', script), 'utf8'), /text\/plain/);
   });
 
+  test('the essay and bento page scripts import the Markdown serializer of bake/copy from a separate chunk', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
+    });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const assets = readdirSync(join(dir, 'dist/assets'));
+    const read = (name) => readFileSync(join(dir, 'dist/assets', name), 'utf8');
+    for (const theme of ['essay', 'bento']) {
+      const entry = read(assets.find((name) => new RegExp(`^${theme}-[\\w-]+\\.js$`).test(name)));
+      const chunks = [...new Set(entry.match(/selection-[\w-]+\.js/g))];
+      assert.equal(chunks.length, 1, `the ${theme} page script imports one selection chunk`);
+      assert.doesNotMatch(entry, /Cannot handle unknown node/, `the ${theme} page script holds the serializer`);
+      assert.match(entry, /text\/plain/);
+      assert.match(read(chunks[0]), /Cannot handle unknown node/);
+    }
+  });
+
   test('a module that the page script imports dynamically is a separate chunk with its own stylesheet, which the page loads when the import runs', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

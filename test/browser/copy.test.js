@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { parse } from '../article.js';
 import { article, bake, createBlog, validConfig } from '../blog.js';
+import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
@@ -71,7 +72,7 @@ test('copying from an article gives the Markdown source of the selection', async
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/syntax/`);
+  await openWithSelectionModule(page, `${base}/2026-10/syntax/`);
   await page.waitForFunction(() => document.querySelector('.bk-notes-layer') !== null);
   const copyChapter = '#copy ~ .bk-block';
 
@@ -249,11 +250,11 @@ test('a converted citation, reference entry and internal link keep a key or an a
   t.after(() => browser.close());
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/rope/`);
+  await openWithSelectionModule(page, `${base}/2026-10/rope/`);
   const paragraph = '.bk-article p';
   await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' too', after: true });
   assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/rope/#a%25zz) too');
-  await page.goto(`${base}/2026-10/host/`);
+  await openWithSelectionModule(page, `${base}/2026-10/host/`);
   await select(page, { selector: '.embed li', contains: 'First', text: 'irst' }, { selector: '.embed li', contains: 'Second', text: 'Sec', after: true });
   assert.equal((await copied(page)).text, ':::references\n- [@a%zz] irst.\n- [@b%20c] Sec\n:::');
   await context.close();
@@ -285,7 +286,7 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/escapes/`);
+  await openWithSelectionModule(page, `${base}/2026-10/escapes/`);
   for (const [, from, to] of paragraphs) {
     const point = { selector: '.bk-article p', contains: from };
     await select(page, { ...point, text: from }, { ...point, text: to, after: true });
@@ -298,5 +299,85 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   }
   await select(page, { selector: '.bk-article p', text: '标点' }, { selector: '.bk-article p', text: 'b。', after: true });
   assert.equal((await copied(page)).text, '标点：“引号”（括号）！还有 snake_case 和 a * b。');
+  await context.close();
+});
+
+test('the module that writes a selection as Markdown loads after the page, and a copy before it arrives is the browser copy', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body: 'Some **bold** text and ==marked== words.\n' }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const paragraph = '.bk-article p';
+  const selectWords = (page) => select(page, { selector: paragraph, text: 'bold' }, { selector: paragraph, text: 'marked', after: true });
+  const withoutIdleCallbacks = () => {
+    window.idleCallbacks = [];
+    window.requestIdleCallback = (callback) => window.idleCallbacks.push(callback);
+  };
+
+  await t.test('a copy before the module arrives is the browser copy without a toast, and a copy after it is Markdown', async () => {
+    const page = await context.newPage();
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    t.after(release);
+    await page.route(
+      (url) => isSelectionChunk(url.href),
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    const requested = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
+    await page.goto(`${base}/2026-10/rope/`);
+    const request = await requested;
+    await selectWords(page);
+    assert.equal((await copied(page)).text, 'bold text and marked');
+    assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
+    release();
+    await selectionModuleReady(page, request.url());
+    await selectWords(page);
+    assert.equal((await copied(page)).text, '**bold** text and ==marked==');
+    await page.close();
+  });
+
+  await t.test('the first selectstart in the article loads the module before the browser is idle', async () => {
+    const page = await context.newPage();
+    await page.addInitScript(withoutIdleCallbacks);
+    const requested = [];
+    page.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
+    await page.goto(`${base}/2026-10/rope/`);
+    await page.waitForFunction(() => window.idleCallbacks.length === 1);
+    assert.deepEqual(requested, []);
+    const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
+    const box = await page.locator(paragraph).boundingBox();
+    await page.mouse.move(box.x + 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await page.mouse.up();
+    await selectionModuleReady(page, (await loading).url());
+    await selectWords(page);
+    assert.equal((await copied(page)).text, '**bold** text and ==marked==');
+    await page.close();
+  });
+
+  await t.test('without a selection the module loads when the browser is idle after the page has loaded', async () => {
+    const page = await context.newPage();
+    await page.addInitScript(withoutIdleCallbacks);
+    const requested = [];
+    page.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
+    await page.goto(`${base}/2026-10/rope/`);
+    await page.waitForFunction(() => window.idleCallbacks.length === 1);
+    assert.deepEqual(requested, []);
+    const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
+    await page.evaluate(() => window.idleCallbacks[0]());
+    await selectionModuleReady(page, (await loading).url());
+    await page.close();
+  });
+
   await context.close();
 });
