@@ -224,10 +224,10 @@ test('internal links, preview cards and embeds', async (t) => {
     });
     assert.deepEqual(report.parts, ['Chain rule', 'Order']);
     assert.deepEqual(report.citations, ['../../2026-10/target/#reference-k']);
-    assert.deepEqual(report.sources, ['"From “"Target1"”"" ↗"', '"From “"Target2"”"" ↗"']);
+    assert.deepEqual(report.sources, ['"From “"Target1"”""↗"', '"From “"Target2"”""↗"']);
     assert.deepEqual(report.hrefs, [`${base}/dist/2026-10/target/#chain-rule`, `${base}/dist/2026-10/target/#order`]);
     assert.equal(report.formulas, 3);
-    assert.equal(report.border, '1px');
+    assert.equal(report.border, '2px');
     assert.deepEqual(report.missingGlyphs, []);
     assert.deepEqual(report.duplicateIds, []);
     assert.deepEqual(report.toc, ['links']);

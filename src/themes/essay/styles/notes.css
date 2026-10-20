@@ -9,15 +9,32 @@
 }
 
 .sidenote-ref a {
+  position: relative;
+  isolation: isolate;
   color: var(--accent);
   text-decoration: none;
   border-radius: 3px;
   padding: 0 2px;
-  transition: background-color 0.3s ease-out;
 }
 
-.sidenote-ref.is-active a {
-  background-color: var(--mark);
+.sidenote-ref a::before,
+.bk-tintable::after,
+.bk-notes-layer .bk-sidenote::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--mark);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+.sidenote-ref.is-active a::before,
+.bk-tintable.bk-tinted::after,
+.bk-notes-layer .bk-sidenote.is-active::after {
+  opacity: 1;
   transition-duration: 0.15s;
 }
 
@@ -26,9 +43,6 @@
   font-size: 13.5px;
   line-height: 1.7;
   color: var(--ink-2);
-  transition:
-    color 0.3s ease-out,
-    background-color 0.3s ease-out;
 }
 
 html:not([data-script]) .bk-article .bk-sidenote {
@@ -40,12 +54,9 @@ html:not([data-script]) .bk-article .bk-sidenote {
 
 .bk-sidenote-number {
   margin-right: 6px;
-  border-radius: 3px;
-  padding: 0 2px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--accent);
-  transition: background-color 0.3s ease-out;
 }
 
 .bk-sidenote-body,
@@ -61,28 +72,16 @@ html:not([data-script]) .bk-article .bk-sidenote {
   margin-bottom: 0;
 }
 
-.bk-sidenote.is-active {
-  color: var(--ink);
-  transition-duration: 0.15s;
-}
-
-.bk-sidenote.is-active .bk-sidenote-number {
-  background-color: var(--mark);
-  transition-duration: 0.15s;
-}
-
 .bk-tintable {
-  border-radius: 4px;
-  box-shadow: 0 0 0 4px transparent;
-  transition:
-    background-color 0.3s ease-out,
-    box-shadow 0.3s ease-out;
+  position: relative;
+  isolation: isolate;
 }
 
-.bk-tintable.bk-tinted {
-  background-color: color-mix(in srgb, var(--mark) 60%, transparent);
+.bk-tintable::after,
+.bk-notes-layer .bk-sidenote::after {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--mark) 60%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--mark) 60%, transparent);
-  transition-duration: 0.15s;
 }
 
 .bk-notes-layer {
@@ -96,6 +95,7 @@ html:not([data-script]) .bk-article .bk-sidenote {
 .bk-notes-layer .bk-sidenote {
   display: block;
   position: absolute;
+  isolation: isolate;
   left: 0;
   width: 100%;
 }
@@ -109,13 +109,18 @@ html:not([data-script]) .bk-article .bk-sidenote {
     padding: 2px 4px;
   }
 
+  .sidenote-ref a[aria-expanded='true']::before {
+    opacity: 1;
+  }
+
   .bk-article .bk-sidenote.is-open:where(:not(.component-box *)) {
     display: block;
     margin: 6px 0 14px;
-    padding: 8px 12px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border-radius: 8px;
     background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
     font-size: 14px;
+    line-height: 1.75;
   }
 }
 
