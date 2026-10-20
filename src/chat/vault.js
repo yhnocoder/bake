@@ -89,11 +89,13 @@ export async function unlockKey() {
 
 export async function rememberedKey({ now = Date.now() } = {}) {
   const record = storedKey();
-  if (record === null) return null;
-  try {
-    const remembered = await keyStore('readonly', (store) => store.get(REMEMBERED));
-    if (remembered?.credential === record.credential && remembered.until > now) return await decryptWith(remembered.key, record);
-  } catch {}
+  if (record !== null) {
+    try {
+      const remembered = await keyStore('readonly', (store) => store.get(REMEMBERED));
+      const left = remembered?.until - now;
+      if (remembered?.credential === record.credential && left > 0 && left <= REMEMBER_DAYS * DAY) return await decryptWith(remembered.key, record);
+    } catch {}
+  }
   await forgetRemembered();
   return null;
 }

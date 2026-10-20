@@ -67,6 +67,7 @@ function Chat(props) {
   let historyNew;
   let lastId = 0;
   let unlockTried = false;
+  let remembering = null;
   let activity = 'idle';
   let container;
   let list;
@@ -139,21 +140,25 @@ function Chat(props) {
     else note(labels.greeting[page.article === null ? 'blog' : 'article']);
   }
 
-  async function unlockRemembered() {
+  function unlockRemembered() {
     unlockTried = true;
-    const key = await rememberedKey();
-    if (key === null || view() !== 'locked') return false;
-    apiKey = key;
-    setView('chat');
-    return true;
+    remembering ??= rememberedKey().then((key) => {
+      remembering = null;
+      if (key !== null && view() === 'locked') {
+        apiKey = key;
+        setView('chat');
+      }
+      return view() === 'chat';
+    });
+    return remembering;
   }
 
   async function unlock() {
-    if (await unlockRemembered()) return true;
     setPending('unlock');
-    setPet('unlocking');
-    note(labels.unlocking);
     try {
+      if (await unlockRemembered()) return true;
+      setPet('unlocking');
+      note(labels.unlocking);
       apiKey = await unlockKey();
       setView('chat');
       note(labels.unlocked);

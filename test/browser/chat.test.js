@@ -169,21 +169,24 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
     assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0);
 
-    await page.evaluate(
-      () =>
-        new Promise((resolve) => {
-          const request = indexedDB.open('bake-chat', 1);
-          request.onsuccess = () => {
-            const store = request.result.transaction('keys', 'readwrite').objectStore('keys');
-            store.get('key').onsuccess = (event) => {
-              store.put({ ...event.target.result, until: Date.now() - 1 }, 'key').onsuccess = () => {
-                request.result.close();
-                resolve();
+    const keepUntil = (offset) =>
+      page.evaluate(
+        (offset) =>
+          new Promise((resolve) => {
+            const request = indexedDB.open('bake-chat', 1);
+            request.onsuccess = () => {
+              const store = request.result.transaction('keys', 'readwrite').objectStore('keys');
+              store.get('key').onsuccess = (event) => {
+                store.put({ ...event.target.result, until: Date.now() + offset }, 'key').onsuccess = () => {
+                  request.result.close();
+                  resolve();
+                };
               };
             };
-          };
-        }),
-    );
+          }),
+        offset,
+      );
+    await keepUntil(-1);
     await page.reload();
     await watchPet(page);
     await page.locator('.bk-chat-launcher').click();
@@ -192,13 +195,29 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0, 'opening the chat asks for no passkey');
     assert.equal(await remembered(), null, 'an expired key is forgotten');
     api.answers.push({ body: text('再说一次。') });
-    await ask(page, '还有吗');
+    const completions = () => api.requests.filter((request) => request.path.endsWith('/chat/completions')).length;
+    const sent = completions();
+    await page.locator(QUESTION).fill('还有吗');
+    await page.locator('.bk-chat-composer').evaluate((form) => {
+      form.requestSubmit();
+      form.requestSubmit();
+    });
     await page.locator('.bk-chat-note').filter({ hasText: '已解锁' }).waitFor();
     await page.locator('.bk-chat-reply[data-done]').waitFor();
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '已解锁' }).count(), 1, 'a second submit during the unlock starts no second unlock');
+    assert.equal(completions() - sent, 1, 'the question is sent once');
     assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
     assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
     assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 1);
     assert.equal(Math.round((await remembered()).days), 30);
+
+    await keepUntil(365 * 86400000);
+    await page.reload();
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator(QUESTION).waitFor();
+    await page.waitForTimeout(300);
+    assert.equal(await remembered(), null, 'a key kept for longer than 30 days is forgotten');
 
     await openSettings(page);
     await page.locator('.bk-chat-menu-item[data-action="clear-key"]').click();
