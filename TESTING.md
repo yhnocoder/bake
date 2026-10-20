@@ -7,6 +7,7 @@
 | `make check` | `scripts/lint.sh` (comment check, shellcheck on shell scripts when installed), then the unit tests |
 | `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
 | `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`), each test with a time limit of 120 seconds, so a test that never ends fails with its name |
+| `npm run test:frames` | The frame time gate (`node --test` on the files in `test/frames/` that end in `.test.js`), described in "Frame times"; with `BAKE_FRAMES=all` it measures every interaction |
 | `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
 | `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://localhost:8000/ |
 | `make dev` | Installs the dependencies when needed and runs `bake dev` in `examples/blog/`, which serves it at http://localhost:4321/ and updates the page on every save |
@@ -33,10 +34,11 @@ During development, run the unit tests plus the tests the change affects. CI run
 | `lint` | `scripts/lint.sh`: the comment check and shellcheck |
 | `unit` | The unit tests in two shards, `node --test --test-shard=1/2` and `2/2` |
 | `browser` | The browser tests in three shards, `--test-shard=1/3` to `3/3` |
-| `test` | Passes when `lint`, every `unit` shard and every `browser` shard passed; this is the check to read for the result of a run |
+| `frames` | The frame time gate for pull requests, alone on its runner, described in "Frame times" |
+| `test` | Passes when `lint`, every `unit` shard, every `browser` shard and `frames` passed; this is the check to read for the result of a run |
 | `screenshots`, `publish-screenshots` | The screenshots in the pull request description, described below; pull requests only |
 
-`node --test --test-shard=i/n` sorts the test files and gives shard `i` every `n`-th file, so a test file always runs whole on one runner and the slowest test file sets the shortest time its shard can take. The unit tests need Chromium too, because `bake build` draws share images with it. Every job except `lint` and `publish-screenshots` uses the composite action `.github/actions/setup`, which installs Node 24 with the npm cache, runs `npm ci` and installs Playwright's Chromium headless shell with its system libraries, keeping the browser in the Actions cache under the Playwright version. When a shard comes close to 5 minutes, add a shard in the matrix of its job and in the command. `.github/workflows/nightly.yml` runs the nightly tier once a day and when started by hand, described in "Performance measurements" below. Performance jobs run alone, never in parallel with other heavy jobs.
+`node --test --test-shard=i/n` sorts the test files and gives shard `i` every `n`-th file, so a test file always runs whole on one runner and the slowest test file sets the shortest time its shard can take. The unit tests need Chromium too, because `bake build` draws share images with it. Every job except `lint` and `publish-screenshots` uses the composite action `.github/actions/setup`, which installs Node 24 with the npm cache, runs `npm ci` and installs Playwright's Chromium headless shell with its system libraries, keeping the browser in the Actions cache under the Playwright version. When a shard comes close to 5 minutes, add a shard in the matrix of its job and in the command. `.github/workflows/nightly.yml` runs the nightly tier once a day and when started by hand, described in "Performance measurements" and "Frame times" below. Performance jobs run alone, never in parallel with other heavy jobs.
 
 ## Rules for tests
 
@@ -54,7 +56,7 @@ Browser tests use Playwright with the preinstalled Chromium in the cloud environ
 
 ## Performance measurements
 
-The nightly workflow has one job, `performance`, which runs alone on its runner. It sets up the runner with `.github/actions/setup`, builds `examples/blog/`, runs `scripts/measure-pages.js` on `examples/blog/dist/`, runs `scripts/check-budgets.js` on the report and uploads the report as the workflow artifact `performance-report`, also when the budget check fails. On the development machine the measurement takes about 2 minutes.
+The nightly workflow has two jobs, `performance` and `frames`, which run one after the other, each alone on its runner. `performance` sets up the runner with `.github/actions/setup`, builds `examples/blog/`, runs `scripts/measure-pages.js` on `examples/blog/dist/`, runs `scripts/check-budgets.js` on the report and uploads the report as the workflow artifact `performance-report`, also when the budget check fails. On the development machine the measurement takes about 2 minutes.
 
 `scripts/measure-pages.js` serves the built site with `scripts/static-server.js` at `localhost`, where the AI chat appears, with `gzip: true`, so HTML, CSS, JavaScript, JSON, XML and SVG files are sent compressed with gzip as GitHub Pages sends them. It opens every HTML page except `404.html` in Chromium twice: 1440 by 900 pixels, and 375 by 812 pixels as a mobile device with touch. Each page and width gets a new browser context, so nothing is cached. Through the Chrome DevTools Protocol the page runs with `Emulation.setCPUThrottlingRate` at 4, so the CPU is 4 times slower, and with `Network.emulateNetworkConditions` set to the Fast 4G preset of Chrome DevTools: 9 Mbit/s down and 1.5 Mbit/s up, each multiplied by 0.9, and 60 milliseconds of round-trip time multiplied by 2.75, which is 165 milliseconds of latency. The script waits for the `load` event, for 500 milliseconds without requests, for the first contentful paint and for every component frame in the first screen to get `data-state="ready"` or `"failed"`. It then scrolls to the end of the page by 100 pixels every 100 milliseconds, which is 1000 pixels per second, waits again until no request is pending and every component frame on the page is ready or failed, and records:
 
@@ -78,6 +80,18 @@ The nightly workflow has one job, `performance`, which runs alone on its runner.
 A script is assigned to the root of its chain of initiators that the Chrome DevTools Protocol reports. The report also lists every request of each page with its path, its type, its bytes and, for a script, its group, so a change of a metric can be traced to a file.
 
 `test/perf/budgets.json` holds one limit per metric, which applies to every page and both widths, and states for each limit what it is based on. The limits on bytes and on font files are the largest value of two measurements of `examples/blog/` plus 20 percent; the byte counts do not change between runs. The limits on times are twice the largest measured time, because times vary by about 15 percent between runs on the same machine and the runners of GitHub Actions are slower than the development machine. `otherScriptBytes`, `componentsBlankOnScroll`, `failedComponents` and `failedRequests` have the limit 0. `firstScreenComponents` describes the page and has no limit. `scripts/check-budgets.js` prints one line for each exceeded limit, such as `/2026-10/syntax/ at 375 pixels: fontBytes is 1001, over the limit of 1000`, followed by the count, and exits with status 1. When a change makes a page larger or slower on purpose, the pull request raises the limit and rewrites its basis; a gap that stays is written down in "Clean code" in CONTRIBUTING.md together with who accepted it.
+
+## Frame times
+
+Every interaction on a page draws at least 60 frames per second on a CPU four times slower than the runner's. `test/frames/frames.test.js` builds `examples/blog/` into a temporary directory, serves it at `localhost` and opens each page in Chromium at 1440 by 900 pixels and at 375 by 812 pixels with a device pixel ratio of 2, without reduced motion, so the animations run as a reader sees them. After the page has loaded, it slows the CPU down four times with the Chrome DevTools Protocol, records the time between consecutive `requestAnimationFrame` callbacks while Playwright performs the interaction, and fails when:
+
+- more than 5% of the frames take longer than 17.7 ms, one frame budget at 60 frames per second plus 1 ms,
+- one frame takes longer than 50 ms,
+- fewer than 20 frames were drawn,
+- the page throws an error, or
+- a component enters the viewport before its `data-state` is `ready`.
+
+Each case prints its frame count, median, 95th percentile, longest frame and share of slow frames. The `frames` job of pull requests measures scrolling, highlighting a sidenote, moving over the table of contents and switching the theme on the syntax article. The `frames` job of the nightly workflow runs the gate with `BAKE_FRAMES=all` and also measures the other table of contents styles, the phone drawer, the AI chat panel, folds, dragging a function plot, scrolling the bento article and the homepage, and resizing the bento article. A case that is known to be too slow is listed in `knownFailures` in the test file with the Issue Board task that fixes it; it runs and reports its numbers as a todo and does not fail the run. A case that fails just past one threshold is rerun once before it is investigated.
 
 ## Screenshots in pull requests
 
