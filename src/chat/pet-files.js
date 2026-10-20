@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { join, posix, sep } from 'node:path';
 import sharp from 'sharp';
 import { describeValue } from '../report.js';
 import { PET_FRAME, PET_JSON_MAX_BYTES, PET_MAX_BYTES, PET_ROW_COUNT, PET_SHEET_HEIGHTS, PET_SHEET_WIDTH } from './pet-format.js';
@@ -36,11 +36,16 @@ export async function readPet(root, pet, report) {
   else if (isUrl(pet)) read = await downloadPet(pet, (message) => report(null, message));
   else read = await readFolder(join(root, pet), petFolder(pet), report);
   if (read === null) return null;
-  const { name, sheet, image } = read;
+  const { name, sheet, image, reportSheet } = read;
+  const published = image.format === 'webp' && image.height === PET_ROW_COUNT * PET_FRAME.height ? sheet : await croppedSheet(sheet);
+  if (published.length > PET_MAX_BYTES) {
+    reportSheet(`the spritesheet has ${megabytes(published.length)} as WebP, a published pet spritesheet must be at most ${byteLimit(PET_MAX_BYTES)}`);
+    return null;
+  }
   const credit = Object.hasOwn(BUILT_IN_PETS, pet) ? BUILT_IN_PETS[pet] : null;
   const files = [
     { path: `${PET_DIR}/pet.json`, source: `${JSON.stringify({ displayName: name, spritesheetPath: 'spritesheet.webp', ...(credit ? { credit: { ...credit, href: LICENSE } } : {}) })}\n` },
-    { path: `${PET_DIR}/spritesheet.webp`, source: image.format === 'webp' && image.height === PET_ROW_COUNT * PET_FRAME.height ? sheet : await croppedSheet(sheet) },
+    { path: `${PET_DIR}/spritesheet.webp`, source: published },
     {
       path: `${PET_DIR}/frame.webp`,
       source: await sharp(sheet)
@@ -59,21 +64,43 @@ async function readFolder(dir, folder, report) {
     report(null, `the folder ${folder} does not exist`);
     return null;
   }
-  const jsonPath = join(dir, 'pet.json');
-  if (!existsSync(jsonPath)) {
+  if (!existsSync(join(dir, 'pet.json'))) {
     report(null, `${label('pet.json')} does not exist`);
+    return null;
+  }
+  const jsonPath = fileInside(dir, 'pet.json');
+  if (jsonPath === null) {
+    report(label('pet.json'), 'pet.json must be a file inside the pet folder');
+    return null;
+  }
+  if (statSync(jsonPath).size > PET_JSON_MAX_BYTES) {
+    report(label('pet.json'), `pet.json is larger than ${byteLimit(PET_JSON_MAX_BYTES)}`);
     return null;
   }
   const json = petJson(readFileSync(jsonPath, 'utf8'), (message) => report(label('pet.json'), message));
   if (json === null) return null;
   const sheetName = posix.normalize(json.spritesheetPath);
-  if (posix.isAbsolute(sheetName) || sheetName.startsWith('../') || !existsSync(join(dir, sheetName))) {
+  const sheetPath = posix.isAbsolute(sheetName) ? null : fileInside(dir, sheetName);
+  if (sheetPath === null) {
     report(label('pet.json'), `spritesheetPath ${JSON.stringify(json.spritesheetPath)} does not name a file in the pet folder`);
     return null;
   }
-  const sheet = readFileSync(join(dir, sheetName));
-  const image = await sheetImage(sheet, (message) => report(label(sheetName), message));
-  return image === null ? null : { name: json.displayName, sheet, image };
+  const reportSheet = (message) => report(label(sheetName), message);
+  const size = statSync(sheetPath).size;
+  if (size > PET_MAX_BYTES) {
+    reportSheet(`the spritesheet has ${megabytes(size)}, a pet spritesheet must be at most ${byteLimit(PET_MAX_BYTES)}`);
+    return null;
+  }
+  const sheet = readFileSync(sheetPath);
+  const image = await sheetImage(sheet, reportSheet);
+  return image === null ? null : { name: json.displayName, sheet, image, reportSheet };
+}
+
+function fileInside(dir, name) {
+  const path = join(dir, name);
+  if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return null;
+  const folder = realpathSync(dir);
+  return realpathSync(path).startsWith(folder + sep) ? path : null;
 }
 
 async function downloadPet(url, report) {
@@ -88,8 +115,9 @@ async function downloadPet(url, report) {
   }
   const sheet = await download(sheetUrl.href, PET_MAX_BYTES, report);
   if (sheet === null) return null;
-  const image = await sheetImage(sheet, (message) => report(`${sheetUrl.href}: ${message}`));
-  return image === null ? null : { name: json.displayName, sheet, image };
+  const reportSheet = (message) => report(`${sheetUrl.href}: ${message}`);
+  const image = await sheetImage(sheet, reportSheet);
+  return image === null ? null : { name: json.displayName, sheet, image, reportSheet };
 }
 
 async function download(url, limit, report) {
@@ -110,7 +138,7 @@ async function download(url, limit, report) {
     size += chunk.length;
     if (size > limit) {
       await response.body.cancel().catch(() => {});
-      report(`${url} is larger than ${limit >= 1024 * 1024 ? `${limit / 1024 / 1024} MB` : `${limit / 1024} KB`}`);
+      report(`${url} is larger than ${byteLimit(limit)}`);
       return null;
     }
     chunks.push(chunk);
@@ -166,6 +194,14 @@ function croppedSheet(sheet) {
     .extract({ left: 0, top: 0, width: PET_SHEET_WIDTH, height: PET_ROW_COUNT * PET_FRAME.height })
     .webp(WEBP)
     .toBuffer();
+}
+
+function byteLimit(limit) {
+  return limit >= 1024 * 1024 ? `${limit / 1024 / 1024} MB` : `${limit / 1024} KB`;
+}
+
+function megabytes(size) {
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function isUrl(value) {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, symlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
@@ -17,6 +17,22 @@ function config(pet) {
 function sheet(width, height, format = 'png') {
   return sharp({ create: { width, height, channels: 4, background: { r: 200, g: 120, b: 40, alpha: 0.5 } } })
     [format]()
+    .toBuffer();
+}
+
+async function noiseSheet() {
+  const [width, height] = [1536, 1872];
+  const colours = Array.from({ length: 256 }, (_, index) => [(index & 1) * 255, ((index >> 1) & 1) * 255, ((index >> 2) & 1) * 255, (index * 37) & 255]);
+  const raw = Buffer.alloc(width * height * 4);
+  let seed = 1;
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let mixed = Math.imul(seed ^ (seed >>> 15), seed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    raw.set(colours[((mixed ^ (mixed >>> 14)) >>> 0) & 255], pixel * 4);
+  }
+  return sharp(raw, { raw: { width, height, channels: 4 } })
+    .png({ palette: true, colours: 256, dither: 0 })
     .toBuffer();
 }
 
@@ -81,18 +97,37 @@ describe('chat pets', () => {
       { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"sheet.png"}', 'pets/bun/sheet.png': 'not an image' }, error: 'pets/bun/sheet.png:1:1 the spritesheet is not a PNG or WebP image' },
       { files: { 'pets/bun/pet.json': '{"displayName":"Bun"' }, error: /^pets\/bun\/pet\.json:1:1 pet\.json is not valid JSON: / },
       { files: { 'pets/bun/pet.json': '{"spritesheetPath":"sheet.png"}' }, error: 'pets/bun/pet.json:1:1 pet.json must have a non-empty displayName' },
-      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"../secret.png"}' }, error: 'pets/bun/pet.json:1:1 spritesheetPath "../secret.png" does not name a file in the pet folder' },
+      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"../secret.png"}', 'pets/secret.png': 'outside' }, error: 'pets/bun/pet.json:1:1 spritesheetPath "../secret.png" does not name a file in the pet folder' },
+      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"."}' }, error: 'pets/bun/pet.json:1:1 spritesheetPath "." does not name a file in the pet folder' },
+      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":".."}' }, error: 'pets/bun/pet.json:1:1 spritesheetPath ".." does not name a file in the pet folder' },
+      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"art"}', 'pets/bun/art/sheet.png': 'a folder' }, error: 'pets/bun/pet.json:1:1 spritesheetPath "art" does not name a file in the pet folder' },
+      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"link.png"}', 'pets/secret.png': 'outside' }, link: ['../secret.png', 'pets/bun/link.png'], error: 'pets/bun/pet.json:1:1 spritesheetPath "link.png" does not name a file in the pet folder' },
+      { files: { 'pets/bun/pet.json': `{"displayName":"Bun","spritesheetPath":"sheet.png","notes":"${'x'.repeat(64 * 1024)}"}` }, error: 'pets/bun/pet.json:1:1 pet.json is larger than 64 KB' },
+      { files: { 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"sheet.png"}', 'pets/bun/sheet.png': Buffer.alloc(6 * 1024 * 1024) }, error: 'pets/bun/sheet.png:1:1 the spritesheet has 6.0 MB, a pet spritesheet must be at most 5 MB' },
       { files: { 'pets/bun/readme.txt': 'no pet.json' }, error: 'bake.config.js:5:16 chat.pet: pets/bun/pet.json does not exist' },
       { files: {}, error: 'bake.config.js:5:16 chat.pet: the folder pets/bun does not exist' },
     ];
-    for (const { files, sheet: size, error } of cases) {
-      const dir = createBlog(t, { 'bake.config.js': config('pets/bun'), ...files });
+    for (const { files, sheet: size, link, error } of cases) {
+      const dir = createBlog(t, { 'bake.config.js': config('pets/bun') });
+      writeFiles(dir, files);
       if (size !== undefined) writeFiles(dir, { 'pets/bun/sheet.png': await sheet(...size) });
+      if (link !== undefined) symlinkSync(link[0], join(dir, link[1]));
       const { errors } = await petFiles(dir);
       assert.equal(errors.length, 1, errors.join('\n'));
       if (typeof error === 'string') assert.equal(errors[0], error);
       else assert.match(errors[0], error);
     }
+  });
+
+  test('reports a sheet whose WebP would be larger than 5 MB at the sheet file', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': config('pets/bun'), 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"sheet.png"}' });
+    const noise = await noiseSheet();
+    assert.ok(noise.length < 5 * 1024 * 1024, `the PNG has ${noise.length} bytes`);
+    writeFiles(dir, { 'pets/bun/sheet.png': noise });
+    const { errors, files } = await petFiles(dir);
+    assert.equal(errors.length, 1, errors.join('\n'));
+    assert.match(errors[0], /^pets\/bun\/sheet\.png:1:1 the spritesheet has [5-9]\.\d MB as WebP, a published pet spritesheet must be at most 5 MB$/);
+    assert.deepEqual(files, {});
   });
 
   test('rejects a chat.pet that is not a built-in name, a folder in the blog or an http address', async (t) => {
