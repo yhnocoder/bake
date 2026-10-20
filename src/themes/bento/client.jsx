@@ -1,4 +1,3 @@
-import 'bake/theme/styles/fonts.css';
 import 'bake/theme/styles/tokens.css';
 import 'bake/theme/styles/page.css';
 import 'bake/theme/styles/blocks.css';

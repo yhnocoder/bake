@@ -1,5 +1,7 @@
 import { segments, texBox, texFailed } from './tex.js'
 
+const HALO_WIDTH = 3
+
 let measureContext
 let uiFont
 
@@ -36,7 +38,7 @@ export function SvgLabel(props) {
             fill={fill}
             class="llm-label-text"
             stroke={halo ? 'var(--surface)' : undefined}
-            stroke-width={halo ? 3 : undefined}
+            stroke-width={halo ? HALO_WIDTH : undefined}
             paint-order={halo ? 'stroke' : undefined}
           >
             {part.text}
@@ -51,7 +53,10 @@ export function SvgLabel(props) {
       svg.setAttribute('height', height)
       svg.setAttribute('overflow', 'visible')
       svg.style.color = fill
-      if (halo) svg.classList.add('llm-halo')
+      if (halo) {
+        svg.classList.add('llm-halo')
+        svg.style.setProperty('--llm-halo-width', `${HALO_WIDTH / part.box.scale}px`)
+      }
       return svg
     })
   }

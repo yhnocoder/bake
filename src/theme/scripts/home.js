@@ -6,6 +6,7 @@ import { withoutHover } from './screens.js';
 const LOAD_MARGIN = '300px 0px';
 const MIDDLE_BAND = '-45% 0px -45% 0px';
 const CURRENT_LINE = 0.15;
+const SCROLL_REST = 150;
 
 export function startHome(home) {
   const root = document.documentElement;
@@ -54,6 +55,7 @@ export function startHome(home) {
     card.addEventListener('blur', () => preview.pause());
   }
   reducedMotion.addEventListener('change', () => previews.forEach((preview) => preview.sync()));
+  addEventListener('scroll', scrollHold(previews), { passive: true });
 
   if (home.querySelector('.bk-chips[data-for="category"]') !== null) startCurrentChip(home);
   startStuckBar(home);
@@ -82,6 +84,20 @@ export function startHome(home) {
       moveCards(visibleCards(), () => filterMonths(home, chip.dataset.tag, labels, previews));
     });
   }
+}
+
+function scrollHold(previews) {
+  let timer = null;
+  const hold = (held) => previews.forEach((preview) => preview.hold(held));
+  return () => {
+    if (!withoutHover.matches) return;
+    if (timer === null) hold(true);
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      hold(false);
+    }, SCROLL_REST);
+  };
 }
 
 function startStuckBar(home) {
@@ -167,17 +183,19 @@ function moveCards(before, change) {
   change();
   if (reducedMotion.matches) return;
   const height = innerHeight;
+  const moves = [];
   for (const card of document.querySelectorAll('.bk-card')) {
     if (card.offsetParent === null) continue;
     const to = card.getBoundingClientRect();
-    const old = from.get(card);
-    if (to.bottom < 0 || to.top > height) continue;
+    if (to.bottom >= 0 && to.top <= height) moves.push([card, from.get(card), to]);
+  }
+  for (const [card, old, to] of moves) {
     if (old === undefined) {
       card.animate([{ opacity: 0, scale: '0.96' }, { opacity: 1, scale: '1' }], { duration: 220, easing: EASING });
       continue;
     }
-    const keyframe = { translate: `${old.left - to.left}px ${old.top - to.top}px`, scale: `${old.width / to.width} ${old.height / to.height}`, transformOrigin: 'top left' };
-    card.animate([keyframe, { translate: '0 0', scale: '1', transformOrigin: 'top left' }], { duration: 260, easing: EASING });
+    const keyframe = { translate: `${old.left - to.left}px ${old.top - to.top}px`, scale: `${old.width / to.width} ${old.height / to.height}` };
+    card.animate([keyframe, { translate: '0 0', scale: '1' }], { duration: 260, easing: EASING });
   }
 }
 
@@ -187,8 +205,9 @@ function cardPreview(card) {
   let wanted = false;
   let running = false;
   let onScreen = false;
+  let held = false;
   const sync = () => {
-    const play = wanted && onScreen && controller !== null && !reducedMotion.matches;
+    const play = wanted && onScreen && !held && controller !== null && !reducedMotion.matches;
     if (play === running) return;
     running = play;
     try {
@@ -202,6 +221,10 @@ function cardPreview(card) {
     sync,
     show(visible) {
       onScreen = visible;
+      sync();
+    },
+    hold(scrolling) {
+      held = scrolling;
       sync();
     },
     async load() {

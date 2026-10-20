@@ -451,6 +451,29 @@ test('the essay theme lays out articles', async (t) => {
     );
   });
 
+  await t.test('the font faces load from a stylesheet that does not block the first paint, with and without scripts', async () => {
+    for (const path of ['', '2026-10/syntax/', '2026-10/activations/', 'missing/']) {
+      const html = await (await fetch(`${origin}/${path}`)).text();
+      const blocking = [...html.replace(/<noscript>.*?<\/noscript>/gs, '').matchAll(/<link rel="stylesheet" href="([^"]+)"( media="[^"]+")?/g)].filter(([, , media]) => media === undefined).map(([, href]) => href);
+      assert.ok(blocking.length > 0, `${path} links no stylesheet`);
+      for (const href of blocking) {
+        const css = readFileSync(join(dir, 'dist/assets', href.split('/').pop()), 'utf8');
+        assert.equal(css.includes('@font-face'), false, `${path} blocks its first paint on ${href}, which declares fonts`);
+      }
+    }
+    for (const javaScriptEnabled of [true, false]) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, javaScriptEnabled });
+      const page = await context.newPage();
+      await page.goto(`${origin}/2026-10/syntax/`, { waitUntil: 'networkidle' });
+      const loaded = await page.evaluate(async () => {
+        await document.fonts.ready;
+        return [...document.fonts].filter((face) => face.status === 'loaded').map((face) => `${face.family} ${face.weight}`);
+      });
+      await context.close();
+      assert.ok(loaded.includes('LXGW WenKai 700'), `with scripts ${javaScriptEnabled ? 'enabled' : 'disabled'} the headings did not load WenKai: ${loaded.join(', ')}`);
+    }
+  });
+
   await t.test('the references label is hidden right after a heading and shown otherwise', async () => {
     const labels = async (path) => {
       const page = await open(path);

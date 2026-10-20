@@ -2,6 +2,22 @@
 @import 'lxgw-wenkai-webfont/lxgwwenkai-bold.css';
 
 @font-face {
+  font-family: 'LXGW WenKai';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('LXGW WenKai'), local('LXGW WenKai Regular'), local('LXGWWenKai-Regular');
+}
+
+@font-face {
+  font-family: 'LXGW WenKai';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('LXGW WenKai Bold'), local('LXGWWenKai-Bold');
+}
+
+@font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400;
