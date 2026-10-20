@@ -5,9 +5,9 @@ import { before, describe, test } from 'node:test';
 import { readComponents } from '../src/components/read.js';
 import { readPreamble } from '../src/config/preamble.js';
 import { indexPages } from '../src/build/links.js';
-import { BUILT_IN_BLOCK_NAMES, parseArticle, readArticle } from '../src/markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES, readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
-import { folder, frontMatter, html, outline, parse, parsed } from './article.js';
+import { folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
 
 const fixturesDir = new URL('./fixtures/syntax-errors/', import.meta.url);
 const markdownFixtures = [

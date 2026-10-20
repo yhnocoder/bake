@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { chatBundle } from '../chat/bundle.js';
+import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { bundleComponents } from '../components/bundle.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
@@ -14,10 +14,10 @@ import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { listFiles } from './files.js';
 import { indexPages } from './links.js';
-import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
+import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
+import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
 

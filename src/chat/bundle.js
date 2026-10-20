@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { build } from 'vite';
 import solid from 'vite-plugin-solid';
-import { CHAT_PREAMBLE_PATH } from '../build/site-files.js';
 import { BAKE_ROOT, outputOf, viteConfig } from '../build/vite.js';
 import { chatModules, isMathJaxModule } from '../components/modules.js';
+
+export const CHAT_PREAMBLE_PATH = '_bake/preamble.json';
 
 const ENTRY = join(import.meta.dirname, 'entry.js');
 const BUILD_FILES = [import.meta.filename, join(import.meta.dirname, '../components/modules.js'), join(import.meta.dirname, '../build/vite.js'), join(BAKE_ROOT, 'package.json')];

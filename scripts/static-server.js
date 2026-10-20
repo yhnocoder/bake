@@ -1,7 +1,7 @@
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve, sep } from 'node:path';
-import { contentType } from '../src/build/content-types.js';
+import { contentType } from '../src/content-types.js';
 
 export async function serveStatic(dir) {
   const root = resolve(dir);
