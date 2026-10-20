@@ -238,7 +238,7 @@ The page writes the regions `article` on `<article class="bk-article">`, `words`
 
 ## Components
 
-A component is an interactive block that a blog writes. `components/` in the blog holds one component per file, `name.js` or `name.jsx`. The file name is both the custom element name and the block name in Markdown, so it uses lowercase letters and digits with at least one `-`, and it cannot be the name of a built-in block such as `list-table`. `components/lib/` holds code and CSS that components share; files there are not components. A component may import `components/lib/`, npm packages from the blog's `package.json`, `solid-js`, which resolves to Bake's own copy, `bake/math` and `bake/kit`.
+A component is an interactive block that a blog writes. `components/` in the blog holds one component per file, `name.js` or `name.jsx`. The file name is both the custom element name and the block name in Markdown, so it uses lowercase letters and digits with at least one `-`, and it cannot be the name of a built-in block such as `list-table` or one of the names that the HTML standard reserves and does not allow as custom element names: `annotation-xml`, `color-profile`, `font-face`, `font-face-src`, `font-face-uri`, `font-face-format`, `font-face-name` and `missing-glyph`. `components/lib/` holds code and CSS that components share; files there are not components. A component may import `components/lib/`, npm packages from the blog's `package.json`, `solid-js`, which resolves to Bake's own copy, `bake/math` and `bake/kit`.
 
 A component module exports three things:
 

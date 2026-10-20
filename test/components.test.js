@@ -109,6 +109,16 @@ describe('reading components', () => {
     ]);
   });
 
+  test('reports a component file named after a custom element name that the HTML standard reserves', async (t) => {
+    const reserved = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
+    const { errors, components: read_ } = await read(t, Object.fromEntries(reserved.map((name) => [`components/${name}.js`, `${height}${component}`])));
+    assert.deepEqual(
+      errors,
+      reserved.map((name) => `components/${name}.js:1:1 ${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`).sort(),
+    );
+    assert.equal(read_.size, 0);
+  });
+
   test('reports problems in params and layout declarations at the start of the component file', async (t) => {
     const { errors, components: read_ } = await read(t, {
       'components/bad-type.js': `export const params = { n: { label: 'N', type: 'integer', default: 1 } };\n${height}${component}`,
