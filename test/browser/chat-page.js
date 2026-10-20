@@ -1,0 +1,112 @@
+import assert from 'node:assert/strict';
+import { cpSync } from 'node:fs';
+import { join } from 'node:path';
+import { chromium } from 'playwright';
+import { bake, createBlog } from '../blog.js';
+import { serve } from './server.js';
+
+export const exampleBlog = join(import.meta.dirname, '../../examples/blog');
+
+export const API_KEY = 'sk-test-0123456789abcdef';
+export const PETS = 'https://pets.example';
+export const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST' };
+
+export function events(chunks, finish = 'stop') {
+  const lines = chunks.map((delta, index) => ({ choices: [{ index: 0, delta, finish_reason: index === chunks.length - 1 ? finish : null }] }));
+  return `${lines.map((line) => `data: ${JSON.stringify(line)}\n\n`).join('')}data: [DONE]\n\n`;
+}
+
+export function text(content, size = 6) {
+  const chunks = [{ role: 'assistant', content: '' }];
+  for (let index = 0; index < content.length; index += size) chunks.push({ content: content.slice(index, index + size) });
+  return events(chunks);
+}
+
+export async function buildExample(t) {
+  const dir = createBlog(t, {});
+  cpSync(exampleBlog, dir, { recursive: true, filter: (path) => path !== join(exampleBlog, 'dist') });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  return (await serve(t, join(dir, 'dist'))).replace('127.0.0.1', 'localhost');
+}
+
+export async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], ...contextOptions });
+  const api = { requests: [], answers: [], models: { status: 200, body: '{"object":"list","data":[]}' }, pets: {}, petRequests: [] };
+  await context.route(
+    (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
+    async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin === PETS) {
+        api.petRequests.push({ path: url.pathname, headers: request.headers() });
+        const file = api.pets[url.pathname];
+        if (file === undefined) return route.fulfill({ status: 404, headers: CORS });
+        if (file.hang) return new Promise(() => {});
+        return route.fulfill({ status: 200, headers: CORS, body: file });
+      }
+      if (url.origin !== 'https://api.deepseek.com') return route.abort();
+      if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      api.requests.push({ path: url.pathname, headers: request.headers(), body: request.postDataJSON() });
+      if (url.pathname === '/models') return route.fulfill({ status: api.models.status, headers: { ...CORS, 'content-type': 'application/json' }, body: api.models.body });
+      const next = api.answers.shift() ?? { status: 500, body: '{"error":{"message":"no answer prepared"}}' };
+      if (next.offline) return route.abort('internetdisconnected');
+      return route.fulfill({ status: next.status ?? 200, headers: { ...CORS, 'content-type': next.status === undefined ? 'text/event-stream' : 'application/json' }, body: next.body });
+    },
+  );
+  await context.addInitScript(() => {
+    window.bakeTest = { signals: [], hold: false, held: [] };
+    const signal = PublicKeyCredential.signalUnknownCredential;
+    PublicKeyCredential.signalUnknownCredential = (options) => {
+      window.bakeTest.signals.push(options.credentialId);
+      return signal.call(PublicKeyCredential, options);
+    };
+    const fetch = window.fetch;
+    window.fetch = (input, init = {}) => {
+      if (!window.bakeTest.hold || !String(input).endsWith('/chat/completions')) return fetch(input, init);
+      window.bakeTest.held.push(JSON.parse(init.body));
+      const first = { choices: [{ index: 0, delta: { content: '前半句' }, finish_reason: null }] };
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(first)}\n\n`));
+          init.signal.addEventListener('abort', () => controller.error(init.signal.reason));
+        },
+      });
+      return Promise.resolve(new Response(body, { headers: { 'content-type': 'text/event-stream' } }));
+    };
+  });
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', (error) => problems.push(error.message));
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: prf, automaticPresenceSimulation: true },
+  });
+  return { context, page, api, problems };
+}
+
+export async function storage(page) {
+  return page.evaluate(() => ({
+    local: Object.fromEntries(Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)])),
+    session: Object.fromEntries(Object.keys(sessionStorage).map((key) => [key, sessionStorage.getItem(key)])),
+    cookies: document.cookie,
+  }));
+}
+
+export const QUESTION = '.bk-chat-composer input[name="question"]';
+export const KEY = '.bk-chat-composer input[name="key"]';
+
+export async function setUpKey(page, key = API_KEY) {
+  if ((await page.locator('.bk-chat-launcher').getAttribute('aria-expanded')) !== 'true') await page.locator('.bk-chat-launcher').click();
+  await page.locator(KEY).fill(key);
+  await page.locator(KEY).press('Enter');
+  await page.locator(QUESTION).waitFor();
+}
+
+export async function ask(page, question) {
+  await page.locator(QUESTION).fill(question);
+  await page.locator(QUESTION).press('Enter');
+}

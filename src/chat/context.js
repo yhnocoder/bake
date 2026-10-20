@@ -1,5 +1,6 @@
 import { escapeMarkup } from '../escape.js';
 import { articleSource } from '../copy/copy.js';
+import { instructionLines } from './instructions.js';
 
 export const CATALOG_PATH = '_bake/articles.json';
 export const ARTICLE_REGION = '[data-region="article"]';
@@ -32,6 +33,15 @@ export function currentPage(root) {
     title: meta('og:title') ?? document.title,
     article: source === null ? null : { source, element: article, outline: article === null ? [] : outlineOf(article) },
   };
+}
+
+export async function articlePage(root, catalog, page, address) {
+  const entry = catalogEntry(root, catalog, address);
+  if (entry === null) return page;
+  const read = await readArticle(root, catalog, address);
+  if (read.failed) throw new Error(read.content);
+  const outline = entry.sections.flatMap((section) => [{ id: section.id, depth: 2, title: section.title }, ...section.subsections.map((subsection) => ({ id: subsection.id, depth: 3, title: subsection.title }))]);
+  return { ...page, title: entry.title, article: { source: read.content, element: null, outline, address: `/${entry.url}` } };
 }
 
 function meta(property) {
@@ -80,8 +90,9 @@ function groups(entries, keysOf) {
   return [...map];
 }
 
-export function systemPrompt({ page, catalog, scopes = [], sources = [] }) {
-  const where = page.article === null ? `on the page ${page.address}` : `reading the article "${page.title}" at ${page.address}`;
+export function systemPrompt({ page, catalog, scopes = [], sources = [], instructions = '' }) {
+  const away = page.article?.address;
+  const where = page.article === null ? `on the page ${page.address}` : away === undefined ? `reading the article "${page.title}" at ${page.address}` : `on the page ${page.address} and continues a conversation about the article "${page.title}" at ${away}`;
   const intro = [`You are the reading assistant of the blog "${catalog.title}"${catalog.description === undefined ? '' : ` (${catalog.description})`}. The reader is ${where}.`, ...commonRules];
   const links = 'Link articles and sections with their addresses and section ids, such as [the article](/2026-10/rope/) or [the section](/2026-10/rope/#id).';
   if (scopes.length > 0) {
@@ -92,24 +103,26 @@ export function systemPrompt({ page, catalog, scopes = [], sources = [] }) {
       links,
       ...sources.map((source) => [`<article address="${escapeMarkup(`/${source.url}`)}" title="${escapeMarkup(source.title)}">`, source.content, '</article>'].join('\n')),
       ...(listed.size === 0 ? [] : [`Read these articles with ${READ_ARTICLE} before you answer; read every one that may be relevant. They are listed one JSON object per line:`, ...catalogLines(catalog.articles.filter((entry) => listed.has(entry.url)))]),
+      ...instructionLines(instructions),
     ].join('\n');
   }
   const blog = [`The blog's articles are listed below, one JSON object per line. Before you answer a question about the content of other articles, call ${READ_ARTICLE} with their addresses and read them; read several when the question spans articles. Do not describe content you have not read.`, links, ...catalogLines(catalog.articles)];
-  if (page.article === null) return [...intro, ...blog].join('\n');
+  if (page.article === null) return [...intro, ...blog, ...instructionLines(instructions)].join('\n');
   const outline = page.article.outline.map((heading) => `${heading.depth === 3 ? '  ' : ''}- #${heading.id} ${heading.title}`);
   return [
     ...intro,
     `Questions are about this article unless the reader asks about others. Its Markdown source is between the <article> tags below. Base your answers on the article. Say so when it does not cover something, and mark what you add from outside the blog.`,
-    'When you refer to a part of this article, link it with its id, such as [the heading](#id). The headings and their ids are:',
+    away === undefined ? 'When you refer to a part of this article, link it with its id, such as [the heading](#id). The headings and their ids are:' : `When you refer to a part of this article, link it with its address and id, such as [the heading](${away}#id). The headings and their ids are:`,
     ...(outline.length === 0 ? ['(the article has no headings)'] : outline),
     '<article>',
     page.article.source,
     '</article>',
     ...blog,
+    ...instructionLines(instructions),
   ].join('\n');
 }
 
-function catalogLines(entries) {
+export function catalogLines(entries) {
   return entries.map((entry) =>
     JSON.stringify({
       address: `/${entry.url}`,
@@ -133,20 +146,20 @@ function sectionLine(section) {
 }
 
 export async function readArticle(root, catalog, address, { fetch = globalThis.fetch } = {}) {
-  const entry = findEntry(root, catalog, String(address ?? ''));
+  const entry = catalogEntry(root, catalog, String(address ?? ''));
   if (entry === null) return { content: `There is no article at ${JSON.stringify(address)}. Use an address from the list.`, label: String(address ?? ''), failed: true };
   try {
     const response = await fetch(new URL(entry.source ?? entry.url, root));
     if (!response.ok) throw new Error(`the server answered ${response.status}`);
     const text = await response.text();
     const content = entry.source === undefined ? new DOMParser().parseFromString(text, 'text/html').body.textContent.replace(/\n\s*\n+/g, '\n\n').trim() : text;
-    return { content: content.slice(0, MAX_TOOL_TEXT), label: entry.title };
+    return { content: content.slice(0, MAX_TOOL_TEXT), label: entry.title, url: entry.url };
   } catch (error) {
-    return { content: `The article could not be read: ${error.message}`, label: entry.title, failed: true };
+    return { content: `The article could not be read: ${error.message}`, label: entry.title, url: entry.url, failed: true };
   }
 }
 
-function findEntry(root, catalog, address) {
+export function catalogEntry(root, catalog, address) {
   let path;
   try {
     const url = new URL(address.replace(/^\/+/, ''), root);

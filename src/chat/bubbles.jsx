@@ -3,18 +3,23 @@ import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { selectionMarkdown } from '../copy/copy.js';
 import styles from './bubbles.css?inline';
-import { READ_ARTICLE, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
+import { READ_ARTICLE, articlePage, catalogEntry, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
 import { answer } from './conversation.js';
-import { ApiError, checkKey } from './deepseek.js';
+import { ApiError, checkKey, complete } from './deepseek.js';
+import { deleteConversation, historyGroups, localDate, readHistory, roundMessages, saveConversation, storedRound } from './history.js';
+import { HistoryList } from './history-list.jsx';
+import { MAX_INSTRUCTIONS, readInstructions, saveInstructions } from './instructions.js';
+import { NoteCard } from './note-card.jsx';
+import { MAX_NOTE_SOURCES, checkNote, citedEntries, notePrompt } from './note.js';
 import { PetError, chooseReaderPet, forgetReaderPet, storedReaderPet } from './reader-pet.js';
 import { MATH_CLASS, replyHtml } from './reply.js';
+import { typesetMath } from './typeset.js';
 import { VaultError, clearKey, saveKey, storedKey, unlockKey } from './vault.js';
 
 const THINKING_KEY = 'bk-chat-thinking';
 const SCOPE_QUERY = /@([^\s@]*)$/;
 const CONTEXT_LENGTH = /context length/i;
 const DEEPSEEK_KEYS = 'https://platform.deepseek.com/api_keys';
-const typeset = new Map();
 const composing = (event) => event.isComposing || event.keyCode === 229;
 
 export function createChat({ shadow, root, labels, pet, petSource, launcher }) {
@@ -41,12 +46,25 @@ function Chat(props) {
   const [draft, setDraft] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [pending, setPending] = createSignal(null);
-  const [menu, setMenu] = createSignal(false);
+  const [popover, setPopover] = createSignal(null);
   const [thinking, setThinking] = createSignal(readThinking());
   const [faded, setFaded] = createSignal(false);
   const [announcement, setAnnouncement] = createSignal(null);
+  const pageArticle = () => (page.article === null ? null : { address: page.address, title: page.title });
+  const [article, setArticle] = createSignal(pageArticle());
+  const [studyNote, setStudyNote] = createSignal(null);
+  const [noteOpen, setNoteOpen] = createSignal(false);
+  const [noteBusy, setNoteBusy] = createSignal(false);
+  const [noteHint, setNoteHint] = createSignal('');
+  const [redo, setRedo] = createSignal(false);
+  const [historyItems, setHistoryItems] = createSignal([]);
+  const [instructions, setInstructions] = createSignal(readInstructions());
+  let conversationId = crypto.randomUUID();
+  let awayPage = null;
   let apiKey = null;
   let abort = null;
+  let noteAbort = null;
+  let historyNew;
   let lastId = 0;
   let unlockTried = false;
   let activity = 'idle';
@@ -79,10 +97,18 @@ function Chat(props) {
     return add({ role: 'note', text, ...extra });
   };
   const problem = (text, retry = null) => add({ role: 'problem', text, retry });
-  const conversation = () =>
-    messages.flatMap((message) =>
-      message.role === 'assistant' && message.done && message.error === null && message.sent.length > 0 ? [{ role: 'user', content: message.ask.content }, ...message.sent] : [],
-    );
+  const finished = () => messages.filter((message) => message.role === 'assistant' && message.done && message.error === null && message.sent.length > 0);
+  const conversation = () => finished().flatMap((message) => [{ role: 'user', content: message.ask.content }, ...message.sent]);
+  const away = () => article() !== null && article().address !== page.address;
+  const persist = () => {
+    const rounds = finished().map(storedRound);
+    if (rounds.length > 0) saveConversation(root, { id: conversationId, article: article(), date: localDate(), rounds, note: studyNote() });
+  };
+  const contextPage = async (catalog) => {
+    if (!away()) return page;
+    if (awayPage?.article.address !== article().address) awayPage = await articlePage(root, catalog, page, article().address);
+    return awayPage;
+  };
   const focusInput = () => requestAnimationFrame(() => open() && input?.focus({ preventScroll: true }));
 
   const show = () => {
@@ -98,7 +124,9 @@ function Chat(props) {
   const hide = ({ focus = true } = {}) => {
     if (!open()) return;
     setOpen(false);
-    setMenu(false);
+    setPopover(null);
+    setNoteOpen(false);
+    setRedo(false);
     setQuery(null);
     launcher.setAttribute('aria-expanded', 'false');
     pet.setState('idle');
@@ -154,31 +182,60 @@ function Chat(props) {
     }
   }
 
-  const newChat = () => {
+  const reset = () => {
     abort?.abort();
+    noteAbort?.abort();
     setBusy(false);
+    setNoteBusy(false);
     setMessages([]);
     setQuote(null);
     setScopes([]);
-    setMenu(false);
+    setPopover(null);
+    conversationId = crypto.randomUUID();
+    setArticle(pageArticle());
+    setStudyNote(null);
+    setNoteOpen(false);
+    setRedo(false);
+    setNoteHint('');
+  };
+  const newChat = () => {
+    reset();
     setPet('idle');
     greet();
     focusInput();
   };
+  const restore = (item) => {
+    reset();
+    conversationId = item.id;
+    setArticle(item.article);
+    setStudyNote(item.note);
+    for (const message of item.rounds.flatMap(roundMessages)) add(message);
+    if (away()) note(labels.restoredFrom(item.article.title));
+    setPet('idle');
+    focusInput();
+  };
+  const toggleHistory = () => {
+    if (popover() === 'history') return setPopover(null);
+    setHistoryItems(readHistory(root).filter((item) => item.id !== conversationId));
+    setPopover('history');
+    requestAnimationFrame(() => historyNew?.focus({ preventScroll: true }));
+  };
+  const forgetConversation = (item) => {
+    deleteConversation(root, item.id);
+    setHistoryItems(historyItems().filter((other) => other.id !== item.id));
+    historyNew?.focus({ preventScroll: true });
+  };
   const changeKey = () => {
-    setMenu(false);
+    setPopover(null);
     setView('setup');
     note(labels.setupText, { link: { href: DEEPSEEK_KEYS, text: labels.setupLink } });
     focusInput();
   };
   const forget = () => {
-    abort?.abort();
     clearKey();
     apiKey = null;
     unlockTried = false;
-    setBusy(false);
-    setMessages([]);
-    setMenu(false);
+    reset();
     setView('setup');
     note(labels.cleared);
     greet();
@@ -189,7 +246,7 @@ function Chat(props) {
   async function submit(event) {
     event?.preventDefault();
     const text = draft().trim();
-    if (text === '' || busy() || pending() !== null) return;
+    if (text === '' || busy() || noteBusy() || pending() !== null) return;
     if (view() === 'setup') return saveApiKey(text);
     if (view() === 'locked' && !(await unlock())) return;
     const picked = scopes();
@@ -198,7 +255,7 @@ function Chat(props) {
     setDraft('');
     setQuote(null);
     setScopes([]);
-    run({ content: quoted === null ? text : `${quoted.replace(/^/gm, '> ')}\n\n${text}`, scopes: picked });
+    run({ content: quoted === null ? text : `${quoted.replace(/^/gm, '> ')}\n\n${text}`, scopes: picked, bubble: { text, quote: quoted, scopes: picked.map((scope) => scope.label) } });
   }
 
   async function run(ask) {
@@ -231,7 +288,7 @@ function Chat(props) {
       );
       const { added } = await answer({
         key: apiKey,
-        system: systemPrompt({ page, catalog, scopes: picked, sources }),
+        system: systemPrompt({ page: await contextPage(catalog), catalog, scopes: picked, sources, instructions: instructions() }),
         history,
         tools: chatTools,
         runTool: (name, args) => (name === READ_ARTICLE ? readArticle(root, catalog, args.address) : Promise.resolve({ content: `Unknown tool ${name}`, label: name, failed: true })),
@@ -252,12 +309,13 @@ function Chat(props) {
     if (!present(id)) return;
     if (latest !== null) commit();
     update(id, { sent, error: failure === null ? null : requestProblem(failure, labels), done: true });
+    persist();
     if (failure === null && latest !== null) setAnnouncement({ text: replyText(latest.content, root) });
     setPet(failure !== null ? 'failed' : controller.signal.aborted ? 'idle' : 'answered');
     setBusy(false);
   }
 
-  const retryable = (id) => !busy() && pending() === null && messages.at(-1)?.id === id;
+  const retryable = (id) => !busy() && !noteBusy() && pending() === null && messages.at(-1)?.id === id;
   const retry = (id) => {
     if (!retryable(id)) return;
     const { ask } = messages.at(-1);
@@ -269,6 +327,86 @@ function Chat(props) {
     remove(id);
     unlock();
   };
+
+  const lastReply = () => finished().at(-1)?.id;
+  const noteCurrent = () => studyNote() !== null && studyNote().versions.at(-1).rounds === finished().length;
+  const noteAction = () => (view() === 'setup' || busy() || noteBusy() || pending() !== null ? null : noteCurrent() ? { label: labels.viewNote, run: openNote } : { label: labels.makeNote, run: () => summarize() });
+  function openNote() {
+    setPopover(null);
+    setNoteHint('');
+    setNoteOpen(true);
+  }
+  const closeNote = () => {
+    setNoteOpen(false);
+    setRedo(false);
+    focusInput();
+  };
+  const showVersion = (index) => {
+    setStudyNote({ ...studyNote(), index });
+    setNoteHint('');
+    persist();
+  };
+
+  async function summarize(request = null) {
+    const rounds = finished().map(storedRound);
+    if (rounds.length === 0 || busy() || noteBusy() || pending() !== null || view() === 'setup') return;
+    if (view() === 'locked' && !(await unlock())) return;
+    const previous = request === null ? null : studyNote().versions[studyNote().index];
+    setPopover(null);
+    setRedo(false);
+    setNoteBusy(true);
+    setPet('reading');
+    const inCard = noteOpen();
+    const progress = inCard ? null : note(labels.summarizing);
+    if (!inCard) focusInput();
+    if (inCard) {
+      setNoteHint(request === null ? labels.summarizing : labels.resummarizing(request));
+      setAnnouncement({ text: noteHint() });
+    }
+    const controller = new AbortController();
+    noteAbort = controller;
+    try {
+      const catalog = await loadCatalog(root).catch(() => Promise.reject(new CatalogError()));
+      const context = await contextPage(catalog);
+      const own = ownArticle(root, catalog, article(), context);
+      const known = own === null || catalog.articles.includes(own.entry) ? catalog : { ...catalog, articles: [...catalog.articles, own.entry] };
+      const cited = citedEntries(root, known, rounds, own?.entry.url).slice(0, MAX_NOTE_SOURCES);
+      const sources = await Promise.all(cited.map(async (entry) => ({ entry, source: (await readArticle(root, known, `/${entry.url}`)).content })));
+      const { message } = await complete({
+        key: apiKey,
+        messages: notePrompt({ catalog, own, sources, rounds, labels, previous: previous?.markdown ?? null, request, instructions: instructions() }),
+        tools: [],
+        thinking: thinking(),
+        signal: controller.signal,
+      });
+      const checked = checkNote(message.content, { root, catalog: known, base: article()?.address });
+      if (checked.markdown === '') throw new EmptyNote();
+      const versions = [...(studyNote()?.versions ?? []), { markdown: checked.markdown, articles: checked.articles, rounds: rounds.length, request, date: localDate() }];
+      setStudyNote({ versions, index: versions.length - 1 });
+      persist();
+      if (progress !== null && present(progress)) remove(progress);
+      setNoteHint('');
+      setNoteOpen(true);
+      setAnnouncement({ text: labels.noteReady });
+      setPet('answered');
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      const text = error instanceof EmptyNote ? labels.noteEmpty : requestProblem(error, labels);
+      setPet('failed');
+      if (progress !== null && present(progress)) {
+        remove(progress);
+        problem(text);
+      } else {
+        setNoteHint(text);
+        setAnnouncement({ text });
+      }
+    } finally {
+      if (noteAbort === controller) {
+        noteAbort = null;
+        setNoteBusy(false);
+      }
+    }
+  }
 
   const ask = async (range) => {
     const article = page.article?.element;
@@ -340,10 +478,12 @@ function Chat(props) {
   const containerKeydown = (event) => {
     if (event.key !== 'Escape' || composing(event)) return;
     event.preventDefault();
-    if (menu()) {
-      setMenu(false);
+    if (popover() !== null) {
+      setPopover(null);
       focusInput();
-    } else hide();
+    } else if (redo()) setRedo(false);
+    else if (noteOpen()) closeNote();
+    else hide();
   };
 
   const toggleThinking = () => {
@@ -359,7 +499,7 @@ function Chat(props) {
     if (!open()) return;
     const path = event.composedPath();
     if (path.includes(container) || path.includes(launcher)) {
-      if (menu() && !path.some((element) => element instanceof Element && element.classList.contains('bk-chat-menu-area'))) setMenu(false);
+      if (popover() !== null && !path.some((element) => element instanceof Element && element.classList.contains('bk-chat-pop-area'))) setPopover(null);
       return;
     }
     hide({ focus: false });
@@ -392,20 +532,28 @@ function Chat(props) {
   const placeholder = () => (view() === 'setup' ? labels.placeholder.key : scopes().length > 0 ? labels.placeholder.scoped : labels.placeholder[page.article === null ? 'blog' : 'article']);
 
   return (
-    <section class="bk-chat" data-open={open() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>
+    <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>
       <p class="bk-chat-status" role="status">
         <Show when={announcement()} keyed>
           {({ text }) => <span>{text}</span>}
         </Show>
       </p>
-      <div class="bk-chat-bubbles" data-faded={faded() ? '' : undefined} ref={list} onScroll={updateFade}>
+      <div class="bk-chat-bubbles" data-faded={faded() ? '' : undefined} hidden={noteOpen()} ref={list} onScroll={updateFade}>
         <div class="bk-chat-thread" ref={(element) => resize.observe(element)}>
           <For each={messages}>
             {(message) =>
               message.role === 'user' ? (
                 <UserBubble message={message} />
               ) : message.role === 'assistant' ? (
-                <Reply message={message} root={root} labels={labels} canRetry={retryable(message.id)} onRetry={() => retry(message.id)} />
+                <Reply
+                  message={message}
+                  root={root}
+                  base={away() ? article().address : undefined}
+                  labels={labels}
+                  canRetry={retryable(message.id)}
+                  onRetry={() => retry(message.id)}
+                  noteAction={message.id === lastReply() ? noteAction() : null}
+                />
               ) : message.role === 'problem' ? (
                 <p class="bk-chat-bubble bk-chat-problem" role="alert">
                   {message.text}
@@ -431,6 +579,23 @@ function Chat(props) {
           </For>
         </div>
       </div>
+      <Show when={noteOpen() && studyNote() !== null}>
+        <NoteCard
+          labels={labels}
+          root={root}
+          note={studyNote()}
+          article={article()}
+          busy={noteBusy()}
+          hint={noteHint()}
+          setHint={setNoteHint}
+          redo={redo()}
+          setRedo={setRedo}
+          announce={(text) => setAnnouncement({ text })}
+          onIndex={showVersion}
+          onBack={closeNote}
+          onRedo={(request) => summarize(request)}
+        />
+      </Show>
       <form class="bk-chat-composer" onSubmit={submit}>
         <Show when={listing()}>
           <div class="bk-chat-scopes">
@@ -510,15 +675,53 @@ function Chat(props) {
           onBlur={() => setQuery(null)}
           on:keydown={keydown}
         />
-        <div class="bk-chat-menu-area">
-          <button type="button" class="bk-chat-icon" aria-label={labels.settings} aria-expanded={String(menu())} onClick={() => setMenu(!menu())}>
+        <div class="bk-chat-pop-area">
+          <button type="button" class="bk-chat-icon" aria-label={labels.history} title={labels.history} aria-expanded={String(popover() === 'history')} onClick={toggleHistory}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" data-stroke>
+              <circle cx="8" cy="8" r="6" />
+              <path d="M8 4.6V8l2.3 1.5" />
+            </svg>
+          </button>
+          <Show when={popover() === 'history'}>
+            <HistoryList
+              labels={labels}
+              home={page.article === null}
+              groups={historyGroups(historyItems(), { address: page.address, home: page.article === null })}
+              newRef={(element) => (historyNew = element)}
+              onNew={newChat}
+              onOpen={restore}
+              onDelete={forgetConversation}
+            />
+          </Show>
+        </div>
+        <div class="bk-chat-pop-area">
+          <button type="button" class="bk-chat-icon" aria-label={labels.settings} title={labels.settings} aria-expanded={String(popover() === 'menu')} onClick={() => setPopover(popover() === 'menu' ? null : 'menu')}>
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <circle cx="3.5" cy="8" r="1.3" />
               <circle cx="8" cy="8" r="1.3" />
               <circle cx="12.5" cy="8" r="1.3" />
             </svg>
           </button>
-          <Show when={menu()}>
+          <Show when={popover() === 'prompt'}>
+            <PromptForm
+              labels={labels}
+              value={instructions()}
+              onCancel={() => {
+                setPopover(null);
+                focusInput();
+              }}
+              onSave={(text) => {
+                const saved = saveInstructions(text);
+                if (saved === null) return labels.promptStorage;
+                setInstructions(saved);
+                setPopover(null);
+                note(saved === '' ? labels.promptCleared : labels.promptSaved);
+                focusInput();
+                return null;
+              }}
+            />
+          </Show>
+          <Show when={popover() === 'menu'}>
             <Settings
               labels={labels}
               root={root}
@@ -526,6 +729,9 @@ function Chat(props) {
               petSource={props.petSource}
               view={view()}
               thinking={thinking()}
+              noteAction={finished().length > 0 && view() !== 'setup' ? { label: noteCurrent() ? labels.viewNote : labels.makeNote, run: noteCurrent() ? openNote : () => summarize(), disabled: busy() || noteBusy() || pending() !== null } : null}
+              instructions={instructions() !== ''}
+              onPrompt={() => setPopover('prompt')}
               onNewChat={newChat}
               onThinking={toggleThinking}
               onChangeKey={changeKey}
@@ -536,7 +742,7 @@ function Chat(props) {
         <Show
           when={busy()}
           fallback={
-            <button type="submit" class="bk-chat-send" disabled={draft().trim() === '' || pending() !== null}>
+            <button type="submit" class="bk-chat-send" disabled={draft().trim() === '' || pending() !== null || noteBusy()}>
               {view() === 'setup' ? labels.save : labels.send}
             </button>
           }
@@ -597,6 +803,19 @@ function Settings(props) {
       <button type="button" class="bk-chat-menu-item" onClick={props.onNewChat}>
         {labels.newChat}
       </button>
+      <Show when={props.noteAction}>
+        {(action) => (
+          <button type="button" class="bk-chat-menu-item" disabled={action().disabled} onClick={action().run}>
+            {action().label}
+          </button>
+        )}
+      </Show>
+      <button type="button" class="bk-chat-menu-item" aria-haspopup="dialog" onClick={props.onPrompt}>
+        {labels.prompt}
+        <Show when={props.instructions}>
+          <span class="bk-chat-menu-state">{labels.promptSet}</span>
+        </Show>
+      </button>
       <button type="button" class="bk-chat-menu-item" aria-pressed={String(props.thinking)} onClick={props.onThinking}>
         {labels.thinking}
       </button>
@@ -653,6 +872,58 @@ function Settings(props) {
   );
 }
 
+function PromptForm(props) {
+  const { labels } = props;
+  const [problem, setProblem] = createSignal(null);
+  let field;
+  requestAnimationFrame(() => {
+    field.focus({ preventScroll: true });
+    field.setSelectionRange(field.value.length, field.value.length);
+  });
+  const save = (event) => {
+    event?.preventDefault();
+    setProblem(props.onSave(field.value));
+  };
+  return (
+    <form class="bk-chat-pop bk-chat-prompt" role="dialog" aria-label={labels.promptTitle} onSubmit={save}>
+      <label for="bk-chat-prompt-text">{labels.promptTitle}</label>
+      <textarea
+        id="bk-chat-prompt-text"
+        rows="4"
+        maxlength={MAX_INSTRUCTIONS}
+        placeholder={labels.promptPlaceholder}
+        value={props.value}
+        ref={field}
+        on:keydown={(event) => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.isComposing) save(event);
+        }}
+      />
+      <p class="bk-chat-prompt-hint" role={problem() === null ? undefined : 'alert'} data-failed={problem() === null ? undefined : ''}>
+        {problem() ?? labels.promptHint}
+      </p>
+      <div class="bk-chat-redo-actions">
+        <button
+          type="button"
+          class="bk-chat-note-button"
+          onClick={() => {
+            field.value = '';
+            field.focus();
+          }}
+        >
+          {labels.promptClear}
+        </button>
+        <span class="bk-chat-prompt-gap" />
+        <button type="button" class="bk-chat-note-button" onClick={props.onCancel}>
+          {labels.cancel}
+        </button>
+        <button type="submit" class="bk-chat-note-button" data-primary>
+          {labels.promptSave}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function UserBubble(props) {
   return (
     <div class="bk-chat-bubble bk-chat-user">
@@ -671,7 +942,7 @@ function Reply(props) {
   const { labels, root } = props;
   let body;
   createEffect(() => {
-    body.innerHTML = replyHtml(props.message.content, { root });
+    body.innerHTML = replyHtml(props.message.content, { root, base: props.base });
     typesetMath(body);
   });
   return (
@@ -690,6 +961,13 @@ function Reply(props) {
         )}
       </For>
       <div class="bk-chat-answer" ref={body} />
+      <Show when={props.noteAction}>
+        {(action) => (
+          <button type="button" class="bk-chat-note-link" onClick={action().run}>
+            {action().label}
+          </button>
+        )}
+      </Show>
       <Show when={props.message.error !== null}>
         <p class="bk-chat-problem" role="alert">
           {props.message.error}
@@ -712,31 +990,6 @@ function replyText(content, root) {
   return element.textContent.trim();
 }
 
-function typesetMath(container) {
-  for (const element of container.querySelectorAll(`.${MATH_CLASS}`)) {
-    const display = element.dataset.display === 'true';
-    const key = `${display ? 'display' : 'inline'} ${element.dataset.tex}`;
-    const done = typeset.get(key);
-    if (typeof done === 'string') {
-      element.innerHTML = done;
-      element.dataset.state = 'ready';
-    } else if (done === null) {
-      element.dataset.state = 'failed';
-    } else if (done === undefined) {
-      typeset.set(
-        key,
-        import('bake/math')
-          .then(({ texToSvg }) => texToSvg(element.dataset.tex, { display }))
-          .then(
-            (svg) => typeset.set(key, svg.outerHTML),
-            () => typeset.set(key, null),
-          )
-          .then(() => container.isConnected && typesetMath(container)),
-      );
-    }
-  }
-}
-
 function readThinking() {
   try {
     return localStorage.getItem(THINKING_KEY) === 'on';
@@ -750,6 +1003,23 @@ function vaultProblem(error, labels) {
 }
 
 class CatalogError extends Error {}
+
+class EmptyNote extends Error {}
+
+function ownArticle(root, catalog, article, context) {
+  if (article === null || context.article === null) return null;
+  const entry = catalogEntry(root, catalog, article.address) ?? { url: article.address.slice(1), title: article.title, tags: [], sections: outlineSections(context.article.outline) };
+  return { entry, source: context.article.source };
+}
+
+function outlineSections(outline) {
+  const sections = [];
+  for (const heading of outline) {
+    if (heading.depth === 2) sections.push({ id: heading.id, number: String(sections.length + 1).padStart(2, '0'), title: heading.title, subsections: [] });
+    else sections.at(-1)?.subsections.push({ id: heading.id, title: heading.title });
+  }
+  return sections;
+}
 
 function requestProblem(error, labels) {
   if (error instanceof CatalogError) return labels.errors.catalog;
