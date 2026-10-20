@@ -131,3 +131,21 @@ test('the bento theme shows the recap of a section under the card title and the 
   assert.match(html, /<span class="bk-heading-text">One<\/span><\/h2><div class="recap bt-recap"><p>The section in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="13" data-end-line="13">/);
   assert.match(html, /<span class="bk-heading-text">Part<\/span><\/h3><div class="recap bt-recap"><p>The part in short.<\/p><\/div><div class="bk-block" data-type="paragraph" data-line="21" data-end-line="21">/);
 });
+
+test('the bento theme lists a sidenote that only a recap refers to at the bottom of the card of that recap', (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': config(''),
+    'content/posts/cards/index.md': article({
+      title: 'Cards',
+      slug: 'cards',
+      body: '## One\n\n:::recap\nThe section in short.[^section]\n:::\n\nText.\n\n### Part\n\n:::recap\nThe part in short.[^part]\n:::\n\nMore text.\n\n## Two\n\nOther text.\n\n[^section]: The section note.\n\n[^part]: The part note.\n',
+    }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const cards = html.split('<section class="bt-card"').slice(1);
+  assert.equal(cards.length, 2);
+  assert.deepEqual([...cards[0].matchAll(/<aside class="bk-sidenote"[^>]*data-label="(\w+)"/g)].map((match) => match[1]), ['section', 'part']);
+  assert.doesNotMatch(cards[1], /<aside class="bk-sidenote"/);
+});
