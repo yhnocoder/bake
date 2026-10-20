@@ -290,6 +290,18 @@ describe('themes', () => {
     assert.equal(result.stderr, 'themes/essay/labels.js:1:1 the theme imports "labelsFor" from this file, which does not export it\n1 error, dist/ was not written\n');
   });
 
+  test('reports a name that a file of a theme of the blog imports from another file of the theme that does not export it at the importing file', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
+      'themes/plain/page.jsx': `import { missing } from './a.js';\n${plainPage}`.replace('<main ', '<main data-missing={missing} '),
+      'themes/plain/a.js': 'export const other = 1;\n',
+      'themes/plain/client.jsx': '',
+    });
+    const result = bake(dir, 'build');
+    assert.match(result.stderr, /^themes\/plain\/page\.jsx:\d+:\d+ .*"missing" is not exported by "themes\/plain\/a\.js"/);
+  });
+
   test('reports an article that the theme cannot render', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

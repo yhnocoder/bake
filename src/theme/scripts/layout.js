@@ -6,6 +6,8 @@ export const LAYOUT_EVENT = 'bk:layout';
 const REACHING_BLOCKS = '.bk-block[data-resolved="wide"], .bk-block[data-resolved="page"]';
 const HEADINGS = 'h2[id], h3[id]';
 const WIDTH_BLOCKS = '.bk-block[data-width="auto"]';
+const CODE = 'pre.shiki';
+const QUOTES = /^["']|["']$/g;
 
 let schedule = () => {};
 let last = null;
@@ -46,7 +48,11 @@ export function startLayout(article, arrangements) {
   addEventListener('resize', () => schedule(true));
   for (const screen of [leftColumnScreen, notesColumnScreen, phoneScreen]) screen.addEventListener('change', () => schedule(true, true));
   document.fonts.ready.then(() => schedule(true, true));
-  document.fonts.addEventListener('loadingdone', () => document.fonts.ready.then(() => schedule(true, true)));
+  document.fonts.addEventListener('loadingdone', (event) => {
+    const families = measuredFamilies(article);
+    const fresh = event.fontfaces.some((face) => families.has(face.family.replace(QUOTES, '')));
+    document.fonts.ready.then(() => schedule(true, fresh));
+  });
   document.addEventListener(CONTENT_EVENT, () => schedule(true, true));
   article.addEventListener(
     'toggle',
@@ -57,6 +63,11 @@ export function startLayout(article, arrangements) {
     true,
   );
   pass();
+}
+
+function measuredFamilies(article) {
+  const elements = [article, article.querySelector(CODE)].filter((element) => element !== null);
+  return new Set(elements.flatMap((element) => getComputedStyle(element).fontFamily.split(',').map((family) => family.trim().replace(QUOTES, ''))));
 }
 
 function measure(article) {

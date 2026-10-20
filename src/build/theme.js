@@ -136,9 +136,13 @@ function missingExport(root, error, locateShared) {
   const cause = error.errors?.[0] ?? error;
   if (cause.code !== 'MISSING_EXPORT') return null;
   const binding = MISSING_BINDING.exec(cause.message)?.[1];
-  const exporter = cause.exporter === SHARED_INDEX ? reExportSource(binding, locateShared) : cause.exporter;
+  const exporter = cause.exporter === SHARED_INDEX ? reExportSource(binding, locateShared) : isShared(cause.id) ? cause.exporter : null;
   if (!isInBlog(root, exporter)) return null;
   return errorAt(blogPath(root, exporter), fileStart, `the theme imports "${binding}" from this file, which does not export it`);
+}
+
+function isShared(file) {
+  return typeof file === 'string' && file.startsWith(`${SHARED_DIR}${sep}`);
 }
 
 function reExportSource(binding, locateShared) {

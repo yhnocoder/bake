@@ -189,8 +189,8 @@ test('the essay theme lays out articles', async (t) => {
     assert.equal(await probes(() => fold.click()), 0);
     await page.getByRole('button', { name: '设置' }).click();
     const styles = page.locator('.bk-settings-panel [role="radio"]');
-    await styles.nth(2).click();
-    await settle(page);
+    assert.equal(await probes(() => styles.nth(2).click()), 0);
+    assert.equal(await probes(() => styles.nth(1).click()), 0);
     assert.equal(await probes(() => styles.nth(0).click()), 0);
     await page.close();
   });
