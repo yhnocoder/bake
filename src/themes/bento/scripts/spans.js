@@ -41,8 +41,12 @@ function declaredSpan(card, columns) {
 function wideCards(cards) {
   const rooms = new Map(cards.map((card) => [card, card.clientWidth - horizontalPadding(card)]));
   const blocks = cards.flatMap((card) => [...card.querySelectorAll(':scope > .bk-block[data-width="auto"]')].map((block) => ({ card, block })));
-  const declared = blocks.filter(({ block }) => declaresNaturalWidth(block));
-  const overflowing = blocks.filter(({ block }) => !declaresNaturalWidth(block) && overflows(block));
+  const declared = [];
+  const overflowing = [];
+  for (const entry of blocks) {
+    if (declaresNaturalWidth(entry.block)) declared.push(entry);
+    else if (overflows(entry.block)) overflowing.push(entry);
+  }
   const natural = naturalWidths(declared.map(({ block }) => naturalWidthProbe(block)));
   const wide = declared.filter(({ card }, index) => natural[index] > rooms.get(card) + 0.5);
   return new Set([...wide, ...overflowing].map(({ card }) => card));
