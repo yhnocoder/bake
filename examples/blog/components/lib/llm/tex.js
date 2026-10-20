@@ -22,7 +22,8 @@ function request(tex) {
 }
 
 export function texSvg(tex) {
-  return request(tex)?.cloneNode(true) ?? null
+  const svg = request(tex)
+  return svg ? svg.cloneNode(true) : null
 }
 
 export function texFailed(tex) {

@@ -1,4 +1,4 @@
-import { segments, texBox } from './tex.js'
+import { segments, texBox, texFailed } from './tex.js'
 
 let measureContext
 let uiFont
@@ -16,7 +16,9 @@ export function SvgLabel(props) {
   const halo = props.halo !== false
   const nodes = () => {
     const parts = segments(props.text).map((part) =>
-      part.math ? { box: texBox(part.text, size * 1.1) } : { text: part.text, width: textWidth(part.text, size) },
+      part.math && !texFailed(part.text)
+        ? { box: texBox(part.text, size * 1.1) }
+        : { text: part.text, width: textWidth(part.text, size) },
     )
     if (parts.some((part) => part.box === null)) return []
     const total = parts.reduce((sum, part) => sum + (part.box ? part.box.width : part.width), 0)

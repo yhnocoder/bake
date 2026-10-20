@@ -28,7 +28,7 @@ export const params = {
 export const layout = {
   width: 'body',
   height: (params) => (params.toggle ? 365 : params.zoom ? 400 : keyList(params.fns).includes('swish') ? 430 : 360),
-  narrowHeight: (params) => (params.toggle ? 572 : params.zoom ? 600 : keyList(params.fns).includes('swish') ? 566 : keyList(params.fns).length > 2 ? 516 : 500),
+  narrowHeight: (params) => (params.toggle ? 572 : params.zoom ? 600 : keyList(params.fns).includes('swish') ? 576 : keyList(params.fns).length > 2 ? 516 : 500),
 }
 
 const ZOOM_MIN = 0.25
