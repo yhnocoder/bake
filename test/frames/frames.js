@@ -1,6 +1,7 @@
 export const FRAME_BUDGET = 1000 / 60;
 export const SLOW_FRAME = FRAME_BUDGET + 1;
 export const MAX_SLOW_SHARE = 0.05;
+export const MAX_DROPPED_SHARE = 0.05;
 export const MAX_FRAME = 3 * FRAME_BUDGET + 1;
 export const CPU_SLOWDOWN = 4;
 
@@ -92,6 +93,7 @@ export function frameProblem(stats) {
   if (stats.frames < 20) return `only ${stats.frames} frames were drawn`;
   const problems = [];
   if (stats.slowShare > MAX_SLOW_SHARE) problems.push(`${(stats.slowShare * 100).toFixed(1)}% of the frames took longer than ${SLOW_FRAME.toFixed(1)} ms`);
+  if (stats.droppedShare > MAX_DROPPED_SHARE) problems.push(`${stats.dropped} frames were dropped, ${(stats.droppedShare * 100).toFixed(1)}% of the frames the display showed`);
   if (stats.longest > MAX_FRAME) problems.push(`the longest frame took ${stats.longest.toFixed(1)} ms`);
   return problems.length === 0 ? null : problems.join(' and ');
 }

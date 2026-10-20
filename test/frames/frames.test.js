@@ -30,6 +30,7 @@ const knownFailures = [
   { name: 'opening and closing the AI chat panel on the syntax article at 375 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
   { name: 'dragging the slider of the function plot in the syntax article at 1440 pixels', reason: 'up to 13 percent of the frames are slower than the budget in two of five runs', task: 'kit-cleanup' },
   { name: 'dragging the slider of the function plot in the syntax article at 375 pixels', reason: '5.5 percent of the frames are slower than the budget in one of five runs', task: 'kit-cleanup' },
+  { name: 'opening and closing a fold of the syntax article at 375 pixels', reason: 'one frame of 67 ms in one of five runs, and up to 3 percent dropped frames', task: 'viewport-measure' },
   { name: 'dragging the slider of the function plot in the bento article at 375 pixels', reason: '29 to 34 percent of the frames are slower than the budget', task: 'bento-redesign' },
   { name: 'resizing the bento article at 1440 pixels', reason: 'placing the cards again takes frames of 250 to 350 ms', task: 'bento-redesign' },
 ];
@@ -58,14 +59,18 @@ async function hoverSidenote(page, device) {
   const box = await reference.boundingBox();
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
+  if (device === 'phone') {
+    return async () => {
+      for (let round = 0; round < 3; round += 1) {
+        await page.mouse.click(x, y);
+        await page.waitForTimeout(1000);
+      }
+    };
+  }
   return async () => {
-    for (let round = 0; round < 3; round += 1) {
-      if (device === 'phone') await page.mouse.click(x, y);
-      else await page.mouse.move(x, y, { steps: 4 });
-      await page.waitForTimeout(500);
-      if (device !== 'phone') await page.mouse.move(x, y - 80, { steps: 4 });
-      await page.waitForTimeout(500);
-    }
+    await paced(40, 4000, (index) => page.mouse.move(x, index % 2 === 0 ? y : y - 80));
+    await page.mouse.move(x, y - 80);
+    await page.waitForTimeout(500);
   };
 }
 
