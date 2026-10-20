@@ -21,16 +21,18 @@ export const ink = {
 export class Sketch {
   constructor() {
     this.id = `matrix-sketch-${++sketchCount}`
-    this.parts = []
+    this.background = []
+    this.shapes = []
+    this.labels = []
     this.definitions = []
   }
 
-  add(markup) {
-    this.parts.push(markup)
+  under(name, attrs = {}) {
+    this.background.push(`<${name}${attributes(attrs)}/>`)
   }
 
   el(name, attrs = {}, text) {
-    this.parts.push(`<${name}${attributes(attrs)}>${text == null ? '' : escapeText(text)}</${name}>`)
+    this.shapes.push(`<${name}${attributes(attrs)}>${text == null ? '' : escapeText(text)}</${name}>`)
   }
 
   text(x, y, content, style = '', anchor = 'middle') {
@@ -46,36 +48,27 @@ export class Sketch {
   }
 
   tex(tex, size, x, y, align, color) {
-    const result = texInSvg(tex, size, x, y, align, color)
-    this.parts.push(result.then((math) => math.markup))
-    return result
+    this.labels.push(texInSvg(tex, size, x, y, align, color).then((math) => math.markup))
   }
 
   texOnBackground(tex, size, x, y, align, color) {
-    const result = texInSvg(tex, size, x, y, align, color)
-    this.parts.push(
-      result.then(
+    this.labels.push(
+      texInSvg(tex, size, x, y, align, color).then(
         (math) =>
           `<rect${attributes({ x: math.left - 2, y: math.top - 1, width: math.width + 4, height: math.height + 2, fill: 'var(--surface)' })}/>${math.markup}`,
       ),
     )
-    return result
   }
 
   label(text, size, x, y, align = 'middle', color = '') {
-    const result = labelInSvg(text, size, x, y, align, color)
-    this.parts.push(result.then((label) => label.markup))
-    return result
+    this.labels.push(labelInSvg(text, size, x, y, align, color).then((label) => label.markup))
   }
 
-  group(attrs, draw) {
-    this.parts.push(`<g${attributes(attrs)}>`)
-    draw()
-    this.parts.push('</g>')
-  }
-
-  async markup() {
-    const body = (await Promise.all(this.parts)).join('')
-    return `<defs>${this.definitions.join('')}</defs>${body}`
+  drawing(viewBox) {
+    return {
+      viewBox,
+      shapes: `<defs>${this.definitions.join('')}</defs>${this.background.join('')}${this.shapes.join('')}`,
+      labels: Promise.all(this.labels).then((parts) => parts.join('')),
+    }
   }
 }

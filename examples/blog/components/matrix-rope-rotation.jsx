@@ -1,4 +1,5 @@
 import { For, createSignal } from 'solid-js'
+import { Button, Controls, Segmented, Slider, Tex, createTween } from 'bake/kit'
 import { MathText, SvgTex } from './lib/matrix/view.jsx'
 
 export const params = {
@@ -6,7 +7,7 @@ export const params = {
   s: { label: 'key 的位置 s', type: 'number', min: 0, max: 20, step: 1, default: 1 },
   pair: { label: '分量对', type: 'number', min: 1, max: 4, step: 1, default: 1 },
 }
-export const layout = { width: 'body', height: 452, narrowHeight: 666 }
+export const layout = { width: 'body', height: 410, narrowHeight: 640 }
 
 const CENTER = 160
 const UNIT = 120
@@ -25,6 +26,8 @@ function arcPath(r, start, delta) {
   return `M${p0[0]},${p0[1]} A${r},${r} 0 ${Math.abs(delta) > Math.PI ? 1 : 0} ${delta > 0 ? 0 : 1} ${p1[0]},${p1[1]}`
 }
 
+const PAIRS = [0, 1, 2, 3].map((k) => ({ value: String(k), label: `第 ${k + 1} 对` }))
+
 let figureCount = 0
 
 export default function RopeRotationPlot(props) {
@@ -33,8 +36,10 @@ export default function RopeRotationPlot(props) {
   const [s, setS] = createSignal(props.s)
   const [pair, setPair] = createSignal(props.pair - 1)
   const theta = () => THETAS[pair()]
-  const qr = () => rotate(Q, t() * theta())
-  const kr = () => rotate(K, s() * theta())
+  const queryAngle = createTween(() => t() * theta(), { duration: 150 })
+  const keyAngle = createTween(() => s() * theta(), { duration: 150 })
+  const qr = () => rotate(Q, queryAngle())
+  const kr = () => rotate(K, keyAngle())
   const moved = (a) => {
     const n = wrap(a)
     return n > 0.35 && n < TAU - 0.35
@@ -71,38 +76,22 @@ export default function RopeRotationPlot(props) {
   }
   return (
     <div class="matrix-figure">
-      <div class="matrix-controls">
-        <span class="matrix-choices" role="group" aria-label="选择分量对">
-          <For each={[0, 1, 2, 3]}>
-            {(k) => (
-              <button type="button" aria-pressed={String(pair() === k)} onClick={() => setPair(k)}>
-                第 {k + 1} 对
-              </button>
-            )}
-          </For>
+      <Controls>
+        <Segmented label="选择分量对" options={PAIRS} value={String(pair())} onChange={(value) => setPair(Number(value))} />
+      </Controls>
+      <Controls>
+        <Slider label={<Tex tex="t" />} min={0} max={20} value={t()} onInput={setT} />
+        <Slider label={<Tex tex="s" />} min={0} max={20} value={s()} onInput={setS} />
+        <span class="matrix-actions">
+          <Button disabled={t() >= 20 || s() >= 20} onClick={() => (setT(t() + 1), setS(s() + 1))}>
+            <MathText text="$t$ 和 $s$ 同时加 1" />
+          </Button>
+          <Button disabled={t() <= 0 || s() <= 0} onClick={() => (setT(t() - 1), setS(s() - 1))}>
+            同时减 1
+          </Button>
+          <Button onClick={reset}>重置</Button>
         </span>
-      </div>
-      <div class="matrix-controls">
-        <label>
-          <MathText text="$t$" />
-          <input type="range" min="0" max="20" step="1" value={t()} style="width:130px" onInput={(e) => setT(+e.currentTarget.value)} />
-          <span class="matrix-value">{t()}</span>
-        </label>
-        <label>
-          <MathText text="$s$" />
-          <input type="range" min="0" max="20" step="1" value={s()} style="width:130px" onInput={(e) => setS(+e.currentTarget.value)} />
-          <span class="matrix-value">{s()}</span>
-        </label>
-        <button type="button" class="matrix-button" disabled={t() >= 20 || s() >= 20} onClick={() => (setT(t() + 1), setS(s() + 1))}>
-          <MathText text="$t$ 和 $s$ 同时加 1" />
-        </button>
-        <button type="button" class="matrix-button" disabled={t() <= 0 || s() <= 0} onClick={() => (setT(t() - 1), setS(s() - 1))}>
-          同时减 1
-        </button>
-        <button type="button" class="matrix-button" onClick={reset}>
-          重置
-        </button>
-      </div>
+      </Controls>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px 22px;align-items:center">
         <div class="matrix-plot" style="max-width:320px;width:100%;justify-self:center">
           <svg viewBox="0 0 320 320" role="img" aria-label="一对分量的 query 和 key 向量，旋转前后的位置">
@@ -118,15 +107,19 @@ export default function RopeRotationPlot(props) {
             <circle cx={CENTER} cy={CENTER} r={UNIT} fill="none" stroke="var(--grid)" />
             <line x1={CENTER - UNIT - 14} y1={CENTER} x2={CENTER + UNIT + 14} y2={CENTER} stroke="var(--axis)" />
             <line x1={CENTER} y1={CENTER - UNIT - 14} x2={CENTER} y2={CENTER + UNIT + 14} stroke="var(--axis)" />
-            <path d={arcPath(Math.hypot(...Q) * UNIT, Math.atan2(Q[1], Q[0]), wrap(t() * theta()))} fill="none" stroke="var(--series-1)" stroke-width="1.2" stroke-dasharray="2 3" />
-            <path d={arcPath(Math.hypot(...K) * UNIT, Math.atan2(K[1], K[0]), wrap(s() * theta()))} fill="none" stroke="var(--series-2)" stroke-width="1.2" stroke-dasharray="2 3" />
+            <path d={arcPath(Math.hypot(...Q) * UNIT, Math.atan2(Q[1], Q[0]), wrap(queryAngle()))} fill="none" stroke="var(--series-1)" stroke-width="1.2" stroke-dasharray="2 3" />
+            <path d={arcPath(Math.hypot(...K) * UNIT, Math.atan2(K[1], K[0]), wrap(keyAngle()))} fill="none" stroke="var(--series-2)" stroke-width="1.2" stroke-dasharray="2 3" />
             {vector(Q, 'series-1', false)}
             {vector(K, 'series-2', false)}
             <path d={angleBetween()} fill="none" stroke="var(--ink-3)" stroke-width="1.2" />
             {vector(qr(), 'series-1', true)}
             {vector(kr(), 'series-2', true)}
-            <SvgTex tex="\mathbf{q}" size={15} x={labelAt(Q)[0]} y={labelAt(Q)[1] + 5} color="var(--series-1)" opacity={moved(t() * theta()) ? 1 : 0} />
-            <SvgTex tex="\mathbf{k}" size={15} x={labelAt(K)[0]} y={labelAt(K)[1] + 5} color="var(--series-2)" opacity={moved(s() * theta()) ? 1 : 0} />
+            <g class="matrix-fade" style={{ opacity: moved(t() * theta()) ? 1 : 0 }}>
+              <SvgTex tex="\mathbf{q}" size={15} x={labelAt(Q)[0]} y={labelAt(Q)[1] + 5} color="var(--series-1)" />
+            </g>
+            <g class="matrix-fade" style={{ opacity: moved(s() * theta()) ? 1 : 0 }}>
+              <SvgTex tex="\mathbf{k}" size={15} x={labelAt(K)[0]} y={labelAt(K)[1] + 5} color="var(--series-2)" />
+            </g>
             <SvgTex tex="\mathbf{q}R_t" size={15} x={labelAt(qr())[0]} y={labelAt(qr())[1] + 5} color="var(--series-1)" />
             <SvgTex tex="\mathbf{k}R_s" size={15} x={labelAt(kr())[0]} y={labelAt(kr())[1] + 5} color="var(--series-2)" />
           </svg>

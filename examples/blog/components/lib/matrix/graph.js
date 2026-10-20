@@ -23,7 +23,6 @@ export function drawChain(sketch, arrows, items, options) {
   let lastPill = null
   const late = []
   const marks = {}
-  let sideLabel = null
 
   function tag(x, top, text, kind) {
     const width = text.length > 4 ? 42 : 36
@@ -81,13 +80,13 @@ export function drawChain(sketch, arrows, items, options) {
       const cy = top + BH / 2
       const length = options.sideLen || 160
       sketch.el('path', { d: `M${CX + BW / 2 + length},${cy} L${CX + BW / 2 + 2},${cy}`, ...ink.edge, 'marker-end': arrows.plain })
-      sideLabel = sketch.label(item.side, 11.5, CX + BW / 2 + length + 8, cy + 4, 'start', 'var(--ink-2)')
+      sketch.label(item.side, 11.5, CX + BW / 2 + length + 8, cy + 4, 'start', 'var(--ink-2)')
     }
     if (item.mark) marks[item.mark] = { top, bot: top + BH + (item.stack ? 8 : 0), x: CX - BW / 2, w: BW + (item.stack ? 8 : 0) }
     y = top + BH + (item.stack ? 8 : 0)
   })
   late.forEach((draw) => draw())
-  return { y, marks, sideLabel }
+  return { y, marks }
 }
 
 export function drawGraph(sketch, arrows, nodes, edges) {

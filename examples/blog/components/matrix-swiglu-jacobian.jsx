@@ -1,12 +1,14 @@
-import { For, createResource, createSignal } from 'solid-js'
+import { For, createSignal, onCleanup } from 'solid-js'
+import { Button } from 'bake/kit'
 import { Sketch } from './lib/matrix/sketch.js'
-import { MathText, SvgTex } from './lib/matrix/view.jsx'
+import { mathHtml } from './lib/matrix/tex.js'
+import { MathText, SketchLayer, SvgTex, fadeIn } from './lib/matrix/view.jsx'
 import './lib/matrix/steps.css'
 
 export const params = {
   step: { label: '初始步骤', type: 'number', min: 1, max: 8, step: 1, default: 1 },
 }
-export const layout = { width: 'body', height: 514, narrowHeight: 512 }
+export const layout = { width: 'body', height: 480, narrowHeight: 440 }
 
 const COLORS = { gate: 'var(--series-2)', up: 'var(--series-3)', down: 'var(--ink)' }
 const SWISH = '\\mathrm{Swish}(\\mathbf{a})'
@@ -59,17 +61,17 @@ const TEXTS = [
   '<p><span class="t">两条路径相加。</span>$\\mathbf{x}$ 同时经过两条路径影响 $\\mathbf{h}$，按全导数链式法则，把两条路径的乘积相加，得到整个 FFN 的 Jacobian：</p>$$\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{x}} = \\underbrace{W_{down}^{T}\\,\\mathrm{diag}(\\mathbf{b})\\,\\mathrm{diag}\\big(\\mathrm{Swish}\'(\\mathbf{a})\\big)\\,W_{gate}^{T}}_{\\text{gate}} + \\underbrace{W_{down}^{T}\\,\\mathrm{diag}\\big(\\mathrm{Swish}(\\mathbf{a})\\big)\\,W_{up}^{T}}_{\\text{up}}$$',
 ]
 
-async function drawForward() {
+function drawForward() {
   const sketch = new Sketch()
   const arrow = sketch.marker('forward', 'var(--ink-3)')
   for (const [d, x, y, tex] of FORWARD) {
     sketch.el('path', { d, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1.2, 'marker-end': arrow })
     sketch.tex(tex, 12, x, y, 'middle', 'var(--ink-3)')
   }
-  return sketch.markup()
+  return sketch.drawing()
 }
 
-async function drawNodes() {
+function drawNodes() {
   const sketch = new Sketch()
   const sizes = [14, 12, 11]
   const colors = [undefined, 'var(--ink-2)', 'var(--ink-3)']
@@ -89,36 +91,43 @@ async function drawNodes() {
       sketch.label(line, sizes[styles[i]], node.x + node.w / 2, node.y + 20 + 18 * i, 'middle', colors[styles[i]]),
     )
   }
-  return sketch.markup()
+  return sketch.drawing()
 }
 
 let figureCount = 0
 
 export default function SwigluJacobianSteps(props) {
   const id = `matrix-swiglu-${++figureCount}`
+  let text
   const [index, setIndex] = createSignal(Math.min(Math.max(props.step, 1), STEPS.length) - 1)
-  const [forward] = createResource(drawForward)
-  const [nodes] = createResource(drawNodes)
+  const forward = drawForward()
+  const nodes = drawNodes()
   const seen = () => new Set(STEPS.slice(0, index() + 1).flatMap((step) => step.path))
   const path = () => STEPS[index()].path
   const current = () => (STEPS[index()].last ? null : path()[path().length - 1])
-  const target = () => NODES[STEPS[index()].node]
   const opacity = (key) => (path().includes(key) ? 1 : seen().has(key) ? 0.3 : 0)
+  let prepare = 0
+  const prepareNeighbours = () => {
+    clearTimeout(prepare)
+    prepare = setTimeout(() => [index() + 1, index() - 1].filter((i) => TEXTS[i]).forEach((i) => mathHtml(TEXTS[i])), 200)
+  }
+  onCleanup(() => clearTimeout(prepare))
+  const go = (step) => {
+    setIndex(step)
+    fadeIn(text)
+    prepareNeighbours()
+  }
+  prepareNeighbours()
 
   return (
     <div class="matrix-figure matrix-steps">
       <div class="matrix-steps-nav">
-        <button class="matrix-button" type="button" disabled={index() === 0} onClick={() => setIndex(index() - 1)}>
+        <Button disabled={index() === 0} onClick={() => go(index() - 1)}>
           上一步
-        </button>
-        <button
-          class="matrix-button primary"
-          type="button"
-          disabled={index() === STEPS.length - 1}
-          onClick={() => setIndex(index() + 1)}
-        >
+        </Button>
+        <Button disabled={index() === STEPS.length - 1} onClick={() => go(index() + 1)}>
           下一步
-        </button>
+        </Button>
         <span class="matrix-steps-count">
           第 {index() + 1} / {STEPS.length} 步
         </span>
@@ -139,36 +148,45 @@ export default function SwigluJacobianSteps(props) {
               )}
             </For>
           </defs>
-          <g innerHTML={forward() || ''} />
+          <SketchLayer drawing={forward} />
           <For each={BACKWARD}>
             {(arrow) => (
-              <g style={{ opacity: opacity(arrow.key), transition: 'opacity .25s' }}>
+              <g class="matrix-fade" style={{ opacity: opacity(arrow.key) }}>
+                <path d={arrow.d} fill="none" stroke={COLORS[arrow.kind]} stroke-width="1.8" marker-end={`url(#${id}-${arrow.kind})`} />
                 <path
+                  class="matrix-fade"
                   d={arrow.d}
                   fill="none"
                   stroke={COLORS[arrow.kind]}
-                  stroke-width={arrow.key === current() ? 2.6 : 1.8}
+                  stroke-width="2.6"
                   marker-end={`url(#${id}-${arrow.kind})`}
+                  style={{ opacity: arrow.key === current() ? 1 : 0 }}
                 />
                 <SvgTex tex={arrow.tex} size={13} x={arrow.x} y={arrow.y} color={COLORS[arrow.kind]} />
               </g>
             )}
           </For>
-          <rect
-            x={target().x - 6}
-            y={target().y - 6}
-            width={target().w + 12}
-            height={target().h + 12}
-            rx="11"
-            fill="var(--accent)"
-            fill-opacity="0.12"
-            stroke="var(--accent)"
-            stroke-width="1.5"
-          />
-          <g innerHTML={nodes() || ''} />
+          <For each={Object.entries(NODES)}>
+            {([key, node]) => (
+              <rect
+                class="matrix-fade"
+                x={node.x - 6}
+                y={node.y - 6}
+                width={node.w + 12}
+                height={node.h + 12}
+                rx="11"
+                fill="var(--accent)"
+                fill-opacity="0.12"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+                style={{ opacity: STEPS[index()].node === key ? 1 : 0 }}
+              />
+            )}
+          </For>
+          <SketchLayer drawing={nodes} />
         </svg>
       </div>
-      <MathText class="matrix-steps-text" text={TEXTS[index()]} />
+      <MathText ref={text} class="matrix-steps-text" text={TEXTS[index()]} />
     </div>
   )
 }

@@ -34,9 +34,15 @@ const names = {
   loss: 'Loss',
 }
 
-async function draw(from, to, brace) {
+const CX = 150
+const BW = 230
+const SIDE_LENGTH = 30
+const SIDE_LABEL_WIDTH = 69.33
+const BRACE_LABEL_WIDTH = 67.69
+
+function draw(from, to, brace) {
   const sketch = new Sketch()
-  const { y, marks, sideLabel } = drawChain(sketch, chainArrows(sketch), chain, { CX: 150, BW: 230, PW: 195, gap: 18, sideLen: 30 })
+  const { y, marks } = drawChain(sketch, chainArrows(sketch), chain, { CX, BW, PW: 195, gap: 18, sideLen: SIDE_LENGTH })
   const lit = steps.slice(steps.indexOf(from), steps.indexOf(to) + 1).map((key) => marks[key])
   const x0 = Math.min(...lit.map((m) => m.x))
   const x1 = Math.max(...lit.map((m) => m.x + m.w))
@@ -52,23 +58,25 @@ async function draw(from, to, brace) {
       d: `M${x},${y1} q${-w},0 ${-w},${w} L${x - w},${ym - w} q0,${w} ${-w},${w} q${w},0 ${w},${w} L${x - w},${y2 - w} q0,${w} ${w},${w}`,
       ...ink.edge,
     })
-    const label = await sketch.label('$\\dfrac{\\partial \\ell}{\\partial \\mathbf{z}} = \\mathbf{p} - \\mathbf{y}$', 12.5, x - 2 * w - 6, ym + 5, 'end')
-    left = Math.min(left, label.left)
+    const end = x - 2 * w - 6
+    sketch.label('$\\dfrac{\\partial \\ell}{\\partial \\mathbf{z}} = \\mathbf{p} - \\mathbf{y}$', 12.5, end, ym + 5, 'end')
+    left = Math.min(left, end - BRACE_LABEL_WIDTH)
   }
-  const side = await sideLabel
-  const right = side.left + side.width
+  const right = CX + BW / 2 + SIDE_LENGTH + 8 + SIDE_LABEL_WIDTH
   const top = Math.min(2, marks[from].top - 6)
   const bottom = Math.max(y, marks[to].bot + 6)
-  return { viewBox: `${left - 4} ${top - 4} ${right - left + 8} ${bottom - top + 8}`, markup: await sketch.markup() }
+  return sketch.drawing(`${left - 4} ${top - 4} ${right - left + 8} ${bottom - top + 8}`)
 }
 
 export default function LmHeadLocalView(props) {
   const label = () => `从 lm head 的输入到 Loss 的计算过程，高亮${names[props.from]}到${names[props.to]}`
   return (
-    <SketchView
-      source={() => draw(props.from, props.to, props.brace)}
-      label={label()}
-      style="max-width:360px;margin:0 auto"
-    />
+    <div class="matrix-root">
+      <SketchView
+        drawing={draw(props.from, props.to, props.brace)}
+        label={label()}
+        style="max-width:360px;margin:0 auto"
+      />
+    </div>
   )
 }

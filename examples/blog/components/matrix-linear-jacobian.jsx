@@ -1,12 +1,13 @@
-import { createSignal } from 'solid-js'
-import { MathText } from './lib/matrix/view.jsx'
+import { Show, createSignal } from 'solid-js'
+import { Controls, Slider, Tex, formatNumber } from 'bake/kit'
+import { MathText, fadeIn } from './lib/matrix/view.jsx'
 import { Matrix } from './lib/matrix/matrix.jsx'
 
 export const params = {
   x1: { label: 'x₁ 的初始值', type: 'number', min: -2, max: 2, step: 0.01, default: 1 },
   x2: { label: 'x₂ 的初始值', type: 'number', min: -2, max: 2, step: 0.01, default: -0.5 },
 }
-export const layout = { width: 'body', height: 424, narrowHeight: 557 }
+export const layout = { width: 'body', height: 335, narrowHeight: 520 }
 
 const W = [
   [1, -2, 0.5],
@@ -15,8 +16,8 @@ const W = [
 const ROWS = [1, 2]
 const COLUMNS = [1, 2, 3]
 const outputs = (x) => [0, 1, 2].map((j) => x[0] * W[0][j] + x[1] * W[1][j])
-const fixed2 = (v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2)
-const fixed3 = (v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(3)
+const fixed2 = (v) => formatNumber(v, 2)
+const fixed3 = (v) => formatNumber(v, 3)
 const inputName = (i) => `<span style="color:var(--series-3)">$x_{${i}}$</span>`
 const outputName = (j) => `<span style="color:var(--series-5)">$z_{${j}}$</span>`
 const outputFormula = (j) =>
@@ -26,6 +27,7 @@ export default function LinearJacobianCells(props) {
   const [x, setX] = createSignal([props.x1, props.x2])
   const [lit, setLit] = createSignal(new Set())
   const [say, setSay] = createSignal('移动滑块改变 $\\mathbf{x}$，指针停在任意一格上显示该格的含义。')
+  let say$
   let previous = x()
   let previousZ = outputs(x())
 
@@ -37,9 +39,7 @@ export default function LinearJacobianCells(props) {
     if (Math.abs(dx) > 1e-9) {
       const changes = z.map((v, j) => fixed3(v - previousZ[j])).join('　')
       const ratios = z.map((v, j) => fixed2((v - previousZ[j]) / dx)).join('　')
-      setSay(
-        `${inputName(index + 1)} 变化 <b>${fixed2(dx)}</b>，三个输出分别变化 <b>${changes}</b>，比值 <b>${ratios}</b>，即 $J$ 的第 ${index + 1} 列，也就是 $W$ 的第 ${index + 1} 行。`,
-      )
+      setSay({ index: index + 1, dx: fixed2(dx), changes, ratios })
     }
     previous = next
     previousZ = z
@@ -66,7 +66,7 @@ export default function LinearJacobianCells(props) {
       const z = outputs(x())
       ROWS.forEach((i) => light(`w${i}${j}`, `x${i}`, `j${i}${j}`))
       setSay(
-        `${outputFormula(j)} $= ${W[0][j - 1]} \\times (${x()[0].toFixed(2)}) ${W[1][j - 1] < 0 ? '-' : '+'} ${Math.abs(W[1][j - 1])} \\times (${x()[1].toFixed(2)})$ = <b>${fixed3(z[j - 1])}</b>。` +
+        `${outputFormula(j)} = ${W[0][j - 1]} × (${fixed2(x()[0])}) ${W[1][j - 1] < 0 ? '−' : '+'} ${Math.abs(W[1][j - 1])} × (${fixed2(x()[1])}) = <b>${fixed3(z[j - 1])}</b>。` +
           `它对 $x_1$、$x_2$ 的偏导数是 $W$ 的第 ${j} 列 <b>${W[0][j - 1]}　${W[1][j - 1]}</b>，也就是 $z_{${j}}$ 的梯度，即 $J$ 的第 ${j} 行。`,
       )
     } else {
@@ -77,6 +77,7 @@ export default function LinearJacobianCells(props) {
       )
     }
     setLit(keys)
+    fadeIn(say$)
   }
   const leave = () => setLit(new Set())
 
@@ -92,22 +93,13 @@ export default function LinearJacobianCells(props) {
 
   return (
     <div class="matrix-figure">
-      <div class="matrix-controls">
+      <Controls>
         {ROWS.map((i) => (
-          <label style={{ '--accent': 'var(--series-3)' }}>
-            <MathText text={`$x_${i}$`} />
-            <input
-              type="range"
-              min="-2"
-              max="2"
-              step="0.01"
-              value={x()[i - 1]}
-              onInput={(event) => move(i - 1, Number(event.currentTarget.value))}
-            />
-            <span class="matrix-value">{x()[i - 1].toFixed(2)}</span>
-          </label>
+          <span class="matrix-input-slider">
+            <Slider label={<Tex tex={`x_${i}`} />} min={-2} max={2} step={0.01} value={x()[i - 1]} onInput={(value) => move(i - 1, value)} />
+          </span>
         ))}
-      </div>
+      </Controls>
       <div class="matrix-equation">
         <MathText class="matrix-name" text="$\mathbf{x}$" />
         {matrix(inputCells, 2, 'input')}
@@ -122,7 +114,14 @@ export default function LinearJacobianCells(props) {
         <MathText class="matrix-name" text="$J = \dfrac{\partial \mathbf{z}}{\partial \mathbf{x}}$ =" />
         {matrix(jacobianCells, 2, 'compact')}
       </div>
-      <MathText class="matrix-say" text={say()} />
+      <Show when={typeof say() === 'object' && say()} fallback={<MathText ref={say$} class="matrix-say" text={say()} />}>
+        {(moved) => (
+          <span class="matrix-say">
+            <MathText text={inputName(moved().index)} /> 变化 <b>{moved().dx}</b>，三个输出分别变化 <b>{moved().changes}</b>，比值{' '}
+            <b>{moved().ratios}</b>，即 <MathText text="$J$" /> 的第 {moved().index} 列，也就是 <MathText text="$W$" /> 的第 {moved().index} 行。
+          </span>
+        )}
+      </Show>
     </div>
   )
 }

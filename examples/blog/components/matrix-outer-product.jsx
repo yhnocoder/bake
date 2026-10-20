@@ -1,9 +1,10 @@
 import { For, createSignal } from 'solid-js'
-import { MathText } from './lib/matrix/view.jsx'
+import { formatNumber } from 'bake/kit'
+import { MathText, fadeIn } from './lib/matrix/view.jsx'
 import { Matrix } from './lib/matrix/matrix.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 395, narrowHeight: 760 }
+export const layout = { width: 'body', height: 395, narrowHeight: 770 }
 
 const WEIGHTS = [
   [1, 1, 0.5],
@@ -30,7 +31,7 @@ const M = G[0].length
 const OUTER = X.map((x, t) => x.map((xi) => G[t].map((g) => xi * g)))
 const SUM = OUTER[0].map((row, i) => row.map((_, j) => OUTER.reduce((total, outer) => total + outer[i][j], 0)))
 
-const format = (v) => (v < 0 ? '−' : '') + (Number.isInteger(v * 2) ? Math.abs(v) : Math.abs(v).toFixed(3))
+const format = (v) => (Number.isInteger(v * 2) ? String(v).replace('-', '−') : formatNumber(v, 3))
 const operand = (v) => (v < 0 ? `(${format(v)})` : format(v))
 const product = (t, i, j) => `${operand(X[t][i])} × ${operand(G[t][j])} = <b>${format(OUTER[t][i][j])}</b>`
 const grid = (rows, columns, make) =>
@@ -43,6 +44,7 @@ const INTRO =
 export default function OuterProductSum() {
   const [lit, setLit] = createSignal(new Set())
   const [say, setSay] = createSignal(INTRO)
+  let say$
 
   const cell = (role, t, i, j, value) => ({ key: key(role, t, i, j), role, t, i, j, value: format(value) })
   const inputCells = grid(T, N, (t, i) => cell('x', t, i, -1, X[t][i]))
@@ -81,6 +83,7 @@ export default function OuterProductSum() {
       )
     }
     setLit(keys)
+    fadeIn(say$)
   }
   const leave = () => setLit(new Set())
   const matrix = (cells, columns, kind) => (
@@ -112,7 +115,7 @@ export default function OuterProductSum() {
           {matrix(sumCells, M, '')}
         </div>
       </div>
-      <MathText class="matrix-say" text={say()} />
+      <MathText ref={say$} class="matrix-say" text={say()} />
     </div>
   )
 }

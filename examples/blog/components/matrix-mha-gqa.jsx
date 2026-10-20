@@ -2,9 +2,9 @@ import { Sketch } from './lib/matrix/sketch.js'
 import { SketchView } from './lib/matrix/view.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 210 }
+export const layout = { width: 'body', height: 210, narrowHeight: 160 }
 
-async function draw() {
+function draw() {
   const sketch = new Sketch()
   const QY = 34
   const KY = 118
@@ -36,14 +36,14 @@ async function draw() {
     }
   }
   text(410 + 144, KY + H + 22, '每组 K/V 被 2 个 query head 共用')
-  return { viewBox: '0 0 700 180', markup: await sketch.markup() }
+  return sketch.drawing('0 0 700 180')
 }
 
 export default function MhaGqaComparison() {
   return (
-    <div style="overflow-x:auto">
+    <div class="matrix-root" style="overflow-x:auto">
       <SketchView
-        source={draw}
+        drawing={draw()}
         label="MHA 中每个 query head 有自己的 K 和 V；GQA 中每两个 query head 共用一组 K 和 V"
         style="min-width:560px"
       />

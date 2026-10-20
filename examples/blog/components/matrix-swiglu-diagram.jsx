@@ -3,7 +3,7 @@ import { chainArrows, drawGraph } from './lib/matrix/graph.js'
 import { SketchView } from './lib/matrix/view.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 540 }
+export const layout = { width: 'body', height: 540, narrowHeight: { ratio: 0.8 } }
 
 const linear = '$\\mathrm{Linear}$'
 const nodes = {
@@ -20,18 +20,20 @@ const nodes = {
 }
 const edges = [['x', 'lg'], ['x', 'lu'], ['lg', 'a'], ['lu', 'b'], ['a', 'sw'], ['sw', 'mul'], ['b', 'mul'], ['mul', 'u'], ['u', 'ld'], ['ld', 'h']]
 
-async function draw() {
+function draw() {
   const sketch = new Sketch()
   const height = drawGraph(sketch, chainArrows(sketch), nodes, edges)
-  return { viewBox: `0 0 396 ${height}`, markup: await sketch.markup() }
+  return sketch.drawing(`0 0 396 ${height}`)
 }
 
 export default function SwigluFfnDiagram() {
   return (
-    <SketchView
-      source={draw}
-      label="SwiGLU FFN 的内部计算：两路 Linear，一路经过 Swish，逐元素相乘后再经过一次 Linear"
-      style="max-width:430px;margin:0 auto"
-    />
+    <div class="matrix-root">
+      <SketchView
+        drawing={draw()}
+        label="SwiGLU FFN 的内部计算：两路 Linear，一路经过 Swish，逐元素相乘后再经过一次 Linear"
+        style="max-width:430px;margin:0 auto"
+      />
+    </div>
   )
 }
