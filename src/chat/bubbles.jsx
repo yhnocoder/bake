@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { selectionMarkdown } from '../copy/copy.js';
@@ -876,7 +876,7 @@ function PromptForm(props) {
   const { labels } = props;
   const [problem, setProblem] = createSignal(null);
   let field;
-  requestAnimationFrame(() => {
+  onMount(() => {
     field.focus({ preventScroll: true });
     field.setSelectionRange(field.value.length, field.value.length);
   });

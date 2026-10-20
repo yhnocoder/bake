@@ -29,7 +29,7 @@ export function NoteCard(props) {
   });
   onMount(() => requestAnimationFrame(() => card.isConnected && card.focus({ preventScroll: true })));
   createEffect(() => {
-    if (props.redo) requestAnimationFrame(() => request.focus({ preventScroll: true }));
+    if (props.redo) request.focus({ preventScroll: true });
   });
 
   const tell = (text) => {

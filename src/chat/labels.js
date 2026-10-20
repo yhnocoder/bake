@@ -53,9 +53,9 @@ const CHINESE = {
   redoEmpty: '先写一句要求，比如：写短一点',
   redoChips: [
     { text: '写短一点', insert: '写短一点' },
-    { text: '只留 …', insert: '只留' },
-    { text: '加几道自测题', insert: '加几道自测题' },
-    { text: '去掉没弄清的问题', insert: '去掉没弄清的问题' },
+    { text: '只留某一节', insert: '只留' },
+    { text: '加自测题', insert: '加几道自测题' },
+    { text: '去掉未弄清的', insert: '去掉没弄清的问题' },
   ],
   redoJoin: '；',
   cancel: '取消',
@@ -178,7 +178,7 @@ const ENGLISH = {
   redoEmpty: 'Write a request first, such as: make it shorter',
   redoChips: [
     { text: 'Make it shorter', insert: 'Make it shorter' },
-    { text: 'Keep only …', insert: 'Keep only' },
+    { text: 'Keep one section', insert: 'Keep only' },
     { text: 'Add review questions', insert: 'Add a few review questions' },
     { text: 'Drop the open questions', insert: 'Drop the open questions' },
   ],
