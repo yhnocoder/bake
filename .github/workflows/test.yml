@@ -2,7 +2,9 @@ name: test
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,18 +14,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: make check
-      - run: npm run test:browser
+      - run: scripts/lint.sh
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: node --test --test-shard=${{ matrix.shard }}/2 "test/*.test.js"
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 "test/browser/*.test.js"
+
+  test:
+    needs: [lint, unit, browser]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: test "$RESULTS" = "success success success"
+        env:
+          RESULTS: ${{ needs.lint.result }} ${{ needs.unit.result }} ${{ needs.browser.result }}
 
   screenshots:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -36,11 +66,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm ci
-      - run: npx playwright install --with-deps --only-shell chromium
+      - uses: ./.github/actions/setup
       - name: Take and compare screenshots
         run: |
           export SCREENSHOT_URL_PREFIX="https://github.com/$GITHUB_REPOSITORY/blob/ci-screenshots/pr/$PR_NUMBER/${HEAD_SHA:0:7}/"
