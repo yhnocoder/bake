@@ -50,7 +50,7 @@ export function selectionMarkdown(range, article) {
 function withAncestors(range, article) {
   let content = range.cloneContents();
   const common = range.commonAncestorContainer;
-  for (let element = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement; element !== article && !element.matches('[data-line]'); element = element.parentElement) {
+  for (let element = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement; element !== article && !element.matches('[data-line][data-end-line]'); element = element.parentElement) {
     const shell = element.cloneNode(false);
     shell.append(content);
     content = shell;

@@ -257,7 +257,7 @@ async function loadArticle(root, article, { rules, preamble, components }) {
   const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
   const positions = frontMatter?.positions ?? {};
   const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);
-  return { ...article, fields, positions, url, draft: fields?.draft === true, document, content: null, cover, errors };
+  return { ...article, source, fields, positions, url, draft: fields?.draft === true, document, content: null, cover, errors };
 }
 
 async function readCover(path, cover, file, position, errors) {

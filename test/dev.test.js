@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer, request as httpRequest } from 'node:http';
+import { connect } from 'node:net';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { createSite, updateSite } from '../src/build/site.js';
+import { sourceVersion } from '../src/dev/params.js';
 import { createPreview } from '../src/dev/preview.js';
-import { startDevServer } from '../src/dev/server.js';
+import { allowedHost, hostName, startDevServer } from '../src/dev/server.js';
 import { isWatched } from '../src/dev/watch.js';
 import { formatError } from '../src/report.js';
 import { article, createBlog, readTree, validConfig, writeFiles } from './blog.js';
@@ -48,8 +50,84 @@ describe('bake dev', () => {
     const { server, lines } = await start(t, dir, { port: taken });
     assert.ok(server.port > taken, `bake dev listens on ${server.port}, the taken port is ${taken}`);
     assert.equal(lines[0], `Port ${taken} is in use, using port ${server.port}`);
-    assert.equal(lines[1], `Serving the blog at http://localhost:${server.port}/`);
-    assert.ok(lines.slice(2).every((line) => new RegExp(`^On the local network: http://\\d+\\.\\d+\\.\\d+\\.\\d+:${server.port}/$`).test(line)), lines.join('\n'));
+    assert.deepEqual(lines.slice(1), [`Serving the blog at http://localhost:${server.port}/`]);
+  });
+
+  test('prints a loopback address other than 127.0.0.1 as it is, because localhost does not reach it', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const { server, lines } = await start(t, dir, { host: '127.0.0.5' });
+    assert.ok(lines.includes(`Serving the blog at http://127.0.0.5:${server.port}/`), lines.join('\n'));
+  });
+
+  test('listens on the loopback address by default and prints only the local address', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const { server, lines } = await start(t, dir);
+    assert.equal(server.address, '127.0.0.1');
+    assert.ok(lines.includes(`Serving the blog at http://localhost:${server.port}/`), lines.join('\n'));
+    assert.ok(!lines.some((line) => line.startsWith('On the local network')), lines.join('\n'));
+  });
+
+  test('listens on every interface with --host 0.0.0.0 and prints the addresses on the local network', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const { server, lines } = await start(t, dir, { host: '0.0.0.0' });
+    assert.equal(server.address, '0.0.0.0');
+    const index = lines.indexOf(`Serving the blog at http://localhost:${server.port}/`);
+    assert.ok(index >= 0, lines.join('\n'));
+    const network = lines.slice(index + 1).filter((line) => line.startsWith('On the local network'));
+    assert.ok(network.every((line) => new RegExp(`^On the local network: http://\\d+\\.\\d+\\.\\d+\\.\\d+:${server.port}/$`).test(line)), lines.join('\n'));
+  });
+
+  test('refuses requests whose Host header names another host', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article() });
+    const { server } = await start(t, dir);
+    const send = (path, host, method = 'GET') =>
+      new Promise((done, fail) => {
+        const request = httpRequest({ host: '127.0.0.1', port: server.port, path, method, headers: { host, 'content-type': 'application/json' }, setHost: false }, (response) => {
+          let body = '';
+          response.on('data', (chunk) => {
+            body += chunk;
+          });
+          response.on('end', () => done([response.statusCode, body]));
+        });
+        request.on('error', fail);
+        request.end(method === 'POST' ? '{}' : undefined);
+      });
+    const refused = [403, 'bake dev refuses requests for the host evil.example; open the page at localhost or at an IP address'];
+    assert.deepEqual(await send('/2026-10/rope/', `evil.example:${server.port}`), refused);
+    assert.deepEqual(await send('/__bake/params', `evil.example:${server.port}`, 'POST'), refused);
+    assert.deepEqual(await send('/__bake/events', 'evil.example'), refused);
+    const withoutHost = await new Promise((done, fail) => {
+      const socket = connect(server.port, '127.0.0.1', () => socket.end('GET /2026-10/rope/ HTTP/1.0\r\n\r\n'));
+      let text = '';
+      socket.on('data', (chunk) => {
+        text += chunk;
+      });
+      socket.on('end', () => done(text));
+      socket.on('error', fail);
+    });
+    assert.match(withoutHost, /^HTTP\/1\.1 403 /);
+    assert.ok(withoutHost.endsWith('\r\n\r\nbake dev refuses requests without a Host header'), withoutHost);
+    assert.deepEqual(await send('/2026-10/rope/', 'localhost.evil.example'), [403, 'bake dev refuses requests for the host localhost.evil.example; open the page at localhost or at an IP address']);
+    for (const host of [`localhost:${server.port}`, 'blog.localhost', `127.0.0.1:${server.port}`, `[::1]:${server.port}`, '192.168.1.20']) {
+      assert.equal((await send('/2026-10/rope/', host))[0], 200, host);
+    }
+  });
+
+  test('accepts the host name given with --host in the Host header, in any letter case', () => {
+    assert.equal(allowedHost(hostName('Studio.Lan:4321'), 'studio.lan'), true);
+    assert.equal(allowedHost(hostName('studio.lan'), 'Studio.Lan'), true);
+    assert.equal(allowedHost(hostName('other.lan:4321'), 'studio.lan'), false);
+    assert.equal(allowedHost(hostName('studio.lan.evil.example'), 'studio.lan'), false);
+  });
+
+  test('sends HTML pages with headers that refuse framing by other sites', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article() });
+    const { get } = await start(t, dir);
+    for (const path of ['/', '/2026-10/rope/', '/missing/']) {
+      const response = await get(path);
+      assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN', path);
+      assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'self'", path);
+    }
   });
 
   test('serves drafts with the page script and lists every article at a missing address', async (t) => {
@@ -68,9 +146,14 @@ describe('bake dev', () => {
       { line: 9, title: '01 Rotation' },
       { line: 13, title: '01 Rotation › Angles' },
     ]).replaceAll('"', '&quot;');
+    const version = sourceVersion(readFileSync(join(dir, 'content/posts/rope/index.md'), 'utf8'));
+    const token = /data-token="([A-Za-z0-9_-]{43})"/.exec(html)?.[1];
+    assert.ok(token, html.slice(-400));
     assert.ok(
-      html.endsWith(`<script src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}"></script></body></html>\n`),
-      html.slice(-400),
+      html.includes(
+        `<head><script type="module" src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}" data-version="${version}" data-components="{}" data-token="${token}"></script>`,
+      ),
+      html.slice(0, 600),
     );
     assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7" data-end-line="7">/);
     assert.match(await (await get('/2026-10/gelu/')).text(), /<span class="bk-draft">Draft<\/span>/);
@@ -86,7 +169,7 @@ describe('bake dev', () => {
       listing,
       /<li><a href="\/2026-10\/gelu\/">GELU &lt;draft&gt;<\/a><span class="date">2026-10-20<\/span><span class="draft">Draft<\/span><span class="file">content\/posts\/gelu\/index.md<\/span><\/li><li><a href="\/2026-10\/rope\/">Rope<\/a>/,
     );
-    assert.match(listing, /<script src="\/__bake\/client.js" data-bake-dev data-missing><\/script><\/body>/);
+    assert.match(listing, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev data-missing><\/script>/);
   });
 
   test('serves the homepage at / with drafts and the page script', async (t) => {
@@ -102,7 +185,7 @@ describe('bake dev', () => {
     assert.match(html, /<title>Test Blog<\/title>/);
     assert.match(html, /href="2026-10\/rope\/"/);
     assert.match(html, /href="2026-10\/gelu\/"[\s\S]*<span class="bk-card-draft">Draft<\/span>/);
-    assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
+    assert.match(html, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev><\/script>/);
   });
 
   test('serves the feed, the sitemap, the theme stylesheet and the 404 page with assets from the root and without drafts', async (t) => {
@@ -131,7 +214,7 @@ describe('bake dev', () => {
     assert.equal((await get(stylesheet[1])).status, 200);
     assert.match(html, /<li data-url="2026-10\/rope\/" hidden><a href="\/2026-10\/rope\/">Rope<\/a>/);
     assert.doesNotMatch(html, /GELU/);
-    assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
+    assert.match(html, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev><\/script>/);
   });
 
   test('prints problems as file:line:col lines, sends them to the page and prints when they are fixed', async (t) => {

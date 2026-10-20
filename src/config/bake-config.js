@@ -20,7 +20,7 @@ const GROUP_BY = ['category', 'month'];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export function configNotFoundError() {
-  return errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} not found, run bake from the blog root`);
+  return errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} not found, run bake from the blog root or create a blog with bake init`);
 }
 
 export function hasConfig(root) {

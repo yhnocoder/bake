@@ -215,7 +215,7 @@ describe('bake build', () => {
   test('reports a missing bake.config.js with the error count', (t) => {
     const dir = createBlog(t, { 'content/posts/rope/index.md': article() });
     const result = bake(dir, 'build');
-    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root\n1 error, dist/ was not written\n');
+    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root or create a blog with bake init\n1 error, dist/ was not written\n');
     assert.equal(result.status, 1);
   });
 
