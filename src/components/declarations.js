@@ -10,7 +10,7 @@ const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 const PIXELS = /^\d+(?:\.\d+)?$/;
 const COMMON_FIELDS = ['label', 'type', 'default'];
 const TYPE_FIELDS = { number: ['min', 'max', 'step'], text: [], boolean: [], enum: ['options'], file: [] };
-const LAYOUT_FIELDS = ['width', 'height', 'narrowHeight', 'frame'];
+const LAYOUT_FIELDS = ['width', 'height', 'narrowHeight', 'autoHeight', 'frame'];
 const LAYOUT_WIDTH_CHOICES = 'body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%';
 const HEIGHT_FORMS = 'a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them';
 
@@ -73,6 +73,7 @@ function layoutProblems(layout) {
     const value = layout[field];
     if (value !== undefined && typeof value !== 'function' && readHeight(value) === null) problems.push(`layout.${field} must be ${HEIGHT_FORMS}, got ${describeValue(value)}`);
   }
+  if (layout.autoHeight !== undefined && typeof layout.autoHeight !== 'boolean') problems.push(`layout.autoHeight must be true or false, got ${describeValue(layout.autoHeight)}`);
   if (layout.frame !== undefined && typeof layout.frame !== 'boolean') problems.push(`layout.frame must be true or false, got ${describeValue(layout.frame)}`);
   return problems;
 }
@@ -84,7 +85,7 @@ export function resolveComponent(name, component, attributes, files) {
   for (const [param, declaration] of Object.entries(component.params)) params[param] = declaration.default;
   for (const [attribute, raw] of Object.entries(attributes)) {
     if (SIZE_ATTRIBUTES.includes(attribute)) continue;
-    if (attribute === 'id' || attribute === 'class') {
+    if (RESERVED_PARAMS.includes(attribute)) {
       report(attribute, `components take no id or class; remove the ${attribute} from :::${name}`);
       continue;
     }
@@ -98,14 +99,21 @@ export function resolveComponent(name, component, attributes, files) {
     else params[attribute] = value;
   }
   for (const [param, declaration] of Object.entries(component.params)) {
-    if (declaration.type !== 'file' || params[param] === '' || folderFile(params[param], files) !== null) continue;
-    if (Object.hasOwn(attributes, param)) report(param, `parameter "${param}" of ${name} must be a file in the article folder, got ${describeValue(params[param])}`);
+    const problem = fileProblem(declaration, params[param], files);
+    if (problem === null) continue;
+    if (Object.hasOwn(attributes, param)) report(param, `parameter "${param}" of ${name} ${problem}`);
     else report(undefined, `parameter "${param}" of ${name} defaults to ${describeValue(params[param])}, which is not a file in the article folder`);
   }
   const width = componentWidth(name, component.layout, attributes.width, report);
   const heights = componentHeights(name, component.layout, attributes.height, params, report);
   const fileParams = Object.keys(component.params).filter((param) => component.params[param].type === 'file');
-  return { params, fileParams, ...width, ...heights, frame: component.layout.frame !== false, problems };
+  const autoHeight = component.layout.autoHeight === true && attributes.height === undefined;
+  return { params, fileParams, ...width, ...heights, autoHeight, frame: component.layout.frame !== false, problems };
+}
+
+export function fileProblem(declaration, value, files) {
+  if (declaration.type !== 'file' || value === '' || folderFile(value, files) !== null) return null;
+  return `must be a file in the article folder, got ${describeValue(value)}`;
 }
 
 function componentWidth(name, layout, written, report) {

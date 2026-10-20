@@ -258,6 +258,15 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   height: 100%;
 }
 
+.bk-article .component[data-height='auto'][data-state='ready'] > .component-box {
+  height: auto;
+  aspect-ratio: auto;
+}
+
+.bk-article .component[data-height='auto'][data-state='ready'] > .component-box > * {
+  height: auto;
+}
+
 .bk-article .figure[data-float]:where(:not(.component-box *)) {
   max-width: 50%;
   margin-top: 7px;

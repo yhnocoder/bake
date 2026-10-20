@@ -126,7 +126,7 @@ describe('reading components', () => {
       'components/empty-enum.js': `export const params = { fn: { label: 'F', type: 'enum', default: 'a' } };\n${height}${component}`,
       'components/bad-default.js': `export const params = { n: { label: 'N', type: 'number', min: 1, max: 10, default: 20 }, on: { label: 'On', type: 'boolean', default: 'yes' }, fn: { label: 'F', type: 'enum', options: ['a', 'b'], default: 'c' }, t: { label: 'T', type: 'text', default: 3 } };\n${height}${component}`,
       'components/bad-field.js': `export const params = { n: { label: 'N', type: 'text', default: '', optons: [] }, m: { type: 'number', default: 1 }, k: { label: 'K', type: 'number' } };\n${height}${component}`,
-      'components/bad-layout.js': `export const layout = { width: 'full', height: '300px', narrowHeight: { ratio: -1 }, frame: 'no', heigth: 3 };\n${component}`,
+      'components/bad-layout.js': `export const layout = { width: 'full', height: '300px', narrowHeight: { ratio: -1 }, frame: 'no', autoHeight: 1, heigth: 3 };\n${component}`,
       'components/no-height.js': `export const layout = { width: '120%' };\n${component}`,
       'components/no-default-export.js': height,
       'components/Plot_Name.js': component,
@@ -141,10 +141,11 @@ describe('reading components', () => {
       'components/bad-field.js:1:1 bad-field: parameter "n" has the unknown field "optons"; the fields of a text parameter are label, type and default',
       'components/bad-field.js:1:1 bad-field: parameter "m" needs a label, the text shown next to its control',
       'components/bad-field.js:1:1 bad-field: parameter "k" needs a default, the value used when the article does not set it',
-      'components/bad-layout.js:1:1 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight and frame',
+      'components/bad-layout.js:1:1 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight, autoHeight and frame',
       'components/bad-layout.js:1:1 bad-layout: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "full"',
       'components/bad-layout.js:1:1 bad-layout: layout.height must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got "300px"',
       'components/bad-layout.js:1:1 bad-layout: layout.narrowHeight must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got an object',
+      'components/bad-layout.js:1:1 bad-layout: layout.autoHeight must be true or false, got 1',
       'components/bad-layout.js:1:1 bad-layout: layout.frame must be true or false, got "no"',
       'components/bad-type.js:1:1 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
       "components/empty-enum.js:1:1 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
@@ -250,6 +251,14 @@ describe('component blocks', () => {
     assert.match(fourth.html, /<figcaption>\n<p>One.<\/p>\n<p>Two.<\/p>\n<\/figcaption>/);
     assert.equal(fourth.width, 'page');
     assert.deepEqual(article.components, ['act-fn-plot', 'glu-heatmap']);
+  });
+
+  test('marks the frame of a component with autoHeight unless the article sets its height', async () => {
+    const growing = { ...heatmap, name: 'grow-view', layout: { height: 300, narrowHeight: 500, autoHeight: true } };
+    const article = await parsed(':::grow-view\n:::\n\n:::grow-view{height=420}\n:::\n', { components: new Map([['grow-view', growing]]) });
+    const [auto, fixed] = article.intro;
+    assert.match(auto.html, /^<figure class="component" data-component="grow-view" data-params="\{\}" data-line="7" data-height="auto"><div class="component-box" style="--component-height:300px;--component-ratio:auto;--component-narrow-height:500px;--component-narrow-ratio:auto"><\/div><\/figure>$/);
+    assert.doesNotMatch(fixed.html, /data-height/);
   });
 
   test('gives a component the URL-encoded path of a file parameter whose name holds #, ? or %', async () => {

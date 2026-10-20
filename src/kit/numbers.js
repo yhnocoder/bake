@@ -6,7 +6,10 @@ const TICK_STEPS = [
 const EPSILON = 1e-9;
 const MAX_DIGITS = 20;
 
-export const formatNumber = (value, digits) => value.toFixed(digits).replace('-', '−');
+export function formatNumber(value, digits) {
+  const text = value.toFixed(digits);
+  return (Number(text) === 0 ? text.replace('-', '') : text).replace('-', '−');
+}
 
 export function stepDigits(step) {
   for (let digits = 0; digits < MAX_DIGITS; digits++) {
@@ -23,9 +26,10 @@ export function niceTicks(low, high, count) {
   const step = (TICK_STEPS.find(([limit]) => ratio < limit)?.[1] ?? 10) * power;
   const digits = stepDigits(step);
   const ticks = [];
-  for (let index = Math.ceil(low / step - EPSILON); index * step <= high + EPSILON; index++) {
+  const last = Math.floor(high / step + EPSILON);
+  for (let index = Math.ceil(low / step - EPSILON); index <= last; index++) {
     const value = index * step;
-    ticks.push({ value, label: formatNumber(Math.abs(value) < step / 2 ? 0 : value, digits) });
+    ticks.push({ value, label: formatNumber(value, digits) });
   }
   return ticks;
 }
