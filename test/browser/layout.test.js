@@ -333,6 +333,39 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
+  await t.test('a line with inline math, code, a highlight or a sidenote number keeps the line height of its paragraph at every text size, also in an example result on a first visit while the fonts load', async () => {
+    const uneven = [];
+    for (const width of [1440, 375]) {
+      for (const size of ['small', 'medium', 'larger']) {
+        const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('bk-size', value), size);
+        await page.goto(`${origin}/2026-10/syntax/`);
+        await settle(page);
+        const gaps = await page.evaluate(() =>
+          [...document.querySelectorAll('.bk-article p')]
+            .filter((paragraph) => !paragraph.closest('.component-box, .example-source') && paragraph.querySelector('mjx-container:not([display]), code, mark, sup'))
+            .filter((paragraph) => [...paragraph.querySelectorAll('mjx-container svg')].every((svg) => svg.getBoundingClientRect().height < parseFloat(getComputedStyle(paragraph).lineHeight)))
+            .flatMap((paragraph) => {
+              const tops = [];
+              const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+              for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+                if (node.parentElement.closest('code, mjx-container, sup')) continue;
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                for (const rect of range.getClientRects()) if (rect.height > 0 && !tops.some((top) => Math.abs(top - rect.top) < 4)) tops.push(rect.top);
+              }
+              tops.sort((a, b) => a - b);
+              const lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight);
+              return tops.slice(1).map((top, index) => [paragraph.textContent.slice(0, 12), index + 1, Math.round((top - tops[index]) * 10) / 10, Math.round(lineHeight * 10) / 10]).filter(([, , gap, height]) => Math.abs(gap - height) > 0.6);
+            }),
+        );
+        uneven.push(...gaps.map(([text, line, gap, height]) => `${width} pixels, size ${size}: line ${line + 1} of "${text}" starts ${gap} px after the line before it, with a line height of ${height} px`));
+        await page.close();
+      }
+    }
+    assert.deepEqual(uneven, []);
+  });
+
   await t.test('dark mode follows the system and data-theme overrides it both ways', async () => {
     const background = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     const darkSystem = await open('widths', { colorScheme: 'dark' });

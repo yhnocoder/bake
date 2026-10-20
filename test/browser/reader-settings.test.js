@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 import { article, bake, createBlog } from '../blog.js';
 import { serve } from './server.js';
 
@@ -15,7 +18,7 @@ export default class MotionBox extends HTMLElement {
   }
 }
 `;
-const body = ['正文第一段，说明激活函数的作用。', '', ':::motion-box', ':::', '', '## 门控单元', '', '门控单元把两路投影逐元素相乘。', '', '### 小节', '', '小节里的正文。', ''].join('\n');
+const body = ['正文第一段，说明**激活函数**的作用。', '', ':::motion-box', ':::', '', '## 门控单元', '', '门控单元把两路投影逐元素相乘。', '', '### 小节', '', '小节里的正文。', ''].join('\n');
 
 const sharedShadowLayers = (light, dark) => {
   const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
@@ -32,9 +35,38 @@ function readPage() {
   };
 }
 
+async function choose(page, name, attribute, value) {
+  await page.locator('.bk-settings-panel').getByRole('button', { name, exact: true }).click();
+  await page.waitForFunction(([key, expected]) => document.documentElement.dataset[key] === expected && document.getAnimations().length === 0, [attribute, value]);
+}
+
 async function readSettledPage(page) {
   await page.waitForFunction(() => document.body.getAnimations().length === 0);
   return page.evaluate(readPage);
+}
+
+const wenkaiFolder = dirname(createRequire(import.meta.url).resolve('lxgw-wenkai-webfont/lxgwwenkai-regular.css'));
+
+function cjkFontWithThreeWeights() {
+  return [
+    ['light', 300],
+    ['regular', 400],
+    ['bold', 500],
+  ]
+    .map(([file, weight]) =>
+      readFileSync(join(wenkaiFolder, `lxgwwenkai-${file}.css`), 'utf8')
+        .replaceAll("font-family: 'LXGW WenKai'", "font-family: 'PingFang SC'")
+        .replace(/font-weight: \d+/g, `font-weight: ${weight}`)
+        .replaceAll("url('./files/", "url('/__cjk-font/"),
+    )
+    .join('\n');
+}
+
+function darkPixels(png) {
+  const image = PNG.sync.read(png);
+  let count = 0;
+  for (let index = 0; index < image.data.length; index += 4) if (image.data[index] + image.data[index + 1] + image.data[index + 2] < 384) count += 1;
+  return count;
 }
 
 function wenkaiFaces() {
@@ -76,7 +108,7 @@ test('reader settings', async (t) => {
     assert.equal(await panel.isVisible(), false);
     await page.getByRole('button', { name: '设置' }).click();
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
-    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '按钮']);
+    assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '字号', '字重', '间距', '按钮']);
     const styles = await panel.locator('[role="radiogroup"]').evaluate((group) => ({
       label: document.getElementById(group.getAttribute('aria-labelledby')).textContent,
       choices: [...group.querySelectorAll('[role="radio"]')].map((choice) => [choice.querySelector('svg').getBoundingClientRect().width, choice.querySelector('b').textContent, choice.querySelector('small').textContent, choice.getAttribute('aria-checked')]),
@@ -144,8 +176,8 @@ test('reader settings', async (t) => {
     assert.doesNotMatch(initial.bodyFont, /LXGW WenKai/);
 
     await page.getByRole('button', { name: '设置' }).click();
-    await page.getByRole('button', { name: '深' }).click();
-    await page.getByRole('button', { name: '霞鹜文楷' }).click();
+    await choose(page, '深', 'theme', 'dark');
+    await choose(page, '霞鹜文楷', 'font', 'wenkai');
     const chosen = await readSettledPage(page);
     assert.deepEqual([chosen.theme, chosen.font, chosen.stored], ['dark', 'wenkai', ['dark', 'wenkai']]);
     assert.notEqual(chosen.background, initial.background);
@@ -166,10 +198,139 @@ test('reader settings', async (t) => {
 
     await page.reload();
     await page.getByRole('button', { name: '设置' }).click();
-    await page.getByRole('button', { name: '跟随系统' }).click();
-    await page.getByRole('button', { name: '黑体' }).click();
+    await choose(page, '跟随系统', 'theme', 'system');
+    await choose(page, '黑体', 'font', 'sans');
     const reset = await readSettledPage(page);
     assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], ['system', 'sans', ['system', 'sans'], initial.background]);
+    await context.close();
+  });
+
+  await t.test('text size, weight and spacing change the article text with a fade, survive a reload and leave components alone, and WenKai Light loads only when chosen', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+    const page = await context.newPage();
+    await page.goto(url);
+    const read = () =>
+      page.evaluate(() => {
+        const style = (selector) => getComputedStyle(document.querySelector(selector));
+        const paragraph = style('.bk-article p');
+        const strong = style('.bk-article strong');
+        const box = style('.component-box');
+        return {
+          attributes: ['size', 'weight', 'spacing'].map((name) => document.documentElement.dataset[name]),
+          stored: ['size', 'weight', 'spacing'].map((name) => localStorage.getItem(`bk-${name}`)),
+          paragraph: [paragraph.fontSize, paragraph.fontWeight, paragraph.lineHeight, paragraph.marginBottom],
+          heading: style('.bk-article h2').fontSize,
+          strong: [strong.fontWeight, strong.color],
+          ink: paragraph.color,
+          component: [box.fontSize, box.fontWeight, box.lineHeight],
+        };
+      });
+    const initial = await read();
+    assert.deepEqual(initial.attributes, ['medium', 'regular', 'normal']);
+    assert.deepEqual(initial.paragraph, ['16.5px', '400', '30.525px', '16px']);
+    assert.equal(initial.strong[0], '700');
+
+    await page.getByRole('button', { name: '设置' }).click();
+    const panel = page.locator('.bk-settings-panel');
+    assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="size"] button').evaluateAll((buttons) => buttons.map((button) => [button.textContent, button.getAttribute('aria-label')])), [
+      ['A', '小'],
+      ['A', '标准'],
+      ['A', '大'],
+      ['A', '特大'],
+    ]);
+    assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="weight"] button').allTextContents(), ['细', '常规', '粗']);
+    assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="spacing"] button').allTextContents(), ['紧凑', '标准', '宽松']);
+    const box = await panel.boundingBox();
+    assert.ok(box.y >= 0, `the settings panel starts ${box.y} pixels above the screen`);
+
+    await page.evaluate(() => {
+      const start = document.startViewTransition.bind(document);
+      window.fades = 0;
+      document.startViewTransition = (update) => {
+        window.fades += 1;
+        return start(update);
+      };
+    });
+    await choose(page, '特大', 'size', 'larger');
+    await choose(page, '粗', 'weight', 'bold');
+    await choose(page, '宽松', 'spacing', 'loose');
+    assert.equal(await page.evaluate(() => window.fades), 3);
+    const chosen = await read();
+    assert.deepEqual(chosen.attributes, ['larger', 'bold', 'loose']);
+    assert.deepEqual(chosen.stored, ['larger', 'bold', 'loose']);
+    assert.equal(chosen.paragraph[0], '19.47px');
+    assert.equal(chosen.paragraph[1], '500');
+    assert.ok(parseFloat(chosen.paragraph[2]) / parseFloat(chosen.paragraph[0]) > 2, `line height ${chosen.paragraph[2]} at ${chosen.paragraph[0]}`);
+    assert.ok(parseFloat(chosen.paragraph[3]) > parseFloat(initial.paragraph[3]));
+    assert.ok(parseFloat(chosen.heading) > parseFloat(initial.heading));
+    assert.equal(chosen.strong[0], '800');
+    assert.notEqual(chosen.strong[1], chosen.ink);
+    assert.deepEqual(chosen.component, initial.component);
+
+    await page.reload();
+    assert.deepEqual((await read()).attributes, ['larger', 'bold', 'loose']);
+
+    await page.getByRole('button', { name: '设置' }).click();
+    const lightFaces = () => page.evaluate(() => [...document.fonts].filter((face) => face.family.replaceAll('"', '') === 'LXGW WenKai' && face.weight === '300').length);
+    assert.equal(await lightFaces(), 0);
+    await choose(page, '细', 'weight', 'light');
+    assert.equal(await lightFaces(), 0);
+    await choose(page, '霞鹜文楷', 'font', 'wenkai');
+    await page.waitForFunction(() => [...document.fonts].some((face) => face.family.replaceAll('"', '') === 'LXGW WenKai' && face.weight === '300'));
+    const wenkai = await read();
+    assert.deepEqual([wenkai.paragraph[1], wenkai.strong[0], wenkai.strong[1] === wenkai.ink], ['300', '700', true]);
+    await choose(page, '粗', 'weight', 'bold');
+    const wenkaiBold = await read();
+    assert.deepEqual([wenkaiBold.paragraph[1], wenkaiBold.strong[0], wenkaiBold.strong[1] === wenkaiBold.ink], ['700', '700', false]);
+
+    await page.evaluate(() => localStorage.setItem('bk-weight', 'light'));
+    await page.route(/\/assets\/essay-[^/]*\.js$/, (route) => route.abort());
+    await page.reload();
+    assert.ok((await lightFaces()) > 0, 'a stored light weight with LXGW WenKai declares the light faces without the page script');
+    assert.equal((await read()).paragraph[1], '300');
+    await context.close();
+  });
+
+  await t.test('each weight step changes the ink of Chinese body text when the sans stack finds a CJK font with light, regular and medium faces', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+    await context.route('**/__cjk-font/*', (route) => route.fulfill({ path: join(wenkaiFolder, 'files', new URL(route.request().url()).pathname.split('/').pop()), contentType: 'font/woff2' }));
+    const page = await context.newPage();
+    const fontCss = cjkFontWithThreeWeights();
+    const measure = async (weight) => {
+      await page.evaluate((value) => localStorage.setItem('bk-weight', value), weight);
+      await page.reload();
+      await page.addStyleTag({ content: fontCss });
+      const paragraph = page.locator('.bk-article p', { hasText: '门控单元把两路投影逐元素相乘。' });
+      const computed = await paragraph.evaluate(async (element) => {
+        const style = getComputedStyle(element);
+        await document.fonts.load(`${style.fontWeight} ${style.fontSize} "PingFang SC"`, element.textContent);
+        await document.fonts.ready;
+        return style.fontWeight;
+      });
+      await page.waitForFunction(() => document.body.getAnimations().length === 0);
+      return { computed, ink: darkPixels(await paragraph.screenshot()) };
+    };
+    await page.goto(url);
+    const light = await measure('light');
+    const regular = await measure('regular');
+    const bold = await measure('bold');
+    assert.deepEqual([light.computed, regular.computed, bold.computed], ['300', '400', '500']);
+    assert.ok(light.ink < regular.ink && regular.ink < bold.ink, `Chinese body text has ${light.ink}, ${regular.ink} and ${bold.ink} dark pixels at the light, regular and bold steps`);
+    await context.close();
+  });
+
+  await t.test('the settings panel with every row stays inside a short phone screen', async () => {
+    const context = await browser.newContext({ viewport: { width: 375, height: 450 }, hasTouch: true, isMobile: true });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.getByRole('button', { name: '设置' }).click();
+    const panel = page.locator('.bk-settings-panel');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
+    const box = await panel.boundingBox();
+    assert.ok(box.y >= 0 && box.y + box.height <= 450, `the panel spans ${box.y} to ${box.y + box.height}`);
+    await panel.locator('.bk-settings-row[data-setting="buttons"]').scrollIntoViewIfNeeded();
+    await panel.getByRole('switch').click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.buttons), 'always');
     await context.close();
   });
 
@@ -246,7 +407,7 @@ test('reader settings', async (t) => {
     assert.ok(before.shown > 0, 'no text on the page uses LXGW WenKai');
     assert.deepEqual(before.unused, []);
     await page.getByRole('button', { name: '设置' }).click();
-    await page.getByRole('button', { name: '霞鹜文楷' }).click();
+    await choose(page, '霞鹜文楷', 'font', 'wenkai');
     await page.waitForFunction(() => document.fonts.status === 'loaded');
     await page.evaluate(() => document.fonts.ready);
     const after = await page.evaluate(wenkaiFaces);

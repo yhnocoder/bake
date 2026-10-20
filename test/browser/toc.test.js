@@ -787,7 +787,7 @@ test('the table of contents', async (t) => {
         left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
       }));
     assert.deepEqual(await read(), { toc: 'dots', stored: null, views: ['.bk-toc-dots'], left: 198 });
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '按钮']);
+    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '字号', '字重', '间距', '按钮']);
     await page.click('.bk-settings-toggle');
     await page.getByRole('radio', { name: /书签索引/ }).click();
     await settle(page);

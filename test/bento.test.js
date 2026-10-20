@@ -87,7 +87,7 @@ test('the bento theme renders each ## section as a card whose span follows its w
   for (const region of ['article', 'words', 'glyphs', 'previews', 'source']) assert.equal(html.split(`data-region="${region}"`).length, 2, region);
   assert.match(html, /<h2 id="plain" data-line="11" data-end-line="11"><span class="bk-chapter-number" data-ui(?:="")?>01<\/span><a class="bk-heading-link" [^>]*data-ui/);
   assert.match(html, /<script type="application\/json" class="bk-source" data-region="source">"---\\ntitle: Cards/);
-  assert.match(html, /^<!doctype html>\n?<html lang="en" data-theme="system" data-font="sans"><head>/);
+  assert.match(html, /^<!doctype html>\n?<html lang="en" data-theme="system" data-font="sans" data-size="medium" data-weight="regular" data-spacing="normal"><head>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/example.com\/2026-10\/cards\/">/);
   assert.match(html, /<meta property="og:image" content="https:\/\/example.com\/og\/2026-10\/cards-\w+\.png">/);
   assert.match(html, /<button type="button" class="bk-copy-source">/);
