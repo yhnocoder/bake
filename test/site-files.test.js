@@ -218,6 +218,7 @@ describe('site files', () => {
 
   test('_bake/theme.css resolves every form of a relative @import in a theme folder against the built-in theme', (t) => {
     const themeCss = [
+      '@IMPORT url(./styles/settings.css);',
       '@import url(./styles/fonts.css);',
       "@import url( './styles/tokens.css' );",
       '@import url("./styles/home.css");',
@@ -231,6 +232,7 @@ describe('site files', () => {
     assert.match(styles, /--bg:[^;]*#f5f6f4/);
     assert.match(styles, /\.bk-card-frame\{/);
     assert.match(styles, /\.bk-not-found/);
+    assert.match(styles, /\.bk-settings\{/);
   });
 
   test('reports public files at the addresses of the feed, the sitemap, the 404 page and in _bake/', (t) => {
