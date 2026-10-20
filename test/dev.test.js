@@ -266,11 +266,11 @@ describe('bake dev', () => {
 });
 
 describe('preview updates', () => {
-  test('rereads only the changed article and compiles a theme again only when a theme file changes', async (t) => {
+  test('rereads only the changed article, and a theme file change compiles only that theme again and parses no article again', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article(),
-      'content/posts/gelu/index.md': article({ slug: 'gelu' }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
     });
     const site = createSite(dir);
     const first = await updateSite(site);
@@ -282,9 +282,16 @@ describe('preview updates', () => {
     assert.notEqual(byFile(second).get('content/posts/rope/index.md'), byFile(first).get('content/posts/rope/index.md'));
     assert.equal(site.themes.get('essay'), theme);
     writeFiles(dir, { 'themes/essay/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' });
+    const bento = site.themes.get('bento');
     const third = await updateSite(site, ['themes/essay/header.jsx']);
     assert.notEqual(site.themes.get('essay'), theme);
-    assert.match(third.pages[0].outputs[0].render(), /<header class="custom-header">/);
+    assert.equal(site.themes.get('bento'), bento);
+    assert.equal(byFile(third).get('content/posts/gelu/index.md'), byFile(second).get('content/posts/gelu/index.md'));
+    assert.match(third.pages.find((page) => page.entry.url === '/2026-10/rope/').outputs[0].render(), /<header class="custom-header">/);
+    writeFiles(dir, { 'themes/plain/page.jsx': 'export default function Page() {\n  return <html />;\n}\n', 'themes/plain/client.jsx': '' });
+    const fourth = await updateSite(site, ['themes/plain/page.jsx', 'themes/plain/client.jsx']);
+    assert.notEqual(byFile(fourth).get('content/posts/gelu/index.md'), byFile(third).get('content/posts/gelu/index.md'));
+    assert.deepEqual(fourth.errors, []);
   });
 
   test('compiles the site theme again with the site files when an article theme becomes the site theme', async (t) => {

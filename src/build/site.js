@@ -32,8 +32,14 @@ export function createSite(root, { drafts = false, base, shareImages = false } =
 export async function updateSite(site, changedPaths = null) {
   const { root } = site;
   const touches = (path) => changedPaths === null || changedPaths.some((changed) => changed === path || changed.startsWith(`${path}/`));
-  if (touches(THEMES_DIR)) site.themes.clear();
-  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR)) {
+  const themePaths = (changedPaths ?? [THEMES_DIR]).filter((path) => path === THEMES_DIR || path.startsWith(`${THEMES_DIR}/`));
+  for (const path of themePaths) {
+    const name = path.split('/')[1];
+    if (name === undefined) site.themes.clear();
+    else site.themes.delete(name);
+  }
+  const themeNamesChanged = themePaths.length > 0 && site.settings?.rules?.themes.join('\n') !== availableThemes(root).join('\n');
+  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || themeNamesChanged || touches(COMPONENTS_DIR)) {
     site.settings = await readSettings(root);
     site.articles.clear();
     site.bundle = null;
