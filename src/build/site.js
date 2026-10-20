@@ -39,7 +39,7 @@ export async function updateSite(site, changedPaths = null) {
     site.bundle = null;
   }
   const { settings } = site;
-  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], assetFiles: [], shareImages: [], publicFiles: [] };
+  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articleErrorsOnly: false, articles: [], pages: [], siteFiles: [], assetFiles: [], shareImages: [], publicFiles: [] };
   const articles = [];
   for (const found of findArticles(root)) {
     const cached = site.articles.get(found.file);
@@ -49,44 +49,45 @@ export async function updateSite(site, changedPaths = null) {
   site.articles = new Map(articles.map((article) => [article.file, article]));
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
-  linkArticles(articles, errors);
+  linkArticles(articles, site.lastGood, errors);
   const { config } = settings;
-  const isPublished = (article) => article.url !== null && (site.drafts || !article.draft);
-  const published = articles.filter(isPublished);
+  const published = articles.filter((article) => article.url !== null && (site.drafts || !article.draft));
   const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), chatBundle()]);
   const assetFiles = assetOutputs(themes, bundle, chat);
   const current = published.map((article) => ({ article, entry: articleEntry(article, config) }));
   const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, current, config, assetFiles, errors) : new Map();
   const pageSettings = { config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
   const pages = current.map(({ article, entry }) => ({ article, entry, outputs: articleOutputs(root, article, entry, pageSettings, errors) }));
-  const listing = lastGoodArticles(site, articles, errors)
-    .filter(isPublished)
-    .map((article) => ({ article, entry: articleEntry(article, config) }))
-    .sort((a, b) => newestFirst(a.entry, b.entry));
+  const shown = shownPages(articles, pages, site.lastGood, config, errors);
+  const listing = [...shown.values()].sort((a, b) => newestFirst(a.entry, b.entry));
   const listed = listing.filter(({ entry }) => !entry.draft);
-  const entries = listed.map(({ entry }) => entry);
+  const listedEntries = listed.map(({ entry }) => entry);
   const home = homeOutput(listing.map(({ entry }) => entry), pageSettings, errors);
   const siteFiles = [
-    { path: FEED_PATH, render: () => feedXml(config, entries), owner: 'the RSS feed' },
-    { path: SITEMAP_PATH, render: () => sitemapXml(config, entries), owner: 'the sitemap' },
+    { path: FEED_PATH, render: () => feedXml(config, listedEntries), owner: 'the RSS feed' },
+    { path: SITEMAP_PATH, render: () => sitemapXml(config, listedEntries), owner: 'the sitemap' },
     { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, listed), owner: 'the AI chat' },
     { path: CHAT_PREAMBLE_PATH, render: () => `${JSON.stringify(settings.preamble.map((definition) => definition.tex))}\n`, owner: 'the AI chat' },
-    notFoundOutput(entries, site.base ?? sitePath(config.url), pageSettings, errors),
+    notFoundOutput(listedEntries, site.base ?? sitePath(config.url), pageSettings, errors),
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
-  return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
+  const articleFiles = new Set(articles.map((article) => article.file));
+  const articleErrorsOnly = errors.every((error) => articleFiles.has(error.file));
+  if (articleErrorsOnly) site.lastGood = shown;
+  return { errors: sortErrors(errors), articleErrorsOnly, articles, pages: [...shown.values()], home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
 }
 
-function lastGoodArticles(site, articles, errors) {
+function shownPages(articles, pages, lastGood, config, errors) {
   const failed = new Set(errors.map((error) => error.file));
-  site.lastGood = new Map(
-    articles.flatMap((article) => {
-      const good = failed.has(article.file) ? site.lastGood.get(article.file) : article;
-      return good === undefined ? [] : [[article.file, good]];
-    }),
-  );
-  return [...site.lastGood.values()];
+  const current = new Map(pages.map((page) => [page.article.file, page]));
+  const shown = new Map();
+  for (const { file } of articles) {
+    const good = lastGood.get(file);
+    if (!failed.has(file) && current.has(file)) shown.set(file, current.get(file));
+    else if (failed.has(file) && good !== undefined) shown.set(file, { ...good, entry: articleEntry(good.article, config) });
+  }
+  return shown;
 }
 
 async function readSettings(root) {
@@ -207,12 +208,31 @@ async function readMathPreamble(root, errors) {
   return definitions;
 }
 
-function linkArticles(articles, errors) {
-  const index = indexPages(
-    articles.map(({ url, fields, draft, document }) => ({ url, title: fields?.title ?? '', draft, article: document })),
-  );
-  for (const article of articles) article.document?.link(index, errors);
+function linkArticles(articles, lastGood, errors) {
+  const failed = new Set(errors.map((error) => error.file));
+  const changed = articles.filter((article) => lastGood.has(article.file) && lastGood.get(article.file).article !== article);
+  const failedReading = changed.filter((article) => failed.has(article.file));
+  let linkErrors = linkWithLastGood(articles, failedReading, lastGood);
+  const failedLinks = new Set(linkErrors.map((error) => error.file));
+  const failing = changed.filter((article) => failed.has(article.file) || failedLinks.has(article.file));
+  if (failing.length > failedReading.length) linkErrors = linkWithLastGood(articles, failing, lastGood);
   for (const article of articles) article.content = article.document?.structure() ?? null;
+  errors.push(...linkErrors);
+}
+
+function linkWithLastGood(articles, failing, lastGood) {
+  const errors = [];
+  const shown = articles.map((article) => (failing.includes(article) ? lastGood.get(article.file).article : article));
+  const index = indexPages(shown.map(linkTarget));
+  for (const article of articles) {
+    const own = failing.includes(article) ? indexPages(articles.map((other, position) => linkTarget(other === article ? article : shown[position]))) : index;
+    article.document?.link(own, errors);
+  }
+  return errors;
+}
+
+function linkTarget({ url, fields, draft, document }) {
+  return { url, title: fields?.title ?? '', draft, article: document };
 }
 
 async function loadArticle(root, article, { rules, preamble, components }) {
