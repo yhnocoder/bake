@@ -17,7 +17,7 @@ export default function Page(props) {
     <html lang={props.site.language}>
       <head>
         <For each={props.assets.styles}>{(href) => <link rel="stylesheet" href={href} />}</For>
-        <For each={props.assets.scripts}>{(src) => <script defer src={src} />}</For>
+        <For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>
       </head>
       <body>
         <main innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
@@ -215,7 +215,7 @@ describe('bake build', () => {
   test('reports a missing bake.config.js with the error count', (t) => {
     const dir = createBlog(t, { 'content/posts/rope/index.md': article() });
     const result = bake(dir, 'build');
-    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root\n1 error, dist/ was not written\n');
+    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root or create a blog with bake init\n1 error, dist/ was not written\n');
     assert.equal(result.status, 1);
   });
 
@@ -421,8 +421,8 @@ describe('bake build', () => {
       '2026-10/host/index.html src ../../2026-10/files/a%231.webp',
       '2026-10/host/index.html href ../../2026-10/files/b%3F1.json',
       '2026-10/host/index.html data-params ../../2026-10/files/a%231.png',
-      '2026-10/plain/index.html href ../../assets/plain%231%20%25-',
-      '2026-10/plain/index.html src ../../assets/plain%231%20%25-',
+      '2026-10/plain/index.html href ../../assets/plain_1%20_-',
+      '2026-10/plain/index.html src ../../assets/plain_1%20_-',
       'index.html data-preview 2026-10/files/c%251.js',
       'index.html src 2026-10/host/d%20e.svg',
     ]) {

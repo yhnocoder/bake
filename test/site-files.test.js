@@ -141,7 +141,8 @@ describe('site files', () => {
     const { styles, scripts } = props.assets;
     assert.equal(styles.length, 1);
     assert.match(styles[0], /^\/bake\/assets\/probe-[\w-]+\.css$/);
-    assert.ok(scripts.every((path) => /^\/bake\/assets\/probe-[\w-]+\.js$/.test(path)));
+    assert.equal(scripts.length, 1);
+    assert.match(scripts[0], /^\/bake\/assets\/probe-[\w-]+\.js$/);
     assert.deepEqual(props, {
       site: { title: 'Notes & <Models>', url: 'https://x.github.io/bake', language: 'en', description: 'Short "notes".', link: 'https://x.github.io/bake/', bento: { columns: 4 } },
       articles: [
@@ -160,7 +161,7 @@ describe('site files', () => {
     assert.match(html, /^<!doctype html>\n<html lang="en" data-theme="system" data-font="sans">/);
     assert.match(html, /<meta name="robots" content="noindex"><title>This page does not exist · Notes &amp; &lt;Models><\/title>/);
     assert.match(html, /<link rel="stylesheet" href="\/bake\/assets\/essay-[\w-]+\.css">/);
-    assert.match(html, /<script defer src="\/bake\/assets\/essay-[\w-]+\.js"><\/script>/);
+    assert.match(html, /<script type="module" src="\/bake\/assets\/essay-[\w-]+\.js"><\/script>/);
     assert.match(html, /<main class="bk-not-found" data-root="\/bake\/"><a class="bk-site" href="\/bake\/">Notes &amp; &lt;Models><\/a><h1 class="bk-not-found-title">This page does not exist<\/h1><p class="bk-not-found-path" hidden>/);
     assert.match(html, /<section class="bk-not-found-matches" hidden><h2>You may be looking for:<\/h2><ul><li data-url="2026-10\/alpha\/" hidden><a href="\/bake\/2026-10\/alpha\/">Alpha<\/a>/);
     assert.match(html, /<a class="bk-not-found-home" href="\/bake\/">Back to the homepage →<\/a><\/main>/);
@@ -217,7 +218,7 @@ describe('site files', () => {
 
   test('_bake/theme.css resolves every form of a relative @import in a theme folder against the built-in theme', (t) => {
     const themeCss = [
-      '@IMPORT url(./styles/fonts.css);',
+      '@import url(./styles/fonts.css);',
       "@import url( './styles/tokens.css' );",
       '@import url("./styles/home.css");',
       "@import './styles/not-found.css';",

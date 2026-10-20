@@ -131,7 +131,7 @@ export function ticksView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.dismiss(pointed);
+    intent.dismiss(pointed, [ticks.rows[pointed], card]);
     hide();
   }
   return {

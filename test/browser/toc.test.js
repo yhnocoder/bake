@@ -460,6 +460,16 @@ test('the table of contents', async (t) => {
       assert.equal(await focused(), { tabs: 'bk-tab #one', dots: 'bk-dot-item #one', ticks: 'bk-tick #one-b' }[style], `${style}: the focus does not return to the entry`);
       await page.waitForTimeout(300);
       assert.equal(await shown(), false, `${style}: the card opens again when the focus returns to its entry`);
+      const focusedEntry = await page.evaluate(() => {
+        const box = document.activeElement.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      });
+      await page.mouse.move(focusedEntry.x, focusedEntry.y);
+      const opened = await page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame, { timeout: 2000 }).then(
+        () => true,
+        () => false,
+      );
+      assert.equal(opened, true, `${style}: the card stays closed when the pointer reaches the entry that the keyboard closed it from`);
       await context.close();
     }
   });
