@@ -94,7 +94,8 @@ describe('bake build', () => {
     assert.match(tree['2026-09/series/index.html'].toString(), /<h1 class="bk-title">Series<\/h1>/);
     const assets = Object.keys(tree).filter((path) => path.startsWith('assets/'));
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.js$/.test(path)).length, 1);
-    assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.css$/.test(path)).length, 1);
+    assert.equal(assets.filter((path) => /^assets\/essay-(?!fonts-)[\w-]+\.css$/.test(path)).length, 1);
+    assert.equal(assets.filter((path) => /^assets\/essay-fonts-[\w-]+\.css$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/chat-[\w-]+\.js$/.test(path)).length, 1);
     for (const path of assets.filter((asset) => /^assets\/(essay|chat)-[\w-]+\.(js|css)$/.test(asset))) assert.ok(page.includes(`../../${path}`), `the page links ${path}`);
     assert.equal(tree['2026-10/rope/index.md'].toString(), readFileSync(join(dir, 'content/posts/2026-10/rope/index.md'), 'utf8'));

@@ -1,4 +1,3 @@
-import '../essay/styles/fonts.css';
 import '../essay/styles/tokens.css';
 import '../essay/styles/page.css';
 import '../essay/styles/blocks.css';

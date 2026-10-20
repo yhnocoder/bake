@@ -113,7 +113,7 @@ describe('homepage', () => {
         { title: 'Demo', summary: 'A page.', date: '2026-09-05', tags: ['html'], category: { id: 'ml', name: 'ML', color: '#2a78d6', desc: '' }, draft: false, url: '2026-09/demo/', preview: '2026-09/demo/anim/preview.js' },
         { title: 'Old', date: '2026-08-30', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-08/old/' },
       ],
-      assets: { root: './', styles, scripts },
+      assets: { root: './', styles, fonts: [], scripts },
     });
     assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/', bento: { columns: 5 } });
     assert.equal(readFileSync(join(dir, 'dist/2026-09/demo/anim/preview.js'), 'utf8'), 'export default () => ({ start() {}, stop() {} });\n');
@@ -229,7 +229,7 @@ describe('homepage', () => {
       site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
       home: { groupBy: 'month', columns: 3, categories: [] },
       articles: [entry, { ...entry, title: 'GELU', draft: false, url: '2026-10/gelu/' }],
-      assets: { root: './', styles: [], scripts: [] },
+      assets: { root: './', styles: [], fonts: [], scripts: [] },
     });
     const cards = html.split('<a class="bk-card"').slice(1);
     assert.match(cards[0], /<div class="bk-card-frame"><div class="bk-card-fallback">.*?<\/div><span class="bk-card-draft">草稿<\/span><\/div>/);
@@ -246,7 +246,7 @@ describe('homepage', () => {
       site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
       home: { groupBy: 'month', columns: 3, categories: [] },
       articles: [],
-      assets: { root: './', styles: [], scripts: [] },
+      assets: { root: './', styles: [], fonts: [], scripts: [] },
     });
     assert.match(html, /<p class="bk-home-empty">还没有文章<\/p>/);
   });
