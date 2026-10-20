@@ -345,6 +345,25 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await page.evaluate(() => getSelection().toString().trimEnd()), (await card.locator('.bk-chat-note-source').textContent()).trimEnd());
   });
 
+  await t.test('the tabs of the prompt form fit the form in Chinese and in English at 375 pixels', async (t) => {
+    for (const lang of ['zh-CN', 'en']) {
+      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 812 } } });
+      await page.route(`${base}/2026-10/syntax/`, async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, body: (await response.text()).replace('<html lang="zh-CN"', `<html lang="${lang}"`) });
+      });
+      await page.goto(`${base}/2026-10/syntax/`);
+      await setUpKey(page);
+      await page.locator('.bk-chat-icon').last().click();
+      await page.locator('.bk-chat-menu-item').filter({ hasText: lang === 'en' ? 'Prompts' : '提示词' }).click();
+      const tabs = page.locator('.bk-chat-prompt-tabs');
+      await tabs.waitFor();
+      const fit = await tabs.evaluate((list) => [...list.children].map((tab) => ({ text: tab.textContent, clipped: tab.scrollWidth > tab.clientWidth, outside: tab.getBoundingClientRect().right > list.getBoundingClientRect().right + 0.5 })));
+      assert.deepEqual(fit.filter((tab) => tab.clipped || tab.outside), [], `${lang}: ${JSON.stringify(fit)}`);
+      await page.close();
+    }
+  });
+
   await t.test('instructions and built-in prompts written in the chat settings are stored in this browser and used in every request', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
@@ -405,7 +424,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await form.getByRole('button', { name: '恢复默认' }).click();
     assert.equal(await chatRules.inputValue(), CHAT_RULES);
     await page.keyboard.press('Control+Enter');
-    await page.locator('.bk-chat-note', { hasText: '提示词已恢复默认。' }).waitFor();
+    await page.locator('.bk-chat-note', { hasText: '提示词已保存，现在用的是内置提示词，没有额外要求。' }).waitFor();
     const local = (await storage(page)).local;
     for (const key of ['bk-chat-instructions', 'bk-chat-rules', 'bk-chat-note-rules']) assert.equal(local[key], undefined);
     await openMenu(page);

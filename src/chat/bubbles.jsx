@@ -733,7 +733,10 @@ function Chat(props) {
               }}
               onSave={(text) => {
                 const saved = savePrompts(text, builtInPrompts);
-                if (saved === null) return labels.promptStorage;
+                if (saved === null) {
+                  setPrompts(readPrompts());
+                  return labels.promptStorage;
+                }
                 setPrompts(saved);
                 setPopover(null);
                 note(customPrompts(saved) ? labels.promptSaved : labels.promptCleared);

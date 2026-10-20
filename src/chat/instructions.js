@@ -4,7 +4,7 @@ export const MAX_INSTRUCTIONS = 2000;
 export const MAX_RULES = 8000;
 
 export function readPrompts() {
-  return { instructions: stored(INSTRUCTIONS_KEY) ?? '', chat: stored(RULES_KEYS.chat), note: stored(RULES_KEYS.note) };
+  return { instructions: (stored(INSTRUCTIONS_KEY) ?? '').slice(0, MAX_INSTRUCTIONS), chat: stored(RULES_KEYS.chat)?.slice(0, MAX_RULES) ?? null, note: stored(RULES_KEYS.note)?.slice(0, MAX_RULES) ?? null };
 }
 
 export function savePrompts({ instructions, chat, note }, builtIn) {
