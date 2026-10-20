@@ -113,10 +113,8 @@ function Chat(props) {
   };
   const focusInput = () => requestAnimationFrame(() => open() && input?.focus({ preventScroll: true }));
 
-  let closeNoteOnHide = false;
   const show = () => {
     if (open()) return;
-    closeNoteOnHide = false;
     pet.load();
     setOpen(true);
     launcher.setAttribute('aria-expanded', 'true');
@@ -129,16 +127,20 @@ function Chat(props) {
     if (!open()) return;
     setOpen(false);
     setPopover(null);
-    closeNoteOnHide = noteOpen() || redo();
+    if (noteOpen() || redo()) closeNoteAfterFade();
     setQuery(null);
     launcher.setAttribute('aria-expanded', 'false');
     pet.setState('idle');
     if (focus) launcher.focus({ preventScroll: true });
   };
   const toggle = () => (open() ? hide() : show());
-  const hidden = (event) => {
-    if (open() || !closeNoteOnHide || event.pseudoElement !== '::before' || event.propertyName !== 'opacity') return;
-    closeNoteOnHide = false;
+  const closeNoteAfterFade = () => {
+    if (open()) return;
+    const fade = container.getAnimations({ subtree: true }).find((animation) => animation.effect?.pseudoElement === '::before' && animation.transitionProperty === 'opacity');
+    if (fade !== undefined) {
+      fade.finished.then(closeNoteAfterFade, closeNoteAfterFade);
+      return;
+    }
     setNoteOpen(false);
     setRedo(false);
   };
@@ -552,7 +554,7 @@ function Chat(props) {
   const placeholder = () => (view() === 'setup' ? labels.placeholder.key : scopes().length > 0 ? labels.placeholder.scoped : labels.placeholder[page.article === null ? 'blog' : 'article']);
 
   return (
-    <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown} on:transitionend={hidden}>
+    <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>
       <p class="bk-chat-status" role="status">
         <Show when={announcement()} keyed>
           {({ text }) => <span>{text}</span>}
@@ -733,10 +735,7 @@ function Chat(props) {
               }}
               onSave={(text) => {
                 const saved = savePrompts(text, builtInPrompts);
-                if (saved === null) {
-                  setPrompts(readPrompts());
-                  return labels.promptStorage;
-                }
+                if (saved === null) return labels.promptStorage;
                 setPrompts(saved);
                 setPopover(null);
                 note(customPrompts(saved) ? labels.promptSaved : labels.promptCleared);
@@ -938,7 +937,16 @@ function PromptForm(props) {
                 choose(PROMPT_TABS[(index() + step + PROMPT_TABS.length) % PROMPT_TABS.length]);
               }}
             >
-              {labels.promptTabs[name]}
+              <For each={labels.promptTabs[name]}>
+                {(part, index) => (
+                  <>
+                    <Show when={index() > 0}>
+                      <wbr />
+                    </Show>
+                    {part}
+                  </>
+                )}
+              </For>
             </button>
           )}
         </For>

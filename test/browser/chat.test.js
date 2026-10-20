@@ -284,32 +284,53 @@ test('the AI chat on published pages', async (t) => {
     }
 
     await page.addInitScript(() => {
+      if (sessionStorage.getItem('bake-test-held-read') !== null) return;
+      sessionStorage.setItem('bake-test-held-read', '');
       const open = indexedDB.open.bind(indexedDB);
-      let delayed = false;
+      const close = IDBDatabase.prototype.close;
+      let connections = 0;
+      let held = false;
+      IDBDatabase.prototype.close = function () {
+        connections -= 1;
+        return close.call(this);
+      };
+      window.bakeTest.databaseIdle = () => connections === 0;
       indexedDB.open = (...args) => {
-        if (delayed) return open(...args);
-        delayed = true;
+        connections += 1;
         const request = open(...args);
+        if (held) return request;
+        held = true;
         const late = { result: undefined, error: null, onsuccess: null, onerror: null, onupgradeneeded: null, onblocked: null };
         request.onupgradeneeded = (event) => {
           late.result = request.result;
           late.onupgradeneeded?.(event);
         };
-        request.onsuccess = (event) => setTimeout(() => {
+        request.onsuccess = (event) => {
           late.result = request.result;
-          window.bakeTest.lateRead = 'started';
-          late.onsuccess?.(event);
-          setTimeout(() => (window.bakeTest.lateRead = 'done'), 300);
-        }, 3000);
-        request.onerror = (event) => late.onerror?.(event);
+          window.bakeTest.releaseRead = () => late.onsuccess?.(event);
+        };
+        request.onerror = (event) => {
+          connections -= 1;
+          late.onerror?.(event);
+        };
         return late;
       };
     });
     await page.reload();
     await setUpKey(page);
     assert.notEqual(await remembered(), null);
-    await page.waitForFunction(() => window.bakeTest.lateRead === 'done');
+    await page.waitForFunction(() => typeof window.bakeTest.releaseRead === 'function');
+    await page.evaluate(() => window.bakeTest.releaseRead());
+    await page.waitForFunction(() => window.bakeTest.databaseIdle());
     assert.notEqual(await remembered(), null, 'a key saved while the chat still reads the remembered key stays');
+    await page.reload();
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator(QUESTION).waitFor();
+    api.answers.push({ body: text('还在。') });
+    await ask(page, '还记得吗');
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
+    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0, 'the next page asks for no passkey');
   });
 
   await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {

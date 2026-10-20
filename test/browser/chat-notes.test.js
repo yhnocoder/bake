@@ -298,7 +298,8 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
           const frames = [];
           const sample = () => {
             const opacity = Number(getComputedStyle(chat, '::before').opacity);
-            frames.push({ opacity, card: chat.querySelector('.bk-chat-note-card') !== null, width: Math.round(chat.getBoundingClientRect().width) });
+            const box = chat.getBoundingClientRect();
+            frames.push({ opacity, card: chat.querySelector('.bk-chat-note-card') !== null, size: `${Math.round(box.width)}x${Math.round(box.height)}` });
             if (opacity === 0 && !chat.hasAttribute('data-open')) setTimeout(() => resolve({ frames, card: chat.querySelector('.bk-chat-note-card') !== null }), 50);
             else requestAnimationFrame(sample);
           };
@@ -309,11 +310,28 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     const fade = await fading;
     const shown = fade.frames.filter((frame) => frame.opacity > 0);
     assert.ok(shown.length > 1, JSON.stringify(fade.frames));
-    assert.deepEqual(new Set(shown.map((frame) => `${frame.card} ${frame.width}`)), new Set([`true ${shown[0].width}`]), 'the note card stays at its size while the glass fades out');
+    assert.deepEqual(new Set(shown.map((frame) => `${frame.card} ${frame.size}`)), new Set([`true ${shown[0].size}`]), 'the note card stays at its size while the glass fades out');
     assert.equal(fade.card, false, 'the note card closes once the glass has faded out');
     await page.locator('.bk-chat-launcher').click();
     await page.locator('.bk-chat-bubbles').waitFor();
     assert.equal(await card.count(), 0);
+
+    await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
+    await card.waitFor();
+    const host = page.locator('[data-bake-chat]');
+    const glass = () => page.evaluate(() => Number(getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat'), '::before').opacity));
+    await host.evaluate((element) => element.style.setProperty('--chat-hidden', '1'));
+    for (let tries = 0; (await glass()) !== 0; tries += 1) {
+      assert.ok(tries < 100, 'the theme hides the chat');
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.click(400, 300);
+    await page.locator('.bk-chat:not([data-open])').waitFor();
+    await card.waitFor({ state: 'detached' });
+    await host.evaluate((element) => element.style.removeProperty('--chat-hidden'));
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator('.bk-chat-bubbles').waitFor();
+    assert.equal(await card.count(), 0, 'a chat closed while the theme hides it opens with the bubbles');
     await page.keyboard.press('Escape');
     await page.locator('.bk-chat:not([data-open])').waitFor();
     assert.deepEqual(problems, []);
@@ -345,23 +363,74 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await page.evaluate(() => getSelection().toString().trimEnd()), (await card.locator('.bk-chat-note-source').textContent()).trimEnd());
   });
 
-  await t.test('the tabs of the prompt form fit the form in Chinese and in English at 375 pixels', async (t) => {
-    for (const lang of ['zh-CN', 'en']) {
-      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 812 } } });
-      await page.route(`${base}/2026-10/syntax/`, async (route) => {
-        const response = await route.fetch();
-        await route.fulfill({ response, body: (await response.text()).replace('<html lang="zh-CN"', `<html lang="${lang}"`) });
-      });
-      await page.goto(`${base}/2026-10/syntax/`);
-      await setUpKey(page);
-      await page.locator('.bk-chat-icon').last().click();
-      await page.locator('.bk-chat-menu-item').filter({ hasText: lang === 'en' ? 'Prompts' : '提示词' }).click();
-      const tabs = page.locator('.bk-chat-prompt-tabs');
-      await tabs.waitFor();
-      const fit = await tabs.evaluate((list) => [...list.children].map((tab) => ({ text: tab.textContent, clipped: tab.scrollWidth > tab.clientWidth, outside: tab.getBoundingClientRect().right > list.getBoundingClientRect().right + 0.5 })));
-      assert.deepEqual(fit.filter((tab) => tab.clipped || tab.outside), [], `${lang}: ${JSON.stringify(fit)}`);
-      await page.close();
+  await t.test('the tabs of the prompt form fit the form in Chinese and in English at 320 and 375 pixels and break only between words', async (t) => {
+    for (const width of [320, 375]) {
+      for (const lang of ['zh-CN', 'en']) {
+        const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width, height: 812 } } });
+        await page.route(`${base}/2026-10/syntax/`, async (route) => {
+          const response = await route.fetch();
+          await route.fulfill({ response, body: (await response.text()).replace('<html lang="zh-CN"', `<html lang="${lang}"`) });
+        });
+        await page.goto(`${base}/2026-10/syntax/`);
+        await setUpKey(page);
+        await page.locator('.bk-chat-icon').last().click();
+        await page.locator('.bk-chat-menu-item').filter({ hasText: lang === 'en' ? 'Prompts' : '提示词' }).click();
+        const tabs = page.locator('.bk-chat-prompt-tabs');
+        await tabs.waitFor();
+        const fit = await tabs.evaluate((list) =>
+          [...list.children].map((tab) => {
+            const words = [...tab.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
+            const range = document.createRange();
+            const broken = words.filter((word) => {
+              range.selectNodeContents(word);
+              return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size > 1;
+            });
+            return {
+              text: tab.textContent,
+              clipped: tab.scrollWidth > tab.clientWidth,
+              outside: tab.getBoundingClientRect().right > list.getBoundingClientRect().right + 0.5 || list.getBoundingClientRect().right > list.parentElement.getBoundingClientRect().right + 0.5,
+              broken: broken.map((word) => word.textContent),
+            };
+          }),
+        );
+        assert.deepEqual(
+          fit.filter((tab) => tab.clipped || tab.outside || tab.broken.length > 0),
+          [],
+          `${lang} at ${width} pixels: ${JSON.stringify(fit)}`,
+        );
+        await page.close();
+      }
     }
+  });
+
+  await t.test('prompts that cannot all be stored change nothing in storage and stay in the form', async (t) => {
+    const { page } = await openBrowser(t, base);
+    await page.addInitScript(() => {
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'bk-chat-note-rules') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+        return setItem.call(this, key, value);
+      };
+    });
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await openMenu(page);
+    await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
+    const form = page.locator('.bk-chat-prompt');
+    await form.locator('#bk-chat-prompt-text').fill('回答不超过三句话。');
+    await form.getByRole('tab', { name: '对话提示词' }).click();
+    await form.locator('#bk-chat-prompt-chat').fill('你是这个博客的助手。');
+    await form.getByRole('tab', { name: '笔记提示词' }).click();
+    await form.locator('#bk-chat-prompt-note').fill('把对话整理成提纲。');
+    await form.getByRole('button', { name: '保存' }).click();
+    await form.getByRole('alert').filter({ hasText: chatLabels('zh').promptStorage }).waitFor();
+    const local = (await storage(page)).local;
+    for (const key of ['bk-chat-instructions', 'bk-chat-rules', 'bk-chat-note-rules']) assert.equal(local[key], undefined, key);
+    assert.equal(await form.locator('#bk-chat-prompt-text').inputValue(), '回答不超过三句话。');
+    assert.equal(await form.locator('#bk-chat-prompt-chat').inputValue(), '你是这个博客的助手。');
+    assert.equal(await form.locator('#bk-chat-prompt-note').inputValue(), '把对话整理成提纲。');
+    await openMenu(page);
+    assert.equal(await page.locator('.bk-chat-menu-state').count(), 0);
   });
 
   await t.test('instructions and built-in prompts written in the chat settings are stored in this browser and used in every request', async (t) => {

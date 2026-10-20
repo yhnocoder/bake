@@ -70,7 +70,7 @@ const CHINESE = {
   prompt: '提示词',
   promptSet: '已修改',
   promptTitle: '提示词',
-  promptTabs: { instructions: '额外要求', chat: '对话提示词', note: '笔记提示词' },
+  promptTabs: { instructions: ['额外', '要求'], chat: ['对话', '提示词'], note: ['笔记', '提示词'] },
   promptPlaceholder: '比如：回答尽量简短；先给结论再解释；用英文回答',
   promptHints: {
     instructions: '每次提问和整理笔记时，这段要求加在内置提示词后面。只保存在这个浏览器里。',
@@ -201,7 +201,7 @@ const ENGLISH = {
   prompt: 'Prompts',
   promptSet: 'changed',
   promptTitle: 'Prompts',
-  promptTabs: { instructions: 'Extra', chat: 'Chat prompt', note: 'Note prompt' },
+  promptTabs: { instructions: ['Extra ', 'rules'], chat: ['Chat ', 'prompt'], note: ['Note ', 'prompt'] },
   promptPlaceholder: 'For example: keep answers short; give the conclusion first; answer in Chinese',
   promptHints: {
     instructions: 'Every question and every note adds these instructions after the built-in prompt. Stored only in this browser.',

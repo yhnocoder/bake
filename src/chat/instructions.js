@@ -9,8 +9,15 @@ export function readPrompts() {
 
 export function savePrompts({ instructions, chat, note }, builtIn) {
   const prompts = { instructions: instructions.trim().slice(0, MAX_INSTRUCTIONS), chat: ownRules(chat, builtIn.chat), note: ownRules(note, builtIn.note) };
-  const saved = store(INSTRUCTIONS_KEY, prompts.instructions === '' ? null : prompts.instructions) && store(RULES_KEYS.chat, prompts.chat) && store(RULES_KEYS.note, prompts.note);
-  return saved ? prompts : null;
+  const values = [
+    [INSTRUCTIONS_KEY, prompts.instructions === '' ? null : prompts.instructions],
+    [RULES_KEYS.chat, prompts.chat],
+    [RULES_KEYS.note, prompts.note],
+  ];
+  const previous = values.map(([key]) => [key, stored(key)]);
+  if (values.every(([key, value]) => store(key, value))) return prompts;
+  for (const [key, value] of previous) store(key, value);
+  return null;
 }
 
 export function customPrompts(prompts) {

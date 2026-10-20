@@ -774,14 +774,14 @@
 .bk-chat-prompt-tabs button {
   position: relative;
   flex: 1 1 auto;
-  height: 26px;
-  padding: 0 8px;
+  min-height: 26px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 6px;
   background: none;
   color: var(--ink-3);
-  font: 600 12px/1 var(--font-ui, inherit);
-  white-space: nowrap;
+  font: 600 12px/1.25 var(--font-ui, inherit);
+  word-break: keep-all;
   cursor: pointer;
   isolation: isolate;
   user-select: none;
