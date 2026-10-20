@@ -3,7 +3,7 @@ import { render } from 'solid-js/web';
 import { labelsFor } from '../labels.js';
 import { SETTINGS, storageKey } from '../settings.js';
 import { closeOnEscape } from './escape.js';
-import { layoutChanged } from './motion.js';
+import { requestLayout } from './layout.js';
 
 export const SETTING_EVENT = 'bk:setting';
 const THEME_EVENT = 'bake:theme';
@@ -29,7 +29,7 @@ export function chooseSetting(name, value) {
   values[name][1](value);
   document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
   if (name === 'theme') document.dispatchEvent(new CustomEvent(THEME_EVENT));
-  if (settingRows.find((row) => row.name === name)?.changesLayout) layoutChanged();
+  if (settingRows.find((row) => row.name === name)?.changesLayout) requestLayout({ arrange: true });
 }
 
 export function startSettings() {

@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { article, bake, createBlog, validConfig } from './blog.js';
 
+const SHARED_DIR = new URL('../src/theme/', import.meta.url).pathname;
+const BUILT_IN_DIR = new URL('../src/themes/', import.meta.url).pathname;
+
 const plainPage = `import { For } from 'solid-js';
 
 export default function Page(props) {
@@ -68,6 +71,59 @@ describe('themes', () => {
     assert.equal(result.stderr, '');
     const script = readdirSync(join(dir, 'dist/assets')).find((name) => /^plain-[\w-]+\.js$/.test(name));
     assert.match(readFileSync(join(dir, 'dist/assets', script), 'utf8'), /text\/plain/);
+  });
+
+  test("a file in the blog's themes/bento/ replaces the file of the shared theme module that bento uses", (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: bento\n', body: '## One\n\nText.\n' }),
+      'themes/bento/header.jsx': 'export function Header(props) {\n  return <header class="bento-header">{props.article.title}</header>;\n}\n',
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    assert.match(page, /<header class="bento-header">Rope<\/header>/);
+    assert.match(page, /<section class="bt-card"/);
+  });
+
+  test('a theme of the blog builds its pages from the shared theme module bake/theme', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: '## One\n\nText.\n' }),
+      'themes/plain/page.jsx': [
+        "import { ArticleDocument, Block, Header, SITE_SETTINGS, labelsFor } from 'bake/theme';",
+        '',
+        'export default function Page(props) {',
+        '  const labels = labelsFor(props.site.language);',
+        '  return (',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} settings={SITE_SETTINGS} bodyClass="plain">',
+        '      <Header site={props.site} article={props.article} home={props.assets.root} labels={labels} />',
+        '      <main class="bk-article">{props.article.content.sections[0].blocks.map((block) => <Block block={block} labels={labels} />)}</main>',
+        '    </ArticleDocument>',
+        '  );',
+        '}',
+        '',
+      ].join('\n'),
+      'themes/plain/client.jsx': "import 'bake/theme/styles/tokens.css';\nimport { startFolds } from 'bake/theme/client';\n\nstartFolds(document.querySelector('.bk-article'));\n",
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    assert.match(page, /<html lang="en" data-theme="system" data-font="sans">/);
+    assert.match(page, /<body class="plain"/);
+    assert.match(page, /<header class="bk-header"/);
+    assert.match(page, /<div class="bk-block" data-type="paragraph" data-line="10" data-end-line="10"><p>Text.<\/p><\/div>/);
+    assert.match(page, /<script type="application\/json" class="bk-source" data-region="source">/);
+    const styles = readdirSync(join(dir, 'dist/assets')).filter((name) => /^plain-[\w-]+\.css$/.test(name));
+    assert.match(readFileSync(join(dir, 'dist/assets', styles[0]), 'utf8'), /--bg:/);
+  });
+
+  test('no file of the shared theme module has the path of a file in a built-in theme', () => {
+    const files = (folder) => readdirSync(folder, { recursive: true }).filter((path) => path.includes('.'));
+    const shared = new Set(files(SHARED_DIR));
+    for (const theme of readdirSync(BUILT_IN_DIR)) {
+      assert.deepEqual(files(join(BUILT_IN_DIR, theme)).filter((path) => shared.has(path)), [], theme);
+    }
   });
 
   test('reports a theme folder without page.jsx or client.jsx', (t) => {

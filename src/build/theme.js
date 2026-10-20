@@ -15,6 +15,13 @@ const THEME_STYLES_FILE = 'theme.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
+const SHARED_DIR = join(import.meta.dirname, '../theme');
+const SHARED_MODULE = 'bake/theme';
+const SHARED_EXPORTS = new Map([
+  ['', 'index.jsx'],
+  ['/client', 'client.js'],
+  ...['fonts', 'tokens', 'base', 'page', 'blocks', 'settings', 'home', 'not-found', 'print'].map((name) => [`/styles/${name}.css`, `styles/${name}.css`]),
+]);
 const RENDER_ENTRY = 'bake:render';
 const BAKE_MODULES = new Map([
   ['bake/copy', join(import.meta.dirname, '../copy/copy.js')],
@@ -22,15 +29,16 @@ const BAKE_MODULES = new Map([
 ]);
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const RELATIVE_IMPORT = /^\.\.?[/]/;
-const CSS_IMPORT = /@import\s+(?:url\(\s*(['"]?)(\.\.?[/][^'"()\s]+)\1\s*\)|(['"])(\.\.?[/][^'"]+)\3)/gi;
+const CSS_IMPORT = /@import\s+(?:url\(\s*(['"]?)((?:\.\.?|bake\/theme)[/][^'"()\s]+)\1\s*\)|(['"])((?:\.\.?|bake\/theme)[/][^'"]+)\3)/gi;
 const ASSET_FILE_NAMES = 'assets/[name]-[hash][extname]';
 
 export async function compileTheme(root, name, { siteTheme }, errors) {
-  const folders = themeFolders(root, name);
+  const own = themeFolders(root, name);
+  const folders = [...own, SHARED_DIR];
   const locate = fileLocator(folders);
   const count = errors.length;
   for (const file of [PAGE_FILE, CLIENT_FILE, ...(siteTheme ? [HOME_FILE, NOT_FOUND_FILE, THEME_STYLES_FILE] : [])]) {
-    if (locate(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
+    if (fileLocator(own)(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
   try {
@@ -71,7 +79,12 @@ function fileLocator(folders) {
 
 function themeFiles(folders, locate) {
   const resolveThemeFile = (source, importer) => {
-    if (importer === undefined || !RELATIVE_IMPORT.test(source)) return null;
+    if (importer === undefined) return null;
+    if (source.startsWith(SHARED_MODULE)) {
+      const path = SHARED_EXPORTS.get(source.slice(SHARED_MODULE.length));
+      return path === undefined ? null : locate(path);
+    }
+    if (!RELATIVE_IMPORT.test(source)) return null;
     const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
     if (folder === undefined) return null;
     const path = relative(folder, resolve(dirname(importer), source));

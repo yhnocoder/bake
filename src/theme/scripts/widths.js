@@ -1,42 +1,8 @@
-import { CONTENT_EVENT, layoutChanged, oncePerFrame } from './motion.js';
-
 const SCROLLERS = 'pre.shiki, .table-scroll, mjx-container[display]';
 const NATURAL_WIDTH_HOSTS = { math: 'mjx-container[display]', code: 'pre.shiki' };
 
-export function startWidths(article) {
-  let blocks = [];
-  const read = () => {
-    blocks = [...article.querySelectorAll('.bk-block[data-width]')];
-  };
-  const layout = oncePerFrame(() => {
-    resolveWidths(article, blocks);
-    layoutChanged();
-  });
-  read();
-  layout();
-  let observedWidth = null;
-  new ResizeObserver(([entry]) => {
-    if (entry.contentRect.width === observedWidth) return;
-    observedWidth = entry.contentRect.width;
-    layout();
-  }).observe(article);
-  addEventListener('resize', layout);
-  document.fonts.ready.then(layout);
-  article.addEventListener(
-    'toggle',
-    (event) => {
-      const block = event.target.closest('.bk-block[data-width="auto"]');
-      if (block !== null && !declaresNaturalWidth(block)) layout();
-    },
-    true,
-  );
-  document.addEventListener(CONTENT_EVENT, () => {
-    read();
-    layout();
-  });
-}
-
-function resolveWidths(article, blocks) {
+export function resolveWidths(article) {
+  const blocks = [...article.querySelectorAll('.bk-block[data-width]')];
   const body = article.clientWidth;
   const auto = blocks.filter((block) => block.dataset.width === 'auto');
   for (const block of blocks) {

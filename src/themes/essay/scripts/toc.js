@@ -1,10 +1,6 @@
-import { labelsFor } from '../labels.js';
+import { CONTENT_EVENT, LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, labelsFor, leftColumnScreen, notesColumnScreen, oncePerFrame } from 'bake/theme/client';
 import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
-import { followLink } from './heading-links.jsx';
-import { CONTENT_EVENT, LAYOUT_EVENT, oncePerFrame } from './motion.js';
-import { leftColumnScreen, notesColumnScreen } from './screens.js';
-import { SETTING_EVENT } from './settings.jsx';
 import { readOutline } from './toc-card.js';
 import { dotsView } from './toc-dots.js';
 import { notesColumn, notesRailView } from './toc-notes.js';
@@ -59,7 +55,7 @@ export function startToc(article) {
   });
 
   const update = oncePerFrame(() => {
-    state = readingState(context.outline, article);
+    state = readingState(context.outline, currentLayout(article));
     view.update(state);
     const yielding = crossing.some(isOnScreen);
     for (const element of view.columns ?? []) {
@@ -69,7 +65,7 @@ export function startToc(article) {
   });
   const layout = oncePerFrame(() => {
     view.relayout?.();
-    crossing = blocksCrossing(view.columns ?? [], article);
+    crossing = blocksCrossing(view.columns ?? [], currentLayout(article));
     update();
   });
   const mount = (again = false) => {
@@ -84,7 +80,7 @@ export function startToc(article) {
     kind = next;
     mountedStyle = style;
     view = kind === 'notes' ? notesView() : VIEWS[kind](context);
-    state = readingState(context.outline, article);
+    state = readingState(context.outline, currentLayout(article));
     view.update(state);
     if (kind === 'notes') column.show();
     layout();
@@ -113,11 +109,8 @@ export function startToc(article) {
   mount();
   settle();
   addEventListener('scroll', update, { passive: true });
-  addEventListener('resize', layout);
   document.addEventListener(LAYOUT_EVENT, layout);
-  document.fonts.addEventListener('loadingdone', layout);
   document.addEventListener(CONTENT_EVENT, reread);
-  new ResizeObserver(layout).observe(article);
   leftColumnScreen.addEventListener('change', () => mount());
   notesColumnScreen.addEventListener('change', () => mount());
   document.addEventListener(SETTING_EVENT, (event) => {
@@ -125,11 +118,11 @@ export function startToc(article) {
   });
 }
 
-function readingState(outline, article) {
+function readingState(outline, measured) {
   const { entries, chapters } = outline;
   const height = innerHeight;
   const line = Math.min(height * READING_LINE, READING_LINE_MAX);
-  const tops = entries.map((entry) => (entry.heading === null ? Infinity : entry.heading.getBoundingClientRect().top));
+  const tops = entries.map((entry) => (measured.headings.get(entry.heading) ?? Infinity) - scrollY);
   let entry = -1;
   for (const [index, top] of tops.entries()) {
     if (top <= line) entry = index;
@@ -137,7 +130,7 @@ function readingState(outline, article) {
   }
   const atEnd = scrollY > 0 && scrollY + height >= document.documentElement.scrollHeight - 4;
   if (atEnd) entry = entries.length - 1;
-  const articleBottom = article.getBoundingClientRect().bottom;
+  const articleBottom = measured.article.bottom - scrollY;
   let entryDone = atEnd;
   if (entry >= 0 && !atEnd) {
     const top = tops[entry];
@@ -160,16 +153,12 @@ function readingState(outline, article) {
   };
 }
 
-function blocksCrossing(columns, article) {
-  const spans = columns.map((column) => column.getBoundingClientRect()).filter((box) => box.width > 0);
+function blocksCrossing(columns, measured) {
+  const spans = columns.map((column) => column.getBoundingClientRect()).filter((box) => box.width > 0).map((box) => ({ left: box.left + scrollX, right: box.right + scrollX }));
   if (spans.length === 0) return [];
-  return [...article.querySelectorAll('.bk-block')].filter((block) => {
-    const box = block.getBoundingClientRect();
-    return box.height > 0 && spans.some((span) => box.left < span.right && box.right > span.left);
-  });
+  return measured.blocks.filter((block) => block.height > 0 && spans.some((span) => block.left < span.right && block.right > span.left));
 }
 
 function isOnScreen(block) {
-  const box = block.getBoundingClientRect();
-  return box.bottom > 0 && box.top < innerHeight;
+  return block.bottom - scrollY > 0 && block.top - scrollY < innerHeight;
 }
