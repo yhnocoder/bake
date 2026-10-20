@@ -122,7 +122,7 @@ describe('the parameter endpoint of bake dev', () => {
     t.after(() => server.close());
     const page = await (await fetch(new URL('2026-10/live/', server.url))).text();
     const version = /data-version="([0-9a-f]+)"/.exec(page)[1];
-    const token = /<script src="\/__bake\/client.js" data-bake-dev [^>]*data-token="([^"]+)"/.exec(page)[1];
+    const token = /<script type="module" src="\/__bake\/client.js" data-bake-dev [^>]*data-token="([^"]+)"/.exec(page)[1];
     const post = async (body, headers = {}) => {
       const response = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token, ...headers }, body: JSON.stringify(body) });
       return [response.status, await response.json()];

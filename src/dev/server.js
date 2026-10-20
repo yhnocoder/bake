@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { isIP, isIPv4, isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -20,13 +20,8 @@ const TOKEN_HEADER = 'x-bake-token';
 const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
 const MAX_REQUEST_BYTES = 1024 * 1024;
-const CLIENT_FILES = {
-  'client.js': 'text/javascript; charset=utf-8',
-  'client.css': 'text/css; charset=utf-8',
-  'param-bar.js': 'text/javascript; charset=utf-8',
-  'param-bar.css': 'text/css; charset=utf-8',
-  'switch.css': 'text/css; charset=utf-8',
-};
+const CLIENT_DIR = join(import.meta.dirname, 'client');
+const CLIENT_FILES = new Set(readdirSync(CLIENT_DIR));
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
@@ -72,9 +67,9 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     if (pathname === `${DEV_PREFIX}events`) return openEvents(request, response);
     if (pathname === `${DEV_PREFIX}params`) return answerParams(request, response);
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
-    if (clientFile !== null && Object.hasOwn(CLIENT_FILES, clientFile)) {
-      response.writeHead(200, { 'content-type': CLIENT_FILES[clientFile], 'cache-control': 'no-store' });
-      return response.end(readFileSync(join(import.meta.dirname, clientFile)));
+    if (clientFile !== null && CLIENT_FILES.has(clientFile)) {
+      response.writeHead(200, { 'content-type': contentType(clientFile), 'cache-control': 'no-store' });
+      return response.end(readFileSync(join(CLIENT_DIR, clientFile)));
     }
     let path;
     try {
@@ -294,7 +289,10 @@ function injectClient(html, data) {
   const attributes = Object.entries(data)
     .map(([name, value]) => (value === true ? ` data-${name}` : ` data-${name}="${escapeMarkup(value)}"`))
     .join('');
-  const script = `<script src="${DEV_PREFIX}client.js" data-bake-dev${attributes}></script>`;
+  const script = `<script type="module" src="${DEV_PREFIX}client.js" data-bake-dev${attributes}></script>`;
+  // why: a module script runs after parsing in document order, so it goes first in the head to see the regions before the deferred theme scripts insert nodes into them
+  const head = /<head(?:\s[^>]*)?>/i.exec(html);
+  if (head !== null) return `${html.slice(0, head.index + head[0].length)}${script}${html.slice(head.index + head[0].length)}`;
   const end = html.lastIndexOf('</body>');
   return end === -1 ? `${html}${script}` : `${html.slice(0, end)}${script}${html.slice(end)}`;
 }
