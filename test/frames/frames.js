@@ -1,9 +1,9 @@
 export const FRAME_BUDGET = 1000 / 60;
 export const SLOW_FRAME = FRAME_BUDGET + 1;
-export const MAX_SLOW_SHARE = 0.05;
-export const MAX_DROPPED_SHARE = 0.05;
-export const MAX_FRAME = 3 * FRAME_BUDGET + 1;
-export const CPU_SLOWDOWN = 4;
+export const MAX_SLOW_SHARE = 0.03;
+export const MAX_DROPPED_SHARE = 0.03;
+export const MAX_FRAME = 2 * FRAME_BUDGET + 1;
+export const CPU_SLOWDOWN = 2;
 
 export const VIEWPORTS = {
   desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
