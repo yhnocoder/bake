@@ -2,15 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { build } from 'vite';
 import solid from 'vite-plugin-solid';
-import { BAKE_ROOT, outputOf, viteConfig } from '../build/vite.js';
-import { chatModules, isMathJaxModule } from '../components/modules.js';
+import { mathModules, publicModules } from '../bundle/modules.js';
+import { BAKE_ROOT, browserBuild } from '../bundle/vite.js';
 
 export const CHAT_PREAMBLE_PATH = '_bake/preamble.json';
 
 const ENTRY = join(import.meta.dirname, 'entry.js');
-const BUILD_FILES = [import.meta.filename, join(import.meta.dirname, '../components/modules.js'), join(import.meta.dirname, '../build/vite.js'), join(BAKE_ROOT, 'package.json')];
+const BUILD_FILES = [import.meta.filename, join(import.meta.dirname, '../bundle/modules.js'), join(import.meta.dirname, '../bundle/vite.js'), join(BAKE_ROOT, 'package.json')];
 const CACHE_DIR = join(tmpdir(), 'bake-chat');
 const INDEX_FILE = join(CACHE_DIR, `${digest(BAKE_ROOT).slice(0, 16)}.json`);
 const QUERY = /\?.*$/;
@@ -35,32 +34,26 @@ function cachedBundle() {
 }
 
 async function buildBundle() {
-  const result = await build({
-    ...viteConfig([chatModules(`../${CHAT_PREAMBLE_PATH}`), solid()]),
-    base: './',
-    build: {
-      write: false,
-      cssCodeSplit: true,
-      assetsInlineLimit: 0,
-      modulePreload: { polyfill: false },
-      rolldownOptions: {
-        input: { chat: ENTRY },
-        output: {
-          format: 'es',
-          entryFileNames: 'assets/[name]-[hash].js',
-          chunkFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash][extname]',
-          codeSplitting: { groups: [{ name: 'mathjax', test: isMathJaxModule }] },
-        },
-      },
-    },
+  const { entry, files, modules } = await browserBuild({
+    input: { chat: ENTRY },
+    plugins: [mathModules(fetchedPreamble(`../${CHAT_PREAMBLE_PATH}`)), solid()],
+    alias: publicModules('chat'),
+    format: 'es',
   });
-  const outputs = outputOf(result);
-  const entry = outputs.find((output) => output.type === 'chunk' && output.isEntry).fileName;
-  const files = outputs.map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source }));
-  const modules = outputs.flatMap((output) => (output.type === 'chunk' ? output.moduleIds : [])).filter((id) => !id.startsWith('\0'));
-  storeBundle(entry, files, [...new Set([...BUILD_FILES, ...modules.map((id) => id.replace(QUERY, ''))])]);
+  const sources = modules.filter((id) => !id.startsWith('\0')).map((id) => id.replace(QUERY, ''));
+  storeBundle(entry, files, [...new Set([...BUILD_FILES, ...sources])]);
   return { entry, files };
+}
+
+function fetchedPreamble(address) {
+  return [
+    `const path = ${JSON.stringify(address)};`,
+    'const address = new URL(path, import.meta.url);',
+    'const response = await fetch(address);',
+    "if (!response.ok) throw new Error(`${address} answered ${response.status}`);",
+    'export const definitions = await response.json();',
+    '',
+  ].join('\n');
 }
 
 function storeBundle(entry, files, inputs) {
