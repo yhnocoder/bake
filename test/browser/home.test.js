@@ -315,6 +315,30 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
+  await t.test('a stored grouping and column count place the switch thumbs on the chosen buttons before the page script runs, without an animation', async () => {
+    const { context, page } = await open();
+    await page.evaluate(() => {
+      localStorage.setItem('bk-group', 'month');
+      localStorage.setItem('bk-columns', '5');
+    });
+    await page.route('**/assets/*.js', (route) => route.abort());
+    await page.reload();
+    const placed = await page.evaluate(() =>
+      Object.fromEntries(
+        [['group', 'month'], ['columns', '5']].map(([name, value]) => {
+          const options = document.querySelector(`[data-control="${name}"] .bk-switch-options`);
+          const box = getComputedStyle(options, '::before');
+          const chosen = options.querySelector(`[data-value="${value}"]`).getBoundingClientRect();
+          const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(box.transform).m41;
+          return [name, { left: Math.abs(left - chosen.left) < 1, width: Math.abs(parseFloat(box.width) - chosen.width) < 1, animations: options.getAnimations({ subtree: true }).length }];
+        }),
+      ),
+    );
+    assert.deepEqual(placed, { group: { left: true, width: true, animations: 0 }, columns: { left: true, width: true, animations: 0 } });
+    await page.unroute('**/assets/*.js');
+    await context.close();
+  });
+
   await t.test('without scripts the default grouping and its cards are shown and the controls are hidden', async () => {
     const { context, page } = await open({ javaScriptEnabled: false });
     const shown = await page.evaluate(() => ({
