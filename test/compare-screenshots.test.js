@@ -143,14 +143,14 @@ describe('screenshot comparison', () => {
     assert.equal(sheetColumns(area.panels.map((panel) => panel.png.width)), 2);
   });
 
-  test('never cuts a wide panel and fits the image to the description column', () => {
+  test('never cuts a wide panel and fits the image to the report width', () => {
     const [area] = compareShot(ruled(1440, 900), paint(ruled(1440, 900), { left: 0, top: 300, right: 1440, bottom: 320 })).areas;
     assert.deepEqual(area.panels.map((panel) => panel.png.width), [1440, 1440, 1440]);
     assert.equal(sheetColumns([1440, 1440, 1440]), 1);
     assert.ok(sheetWidth([1440, 1440, 1440]) <= maxImageWidth);
   });
 
-  test('puts panels side by side only while the image fits the description column', () => {
+  test('puts panels side by side only while the image fits the report width', () => {
     assert.equal(sheetColumns([200, 200, 200]), 3);
     assert.equal(sheetColumns([375, 375, 375]), 2);
     assert.equal(sheetColumns([375, 375]), 2);
@@ -209,19 +209,19 @@ describe('screenshot comparison', () => {
     const areas = [1, 2].map((index) => ({ left: 0, right: 640, before: rows, after: rows, image: `post.desktop-light.${index}.png` }));
     const changes = [{ ...results[0], colorSchemes: ['light', 'dark'], beforeHeight: 10, afterHeight: 10, areas, hiddenAreas: 0 }];
     const pages = [{ page: 'post', images: [{ name: 'post.desktop.png', label: 'desktop' }] }];
-    const text = summary({ results, changes, pages, hasBase: true, url: (path) => `u/${path}` });
+    const text = summary({ results, changes, pages, hasBase: true });
     assert.equal(text.split('\n')[0], '**2 screenshots of 1 pages: 2 changed.**');
     assert.equal(text.split('\n')[1], '');
     assert.equal(text.match(/<details>/g).length, 3);
     assert.equal(text.match(/<\/details>/g).length, 3);
     assert.match(text, /<summary>Changes on post<\/summary>\n\n\*\*post, desktop, light and dark\*\*: 2 changed areas/);
-    assert.match(text, /Area 2: Rows 0 to 10, columns 0 to 640\.\n\n!\[post desktop\]\(u\/changes\/post\.desktop-light\.2\.png\)/);
+    assert.match(text, /Area 2: Rows 0 to 10, columns 0 to 640\.\n\n!\[post desktop\]\(changes\/post\.desktop-light\.2\.png\)/);
     assert.ok(!text.includes('full/'));
   });
 
   test('says that no page changed and leaves out the changes section', () => {
     const results = [{ ...parseShot('post.mobile-light.png'), status: 'unchanged' }];
-    const text = summary({ results, changes: [], pages: [], hasBase: true, url: (path) => path });
+    const text = summary({ results, changes: [], pages: [], hasBase: true });
     assert.equal(text, '**1 screenshots of 1 pages: 1 unchanged.**\nNo page looks different from the base.\n\n');
   });
 });

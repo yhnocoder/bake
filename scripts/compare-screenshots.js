@@ -22,9 +22,9 @@ const padColor = [128, 128, 128, 255];
 
 if (import.meta.main) await main(process.argv.slice(2));
 
-async function main([baseDir, headDir, outDir, urlPrefix = '', urlSuffix = '']) {
+async function main([baseDir, headDir, outDir]) {
   if (baseDir === undefined || headDir === undefined || outDir === undefined) {
-    console.error('Usage: node scripts/compare-screenshots.js <base dir> <head dir> <output dir> [image URL prefix] [image URL suffix]');
+    console.error('Usage: node scripts/compare-screenshots.js <base dir> <head dir> <output dir>');
     process.exit(2);
   }
   rmSync(outDir, { recursive: true, force: true });
@@ -54,9 +54,8 @@ async function main([baseDir, headDir, outDir, urlPrefix = '', urlSuffix = '']) 
     for (const page of new Set(shots.filter((shot) => shot.status !== 'removed').map((shot) => shot.page))) {
       pages.push({ page, images: await writeOverview(sheet, headDir, outDir, page) });
     }
-    const url = (path) => `${urlPrefix}${path}${urlSuffix}`;
     writeFileSync(join(outDir, 'summary.json'), `${JSON.stringify(shots, null, 2)}\n`);
-    writeFileSync(join(outDir, 'summary.md'), summary({ results: shots, changes, pages, hasBase: existsSync(baseDir), url }));
+    writeFileSync(join(outDir, 'summary.md'), summary({ results: shots, changes, pages, hasBase: existsSync(baseDir) }));
     console.log(countLine(shots));
   } finally {
     await browser.close();
@@ -371,7 +370,7 @@ function countLine(results) {
   return `${results.length} screenshots of ${pages} pages: ${counts.join(', ') || 'none'}`;
 }
 
-export function summary({ results, changes, pages, hasBase, url }) {
+export function summary({ results, changes, pages, hasBase }) {
   const lines = [`**${countLine(results)}.**`];
   if (!hasBase) lines.push('There are no base screenshots, so every screenshot is reported as new.');
   if (changes.length === 0) lines.push('No page looks different from the base.');
@@ -383,7 +382,7 @@ export function summary({ results, changes, pages, hasBase, url }) {
       '',
       ...change.areas.flatMap((area, index) => [
         ...(change.areas.length > 1 ? [`Area ${index + 1}: ${describeArea(area)}`, ''] : []),
-        `![${change.page} ${change.device}](${url(`changes/${area.image}`)})`,
+        `![${change.page} ${change.device}](changes/${area.image})`,
         '',
       ]),
     ])));
@@ -391,7 +390,7 @@ export function summary({ results, changes, pages, hasBase, url }) {
   if (pages.length > 0) {
     lines.push(details(`First screen of ${listPages(pages.map(({ page }) => page))}`, pages.map(({ page, images }) => {
       return details(page, [
-        ...images.flatMap((image) => [`![${page} ${image.label}](${url(`pages/${image.name}`)})`, '']),
+        ...images.flatMap((image) => [`![${page} ${image.label}](pages/${image.name})`, '']),
       ]);
     })));
   }

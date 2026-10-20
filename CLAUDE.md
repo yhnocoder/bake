@@ -17,7 +17,7 @@ Bake is a static site generator for a technical blog with interactive components
 ## Pull requests
 
 - The title says in one sentence what changed.
-- The body has a "Before:" paragraph, an "After:" paragraph, then a short "How". CI adds the Screenshots section, see TESTING.md.
+- The body has a "Before:" paragraph, an "After:" paragraph, then a short "How".
 - Name the Issue Board task the PR belongs to.
 - Add a `Tests: name, name` line to force specific tests in CI.
 
