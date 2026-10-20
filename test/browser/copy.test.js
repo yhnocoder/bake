@@ -93,6 +93,13 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal((await copied(page)).text, sourceLines('- 章节编号', ':::'));
   });
 
+  await t.test('a selection inside the caption of a component gives its block and keeps the figure in the HTML', async () => {
+    await select(page, { selector: `${copyChapter} figcaption`, text: '任何部分' }, { selector: `${copyChapter} figcaption`, text: '整个', after: true });
+    const caption = await copied(page);
+    assert.equal(caption.text, sourceLines(':::act-fn-plot{fn=silu range=6}', ':::'));
+    assert.match(caption.html, /^<figure><figcaption>任何部分，复制的都是它的整个<\/figcaption><\/figure>$/);
+  });
+
   await t.test('a selection inside a list item gives its inline Markdown, and one across items gives list items', async () => {
     await select(page, { selector: `${copyChapter} li`, text: '标题旁的' }, { selector: `${copyChapter} li code`, text: '#', after: true });
     assert.equal((await copied(page)).text, '标题旁的 `#`');

@@ -166,6 +166,7 @@ function blockElement(state, node, context) {
 function componentElement(state, node, context) {
   const { frame, frameWidth, height, narrowHeight } = node.component;
   const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
+  if (context.excerpt === undefined) properties.dataLine = node.position.start.line;
   if (!frame) properties.dataFrame = 'none';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
   const boxStyle = [
