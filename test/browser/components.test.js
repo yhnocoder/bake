@@ -532,17 +532,27 @@ function distinctColors({ data }) {
   return colors.size;
 }
 
-function contentHeights() {
+async function contentHeights() {
   const frames = [...document.querySelectorAll('figure.component[data-height="auto"]')];
   if (frames.length === 0) return ['the page has no component with autoHeight'];
-  return frames.flatMap((frame) => {
+  const problems = [];
+  for (const frame of frames) {
+    frame.scrollIntoView({ block: 'center' });
     const box = frame.querySelector('.component-box');
+    let height = -1;
+    let still = 0;
+    while (still < 10) {
+      await new Promise((done) => requestAnimationFrame(done));
+      still = box.offsetHeight === height ? still + 1 : 0;
+      height = box.offsetHeight;
+    }
     const element = box.firstElementChild;
     const parts = [...element.querySelectorAll('*')].map((part) => part.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
     const bottom = Math.max(...parts.map((rect) => rect.bottom));
     const blank = box.getBoundingClientRect().bottom - bottom;
-    return blank < -1 || blank > 24 || element.scrollHeight > element.clientHeight + 1 ? [`${frame.dataset.component}: the box ends ${Math.round(blank)} pixels below its content`] : [];
-  });
+    if (blank < -1 || blank > 24 || element.scrollHeight > element.clientHeight + 1) problems.push(`${frame.dataset.component}: the box ends ${Math.round(blank)} pixels below its content`);
+  }
+  return problems;
 }
 
 function componentOverflow() {
