@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { isIP, isIPv6 } from 'node:net';
+import { connect, isIP, isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -199,21 +199,38 @@ function sameToken(sent, token) {
 
 async function listen(server, port, host) {
   const last = port === 0 ? 0 : port + PORT_ATTEMPTS - 1;
+  const printsLocalhost = addressHost(host) === 'localhost';
   for (let candidate = port; ; candidate += 1) {
     try {
-      await new Promise((done, fail) => {
-        server.once('error', fail);
-        server.listen(candidate, host, () => {
-          server.off('error', fail);
-          done();
+      if (candidate === 0 || !printsLocalhost || !(await answersOnLocalhost(candidate))) {
+        await new Promise((done, fail) => {
+          server.once('error', fail);
+          server.listen(candidate, host, () => {
+            server.off('error', fail);
+            done();
+          });
         });
-      });
-      return server.address().port;
+        return server.address().port;
+      }
     } catch (error) {
       if (error.code !== 'EADDRINUSE') throw error;
-      if (candidate >= last) throw new Error(`bake dev: ports ${port} to ${last} are all in use, choose another one with --port`);
     }
+    if (candidate >= last) throw new Error(`bake dev: ports ${port} to ${last} are all in use, choose another one with --port`);
   }
+}
+
+// why: the printed localhost address can reach another server on ::1 or on a wildcard address, and macOS lets 127.0.0.1 be bound next to a server on a wildcard address
+async function answersOnLocalhost(port) {
+  const answers = (address) =>
+    new Promise((done) => {
+      const socket = connect({ host: address, port });
+      socket.once('connect', () => {
+        socket.destroy();
+        done(true);
+      });
+      socket.once('error', () => done(false));
+    });
+  return (await Promise.all(['127.0.0.1', '::1'].map(answers))).some(Boolean);
 }
 
 function clientData(root, page, token) {
