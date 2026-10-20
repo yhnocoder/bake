@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 import { article, bake, createBlog } from '../blog.js';
 import { serve } from './server.js';
 
@@ -40,6 +43,30 @@ async function choose(page, name, attribute, value) {
 async function readSettledPage(page) {
   await page.waitForFunction(() => document.body.getAnimations().length === 0);
   return page.evaluate(readPage);
+}
+
+const wenkaiFolder = dirname(createRequire(import.meta.url).resolve('lxgw-wenkai-webfont/lxgwwenkai-regular.css'));
+
+function cjkFontWithThreeWeights() {
+  return [
+    ['light', 300],
+    ['regular', 400],
+    ['bold', 500],
+  ]
+    .map(([file, weight]) =>
+      readFileSync(join(wenkaiFolder, `lxgwwenkai-${file}.css`), 'utf8')
+        .replaceAll("font-family: 'LXGW WenKai'", "font-family: 'PingFang SC'")
+        .replace(/font-weight: \d+/g, `font-weight: ${weight}`)
+        .replaceAll("url('./files/", "url('/__cjk-font/"),
+    )
+    .join('\n');
+}
+
+function darkPixels(png) {
+  const image = PNG.sync.read(png);
+  let count = 0;
+  for (let index = 0; index < image.data.length; index += 4) if (image.data[index] + image.data[index + 1] + image.data[index + 2] < 384) count += 1;
+  return count;
 }
 
 function wenkaiFaces() {
@@ -261,6 +288,34 @@ test('reader settings', async (t) => {
     await page.reload();
     assert.ok((await lightFaces()) > 0, 'a stored light weight with LXGW WenKai declares the light faces without the page script');
     assert.equal((await read()).paragraph[1], '300');
+    await context.close();
+  });
+
+  await t.test('each weight step changes the ink of Chinese body text when the sans stack finds a CJK font with light, regular and medium faces', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+    await context.route('**/__cjk-font/*', (route) => route.fulfill({ path: join(wenkaiFolder, 'files', new URL(route.request().url()).pathname.split('/').pop()), contentType: 'font/woff2' }));
+    const page = await context.newPage();
+    const fontCss = cjkFontWithThreeWeights();
+    const measure = async (weight) => {
+      await page.evaluate((value) => localStorage.setItem('bk-weight', value), weight);
+      await page.reload();
+      await page.addStyleTag({ content: fontCss });
+      const paragraph = page.locator('.bk-article p', { hasText: '门控单元把两路投影逐元素相乘。' });
+      const computed = await paragraph.evaluate(async (element) => {
+        const style = getComputedStyle(element);
+        await document.fonts.load(`${style.fontWeight} ${style.fontSize} "PingFang SC"`, element.textContent);
+        await document.fonts.ready;
+        return style.fontWeight;
+      });
+      await page.waitForFunction(() => document.body.getAnimations().length === 0);
+      return { computed, ink: darkPixels(await paragraph.screenshot()) };
+    };
+    await page.goto(url);
+    const light = await measure('light');
+    const regular = await measure('regular');
+    const bold = await measure('bold');
+    assert.deepEqual([light.computed, regular.computed, bold.computed], ['300', '400', '500']);
+    assert.ok(light.ink < regular.ink && regular.ink < bold.ink, `Chinese body text has ${light.ink}, ${regular.ink} and ${bold.ink} dark pixels at the light, regular and bold steps`);
     await context.close();
   });
 
