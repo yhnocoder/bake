@@ -493,7 +493,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         [start, end],
       );
       await page.evaluate(() => navigator.clipboard.writeText(''));
-      await page.keyboard.press('Control+C');
+      await page.keyboard.press('ControlOrMeta+C');
       return page.evaluate(() => navigator.clipboard.readText());
     };
     const block = (start) => `.bt-card > .bk-block[data-line="${lines.findIndex((line) => line.startsWith(start)) + 1}"]`;

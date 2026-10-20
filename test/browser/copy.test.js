@@ -54,7 +54,7 @@ function select(page, start, end) {
 
 async function copied(page) {
   await page.evaluate(() => navigator.clipboard.writeText(''));
-  await page.keyboard.press('Control+C');
+  await page.keyboard.press('ControlOrMeta+C');
   return page.evaluate(async () => {
     const [item] = await navigator.clipboard.read();
     const read = async (type) => (item.types.includes(type) ? (await item.getType(type)).text() : null);
