@@ -22,6 +22,11 @@ for attempt in 1 2 3 4 5; do
   rm -f "$index"
   if [ -n "$old" ]; then GIT_INDEX_FILE=$index git read-tree "$old"; else GIT_INDEX_FILE=$index git read-tree --empty; fi
   GIT_INDEX_FILE=$index git rm -r --quiet --cached --ignore-unmatch -- "$folder"
+  if [ -n "$old" ]; then
+    git ls-tree -r -d --name-only "$old" pr/ | while read -r path; do
+      if [[ $path =~ ^pr/[^/]+/[^/]+/full$ ]]; then GIT_INDEX_FILE=$index git rm -r --quiet --cached -- "$path"; fi
+    done
+  fi
   GIT_INDEX_FILE=$index git --work-tree="$stage" add --force --all -- "$target"
   tree=$(GIT_INDEX_FILE=$index git write-tree)
   commit=$(git commit-tree "$tree" -m "Screenshots for $target")

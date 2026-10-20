@@ -198,7 +198,7 @@ describe('screenshot comparison', () => {
     const inserted = { left: 300, right: 1140, before: { top: 920, bottom: 1080 }, after: { top: 920, bottom: 1480 } };
     assert.equal(describeArea(inserted), 'Rows 920 to 1080 before and 920 to 1480 after, columns 300 to 1140.');
     assert.equal(describeChange({ status: 'changed', beforeHeight: 3000, afterHeight: 3400, areas: [inserted, inserted, inserted, inserted], hiddenAreas: 2 }),
-      '6 changed areas; the page is 400 pixels taller. The first 4 are shown; the full-page screenshots have the rest.');
+      '6 changed areas; the page is 400 pixels taller. Only the first 4 are shown.');
     assert.equal(describeChange({ status: 'new', afterHeight: 1500, areas: [{ after: { top: 0, bottom: 1200, continues: true } }] }), 'New page, 1500 pixels tall. Shown: the top 1200 rows.');
     assert.equal(describeChange({ status: 'removed', beforeHeight: 900, areas: [{ before: { top: 0, bottom: 900, continues: false } }] }), 'Removed page, 900 pixels tall.');
   });
@@ -216,7 +216,7 @@ describe('screenshot comparison', () => {
     assert.equal(text.match(/<\/details>/g).length, 3);
     assert.match(text, /<summary>Changes on post<\/summary>\n\n\*\*post, desktop, light and dark\*\*: 2 changed areas/);
     assert.match(text, /Area 2: Rows 0 to 10, columns 0 to 640\.\n\n!\[post desktop\]\(u\/changes\/post\.desktop-light\.2\.png\)/);
-    assert.match(text, /Full pages: \[desktop, light\]\(u\/full\/post\.desktop-light\.png\) · \[desktop, dark\]\(u\/full\/post\.desktop-dark\.png\)/);
+    assert.ok(!text.includes('full/'));
   });
 
   test('says that no page changed and leaves out the changes section', () => {
