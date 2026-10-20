@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 
@@ -13,7 +13,8 @@ let builtExample = null;
 export const validConfig = "export default { title: 'Test Blog', url: 'https://example.com', language: 'en' };\n";
 
 export function createBlog(t, files) {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-blog-'));
+  // why: a process started in the folder sees it with symbolic links resolved, as macOS resolves /var to /private/var
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'bake-blog-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFiles(dir, files);
   return dir;

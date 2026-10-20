@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
@@ -29,6 +30,16 @@ async function eventually(check, message) {
   }
 }
 
+// why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the file is written until bake dev serves it
+async function watching(dir, get) {
+  const deadline = Date.now() + 10000;
+  while ((await get('/2026-10/rope/')).status !== 200) {
+    assert.ok(Date.now() < deadline, 'bake dev did not serve the new article, so it does not watch the blog');
+    writeFiles(dir, { 'content/posts/rope/index.md': article() });
+    await wait(200);
+  }
+}
+
 async function start(t, dir, options = {}) {
   const lines = [];
   const server = await startDevServer(dir, { port: 0, print: (text) => lines.push(...text.split('\n')), ...options });
@@ -53,10 +64,11 @@ describe('bake dev', () => {
     assert.deepEqual(lines.slice(1), [`Serving the blog at http://localhost:${server.port}/`]);
   });
 
-  test('prints a loopback address other than 127.0.0.1 as it is, because localhost does not reach it', async (t) => {
+  test('prints an address other than a loopback or wildcard address as it is, because localhost does not reach it', async (t) => {
+    const host = Object.values(networkInterfaces()).flat().find((address) => address.family === 'IPv4' && !address.internal).address;
     const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const { server, lines } = await start(t, dir, { host: '127.0.0.5' });
-    assert.ok(lines.includes(`Serving the blog at http://127.0.0.5:${server.port}/`), lines.join('\n'));
+    const { server, lines } = await start(t, dir, { host });
+    assert.ok(lines.includes(`Serving the blog at http://${host}:${server.port}/`), lines.join('\n'));
   });
 
   test('listens on the loopback address by default and prints only the local address', async (t) => {
@@ -251,7 +263,8 @@ describe('bake dev', () => {
 
   test('stops with a message when the blog folder can no longer be watched', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const { server } = await start(t, dir);
+    const { server, get } = await start(t, dir);
+    await watching(dir, get);
     rmSync(dir, { recursive: true });
     assert.equal(await server.stopped, `bake dev: cannot watch ${dir}: the folder no longer exists`);
     await assert.rejects(fetch(server.url));

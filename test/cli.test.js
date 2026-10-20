@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { cli, createBlog, validConfig } from './blog.js';
+import { article, cli, createBlog, validConfig, writeFiles } from './blog.js';
 
 function bake(...args) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
@@ -84,11 +84,16 @@ describe('bake cli', () => {
     t.after(() => child.kill());
     let output = '';
     let errors = '';
+    let writing = null;
     let removed = false;
+    t.after(() => clearInterval(writing));
     child.stdout.on('data', (chunk) => {
       output += chunk;
-      if (!removed && /Serving the blog at /.test(output)) {
+      // why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the file is written until bake dev reports it
+      if (writing === null && /Serving the blog at /.test(output)) writing = setInterval(() => writeFiles(dir, { 'content/posts/rope/index.md': article() }), 200);
+      if (!removed && /^Updated /m.test(output)) {
         removed = true;
+        clearInterval(writing);
         remove(dir);
       }
     });
