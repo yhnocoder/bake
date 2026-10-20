@@ -180,13 +180,30 @@ test('reader settings', async (t) => {
       await page.goto(url);
       shadows[colorScheme] = await page.evaluate(() => [
         getComputedStyle(document.querySelector('.bk-settings-toggle')).boxShadow,
-        getComputedStyle(document.querySelector('.bk-settings-options button[aria-pressed="true"]')).boxShadow,
+        getComputedStyle(document.querySelector('.bk-settings-options button[aria-pressed="true"]'), '::before').boxShadow,
         getComputedStyle(document.querySelector('.bk-settings-switch i'), '::after').boxShadow,
       ]);
       await page.close();
     }
     const shared = ['button', 'option', 'switch'].map((name, index) => [name, sharedShadowLayers(shadows.light[index], shadows.dark[index])]);
     assert.deepEqual(shared, [['button', []], ['option', []], ['switch', []]]);
+  });
+
+  await t.test('the chosen theme and font options fade in a layer and animate no shadow or background', async () => {
+    const page = await browser.newPage();
+    await page.goto(url);
+    const styles = await page.evaluate(() => {
+      const options = [...document.querySelectorAll('.bk-settings-options button')];
+      const chosen = options.find((button) => button.getAttribute('aria-pressed') === 'true');
+      const other = options.find((button) => button.getAttribute('aria-pressed') === 'false');
+      return {
+        button: getComputedStyle(chosen).transitionProperty,
+        layer: getComputedStyle(chosen, '::before').transitionProperty,
+        opacity: [getComputedStyle(chosen, '::before').opacity, getComputedStyle(other, '::before').opacity],
+      };
+    });
+    assert.deepEqual(styles, { button: 'color', layer: 'opacity', opacity: ['1', '0'] });
+    await page.close();
   });
 
   await t.test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async () => {

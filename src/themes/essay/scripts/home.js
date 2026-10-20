@@ -130,7 +130,9 @@ function startCurrentChip(home) {
 }
 
 function choose(name, value) {
+  const values = [...document.querySelectorAll(`.bk-switch[data-control="${name}"] button`)].map((button) => button.dataset.value);
   document.documentElement.dataset[name] = value;
+  document.documentElement.style.setProperty(`--${name}-index`, values.indexOf(value));
   try {
     localStorage.setItem(storageKey(name), value);
   } catch {}
