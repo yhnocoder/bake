@@ -404,7 +404,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | No comments except `why: <reason>` | `scripts/check_comment.py`, tested by `test/check-comment.test.js` |
 | The directories of `src/` import each other without a cycle, only `src/cli.js` and `src/dev/` import `src/build/`, and the modules that run in the browser import no `node:` module | `test/layers.test.js` |
 | CLI output is English and lists the commands, and `bake dev` reports a missing `bake.config.js`, prints its address, accepts `--port` and `--host` in either order, reports wrong, repeated or unknown options with the usage line, prints the addresses on the local network only for a wildcard host, stops on an interrupt and exits with a message when it can no longer watch the blog | `test/cli.test.js` |
-| Every width media query in Bake's styles uses a breakpoint of `screens.js` or the phone screen width of 600 pixels | `test/theme-styles.test.js` |
+| Every width media query in Bake's styles uses a breakpoint of `screens.js` or the phone screen width of 600 pixels, and every `--layer-…` variable that the styles use is defined | `test/theme-styles.test.js` |
 | Published files get their media types from `mime`, with the UTF-8 charset for text | `test/content-types.test.js` |
 | Errors are reported as `file:line:col message`, all in one run, sorted, with the count line, and a build with errors leaves `dist/` unchanged | `test/build.test.js` |
 | Every `bake.config.js` and front matter error states its exact position | `test/config.test.js`, `test/front-matter.test.js` |
