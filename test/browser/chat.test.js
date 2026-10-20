@@ -882,6 +882,11 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
   });
 
+});
+
+test('the shadows and the speed of the AI chat on published pages', async (t) => {
+  const base = await buildExample(t);
+
   await t.test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async (t) => {
     const seen = {};
     for (const colorScheme of ['light', 'dark']) {
@@ -969,6 +974,11 @@ test('the AI chat on published pages', async (t) => {
       assert.ok(long[width] <= 80, report);
     }
   });
+
+});
+
+test('the pets and the colours of the AI chat on published pages', async (t) => {
+  const base = await buildExample(t);
 
   await t.test('a reader chooses a pet by the link of its pet.json, and a pet.json or a sheet that is too large or a sheet with the wrong size leaves the pet unchanged', async (t) => {
     const { page, api } = await openBrowser(t, base);
