@@ -400,6 +400,7 @@ describe('bake build', () => {
         if (typeof properties.href === 'string') check('href', properties.href);
         if (typeof properties.srcSet === 'string') for (const candidate of properties.srcSet.split(',')) check('srcset', candidate.trim().split(/\s+/)[0]);
         if (typeof properties.dataPreview === 'string') check('data-preview', properties.dataPreview);
+        if (node.tagName === 'meta' && (properties.property === 'og:image' || properties.name === 'twitter:image')) check('og:image', properties.content);
         if (properties.dataComponent === 'x-plot' && JSON.parse(properties.dataParams).points !== '') check('data-params', JSON.parse(properties.dataParams).points);
         for (const child of [...(node.children ?? []), ...(node.content?.children ?? [])]) visit(child);
       };
@@ -414,6 +415,8 @@ describe('bake build', () => {
       '2026-10/files/index.html href c%251.js',
       '2026-10/files/index.html data-params a%231.png',
       '2026-10/files/index.html data-params b%3F1.json',
+      '2026-10/files/index.html og:image https://example.com/og/2026-10/files-',
+      '2026-10/host/index.html og:image https://example.com/og/2026-10/host-',
       '2026-10/host/index.html src d%20e.svg',
       '2026-10/host/index.html src ../../2026-10/files/a%231.webp',
       '2026-10/host/index.html href ../../2026-10/files/b%3F1.json',
