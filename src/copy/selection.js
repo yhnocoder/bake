@@ -1,6 +1,5 @@
-import { MarkdownWriter, NOTE, UI, isUi, sidenoteElement } from './markdown.js';
+import { MarkdownWriter, NOT_CONTENT, isUi, sidenoteElement } from './markdown.js';
 
-const REMOVED_FROM_HTML = `${UI}, ${NOTE}, .component-box, .embed-source, script, template, button, input, svg`;
 const KEPT_ELEMENTS = new Set(
   'p h1 h2 h3 h4 h5 h6 ul ol li blockquote pre code table thead tbody tfoot tr th td figure figcaption img a strong b em i mark del s sup sub br hr cite kbd'.split(' '),
 );
@@ -80,7 +79,7 @@ function cleanHtml(root, numbers) {
     paragraph.textContent = `$$${tex}$$`;
     math.replaceWith(paragraph);
   }
-  for (const element of root.querySelectorAll(REMOVED_FROM_HTML)) element.remove();
+  for (const element of root.querySelectorAll(NOT_CONTENT)) element.remove();
   for (const reference of root.querySelectorAll('sup.sidenote-ref[data-sidenote]')) {
     const number = reference.dataset.sidenote;
     if (!numbers.includes(number)) numbers.push(number);

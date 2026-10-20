@@ -514,6 +514,8 @@ def silu(x):
 | 脚注没有定义 | `[^gemm]` 没有对应的 `[^gemm]:` | `footnote "gemm" has no definition` |
 | 引用了列表里没有的文献 | `[@vaswani2017]` | `citation "vaswani2017" is not in :::references` |
 | 引用了不存在的公式编号 | `\eqref{eq:fnn}` | `\eqref{eq:fnn} refers to an unknown \label` |
+| 公式标签里有空格 | `\label{eq ffn}` | `\label{eq ffn} has a space; a label name has no spaces, for example \label{eq:ffn}` |
+| 标签写在公式环境外面 | `\end{align}` 后面写 `\label{eq:ffn}` | `\label{eq:ffn} is outside the environment of its equation; write it inside \begin{…} and \end{…}, on the line it labels` |
 | list-table 各行单元格数不同 | 第二行只有两个单元格 | `list-table row 2 has 2 cells, the header row has 3` |
 | 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
 | 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |

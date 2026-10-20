@@ -7,6 +7,7 @@ const ATTRIBUTE_NAME = /^[A-Za-z_][\w-]*$/;
 export const UI = '[data-ui]';
 
 export const NOTE = '[data-sidenote][data-line]';
+export const NOT_CONTENT = `${UI}, ${NOTE}, .component-box, .embed-source, script, template, button, input, svg`;
 const UNIT = '[data-line][data-end-line]';
 const ATOMIC = 'mjx-container, img, svg, input, .component-box';
 const INLINE_LEAF = 'p, h1, h2, h3, h4, h5, h6, td, th, figcaption, summary, li, dt, dd';
@@ -201,7 +202,7 @@ export class MarkdownWriter {
   }
 
   inlineElement(element) {
-    if (element.matches(UI) || element.matches(NOTE) || element.matches('.component-box, svg, script, template, input')) return [];
+    if (element.matches(NOT_CONTENT)) return [];
     if (element.matches('mjx-container[data-tex]')) return [{ type: 'inlineMath', value: element.dataset.tex.trim() }];
     if (element.matches('sup.sidenote-ref[data-sidenote]')) {
       const label = this.addNote(element.dataset.sidenote);

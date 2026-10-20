@@ -20,6 +20,8 @@ const markdownFixtures = [
   'undefined-footnote.md',
   'missing-citation.md',
   'unknown-eqref.md',
+  'label-space.md',
+  'label-outside-environment.md',
   'list-table-cell-count.md',
   'image-width-tier.md',
   'unknown-component-parameter.md',
@@ -226,6 +228,10 @@ describe('attributes', () => {
     assert.equal(writeAttributes({ range: 6 }), '{range=6}');
     assert.equal(writeAttributes({}), '');
   });
+
+  test('refuses to write a value that holds both quote characters, which the attribute syntax cannot hold', () => {
+    assert.throws(() => writeAttributes({ title: `say "it's"` }), /the attribute title cannot be written/);
+  });
 });
 
 describe('writing Markdown', () => {
@@ -295,6 +301,27 @@ describe('writing Markdown', () => {
     assert.deepEqual(article.sections[0].blocks.map((block) => block.type), ['paragraph', 'paragraph', 'paragraph', 'fold', 'list-table', 'references', 'math']);
     assert.equal(outline(article.sections[0].blocks[1].html), '<p>a ==b== \\eqref{x} [@key] a * b *c*</p>');
     assert.equal(outline(article.sections[0].blocks[2].html), '<p>:::fold</p>');
+  });
+
+  test('escapes a paragraph that ends like a paragraph anchor and a heading that ends like attributes, so the text renders unchanged', async () => {
+    const tree = {
+      type: 'root',
+      children: [
+        { type: 'heading', depth: 2, children: [text('Title {x}')] },
+        paragraph(text('see note ^b')),
+        { type: 'heading', depth: 3, children: [text('Kept {y}')], attributes: { id: 'kept' } },
+        paragraph(text('a ^b c')),
+      ],
+    };
+    const markdown = serializeMarkdown(tree);
+    assert.equal(markdown, '## Title \\{x}\n\nsee note \\^b\n\n### Kept {y} {#kept}\n\na ^b c\n');
+    const { article, errors } = await parse(markdown);
+    assert.deepEqual(errors, []);
+    assert.equal(article.sections[0].title, 'Title {x}');
+    assert.deepEqual(
+      article.sections[0].blocks.map((block) => outline(block.html)),
+      ['<p>see note ^b</p>', '<h3 id="kept" data-attributes="{&#x22;id&#x22;:&#x22;kept&#x22;}">Kept {y}</h3>', '<p>a ^b c</p>'],
+    );
   });
 
   test('escapes every asterisk of a run next to text, also in strong text, next to an escaped character and in a table cell, so the text renders unchanged', async () => {
@@ -390,6 +417,18 @@ describe('aside and fold', () => {
     const article = await parsed(':::aside\n```markdown\n:::\n```\n~~~~\n:::\n~~~\n:::\n~~~~\n:::\n\n## After\n');
     assert.equal(outline(article.intro[0].html), '<aside class="aside">\n```markdown\n:::\n```\n```\n:::\n~~~\n:::\n```\n</aside>');
     assert.deepEqual(article.sections.map((section) => section.id), ['after']);
+  });
+
+  test('closes a block after a code fence that a list item or an HTML block ends', async () => {
+    const article = await parsed(':::aside\n- a\n\n  ```\n  code\n- b\n:::\n\n:::fold{title=x}\n<div>\n```\n</div>\n:::\n\nAfter.\n');
+    assert.deepEqual(
+      article.intro.map((block) => [block.type, block.line, block.endLine]),
+      [
+        ['aside', 7, 13],
+        ['fold', 15, 19],
+        ['paragraph', 21, 21],
+      ],
+    );
   });
 
   test('reads a code fence inside a block only with up to three spaces of indentation, so indented code does not hide the closing line', async () => {
