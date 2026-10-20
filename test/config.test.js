@@ -72,22 +72,24 @@ describe('bake.config.js', () => {
     }
   });
 
-  test('reports a syntax error, an error thrown while importing, a CommonJS package.json and a default export that is not an object', (t) => {
+  test('reports a syntax error, an error thrown while importing, a package.json that is CommonJS or has no type, and a default export that is not an object', (t) => {
     assert.deepEqual(problems(t, { 'bake.config.js': 'export default {\n  title: ,\n};\n' }), ['bake.config.js:2:10 Unexpected token']);
     assert.deepEqual(problems(t, { 'bake.config.js': 'export default { title: missingName };\n' }), ['bake.config.js:1:1 missingName is not defined']);
     assert.deepEqual(problems(t, { 'package.json': '{ "type": "commonjs" }\n', 'bake.config.js': `export default { ${base} };\n` }), [
-      'bake.config.js:1:1 bake.config.js is an ES module, but package.json sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there or remove the field',
+      'bake.config.js:1:1 bake.config.js is an ES module, but package.json sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there',
+    ]);
+    assert.deepEqual(problems(t, { 'package.json': '{ "private": true }\n', 'bake.config.js': `export default { ${base} };\n` }), [
+      'bake.config.js:1:1 bake.config.js is an ES module, but package.json has no "type" field, so Node prints a warning while it detects that the file is an ES module; set "type": "module" there',
     ]);
     assert.deepEqual(problems(t, { 'bake.config.js': "const name = 'blog';\nexport default name;\n" }), ['bake.config.js:2:1 the default export of bake.config.js must be an object, got "blog"']);
     assert.deepEqual(problems(t, { 'bake.config.js': 'export const title = 1;\n' }), ['bake.config.js:1:1 the default export of bake.config.js must be an object, got undefined']);
   });
 
-  test('reads bake.config.js next to a package.json with "type": "module" or without a type', (t) => {
-    for (const packageJson of ['{ "type": "module" }\n', '{ "private": true }\n']) {
-      const result = bake(createBlog(t, { 'package.json': packageJson, 'bake.config.js': `export default { ${base} };\n` }), 'build');
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(result.stdout, '0 pages\ndist/ written\n');
-    }
+  test('reads bake.config.js next to a package.json with "type": "module" and prints nothing to stderr', (t) => {
+    const result = bake(createBlog(t, { 'package.json': '{ "type": "module" }\n', 'bake.config.js': `export default { ${base} };\n` }), 'build');
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(result.stdout, '0 pages\ndist/ written\n');
   });
 
   test('reports missing fields, nested values, unknown fields and reused category ids at their own position', (t) => {

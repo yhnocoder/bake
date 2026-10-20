@@ -40,8 +40,10 @@ export async function loadBakeConfig(root, themes, optionProblem, errors) {
     return null;
   }
   const packageFile = nearestPackageFile(root);
-  if (packageFile && packageType(packageFile) === 'commonjs') {
-    errors.push(errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} is an ES module, but ${relative(root, packageFile)} sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there or remove the field`));
+  const type = packageFile === null ? 'module' : packageType(packageFile);
+  if (type !== 'module') {
+    const reason = type === undefined ? 'has no "type" field, so Node prints a warning while it detects that the file is an ES module' : `sets "type": ${JSON.stringify(type)}, so Node reads it as CommonJS`;
+    errors.push(errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} is an ES module, but ${relative(root, packageFile)} ${reason}; set "type": "module" there`));
     return null;
   }
   let exported;

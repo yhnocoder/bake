@@ -14,7 +14,7 @@ npm pkg set type=module
 npx playwright install chromium
 ```
 
-`bake init` creates no `package.json`; `npm install` creates it. `bake.config.js` is an ES module, so the blog's `package.json` sets `"type": "module"`. The last command downloads the Chromium build that `bake build` uses to draw share images, see [Share images](#share-images). Inside the blog, `npx bake <command>` runs the installed version, and the commands below can also be added to the `scripts` of `package.json`.
+`bake init` creates no `package.json`; `npm install` creates it. `bake.config.js` is an ES module, so the blog's `package.json` sets `"type": "module"`; Bake reports an error when the nearest `package.json` sets another type or none. The last command downloads the Chromium build that `bake build` uses to draw share images, see [Share images](#share-images). Inside the blog, `npx bake <command>` runs the installed version, and the commands below can also be added to the `scripts` of `package.json`.
 
 ## Commands
 
