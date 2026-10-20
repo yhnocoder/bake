@@ -1108,3 +1108,14 @@ html[data-script] .bk-toc-chapters {
     visibility: hidden;
   }
 }
+
+@media (max-width: 999.98px) and (prefers-reduced-motion: reduce) {
+  :is(.bk-toc-handle, .bk-settings) {
+    transition-property: opacity, visibility !important;
+    transition-duration: 0.2s !important;
+  }
+
+  html:is(.bk-drawer-open, .bk-buttons-hidden) :is(.bk-toc-handle, .bk-settings) {
+    transform: none;
+  }
+}

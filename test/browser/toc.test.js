@@ -442,8 +442,14 @@ test('the table of contents', async (t) => {
   await t.test('on phones scrolling down hides the buttons, scrolling up shows them, and the setting turns this off', async () => {
     const { page, context } = await open({ viewport: { width: 375, height: 760 }, hasTouch: true });
     const hidden = () => page.evaluate(() => document.documentElement.classList.contains('bk-buttons-hidden'));
-    const shown = () =>
-      page.evaluate(() => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].map((element) => element.getBoundingClientRect().left >= 0 && getComputedStyle(element).opacity === '1'));
+    const placed = (opacity) =>
+      page
+        .waitForFunction(
+          (value) => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].every((element) => element.getBoundingClientRect().left >= 0 && getComputedStyle(element).opacity === value),
+          opacity,
+          { timeout: 2000 },
+        )
+        .then(() => true, () => false);
     const focusable = () =>
       page.evaluate(() =>
         [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings-toggle')].map((element) => {
@@ -460,14 +466,16 @@ test('the table of contents', async (t) => {
       }
       await settle(page);
     };
-    assert.deepEqual(await shown(), [true, true]);
+    assert.equal(await placed('1'), true);
     await scrollBy(600);
     assert.equal(await hidden(), true);
-    assert.deepEqual(await page.evaluate(() => document.querySelector('.bk-toc-handle').getBoundingClientRect().right <= 0), true);
+    assert.equal(await placed('0'), true);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle')).transitionDuration), '0.2s');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden');
     assert.deepEqual(await focusable(), [false, false]);
     await scrollBy(-200);
     assert.equal(await hidden(), false);
-    assert.deepEqual(await shown(), [true, true]);
+    assert.equal(await placed('1'), true);
     assert.deepEqual(await focusable(), [true, true]);
     await scrollBy(600);
     await page.evaluate(() => scrollTo(0, 0));
@@ -482,7 +490,7 @@ test('the table of contents', async (t) => {
     await page.mouse.click(300, 200);
     await scrollBy(800);
     assert.equal(await hidden(), false);
-    assert.deepEqual(await shown(), [true, true]);
+    assert.equal(await placed('1'), true);
     await context.close();
   });
 
