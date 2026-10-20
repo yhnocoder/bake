@@ -205,6 +205,7 @@ function createControl(param, declaration, value, change) {
     }
     const digits = decimals(step, min, max);
     slider?.addEventListener('input', () => {
+      fill(slider);
       const next = Number(Number(slider.value).toFixed(digits));
       number.value = String(next);
       wrapper.removeAttribute('data-invalid');
@@ -215,12 +216,18 @@ function createControl(param, declaration, value, change) {
       const valid = number.value.trim() !== '' && Number.isFinite(next) && !(min !== undefined && next < min) && !(max !== undefined && next > max);
       wrapper.toggleAttribute('data-invalid', !valid);
       if (!valid) return;
-      if (slider !== null) slider.value = String(next);
+      if (slider !== null) {
+        slider.value = String(next);
+        fill(slider);
+      }
       change(next);
     });
     control.set = (next) => {
       number.value = String(next);
-      if (slider !== null) slider.value = String(next);
+      if (slider !== null) {
+        slider.value = String(next);
+        fill(slider);
+      }
       wrapper.removeAttribute('data-invalid');
     };
   } else if (declaration.type === 'enum') {
@@ -254,6 +261,11 @@ function createControl(param, declaration, value, change) {
   }
   control.set(value);
   return control;
+}
+
+function fill(slider) {
+  const share = (Number(slider.value) - Number(slider.min)) / (Number(slider.max) - Number(slider.min));
+  slider.style.setProperty('--fill', `${Math.min(1, Math.max(0, share)) * 100}%`);
 }
 
 function decimals(step, min, max) {
