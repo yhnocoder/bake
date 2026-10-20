@@ -2,7 +2,7 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article in the `essay` theme. `bake dev` serves the same pages and the homepage and updates them on every save. The `bento` theme, the table of contents styles other than `notes` and components are not built yet.
+> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
 
 ## Commands
 
@@ -80,7 +80,7 @@ export default {
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
 | `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
-| `bento` | no | `{ columns }`: number of card columns in the `bento` theme, a positive integer. The default is 4. |
+| `bento` | no | `{ columns }`: number of card columns in the `bento` theme on wide screens, an integer from 1 to 6. The default is 4. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
 
@@ -111,7 +111,7 @@ tags: [LLM]
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of a PNG, JPEG, GIF, WebP, AVIF or SVG image in the article folder that becomes the share image in place of the card Bake draws, see [Share images](#share-images). |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
-| `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. |
+| `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. It has no effect in the `bento` theme, which has no table of contents. |
 | `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
 | `page` | no | Path of an HTML file in the article folder. Bake publishes the folder unchanged and serves this file as the article's `index.html`. An `index.md` with `page` has no text after the front matter. |
 
@@ -134,7 +134,7 @@ Braces at the end of a heading set its attributes:
 | Attribute | Meaning |
 |---|---|
 | `#id` | The anchor of the heading. Without it, the anchor is made from the heading text. |
-| `toc` | A shorter title for the table of contents. |
+| `toc` | A shorter title for the table of contents. It has no effect in the `bento` theme. |
 | `width` | Only for `##` headings: the card width of the section in the `bento` theme, `body`, `wide` or `page`. |
 
 A paragraph that ends with `^name` gets the anchor `name`; the marker is not shown. Two anchors with the same name in one article are an error.
@@ -159,7 +159,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 |---|---|
 | `:::aside{title="Notation"}` | A callout. The title is optional. |
 | `:::fold{title="Derivation"}` | A collapsed part that opens when the reader clicks its title. The title is required. |
-| `:::recap` | The summary of the current `##` or `###` section. It is not shown in the text. The `notes` table of contents shows it under the section once the reader has read it, and the cards of the other styles and the phone drawer show it under the section title. A section without a recap shows the first sentence of its first paragraph there instead. A section has at most one. |
+| `:::recap` | The summary of the current `##` or `###` section. In the `essay` theme it is not shown in the text. The `notes` table of contents shows it under the section once the reader has read it, and the cards of the other styles and the phone drawer show it under the section title. A section without a recap shows the first sentence of its first paragraph there instead. The `bento` theme has no table of contents and shows the recap under the title of the card or under the `###` heading. A section has at most one. |
 | `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
 | `:::list-table` | A table written as a nested list, see below. |
 | `:::example` | Shows the Markdown source of its content next to the result, see below. |
@@ -228,7 +228,7 @@ The activation can run in the GEMM epilogue[^gemm].
 [^gemm]: The epilogue is the stage of a matrix multiplication kernel that processes each result element.
 ```
 
-`[@key]` cites an entry of `:::references`. Citations are numbered by their first appearance, and entries that are never cited are listed after the numbered ones without a number. The `essay` theme shows the list under the label References, or 参考文献 on a Chinese site, unless the block directly follows a heading:
+`[@key]` cites an entry of `:::references`. Citations are numbered by their first appearance, and entries that are never cited are listed after the numbered ones without a number. The `essay` and `bento` themes show the list under the label References, or 参考文献 on a Chinese site, unless the block directly follows a heading:
 
 ```markdown
 Gated variants lower the loss [@shazeer2020].
@@ -250,7 +250,7 @@ The backward pass follows the [chain rule](/2026-07/matrix-calculus/#chain-rule)
 
 Bake checks every internal link after it has read all articles. A link to an article or an anchor that does not exist is an error. When an article with the same slug exists under another month, the error gives its current address, because such a link usually broke when the date of the article changed; the address of a draft is never given. An address written without the trailing slash or with `index.html`, such as `/2026-07/matrix-calculus` or `/2026-07/matrix-calculus/index.html#chain-rule`, is an error that gives the address to write. A query string is kept in the link and does not change the check. A link from a published article to a draft is an error. A link to an anchor on the same page, such as `[see above](#act-fns)`, may name the same kinds of anchors and must exist in the article. Addresses with a scheme, such as `https://…`, are not checked. Bake writes internal links relative to the page, so the site also works when it is published under a sub-path.
 
-In the `essay` theme, when the reader rests the pointer on an internal link or moves the keyboard focus to it, a card shows the title of the target article, the number and title of the section, and the content at the target with its formulas: the first paragraphs of a section, the paragraph, the formula of an equation or the text of a sidenote. A link to a reference entry shows the entry, as a citation does. A click on the card opens the target. On a touch screen there is no card, and a tap on the link opens the target.
+In the `essay` and `bento` themes, when the reader rests the pointer on an internal link or moves the keyboard focus to it, a card shows the title of the target article, the number and title of the section, and the content at the target with its formulas: the first paragraphs of a section, the paragraph, the formula of an equation or the text of a sidenote. A link to a reference entry shows the entry, as a citation does. A click on the card opens the target. On a touch screen there is no card, and a tap on the link opens the target.
 
 ### Embedding other articles
 
@@ -342,7 +342,9 @@ The `essay` theme has four table of contents styles, which `toc` selects:
 
 A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
-A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The browser remembers these choices, and the page applies them before it is first shown.
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 2 from 600 to 1339 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. Cards keep the order of the article, so a row ends with a gap when the next card does not fit into it, and each card is as tall as its content. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it.
+
+A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
 A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, plus a `home.jsx` for the homepage when `bake.config.js` selects it as the site theme, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
 

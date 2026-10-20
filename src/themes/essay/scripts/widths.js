@@ -48,7 +48,7 @@ function resolveWidths(article, blocks) {
   for (const block of auto) block.dataset.resolved = needsWide.has(block) && wide > body + 0.5 ? 'wide' : 'body';
 }
 
-function naturalWidth(block) {
+export function naturalWidth(block) {
   const selector = NATURAL_WIDTH_HOSTS[block.dataset.type];
   const host = (selector === undefined ? null : block.querySelector(selector)) ?? block;
   const width = lengthIn(host, 'var(--natural-width)');
@@ -67,7 +67,7 @@ function lengthIn(host, length) {
   return width;
 }
 
-function overflows(block) {
+export function overflows(block) {
   return [block, ...block.querySelectorAll(SCROLLERS)].some((element) => element.scrollWidth > element.clientWidth + 1);
 }
 
