@@ -504,7 +504,7 @@
     left: 10px;
   }
 
-  .bk-toc-ui:has(.bk-toc-handle) ~ * .bk-settings-panel {
+  :root:has(.bk-toc-handle) .bk-settings-panel {
     bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
   }
 }
