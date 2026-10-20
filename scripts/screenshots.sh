@@ -36,5 +36,5 @@ if [ -n "$base_ref" ]; then
   fi
 fi
 
-node scripts/compare-screenshots.js "$out/base" "$out/head" "$out/report" "${SCREENSHOT_URL_PREFIX:-}" "${SCREENSHOT_URL_SUFFIX:-}"
+node scripts/compare-screenshots.js "$out/base" "$out/head" "$out/report"
 echo "Report: $out/report/summary.md"
