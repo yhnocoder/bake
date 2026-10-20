@@ -2,7 +2,19 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake init`, `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
+## Installation
+
+Bake needs Node.js 24 or later. It is published on npm as `@yhnocoder/bake` and is installed in each blog as a development dependency. To start a new blog:
+
+```bash
+npx @yhnocoder/bake init my-blog
+cd my-blog
+npm install --save-dev @yhnocoder/bake
+npm pkg set type=module
+npx playwright install chromium
+```
+
+`bake init` creates no `package.json`; `npm install` creates it. `bake.config.js` is an ES module, so the blog's `package.json` sets `"type": "module"`. The last command downloads the Chromium build that `bake build` uses to draw share images, see [Share images](#share-images). Inside the blog, `npx bake <command>` runs the installed version, and the commands below can also be added to the `scripts` of `package.json`.
 
 ## Commands
 
@@ -329,7 +341,7 @@ The cache step is optional: it keeps the Chromium download between runs, and `np
 
 Every article page and the homepage show a small animated pet in the bottom right corner. Clicking the pet opens a chat with DeepSeek: an input field and the latest messages appear as bubbles to the left of the pet. The answers of the model are on the right and the questions of the reader on the left. Escape, a click outside the chat or a second click on the pet closes it. On an article page a question is about that article, whose Markdown source goes with every question, and the model can also read other articles of the blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. Typing `@` in the input field opens a list of articles, months, categories and tags; the reader picks one or more of them to limit the question to those articles. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, and formulas are typeset with the macros of `preamble.sty`. A settings button in the input field starts a new chat, turns DeepSeek's thinking mode on and off, changes or clears the key and chooses another pet.
 
-There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
+There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. The reader unlocks the key with Touch ID, Windows Hello or a security key. The browser then keeps the decryption key, which scripts cannot read out, in the site's storage for 30 days, so the pages of the site use the API key without asking again during that time. Saving or unlocking the key starts the 30 days again, and clearing the key in the chat settings forgets both. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
 
 Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads when the reader sends the first question or types `@`. A page without scripts shows nothing of the chat.
 
@@ -381,8 +393,8 @@ The `bento` theme lays the same Markdown out as a grid of cards, one card per `#
 
 A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
-A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, plus a `home.jsx` for the homepage when `bake.config.js` selects it as the site theme, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
+A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/`, and an article or `bake.config.js` selects it by the folder name. Every theme has a `page.jsx` for article pages and a `client.jsx` for the page script. The site theme, the one `theme` in `bake.config.js` names, also has a `home.jsx` for the homepage, a `not-found.jsx` for the 404 page and a `theme.css`, which Bake publishes as `_bake/theme.css`. A `fonts.css` with `@font-face` rules and an `options.js` with the theme's options are optional. A file in `themes/essay/` or `themes/bento/` replaces the file with the same path in the built-in theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest.
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands. `make example` builds the example blog in `examples/blog/` and serves it at http://localhost:8000/, and `make dev` runs `bake dev` on the example blog.
+[CLAUDE.md](CLAUDE.md) holds the rules for changes to Bake, and [TESTING.md](TESTING.md) says how to run the tests. `make example` builds the example blog in `examples/blog/` and serves it at the address it prints, and `make dev` runs `bake dev` on the example blog.
