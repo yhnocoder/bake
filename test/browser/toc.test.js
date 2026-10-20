@@ -136,9 +136,10 @@ async function restingBox(locator) {
     await Promise.all(
       texts.map((element) => {
         const style = getComputedStyle(element);
-        return document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`, element.textContent);
+        return document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`, element.textContent).catch(() => {});
       }),
     );
+    await document.fonts.ready;
     let last = '';
     let since = performance.now();
     while (performance.now() - since < 500) {
