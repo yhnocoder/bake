@@ -344,7 +344,7 @@ test('the table of contents', async (t) => {
     for (const colorScheme of ['light', 'dark']) {
       const desk = await open({ style: 'tabs', colorScheme });
       await scrollToHeading(desk.page, 'chapter-2');
-      const tab = await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-tab.is-current')).boxShadow);
+      const tab = await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-tab.is-current'), '::before').boxShadow);
       await desk.context.close();
       const phone = await open({ style: 'tabs', colorScheme, viewport: { width: 375, height: 760 } });
       const handle = await phone.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle.is-tab')).boxShadow);

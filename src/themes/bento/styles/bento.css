@@ -52,9 +52,6 @@
   box-shadow: var(--shadow);
   font-size: calc(var(--body-size) - 1px);
   line-height: 1.8;
-  transition:
-    background-color 0.2s,
-    border-color 0.2s;
 }
 
 .bt-card[data-span='page'] {
@@ -97,6 +94,16 @@
   margin: -4px 0 16px;
 }
 
+.bt-card > h2 + .bt-recap:where(:not(.component-box *)) {
+  margin: -6px 0 18px;
+  padding-left: 0;
+  border-left: 0;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--recap);
+  text-wrap: pretty;
+}
+
 .bt-card > .bt-recap > :last-child:where(:not(.component-box *)) {
   margin-bottom: 0;
 }
@@ -112,6 +119,19 @@
 
 .bt-card .bk-block[data-type='math']:where(:not(.component-box *)) {
   margin: 10px 0 14px;
+}
+
+.bt-card :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
+  background-position:
+    left center,
+    right center,
+    left 1px center,
+    right 1px center;
+  background-size:
+    40px 200%,
+    40px 200%,
+    16px calc(100% - 2px),
+    16px calc(100% - 2px);
 }
 
 .bt-card :is(.figure, .component:not([data-frame='none'])):where(:not(.component-box *)) {
@@ -151,52 +171,67 @@
 }
 
 .bt-article .sidenote-ref a {
+  position: relative;
+  isolation: isolate;
   color: var(--accent);
   text-decoration: none;
   border-radius: 3px;
   padding: 0 2px;
-  transition: background-color 0.3s ease-out;
 }
 
-.bt-article .sidenote-ref.is-active a {
-  background-color: var(--mark);
+.bt-article :is(.sidenote-ref a, .bk-sidenote-number)::before,
+.bt-notes .bk-sidenote::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 3px;
+  background: var(--mark);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+.bt-article :is(.sidenote-ref.is-active a, .bk-sidenote.is-active .bk-sidenote-number)::before,
+.bt-notes .bk-sidenote.is-active::before {
+  opacity: 1;
   transition-duration: 0.15s;
 }
 
 .bt-notes .bk-sidenote {
+  position: relative;
+  isolation: isolate;
   display: block;
-  margin: 0;
-  border-radius: 4px;
+  margin: -2px -8px;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: 13px;
   line-height: 1.7;
   color: var(--ink-2);
-  transition:
-    color 0.3s ease-out,
-    background-color 0.3s ease-out;
+}
+
+.bt-notes .bk-sidenote::before {
+  border-radius: inherit;
+  background: var(--selection-quiet);
 }
 
 .bt-notes .bk-sidenote + .bk-sidenote {
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .bt-notes .bk-sidenote.is-active {
   color: var(--ink);
-  transition-duration: 0.15s;
 }
 
 .bt-article .bk-sidenote-number {
+  position: relative;
+  isolation: isolate;
   margin-right: 6px;
   border-radius: 3px;
   padding: 0 2px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--accent);
-  transition: background-color 0.3s ease-out;
-}
-
-.bt-article .bk-sidenote.is-active .bk-sidenote-number {
-  background-color: var(--mark);
-  transition-duration: 0.15s;
 }
 
 .bt-article .bk-sidenote-body,

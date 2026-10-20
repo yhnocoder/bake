@@ -118,8 +118,11 @@ test('the essay homepage', async (t) => {
     assert.equal(await previewState(page, gate), null);
     await page.hover(gate);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', gate);
-    await page.waitForFunction((selector) => getComputedStyle(document.querySelector(selector)).borderColor === 'rgb(42, 120, 214)', gate);
-    assert.equal(await page.locator(gate).evaluate((card) => getComputedStyle(card).translate), '0px -2px');
+    await page.waitForFunction((selector) => {
+      const ring = getComputedStyle(document.querySelector(selector), '::after');
+      return ring.borderColor === 'rgb(42, 120, 214)' && ring.opacity === '1';
+    }, gate);
+    assert.equal(await page.locator(gate).evaluate((card) => getComputedStyle(card).translate), '0px -3px');
     await page.mouse.move(5, 5);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', gate);
     assert.deepEqual(await page.evaluate(() => window.previewLog), ['start Gate', 'stop Gate']);
@@ -267,6 +270,51 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
+  await t.test('the bar covers the whole width with an edge only while it is stuck, and the switches slide a thumb to the chosen value', async () => {
+    const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
+    const edge = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity);
+    await page.waitForFunction(() => document.querySelector('.bk-home-bar').hasAttribute('data-stuck') === false);
+    assert.equal(await edge(), '0');
+    await page.evaluate(() => scrollTo({ top: 500, behavior: 'instant' }));
+    await page.waitForFunction(() => document.querySelector('.bk-home-bar').hasAttribute('data-stuck'));
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity === '1');
+    const cover = await page.evaluate(() => {
+      const bar = document.querySelector('.bk-home-bar');
+      const box = bar.getBoundingClientRect();
+      return { top: box.top, background: getComputedStyle(bar).backgroundColor, scrollWidth: document.documentElement.scrollWidth };
+    });
+    assert.deepEqual(cover, { top: 0, background: 'rgb(245, 246, 244)', scrollWidth: 1440 });
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForFunction(() => !document.querySelector('.bk-home-bar').hasAttribute('data-stuck'));
+
+    const thumb = (control) => page.evaluate((name) => {
+      const options = document.querySelector(`[data-control="${name}"] .bk-switch-options`);
+      const box = getComputedStyle(options, '::before');
+      const pressed = options.querySelector('[aria-pressed="true"]').getBoundingClientRect();
+      const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(box.transform).m41;
+      return Math.abs(left - pressed.left) < 1 && Math.abs(parseFloat(box.width) - pressed.width) < 1;
+    }, control);
+    await page.getByRole('button', { name: '5', exact: true }).click();
+    await page.getByRole('button', { name: '月份' }).click();
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-switch-options')].every((options) => options.getAnimations({ subtree: true }).length === 0));
+    assert.deepEqual([await thumb('group'), await thumb('columns')], [true, true]);
+
+    const moving = await page.evaluate(() =>
+      ['.bk-card', '.bk-card-fallback', '.bk-chip', '.bk-home-bar', '.bk-switch-options'].flatMap((selector) =>
+        ['', '::before', '::after'].flatMap((pseudo) => {
+          const element = document.querySelector(selector);
+          if (element === null) return [];
+          return getComputedStyle(element, pseudo || null)
+            .transitionProperty.split(', ')
+            .filter((property) => !['all', 'none', 'opacity', 'transform', 'translate', 'scale'].includes(property))
+            .map((property) => `${selector}${pseudo} ${property}`);
+        }),
+      ),
+    );
+    assert.deepEqual(moving, []);
+    await context.close();
+  });
+
   await t.test('without scripts the default grouping and its cards are shown and the controls are hidden', async () => {
     const { context, page } = await open({ javaScriptEnabled: false });
     const shown = await page.evaluate(() => ({
@@ -339,7 +387,7 @@ test('the essay homepage', async (t) => {
     assert.deepEqual(clipped, []);
     const colors = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
     assert.deepEqual(colors, ['rgb(17, 20, 19)', 'rgb(26, 30, 28)']);
-    const pressedShadow = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-switch[data-control="group"] [data-value="category"]')).boxShadow);
+    const pressedShadow = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-switch[data-control="group"] .bk-switch-options'), '::before').boxShadow);
     const darkShadow = await pressedShadow();
     await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '浅' }).click();
