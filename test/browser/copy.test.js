@@ -190,7 +190,7 @@ test('copying from an article gives the Markdown source of the selection', async
   await context.close();
 });
 
-test('a partly selected paragraph escapes the text that Markdown would read as syntax, so the copy renders the same text', async (t) => {
+test('a partly selected paragraph escapes the text that Markdown would read as syntax and keeps every other character, including U+FDD0, so the copy renders the same text', async (t) => {
   const paragraphs = [
     ['Start: a \\*literal\\* star, snake_case\\_name, a \\_literal\\_ underscore, \\`ticks\\` and C:\\\\path.', 'a *literal*', 'path'],
     ['Money: \\$5 or \\$6, a \\==mark\\== and \\~~strike\\~~ here.', '$5', 'here'],
@@ -200,6 +200,10 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
     ['\\- Not a list either', '- Not', 'list'],
     ['\\> Not a quote at all', '> Not', 'quote'],
     ['中文，标点：“引号”（括号）！还有 snake_case 和 a * b。', '标点', 'b'],
+    ['Noncharacter: a\uFDD0b and \uFDD0\uFDD0 here.', 'a\uFDD0b', 'here'],
+    ['\uFDD0# Not a heading after a noncharacter', '\uFDD0#', 'heading'],
+    ['\\# Heading-like text with \uFDD0 inside', '# Heading-like', 'inside'],
+    ['12\\. List-like text with \uFDD0 inside', '12. List-like', 'inside'],
   ];
   const dir = createBlog(t, {
     'bake.config.js': validConfig,
