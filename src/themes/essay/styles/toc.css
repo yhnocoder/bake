@@ -936,7 +936,7 @@ html[data-script] .bk-toc-chapters {
   transition:
     transform 0.25s var(--ease-out),
     opacity 0.2s,
-    visibility 0.25s;
+    visibility 0s;
 }
 
 .bk-toc-handle.is-tab {
@@ -1167,12 +1167,26 @@ html[data-script] .bk-toc-chapters {
     transform: translateX(-110%);
     visibility: hidden;
   }
+
+  html:is(.bk-toc-drawer-open, .bk-buttons-hidden) .bk-toc-handle {
+    transition-delay: 0s, 0s, 0.25s;
+  }
 }
 
 @media (max-width: 999.98px) and (prefers-reduced-motion: reduce) {
-  :is(.bk-toc-handle, .bk-settings) {
+  .bk-settings {
     transition-property: opacity, visibility !important;
     transition-duration: 0.2s !important;
+  }
+
+  .bk-toc-handle {
+    transition-property: opacity, visibility !important;
+    transition-duration: 0.2s, 0s !important;
+    transition-delay: 0s !important;
+  }
+
+  html:is(.bk-toc-drawer-open, .bk-buttons-hidden) .bk-toc-handle {
+    transition-delay: 0s, 0.2s !important;
   }
 
   html:is(.bk-toc-drawer-open, .bk-buttons-hidden) :is(.bk-toc-handle, .bk-settings) {

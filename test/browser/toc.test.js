@@ -588,11 +588,13 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('on phones a handle opens the drawer of chapters, and a link in it jumps and closes it', async () => {
+  const handleClass = (style) => (style === 'dots' ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab');
+
+  await t.test('on phones a handle opens the drawer of chapters, a link in it jumps and closes it, and closing it returns the focus to the handle', async () => {
     for (const style of STYLES) {
-      const { page, context } = await open({ style, viewport: { width: 375, height: 760 } });
+      const { page, context } = await open({ style, viewport: { width: 375, height: 760 }, reducedMotion: 'no-preference' });
       const handle = page.locator('.bk-toc-handle');
-      assert.equal(await handle.getAttribute('class'), style === 'dots' ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab', style);
+      assert.equal(await handle.getAttribute('class'), handleClass(style), style);
       const [above, below] = [await handle.boundingBox(), await page.locator('.bk-settings-toggle').boundingBox()];
       assert.ok(above.x === 0 && below.x === 0 && above.y + above.height + 10 <= below.y + 0.5, `${style}: the handle ends at ${above.y + above.height}, the settings button starts at ${below.y}`);
       await handle.click();
@@ -608,6 +610,12 @@ test('the table of contents', async (t) => {
       await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().left === 0);
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().right <= 0);
+      assert.equal(await page.evaluate(() => document.activeElement.className), handleClass(style), `${style}: Escape returns the focus to the handle`);
+      await handle.click();
+      await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().left === 0);
+      await page.click('.bk-toc-drawer-close');
+      await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().right <= 0);
+      assert.equal(await page.evaluate(() => document.activeElement.className), handleClass(style), `${style}: the close button returns the focus to the handle`);
       await context.close();
     }
   });
@@ -683,7 +691,7 @@ test('the table of contents', async (t) => {
     await scrollBy(600);
     assert.equal(await hidden(), true);
     assert.equal(await placed('0'), true);
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle')).transitionDuration), '0.2s');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle')).transitionDuration), '0.2s, 0s');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden');
     assert.deepEqual(await focusable(), [false, false]);
     await scrollBy(-200);
