@@ -28,7 +28,9 @@ Verification is sized to the change: a change to documentation only runs no test
 Before any change, measure commit `2465439` on this machine and keep the results in the scratchpad (`perf/baseline.json`), with the scripts that produced them, so step 8 runs the same scripts.
 - `bake dev` startup: from spawning the process to the first successful response for the homepage, on a copy of `examples/blog/`. Median of 5 runs.
 - Hot update: from writing a changed article file to the page in the browser showing the new text, for an article edit, a component edit and a config edit. Median of 5 runs each. The mechanism changes in step 2, so the measure is the time until the new content is visible.
-- Frame rate of the built pages: `npm run test:frames` with `BAKE_FRAMES=all`, per case: frame count, median, 95th percentile, longest frame, share of slow frames. 3 runs.
+- Frame rate of the built pages: `npm run test:frames` with `BAKE_FRAMES=all`, plus scrolling and dragging a component control on `llm-act-fns` and `matrix-calculus`, per case: frame count and median frame time. 3 runs at normal CPU speed, which the final comparison uses, and 3 runs with the gate's 2x CPU slowdown.
+
+This cleanup compares medians only. The baseline showed a median frame time of 16.7 ms, one display refresh, in every case at both CPU speeds, so the final table also lists the share of dropped frames per case as information; it does not set a target for this cleanup. The 95th percentile, the longest frames and the known slow cases are left to a later optimization phase.
 
 ### 1. Rules and documentation
 
@@ -52,6 +54,7 @@ Before any change, measure commit `2465439` on this machine and keep the results
 - One test helper module: the example blog path, building a copy once per test file, serving it, launching the browser once per file, and `settle`. It replaces the inline copies (about 16 build blocks, 41 browser launches, 3 `settle` functions; `buildExample` in `test/browser/chat-page.js` is the starting point). The copy excludes `dist`, the staging folders and `node_modules`.
 - Replace fixed `waitForTimeout` sleeps with waits for an observable state. Give animated interface parts an observable settled state where none exists, or use `page.clock` for timers. A fixed wait that proves something does not happen may stay.
 - Review every test file for tests of implementation details and rewrite or delete them; merge tests that guard the same behavior. `test/browser/chat.test.js` and `test/browser/copy.test.js` build several blogs each; build one per file.
+- `test/frames/frames.test.js` opens only the syntax article, the bento article and the homepage. Add the two long real articles, `llm-act-fns` and `matrix-calculus`: scrolling the whole article and dragging a control of one of their components, in the nightly set.
 - `test/frames/frames.test.js`: the hover case passes with 15 of 20 events; find the cause instead of tolerating misses.
 - `src/cli.js` imports the whole build pipeline for every command; load each command's modules with `await import()` in its branch.
 - Cache the compiled theme the way `src/chat/bundle.js` caches the chat bundle, and reuse share images by the digest in their file name, so repeated test builds do not recompile or relaunch the browser.
@@ -88,4 +91,6 @@ Implement step 5 in commits that each keep the tests green. Delete the special c
 
 ### 8. Final measurements
 
-Run the step 0 scripts on the final commit and write the comparison table (dev startup, hot update, frame rate per case) into the final report.
+Run the step 0 scripts on the final commit and write the comparison table of medians (dev startup, hot update, frame time per case) into the final report, together with the change in line counts between `2465439` and the final commit, broken down by area (build, markdown and rendering, theme layer, each theme, chat, components and kit, dev, scripts, unit tests, browser tests, documentation).
+
+If the dev startup and hot update scripts gave stable numbers, move them into the repository as one script next to `scripts/measure-pages.js`, with limits in `test/perf/budgets.json` checked by `scripts/check-budgets.js` (extended for metrics that have no page and width), and run it in the nightly workflow. `scripts/measure-pages.js` measures page loading for readers and the frame time gate measures interactions; this script measures the author's `bake dev` loop, so the three share the budget file, the budget check and the screen sizes, and nothing else. Timings vary too much between runs for the pull request tier, so it stays nightly. The frame rate already runs in CI as the frame time gate.
