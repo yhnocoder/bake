@@ -1,3 +1,5 @@
+import { fragmentOf } from 'bake/fragments';
+
 const PLACED_BLOCKS = new Set(['math', 'code', 'table', 'list-table', 'example', 'figure', 'component', 'embed']);
 const FLOATED_FIGURE = /^<figure[^>]*\sdata-float=/;
 
@@ -95,7 +97,7 @@ function Heading(props) {
 
 export function HeadingLink(props) {
   return (
-    <a class="bk-heading-link" href={`#${encodeURIComponent(props.id)}`} aria-label={props.labels.copyLink} data-ui>
+    <a class="bk-heading-link" href={fragmentOf(props.id)} aria-label={props.labels.copyLink} data-ui>
       #
     </a>
   );

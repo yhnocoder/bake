@@ -1,3 +1,4 @@
+import { fragmentOf } from 'bake/fragments';
 import { closeOnEscape } from './escape.js';
 
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
@@ -14,7 +15,7 @@ export function createElement(tag, className, text) {
 
 export function tocLink(id, className) {
   const link = createElement('a', className);
-  link.href = `#${encodeURIComponent(id)}`;
+  link.href = fragmentOf(id);
   return link;
 }
 

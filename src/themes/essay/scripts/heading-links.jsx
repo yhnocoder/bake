@@ -1,3 +1,4 @@
+import { elementOfFragment } from 'bake/fragments';
 import { labelsFor } from '../labels.js';
 import { openFoldsAround } from './folds.js';
 import { flash, reducedMotion } from './motion.js';
@@ -18,7 +19,7 @@ function jumpTo(target, { smooth = true } = {}) {
 }
 
 export function followLink(hash) {
-  const target = targetOf(hash);
+  const target = elementOfFragment(document, hash);
   if (target === null) return Promise.resolve();
   history.pushState(null, '', hash);
   return jumpTo(target);
@@ -43,7 +44,7 @@ export function startHeadingLinks() {
     const link = event.target.closest('a[href^="#"]');
     if (link === null || link.closest('.sidenote-ref') !== null) return;
     const hash = link.getAttribute('href');
-    const target = targetOf(hash);
+    const target = elementOfFragment(document, hash);
     if (target === null) return;
     event.preventDefault();
     if (link.classList.contains('bk-heading-link')) {
@@ -52,17 +53,8 @@ export function startHeadingLinks() {
     }
     followLink(hash);
   });
-  const initial = targetOf(location.hash);
+  const initial = elementOfFragment(document, location.hash);
   if (initial !== null) requestAnimationFrame(() => jumpTo(initial, { smooth: false }));
-}
-
-function targetOf(hash) {
-  if (hash.length < 2) return null;
-  try {
-    return document.getElementById(decodeURIComponent(hash.slice(1)));
-  } catch {
-    return null;
-  }
 }
 
 function copyLink(hash, labels) {

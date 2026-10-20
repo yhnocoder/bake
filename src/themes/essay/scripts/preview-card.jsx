@@ -1,3 +1,4 @@
+import { elementOfFragment } from 'bake/fragments';
 import { createEffect, createSignal } from 'solid-js';
 import { render } from 'solid-js/web';
 import { closeOnEscape } from './escape.js';
@@ -93,7 +94,7 @@ export function startPreviewCard(article) {
 
 function readReference(link) {
   if (new URL(link.href).pathname !== location.pathname) return readTemplate(link);
-  const item = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+  const item = elementOfFragment(document, link.hash);
   if (item === null) return null;
   const number = document.createElement('span');
   number.className = 'bk-preview-number';
