@@ -45,15 +45,38 @@ jobs:
       - uses: ./.github/actions/setup
       - run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 "test/browser/*.test.js"
 
+  frames:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run test:frames
+
+  frames-calibration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3, 4, 5]
+    env:
+      BAKE_FRAMES: all
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: node --test --test-reporter=tap "test/frames/*.test.js"
+
   test:
-    needs: [lint, unit, browser]
+    needs: [lint, unit, browser, frames]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: test "$RESULTS" = "success success success"
+      - run: test "$RESULTS" = "success success success success"
         env:
-          RESULTS: ${{ needs.lint.result }} ${{ needs.unit.result }} ${{ needs.browser.result }}
+          RESULTS: ${{ needs.lint.result }} ${{ needs.unit.result }} ${{ needs.browser.result }} ${{ needs.frames.result }}
 
   screenshots:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
