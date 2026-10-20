@@ -146,7 +146,7 @@ describe('bake dev', () => {
     let events = '';
     while (!events.includes('event: problems')) events += new TextDecoder().decode((await reader.read()).value);
     reader.cancel();
-    assert.match(events, /event: problems\ndata: \[\{"position":"content\/posts\/rope\/index.md:7:5","text":"content\/posts\/rope\/index.md:7:5 footnote \\"missing\\" has no definition"\}\]\n\n/);
+    assert.match(events, /event: problems\ndata: \[\{"file":"content\/posts\/rope\/index.md","location":"7:5","message":"footnote \\"missing\\" has no definition","position":"content\/posts\/rope\/index.md:7:5","text":"content\/posts\/rope\/index.md:7:5 footnote \\"missing\\" has no definition"\}\]\n\n/);
     writeFileSync(join(dir, 'content/posts/rope/index.md'), article({ body: 'Text.\n' }));
     await eventually(() => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
     await eventually(() => lines.includes('Updated /, /2026-10/rope/'), `bake dev printed ${JSON.stringify(lines)}`);
