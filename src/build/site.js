@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { chatBundle } from '../chat/bundle.js';
+import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
+import { readPet } from '../chat/pet-files.js';
+import { petFolder } from '../config/pet.js';
 import { bundleComponents } from '../components/bundle.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
-import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
-import { readThemeOptions } from '../config/theme-options.js';
+import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
@@ -16,25 +17,27 @@ import { findArticles } from './articles.js';
 import { articleEntry, newestFirst } from './entries.js';
 import { listFiles } from './files.js';
 import { indexPages } from './links.js';
-import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
+import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
+import { optionProblem, readThemeOptions } from './theme-options.js';
+import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
 
 const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
-export function createSite(root, { drafts = false, base, shareImages = false } = {}) {
-  return { root, drafts, base, shareImages, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
+export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
+  return { root, drafts, base, shareImages, prefetch, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
 }
 
 export async function updateSite(site, changedPaths = null) {
   const { root } = site;
   const touches = (path) => changedPaths === null || changedPaths.some((changed) => changed === path || changed.startsWith(`${path}/`));
   if (touches(THEMES_DIR)) site.themes.clear();
-  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR)) {
+  const pet = site.settings?.config ? petFolder(site.settings.config.chat.pet) : null;
+  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR) || (pet !== null && touches(pet))) {
     site.settings = await readSettings(root);
     site.articles.clear();
     site.bundle = null;
@@ -70,6 +73,7 @@ export async function updateSite(site, changedPaths = null) {
     { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, listed), owner: 'the AI chat' },
     { path: CHAT_PREAMBLE_PATH, render: () => `${JSON.stringify(settings.preamble.map((definition) => definition.tex))}\n`, owner: 'the AI chat' },
     notFoundOutput(listedEntries, site.base ?? sitePath(config.url), pageSettings, errors),
+    ...settings.pet.files.map((file) => ({ path: file.path, render: () => file.source, owner: 'the AI chat' })),
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
@@ -96,23 +100,26 @@ async function readSettings(root) {
   const themeNames = availableThemes(root);
   const themeOptions = await readThemeOptions(root, themeNames, errors);
   if (errors.length > 0) return { errors };
-  const config = await loadBakeConfig(root, themeOptions, errors);
+  const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
   if (config === null) return { errors };
   const preamble = await readMathPreamble(root, errors);
+  const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const componentErrors = [];
   const components = errors.length > 0 ? new Map() : await readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
-  return { errors, config, preamble, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
+  return { errors, config, preamble, pet, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
 }
 
 async function compileThemes(site, published, config, errors) {
   const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
-  const themes = new Map();
-  for (const name of [...names].sort()) {
+  const sorted = [...names].sort();
+  await Promise.all(sorted.map(async (name) => {
     const siteTheme = name === config.theme;
-    if (site.themes.get(name)?.siteTheme !== siteTheme) {
-      const themeErrors = [];
-      site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
-    }
+    if (site.themes.get(name)?.siteTheme === siteTheme) return;
+    const themeErrors = [];
+    site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
+  }));
+  const themes = new Map();
+  for (const name of sorted) {
     const { theme, errors: themeErrors } = site.themes.get(name);
     errors.push(...themeErrors);
     themes.set(name, theme);
@@ -138,7 +145,7 @@ function homeOutput(entries, { config, themes, chat }, errors) {
       options: config.themes[config.theme],
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
-      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', theme.scripts), modules: assetLinks('', [chat.entry]) },
+      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', [theme.script, chat.entry]) },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -150,7 +157,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
       site: siteProps(config),
       options: config.themes[config.theme],
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
-      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, theme.scripts) },
+      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, [theme.script]) },
     }),
   );
   return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
@@ -188,7 +195,7 @@ async function compileComponents(site, published, errors) {
     const { root, settings } = site;
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors), errors: bundleErrors };
+    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors };
   }
   errors.push(...site.bundle.errors);
   return site.bundle.bundle;
@@ -324,8 +331,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
     assets: {
       root,
       styles: assetLinks(root, theme.styles),
-      scripts: assetLinks(root, theme.scripts),
-      modules: assetLinks(root, [...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
+      scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

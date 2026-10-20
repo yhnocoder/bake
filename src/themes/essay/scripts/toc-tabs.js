@@ -60,7 +60,7 @@ export function tabsView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.dismiss(hovered);
+    intent.dismiss(hovered, [items[hovered]?.tab, index.element]);
     hide();
   }
   function layout(state) {

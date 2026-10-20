@@ -40,8 +40,8 @@ try {
       if (!chatShown && (await hasArticleChat(page))) {
         chatShown = true;
         await page.locator('.bk-chat-launcher').click();
-        await page.locator('.bk-chat-panel.is-open .bk-chat-view').waitFor();
-        await page.evaluate(() => document.fonts.ready);
+        await page.waitForLoadState('networkidle');
+        await settleChat(page);
         await page.screenshot({ path: join(out, `${name}-chat.${variant.name}.png`), animations: 'disabled', caret: 'hide' });
         count += 1;
         await page.close();
@@ -55,6 +55,15 @@ try {
   await server.close();
 }
 console.log(`${count} screenshots of ${pages.length} pages written to ${relative(process.cwd(), out)}`);
+
+async function settleChat(page) {
+  await page.evaluate(async () => {
+    const images = [...document.querySelector('[data-bake-chat]').shadowRoot.querySelectorAll('img')];
+    await Promise.all(images.map((image) => image.decode().catch(() => {})));
+    await document.fonts.ready;
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+}
 
 async function hasArticleChat(page) {
   return page.evaluate(() => document.querySelector('script.bk-source') !== null && document.querySelector('[data-bake-chat]') !== null);

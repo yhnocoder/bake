@@ -1,92 +1,55 @@
-import { readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, posix } from 'node:path';
+import { MATHJAX_CHUNK, lazyImports, mathModules, virtualModules } from '../bundle/modules.js';
 
 export const RUNTIME_FILE = join(import.meta.dirname, 'runtime.js');
+export const NODE_MATH_FILE = join(import.meta.dirname, 'node-math.js');
+const SOLID_ELEMENT_FILE = join(import.meta.dirname, 'solid-element.js');
 
-const MATH_MODULE = 'bake/math';
-const MATH_FILE = join(import.meta.dirname, 'math.js');
-const KIT_MODULE = 'bake/kit';
 const KIT_DIR = join(import.meta.dirname, '../kit');
-const KIT_FILE = join(KIT_DIR, 'index.js');
 const KIT_SCRIPT = /\.jsx?$/;
-const PREAMBLE_MODULE = 'bake:preamble';
-const MATH_FONT_MODULE = 'bake:math-font';
 const LOADERS_MODULE = 'bake:component-loaders';
-const FONT_DIR = join(dirname(fileURLToPath(import.meta.resolve('@mathjax/mathjax-newcm-font/js/svg.js'))), 'svg/dynamic');
-const NODE_MATH_MODULE = ["export async function texToSvg() {", "  throw new Error('texToSvg typesets formulas in the browser, inside the component code');", '}', ''].join('\n');
+const FILES_MARKER = 'bake:component-files';
 
-export function isMathJaxModule(id) {
-  return id.includes('/node_modules/@mathjax/') && !id.startsWith(FONT_DIR);
-}
-
-export function nodeModules() {
-  return virtualModules('bake-node-modules', { [MATH_MODULE]: () => NODE_MATH_MODULE }, { [KIT_MODULE]: KIT_FILE });
-}
-
-export function chatModules(preambleAddress) {
-  return virtualModules(
-    'bake-chat-modules',
-    {
-      [PREAMBLE_MODULE]: () => runtimePreamble(preambleAddress),
-      [MATH_FONT_MODULE]: () => lazyImports('fontFiles', fontFiles()),
-    },
-    { [MATH_MODULE]: MATH_FILE },
-  );
-}
-
-export function browserModules({ preamble, components }) {
-  const modules = virtualModules(
-    'bake-browser-modules',
-    {
-      [PREAMBLE_MODULE]: () => `export const definitions = ${JSON.stringify(preamble.map((definition) => definition.tex))};\n`,
-      [MATH_FONT_MODULE]: () => lazyImports('fontFiles', fontFiles()),
-      [LOADERS_MODULE]: () => lazyImports('loaders', components.map((component) => [component.name, component.path])),
-    },
-    { [MATH_MODULE]: MATH_FILE, [KIT_MODULE]: KIT_FILE },
-  );
-  return { ...modules, transform: markKitModulesSideEffectFree };
-}
-
-function runtimePreamble(address) {
+export function browserModules({ preamble, components, prefetch }) {
+  const loaders = virtualModules('bake-component-loaders', {
+    [LOADERS_MODULE]: () =>
+      [lazyImports('loaders', components.map((component) => [component.name, component.path])), `export const files = JSON.parse(${JSON.stringify(FILES_MARKER)});`, ''].join('\n'),
+  });
   return [
-    `const path = ${JSON.stringify(address)};`,
-    'const address = new URL(path, import.meta.url);',
-    'const response = await fetch(address);',
-    "if (!response.ok) throw new Error(`${address} answered ${response.status}`);",
-    'export const definitions = await response.json();',
-    '',
-  ].join('\n');
+    mathModules(`export const definitions = ${JSON.stringify(preamble.map((definition) => definition.tex))};\n`),
+    { ...loaders, transform: markKitModulesSideEffectFree, generateBundle: (options, bundle) => writeComponentFiles(bundle, prefetch ? components : []) },
+  ];
+}
+
+function writeComponentFiles(bundle, components) {
+  const chunks = new Map(Object.values(bundle).filter((output) => output.type === 'chunk').map((chunk) => [chunk.fileName, chunk]));
+  const byModule = new Map([...chunks.values()].map((chunk) => [chunk.facadeModuleId, chunk]));
+  const runtime = [...chunks.values()].find((chunk) => chunk.isEntry);
+  const solidElement = byModule.get(SOLID_ELEMENT_FILE);
+  const files = {};
+  for (const component of components) {
+    const chunk = byModule.get(component.path);
+    if (chunk === undefined) continue;
+    const own = chunkFiles(chunk, chunks, runtime);
+    const all = component.solid && solidElement !== undefined ? [...new Set([...own, ...chunkFiles(solidElement, chunks, runtime)])] : own;
+    files[component.name] = all.map((file) => posix.relative(posix.dirname(runtime.fileName), file));
+  }
+  runtime.code = runtime.code.replace(new RegExp(`(["'\`])${FILES_MARKER}\\1`), () => JSON.stringify(JSON.stringify(files)));
+}
+
+function chunkFiles(chunk, chunks, runtime) {
+  const files = new Set();
+  const visit = (current) => {
+    if (current === runtime || current.name === MATHJAX_CHUNK || files.has(current.fileName)) return;
+    files.add(current.fileName);
+    for (const css of current.viteMetadata?.importedCss ?? []) files.add(css);
+    for (const file of current.imports) visit(chunks.get(file));
+  };
+  visit(chunk);
+  return [...files];
 }
 
 function markKitModulesSideEffectFree(code, id) {
   if (!id.startsWith(`${KIT_DIR}/`) || !KIT_SCRIPT.test(id)) return null;
   return { code, map: null, moduleSideEffects: false };
-}
-
-function virtualModules(name, sources, files = {}) {
-  return {
-    name,
-    enforce: 'pre',
-    resolveId(source) {
-      if (Object.hasOwn(files, source)) return files[source];
-      return Object.hasOwn(sources, source) ? `\0${source}` : null;
-    },
-    load(id) {
-      if (!id.startsWith('\0') || !Object.hasOwn(sources, id.slice(1))) return null;
-      return sources[id.slice(1)]();
-    },
-  };
-}
-
-function fontFiles() {
-  return readdirSync(FONT_DIR)
-    .filter((file) => file.endsWith('.js'))
-    .sort()
-    .map((file) => [file, join(FONT_DIR, file)]);
-}
-
-function lazyImports(name, entries) {
-  const lines = entries.map(([key, path]) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(path)}),`);
-  return [`export const ${name} = {`, ...lines, '};', ''].join('\n');
 }

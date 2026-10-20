@@ -3,28 +3,29 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
+import { DEFAULT_PET, petSourceProblem } from './pet.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { HOME_COLUMNS, TOC_STYLES } from '../theme/choices.js';
+import { HOME_COLUMNS, TOC_STYLES } from '../choices.js';
 import { choiceProblem, slugProblem } from './rules.js';
-import { optionProblem } from './theme-options.js';
 
 export const CONFIG_FILE = 'bake.config.js';
 
-const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'themes', 'home', 'categories'];
+const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'themes', 'home', 'categories', 'chat'];
+const CHAT_FIELDS = ['pet'];
 const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
 const GROUP_BY = ['category', 'month'];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export function configNotFoundError() {
-  return errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} not found, run bake from the blog root`);
+  return errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} not found, run bake from the blog root or create a blog with bake init`);
 }
 
 export function hasConfig(root) {
   return statSync(join(root, CONFIG_FILE), { throwIfNoEntry: false })?.isFile() ?? false;
 }
 
-export async function loadBakeConfig(root, themes, errors) {
+export async function loadBakeConfig(root, themes, optionProblem, errors) {
   if (!hasConfig(root)) {
     errors.push(configNotFoundError());
     return null;
@@ -47,11 +48,16 @@ export async function loadBakeConfig(root, themes, errors) {
   }
   const locate = sourceLocator(program);
   const count = errors.length;
-  const config = validateConfig(exported, themes, (path, part, message) => errors.push(errorAt(CONFIG_FILE, locate(path, part), message)));
+  const config = validateConfig(exported, themes, optionProblem, (path, part, message) => errors.push(errorAt(CONFIG_FILE, locate(path, part), message)));
   return errors.length === count ? deepFreeze(config) : null;
 }
 
-function validateConfig(value, themes, report) {
+export function configPosition(root, path) {
+  const program = parse(readFileSync(join(root, CONFIG_FILE), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+  return sourceLocator(program)(path, 'value');
+}
+
+function validateConfig(value, themes, optionProblem, report) {
   if (!isPlainObject(value)) {
     report([], 'value', `the default export of ${CONFIG_FILE} must be an object, got ${describeValue(value)}`);
     return null;
@@ -73,7 +79,10 @@ function validateConfig(value, themes, report) {
   const toc = value.toc ?? 'notes';
   field(['toc'], choiceProblem('toc', TOC_STYLES, toc));
   const categories = validateCategories(value.categories ?? [], report);
-  const options = validateThemeOptions(value, themes, report);
+  const options = validateThemeOptions(value, themes, optionProblem, report);
+  const chat = section(value, 'chat', CHAT_FIELDS, report);
+  const pet = chat.pet ?? DEFAULT_PET;
+  field(['chat', 'pet'], petSourceProblem(pet));
   const home = section(value, 'home', HOME_FIELDS, report);
   const homeColumns = home.columns ?? 3;
   field(['home', 'columns'], choiceProblem('home.columns', HOME_COLUMNS, homeColumns));
@@ -92,10 +101,11 @@ function validateConfig(value, themes, report) {
     themes: options,
     home: { columns: homeColumns, groupBy },
     categories,
+    chat: { pet },
   };
 }
 
-function validateThemeOptions(config, themes, report) {
+function validateThemeOptions(config, themes, optionProblem, report) {
   const written = section(config, 'themes', [...themes.keys()], report, (name) => `themes.${name} names no theme; the themes are ${[...themes.keys()].join(', ')}`);
   return Object.fromEntries(
     [...themes].map(([name, declarations]) => {

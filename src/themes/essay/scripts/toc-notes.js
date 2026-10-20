@@ -74,7 +74,11 @@ export function notesRailView(context) {
     });
   }
   context.host.append(ticks.element, panel);
-  closeOnEscape(panel, () => close(0));
+  closeOnEscape(panel, () => {
+    const wasOpen = isOpen();
+    close(0);
+    return wasOpen;
+  });
   return {
     columns: [ticks.element],
     update(state) {

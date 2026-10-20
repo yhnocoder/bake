@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
-import { contentType } from '../../src/build/content-types.js';
+import { contentType } from '../../src/content-types.js';
 import { serve } from './server.js';
 
 test('the test server closes while a browser holds a connection that has not sent a request yet', async (t) => {

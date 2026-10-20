@@ -1,12 +1,12 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { isIP, isIPv4, isIPv6 } from 'node:net';
+import { isIP, isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { contentType } from '../build/content-types.js';
-import { escapeMarkup } from '../build/escape.js';
+import { contentType } from '../content-types.js';
+import { escapeMarkup } from '../escape.js';
 import { describeValue, errorCount, formatError } from '../report.js';
 import { missingPage } from './missing.js';
 import { rewriteSource, sourceVersion } from './params.js';
@@ -176,7 +176,7 @@ function addressHost(host) {
 }
 
 function isLoopback(host) {
-  return host === 'localhost' || host === '::1' || (isIPv4(host) && host.startsWith('127.'));
+  return host === 'localhost' || host === '::1' || host === '127.0.0.1';
 }
 
 export function hostName(header) {

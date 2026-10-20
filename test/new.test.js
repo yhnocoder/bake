@@ -64,7 +64,7 @@ describe('bake new', () => {
   test('requires bake.config.js in the current folder', (t) => {
     const dir = createBlog(t, {});
     const result = bake(dir, 'new', '2026-10/rope');
-    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root\n');
+    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root or create a blog with bake init\n');
     assert.equal(result.status, 1);
     assert.equal(existsSync(join(dir, 'content')), false);
   });

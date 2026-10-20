@@ -11,26 +11,32 @@ function bake(...args) {
 }
 
 describe('bake cli', () => {
-  test('--help lists new, dev and build and exits 0', () => {
+  test('--help lists init, new, dev and build and exits 0', () => {
     const result = bake('--help');
     assert.equal(result.status, 0);
     assert.match(result.stdout, /^Usage: bake <command>/);
-    for (const command of ['new <path>', 'dev', 'build']) assert.match(result.stdout, new RegExp(`^  ${command} `, 'm'));
+    for (const command of ['init \\[folder\\]', 'new <path>', 'dev', 'build']) assert.match(result.stdout, new RegExp(`^  ${command} `, 'm'));
   });
 
   test('dev outside a blog root reports the missing bake.config.js and exits 1', (t) => {
     const dir = createBlog(t, {});
     const result = spawnSync(process.execPath, [cli, 'dev'], { cwd: dir, encoding: 'utf8' });
     assert.equal(result.status, 1);
-    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root\n');
+    assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root or create a blog with bake init\n');
   });
 
   test('dev rejects a port that is not a number and options that are unknown, repeated or without a value', () => {
-    for (const args of [['--port', 'http'], ['--port', '70000'], ['--host'], ['--host', ''], ['--host', '--port'], ['--port', '0', '--port', '1'], ['--host', 'a', '--host', 'b'], ['--bind', '0.0.0.0']]) {
+    for (const args of [['--port', 'http'], ['--port', '70000'], ['--host'], ['--host', ''], ['--host', '--port'], ['--port', '0', '--port', '1'], ['--host', 'a', '--host', 'b'], ['--bind', '0.0.0.0'], ['--no-open', '--no-open'], ['--no-open=1']]) {
       const result = bake('dev', ...args);
       assert.equal(result.status, 1, args.join(' '));
-      assert.equal(result.stderr, 'Usage: bake dev [--port <number>] [--host <address>]\n', args.join(' '));
+      assert.equal(result.stderr, 'Usage: bake dev [--port <number>] [--host <address>] [--no-open]\n', args.join(' '));
     }
+  });
+
+  test('--help names the --no-open option of dev and says why bake dev is opened at localhost', () => {
+    const { stdout } = bake('--help');
+    assert.match(stdout, /^  --no-open {10}Do not open the browser when bake dev starts$/m);
+    assert.match(stdout, /^Open bake dev at localhost rather than 127\.0\.0\.1: the AI chat stores its key with a passkey,\nand browsers do not create passkeys for an IP address\.$/m);
   });
 
   test('--help names the --host option of dev', () => {
@@ -51,7 +57,7 @@ describe('bake cli', () => {
       assert.equal(code, 0, output);
       return output;
     };
-    const local = await serve(['--host', '127.0.0.1', '--port', '0']);
+    const local = await serve(['--host', '127.0.0.1', '--no-open', '--port', '0']);
     assert.match(local, /^Serving the blog at http:\/\/localhost:\d+\/\n/);
     assert.doesNotMatch(local, /On the local network/);
     const wildcard = await serve(['--port', '0', '--host', '0.0.0.0']);
