@@ -63,9 +63,10 @@ body {
   font-size: var(--body-size);
   line-height: 1.85;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    background-color 0.2s,
-    color 0.2s;
+}
+
+::view-transition-group(root) {
+  animation-duration: 0.2s;
 }
 
 ::selection {

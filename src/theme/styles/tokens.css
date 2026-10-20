@@ -74,6 +74,14 @@
   --code-token-changed: var(--series-4);
 }
 
+:root[data-scheme='light'] {
+  color-scheme: light;
+}
+
+:root[data-scheme='dark'] {
+  color-scheme: dark;
+}
+
 :root[data-theme='light'] {
   color-scheme: light;
 }
