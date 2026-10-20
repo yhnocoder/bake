@@ -46,11 +46,11 @@ function draw() {
 
 export default function GqaAttentionDiagram() {
   return (
-    <div class="matrix-root" style="overflow-x:auto">
+    <div class="matrix-root">
       <SketchView
         drawing={draw()}
         label="GQA attention 一个 head 的内部计算：Q、K、V 三路 Linear，Q 和 K 经过 RMSNorm 和 RoPE，计算分数、softmax、乘 V，拼接后经过输出 Linear"
-        style="max-width:590px;min-width:480px;margin:0 auto"
+        style="max-width:590px;margin:0 auto"
       />
     </div>
   )

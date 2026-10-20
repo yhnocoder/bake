@@ -56,3 +56,4 @@
 .matrix-loss-sums{font-size:13px;color:var(--ink-2);margin:0}
 .matrix-loss-sums output{display:inline}
 @media (prefers-reduced-motion:reduce){.matrix-loss-results .matrix-loss-cell::before,.matrix-loss-logits button::before,.matrix-loss-logits button::after,.matrix-loss-word,.matrix-loss-mark{transition:none}}
+@media (max-width: 599.98px){.matrix-loss-charts{min-width:0}.matrix-loss-columns{grid-template-columns:repeat(min(var(--count),4),minmax(0,1fr));gap:10px 4px}.matrix-loss-logits button{min-width:0;width:100%}.matrix-loss-values output{font-size:10px}}
