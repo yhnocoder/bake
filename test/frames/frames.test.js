@@ -19,12 +19,12 @@ const WHEEL_STEP = 120;
 const WHEEL_INTERVAL = 50;
 
 const knownFailures = [
-  { name: 'scrolling the first 8000 pixels of the syntax article at 1440 pixels', reason: '10 to 23 percent of the frames are slower than the budget in five of five runs', task: 'toc-writes' },
+  { name: 'scrolling the first 8000 pixels of the syntax article at 1440 pixels', reason: '10 to 23 percent of the frames are slower than the budget in five of five runs', task: 'content-paint' },
   { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: 'the restyle after the theme change takes one frame of 150 to 220 ms', task: 'perf-fixes' },
   { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'the restyle after the theme change takes one frame of 150 to 200 ms', task: 'perf-fixes' },
-  { name: 'scrolling the whole syntax article at 1440 pixels', reason: '5 to 18 percent of the frames are slower than the budget and the longest frame takes 150 to 200 ms', task: 'toc-writes' },
-  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 180 to 220 ms in five of five runs', task: 'toc-writes' },
-  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'up to 11 percent of the frames are slower than the budget in four of five runs', task: 'toc-writes' },
+  { name: 'scrolling the whole syntax article at 1440 pixels', reason: '5 to 18 percent of the frames are slower than the budget and the longest frame takes 150 to 200 ms', task: 'content-paint' },
+  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 180 to 220 ms in five of five runs', task: 'content-paint' },
+  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'up to 11 percent of the frames are slower than the budget in four of five runs', task: 'content-paint' },
   { name: 'opening and closing the AI chat panel on the syntax article at 1440 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
   { name: 'opening and closing the AI chat panel on the syntax article at 375 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
   { name: 'dragging the slider of the function plot in the syntax article at 1440 pixels', reason: 'up to 13 percent of the frames are slower than the budget in two of five runs', task: 'kit-cleanup' },
