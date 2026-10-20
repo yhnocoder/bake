@@ -1,4 +1,4 @@
-import { flash, reducedMotion } from '../../essay/scripts/motion.js';
+import { flash, reducedMotion } from 'bake/theme/client';
 
 const NOTE = '.sidenote-ref, .bk-sidenote';
 

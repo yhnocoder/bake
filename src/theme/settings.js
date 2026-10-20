@@ -1,9 +1,11 @@
 export const SETTINGS = {
-  toc: { pages: ['article'], values: ['notes', 'tabs', 'dots', 'ticks'], initial: (article) => article.toc },
-  theme: { pages: ['article', 'home', 'not-found'], values: ['system', 'light', 'dark'], initial: () => 'system' },
-  font: { pages: ['article', 'home', 'not-found'], values: ['sans', 'wenkai'], initial: () => 'sans' },
-  buttons: { pages: ['article'], values: ['autohide', 'always'], initial: () => 'autohide' },
+  toc: { values: ['notes', 'tabs', 'dots', 'ticks'], initial: (article) => article.toc },
+  theme: { values: ['system', 'light', 'dark'], initial: () => 'system' },
+  font: { values: ['sans', 'wenkai'], initial: () => 'sans' },
+  buttons: { values: ['autohide', 'always'], initial: () => 'autohide' },
 };
+
+export const SITE_SETTINGS = ['theme', 'font'];
 
 export const HOME_COLUMNS = ['3', '4', '5'];
 
@@ -11,12 +13,8 @@ export function storageKey(name) {
   return `bk-${name}`;
 }
 
-export function settingAttributes(page, article) {
-  return Object.fromEntries(
-    Object.entries(SETTINGS)
-      .filter(([, setting]) => setting.pages.includes(page))
-      .map(([name, setting]) => [`data-${name}`, setting.initial(article)]),
-  );
+export function settingAttributes(names, article) {
+  return Object.fromEntries(names.map((name) => [`data-${name}`, SETTINGS[name].initial(article)]));
 }
 
 const MODULE_SCRIPT_SCHEMES = ['http:', 'https:'];

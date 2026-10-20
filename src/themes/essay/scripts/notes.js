@@ -1,6 +1,4 @@
-import { labelsFor } from '../labels.js';
-import { CONTENT_EVENT, EASING, LAYOUT_EVENT, flash, oncePerFrame, reducedMotion } from './motion.js';
-import { notesColumnScreen } from './screens.js';
+import { CONTENT_EVENT, EASING, LAYOUT_EVENT, flash, labelsFor, notesColumnScreen, reducedMotion } from 'bake/theme/client';
 
 const NOTE_GAP = 12;
 const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, .bk-block';
@@ -36,21 +34,11 @@ export function startNotes(article) {
     article.append(layer);
   };
 
-  const layout = oncePerFrame(() => {
-    if (layer !== null) placeNotes(article, layer, placed);
-  });
   read();
-  layout();
-  new ResizeObserver(layout).observe(article);
-  addEventListener('resize', layout);
-  document.addEventListener(LAYOUT_EVENT, layout);
-  document.addEventListener(CONTENT_EVENT, () => {
-    read();
-    layout();
+  document.addEventListener(LAYOUT_EVENT, (event) => {
+    if (layer !== null) placeNotes(article, layer, placed, event.detail);
   });
-  document.fonts.ready.then(layout);
-  document.fonts.addEventListener('loadingdone', layout);
-  notesColumnScreen.addEventListener('change', layout);
+  document.addEventListener(CONTENT_EVENT, read);
 
   const activate = (number) => {
     if (number === active) return;
@@ -81,43 +69,37 @@ export function startNotes(article) {
   });
 }
 
-function placeNotes(article, layer, placed) {
+function placeNotes(article, layer, placed, measured) {
   if (!notesColumnScreen.matches) return;
-  const column = layer.getBoundingClientRect();
-  const blocked = obstacles(article, layer, column);
+  const refs = placed.map(({ number }) => visibleReference(article, number));
+  placed.forEach(({ note }, index) => {
+    note.hidden = refs[index] === null;
+  });
+  const box = layer.getBoundingClientRect();
+  const column = { top: box.top + scrollY, left: box.left + scrollX, right: box.right + scrollX };
+  const blocked = measured.blocks.filter((block) => block.height > 0 && block.right > column.left && block.left < column.right).map((block) => ({ top: block.top - column.top, bottom: block.bottom - column.top }));
+  const reads = placed.map(({ note }, index) => {
+    if (refs[index] === null) return null;
+    const line = lineOf(refs[index]);
+    return { top: line.top + scrollY - column.top, height: line.height, lineHeight: parseFloat(getComputedStyle(note).lineHeight) || line.height, noteHeight: note.offsetHeight };
+  });
   let floor = -Infinity;
-  for (const { note, number } of placed) {
-    const ref = visibleReference(article, number);
-    note.hidden = ref === null;
-    if (ref === null) continue;
-    const line = lineOf(ref);
-    const lineHeight = parseFloat(getComputedStyle(note).lineHeight) || line.height;
-    const height = note.offsetHeight;
-    let top = Math.round(Math.max(line.top - column.top + (line.height - lineHeight) / 2, floor));
+  placed.forEach(({ note }, index) => {
+    const read = reads[index];
+    if (read === null) return;
+    let top = Math.round(Math.max(read.top + (read.height - read.lineHeight) / 2, floor));
     for (let moved = true; moved; ) {
       moved = false;
       for (const block of blocked) {
-        if (top < block.bottom && top + height > block.top) {
+        if (top < block.bottom && top + read.noteHeight > block.top) {
           top = Math.round(block.bottom + NOTE_GAP);
           moved = true;
         }
       }
     }
     note.style.top = `${top}px`;
-    floor = top + height + NOTE_GAP;
-  }
-}
-
-function obstacles(article, layer, column) {
-  const right = column.left + column.width;
-  const blocks = [];
-  for (const block of article.querySelectorAll('.bk-block')) {
-    if (layer.contains(block)) continue;
-    const box = block.getBoundingClientRect();
-    if (box.height === 0 || box.right <= column.left || box.left >= right) continue;
-    blocks.push({ top: box.top - column.top, bottom: box.bottom - column.top });
-  }
-  return blocks;
+    floor = top + read.noteHeight + NOTE_GAP;
+  });
 }
 
 function visibleReference(article, number) {

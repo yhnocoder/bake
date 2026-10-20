@@ -135,6 +135,74 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(overflowing, []);
   });
 
+  await t.test('a resize of the window measures the article in one layout pass and publishes the positions with bk:layout', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      window.layoutProbe = { reads: 0, observed: 0, passes: [] };
+      for (const type of [Element, Range]) {
+        const read = type.prototype.getBoundingClientRect;
+        type.prototype.getBoundingClientRect = function () {
+          window.layoutProbe.reads += 1;
+          return read.call(this);
+        };
+      }
+      const observe = ResizeObserver.prototype.observe;
+      ResizeObserver.prototype.observe = function (target, options) {
+        if (target.matches?.('.bk-article')) window.layoutProbe.observed += 1;
+        return observe.call(this, target, options);
+      };
+      document.addEventListener('bk:layout', (event) => {
+        const headings = [...document.querySelectorAll('.bk-article h2[id]')];
+        window.layoutProbe.passes.push({ headings: headings.every((heading) => event.detail.headings.has(heading)), blocks: event.detail.blocks.every((block) => ['wide', 'page'].includes(block.element.dataset.resolved)), top: event.detail.article.top });
+      });
+    });
+    await page.goto(`${origin}/2026-10/syntax/`);
+    await settle(page);
+    await page.evaluate(() => {
+      window.layoutProbe.reads = 0;
+      window.layoutProbe.passes = [];
+    });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await settle(page);
+    const probe = await page.evaluate(() => window.layoutProbe);
+    assert.equal(probe.observed, 1);
+    assert.ok(probe.passes.length >= 1);
+    assert.ok(probe.passes.every((pass) => pass.headings && pass.blocks && pass.top > 0));
+    assert.ok(probe.reads < 150, `${probe.reads} reads of getBoundingClientRect in one resize`);
+    await page.close();
+  });
+
+  await t.test('a fold inside an example and a change of the table of contents style measure no natural width again', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      window.naturalWidthProbes = 0;
+      const append = Element.prototype.append;
+      Element.prototype.append = function (...nodes) {
+        window.naturalWidthProbes += nodes.filter((node) => node instanceof HTMLElement && node.style.width === 'var(--natural-width)').length;
+        return append.apply(this, nodes);
+      };
+    });
+    await page.goto(`${origin}/2026-10/syntax/`);
+    await settle(page);
+    const probes = async (action) => {
+      await page.evaluate(() => (window.naturalWidthProbes = 0));
+      await action();
+      await settle(page);
+      return page.evaluate(() => window.naturalWidthProbes);
+    };
+    const fold = page.locator('.bk-block[data-type="example"] .example-result details.fold > summary').first();
+    await fold.scrollIntoViewIfNeeded();
+    await settle(page);
+    assert.equal(await probes(() => fold.click()), 0);
+    assert.equal(await probes(() => fold.click()), 0);
+    await page.getByRole('button', { name: '设置' }).click();
+    const styles = page.locator('.bk-settings-panel [role="radio"]');
+    assert.equal(await probes(() => styles.nth(2).click()), 0);
+    assert.equal(await probes(() => styles.nth(1).click()), 0);
+    assert.equal(await probes(() => styles.nth(0).click()), 0);
+    await page.close();
+  });
+
   await t.test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async () => {
     const page = await open('widths');
     const measure = () =>

@@ -1,1 +1,1 @@
-export { default } from '../essay/home.jsx';
+export { Home as default } from 'bake/theme';

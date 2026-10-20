@@ -1,52 +1,25 @@
-import { CONTENT_EVENT, layoutChanged, oncePerFrame } from './motion.js';
-
 const SCROLLERS = 'pre.shiki, .table-scroll, mjx-container[display]';
 const NATURAL_WIDTH_HOSTS = { math: 'mjx-container[display]', code: 'pre.shiki' };
+const declaredWidths = new WeakMap();
 
-export function startWidths(article) {
-  let blocks = [];
-  const read = () => {
-    blocks = [...article.querySelectorAll('.bk-block[data-width]')];
-  };
-  const layout = oncePerFrame(() => {
-    resolveWidths(article, blocks);
-    layoutChanged();
-  });
-  read();
-  layout();
-  let observedWidth = null;
-  new ResizeObserver(([entry]) => {
-    if (entry.contentRect.width === observedWidth) return;
-    observedWidth = entry.contentRect.width;
-    layout();
-  }).observe(article);
-  addEventListener('resize', layout);
-  document.fonts.ready.then(layout);
-  article.addEventListener(
-    'toggle',
-    (event) => {
-      const block = event.target.closest('.bk-block[data-width="auto"]');
-      if (block !== null && !declaresNaturalWidth(block)) layout();
-    },
-    true,
-  );
-  document.addEventListener(CONTENT_EVENT, () => {
-    read();
-    layout();
-  });
-}
-
-function resolveWidths(article, blocks) {
+export function resolveWidths(article, { fresh }) {
+  const blocks = [...article.querySelectorAll('.bk-block[data-width]')];
   const body = article.clientWidth;
   const auto = blocks.filter((block) => block.dataset.width === 'auto');
   for (const block of blocks) {
     if (block.dataset.width !== 'auto') resolve(block, block.dataset.width);
   }
-  const declared = auto.filter(declaresNaturalWidth);
-  const measured = auto.filter((block) => !declared.includes(block));
+  if (fresh) for (const block of auto) declaredWidths.delete(block);
+  for (const block of auto) {
+    if (!declaredWidths.has(block)) declaredWidths.set(block, declaresNaturalWidth(block) ? null : undefined);
+  }
+  const declared = auto.filter((block) => declaredWidths.get(block) !== undefined);
+  const measured = auto.filter((block) => declaredWidths.get(block) === undefined);
   for (const block of measured) resolve(block, 'body');
-  const [wide, ...naturals] = naturalWidths([{ host: article, length: 'var(--wide-width)' }, ...declared.map(naturalWidthProbe)]);
-  const needsWide = new Set([...declared.filter((block, index) => naturals[index] > body + 0.5), ...measured.filter((block) => overflows(block))]);
+  const unknown = declared.filter((block) => declaredWidths.get(block) === null);
+  const [wide, ...naturals] = naturalWidths([{ host: article, length: 'var(--wide-width)' }, ...unknown.map(naturalWidthProbe)]);
+  unknown.forEach((block, index) => declaredWidths.set(block, naturals[index]));
+  const needsWide = new Set([...declared.filter((block) => declaredWidths.get(block) > body + 0.5), ...measured.filter((block) => overflows(block))]);
   for (const block of auto) resolve(block, needsWide.has(block) && wide > body + 0.5 ? 'wide' : 'body');
 }
 
