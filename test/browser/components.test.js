@@ -337,6 +337,30 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
+  await t.test('a download in advance that a starting component cancelled is downloaded again before its own component starts', async () => {
+    const page = await open(null);
+    let delayed = false;
+    let firstRequest;
+    const requested = new Promise((resolve) => {
+      firstRequest = resolve;
+    });
+    await page.route(/[/]count-view-[\w-]{8}\.js$/, async (route) => {
+      if (delayed) return route.continue();
+      delayed = true;
+      firstRequest();
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue().catch(() => {});
+    });
+    await page.goto(`${origin}/2026-10/later/`);
+    await waitForReady(page, 1);
+    await requested;
+    await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+    await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]count-view-[\w-]{8}\.js$/.test(entry.name) && entry.initiatorType === 'fetch' && entry.responseStatus === 200));
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('figure.component')].map((frame) => frame.dataset.state ?? null)), ['ready', null, 'ready']);
+    await page.close();
+  });
+
   await t.test('after a resize, a component starts within the larger of 800 pixels and one and a half heights of the new viewport', async () => {
     const page = await open('below', { viewport: { width: 1440, height: 1000 } });
     await waitForReady(page, 1);

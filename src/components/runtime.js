@@ -9,6 +9,7 @@ const SLOW_CONNECTIONS = ['slow-2g', '2g'];
 const prefetchQueue = [];
 let prefetching = null;
 let starting = 0;
+const prefetched = new Set();
 
 function define(name) {
   if (!definitions.has(name)) {
@@ -115,12 +116,19 @@ function prefetchNext() {
   if (definitions.has(name)) return prefetchNext();
   const controller = new AbortController();
   prefetching = { name, controller };
-  const addresses = files[name].map((file) => new URL(file, import.meta.url).href).filter((address) => performance.getEntriesByName(address).length === 0);
-  Promise.allSettled(addresses.map((address) => fetch(address, { signal: controller.signal, priority: 'low' }).then((response) => response.arrayBuffer()))).then(() => {
+  const addresses = files[name].map((file) => new URL(file, import.meta.url).href).filter((address) => !prefetched.has(address) && !requestedByPage(address));
+  const download = (address) =>
+    fetch(address, { signal: controller.signal, priority: 'low' })
+      .then((response) => response.arrayBuffer())
+      .then(() => prefetched.add(address));
+  Promise.allSettled(addresses.map(download)).then(() => {
     if (prefetching?.controller !== controller) return;
     prefetching = null;
     prefetchNext();
   });
+}
+function requestedByPage(address) {
+  return performance.getEntriesByName(address).some((entry) => entry.initiatorType !== 'fetch');
 }
 function pausePrefetch(name) {
   if (prefetching === null || prefetching.name === name) return;
