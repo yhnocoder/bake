@@ -1,4 +1,5 @@
 import { fragmentOf, idOfFragment } from '../fragments.js';
+import { writeAttributes } from '../markdown/attributes.js';
 
 export const UI = '[data-ui]';
 
@@ -9,7 +10,6 @@ const INLINE_LEAF = 'p, h1, h2, h3, h4, h5, h6, td, th, figcaption, summary, li,
 const BLOCK =
   'address, article, aside, blockquote, details, dialog, div, dl, dt, dd, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, summary, table, thead, tbody, tfoot, tr, td, th, ul, mjx-container[display="true"]';
 const HEADING = 'h1, h2, h3, h4, h5, h6';
-const BARE_VALUE = /^[\w.%/-]+$/;
 const LINE_MARK = '\uFDD0';
 const LINE_PREFIX = '(^|\\n)((?:[ \\t]*(?:>[ \\t]?|(?:[-+*]|\\d{1,9}[.)])[ \\t]+))*[ \\t]*)(\\d*)';
 const LINE_SYNTAX = /^(?:#{1,6}(?:[ \t]|$)|>|[-+](?:[ \t]|$)|[- \t]+$|:{3})/;
@@ -177,7 +177,7 @@ export class MarkdownWriter {
     if (element.matches(UNIT) && (this.isWhole(element) || element.matches(HEADING))) return this.unitSource(element);
     if (element.matches('summary, .aside-title, .embed-source')) return '';
     if (element.matches('p')) return this.inline(element).trim();
-    if (element.matches(HEADING)) return [`${'#'.repeat(Number(element.tagName[1]))} ${this.inline(element).trim()}`, attributeText(writtenAttributes(element))].filter(Boolean).join(' ');
+    if (element.matches(HEADING)) return [`${'#'.repeat(Number(element.tagName[1]))} ${this.inline(element).trim()}`, writeAttributes(writtenAttributes(element))].filter(Boolean).join(' ');
     if (element.matches('.example-source')) return this.selectedText(element).replace(/\n+$/, '');
     if (element.matches('pre')) return this.code(element);
     if (element.matches('mjx-container[data-tex]')) return this.math(element);
@@ -212,7 +212,7 @@ export class MarkdownWriter {
     if (element.matches('a.citation')) return `[@${element.dataset.key}]`;
     if (element.matches('a.eqref')) return `\\eqref{${idOfFragment(hashOf(element.getAttribute('href')))}}`;
     if (element.matches('br')) return '\\\n';
-    if (element.matches('img')) return `![${element.getAttribute('alt') ?? ''}](${element.getAttribute('src')})${attributeText(element.style.width === '' ? {} : { width: element.style.width })}`;
+    if (element.matches('img')) return `![${element.getAttribute('alt') ?? ''}](${element.getAttribute('src')})${writeAttributes(element.style.width === '' ? {} : { width: element.style.width })}`;
     if (element.matches('input[type="checkbox"]')) return element.checked ? '[x] ' : '[ ] ';
     if (element.matches('code')) return inlineCode(this.selectedText(element));
     const inner = this.inline(element);
@@ -276,7 +276,7 @@ export class MarkdownWriter {
     const attributes = {};
     if (figure.style.width !== '') attributes.width = figure.style.width;
     if (figure.dataset.float !== undefined) attributes.float = figure.dataset.float;
-    return `![${image.getAttribute('alt') ?? ''}](${image.getAttribute('src')}${title})${attributeText(attributes)}`;
+    return `![${image.getAttribute('alt') ?? ''}](${image.getAttribute('src')}${title})${writeAttributes(attributes)}`;
   }
 
   fold(details) {
@@ -434,29 +434,11 @@ function quote(text) {
 function fence(name, attributes, body) {
   const inner = body.match(/^:{3,}/gm) ?? [];
   const colons = ':'.repeat(Math.max(3, ...inner.map((line) => line.length + 1)));
-  return `${colons}${name}${attributeText(attributes)}\n${body === '' ? '' : `${body}\n`}${colons}`;
+  return `${colons}${name}${writeAttributes(attributes)}\n${body === '' ? '' : `${body}\n`}${colons}`;
 }
 
 function writtenAttributes(element) {
   return JSON.parse(element.dataset.attributes ?? '{}');
-}
-
-function attributeText(attributes) {
-  const entries = Object.entries(attributes);
-  if (entries.length === 0) return '';
-  return `{${entries.map(([name, value]) => attribute(name, value)).join(' ')}}`;
-}
-
-function attribute(name, value) {
-  if (value === true) return name;
-  if (name === 'id') return `#${value}`;
-  if (name === 'class') return `.${value}`;
-  return `${name}=${attributeValue(String(value))}`;
-}
-
-function attributeValue(value) {
-  if (BARE_VALUE.test(value)) return value;
-  return value.includes('"') ? `'${value}'` : `"${value}"`;
 }
 
 function alignment(align) {

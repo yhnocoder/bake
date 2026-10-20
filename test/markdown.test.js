@@ -6,6 +6,7 @@ import { readComponents } from '../src/components/read.js';
 import { readPreamble } from '../src/config/preamble.js';
 import { indexPages } from '../src/build/links.js';
 import { BUILT_IN_BLOCK_NAMES, parseArticle, readArticle } from '../src/markdown/article.js';
+import { parseAttributes, writeAttributes } from '../src/markdown/attributes.js';
 import { formatError, sortErrors } from '../src/report.js';
 import { folder, frontMatter, html, outline, parse, parsed } from './article.js';
 
@@ -201,6 +202,29 @@ describe('headings and anchors', () => {
       assert.deepEqual((await parse(`${line}\n`)).errors, [message]);
     });
   }
+});
+
+describe('attributes', () => {
+  test('writes attributes in a form that the reader reads back to the same values', () => {
+    const written = [
+      ['{toggle}', { toggle: true }],
+      ['{title="text with spaces"}', { title: 'text with spaces' }],
+      ['{#own .wide}', { id: 'own', class: 'wide' }],
+      ['{range=6 step=0.25 min=-1 width=560px}', { range: '6', step: '0.25', min: '-1', width: '560px' }],
+      [`{label='say "hi"' fn="a}b" toc="短标题" empty=""}`, { label: 'say "hi"', fn: 'a}b', toc: '短标题', empty: '' }],
+      ['{id="two words" class="a=b"}', { id: 'two words', class: 'a=b' }],
+    ];
+    for (const [text, attributes] of written) {
+      assert.equal(writeAttributes(attributes), text);
+      assert.deepEqual(parseAttributes(text).attributes, attributes);
+    }
+    for (const text of ['{#own}', "{title='single quoted'}", '{range="6"}', '{id=own}', '{.wide toggle}']) {
+      const { attributes } = parseAttributes(text);
+      assert.deepEqual(parseAttributes(writeAttributes(attributes)).attributes, attributes);
+    }
+    assert.equal(writeAttributes({ range: 6 }), '{range=6}');
+    assert.equal(writeAttributes({}), '');
+  });
 });
 
 describe('inline syntax', () => {
