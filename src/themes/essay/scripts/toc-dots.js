@@ -39,7 +39,7 @@ export function dotsView(context) {
     if (!root.contains(event.relatedTarget)) leave();
   });
   context.host.append(root, card);
-  cardKeyboard({ groups: items.map((entry) => [entry.item]), card, shown: () => (card.classList.contains('is-on') ? hovered : -1), leave: () => leave() });
+  cardKeyboard({ groups: items.map((entry) => [entry.item]), card, shown: () => (card.classList.contains('is-on') ? hovered : -1), leave: () => leave(), close: () => close() });
   let shownCurrent = null;
   let hovered = -1;
   let shownState = '';
@@ -70,12 +70,17 @@ export function dotsView(context) {
       card.classList.add('is-on');
     }, now);
   }
+  function hide() {
+    card.classList.remove('is-on');
+    hovered = -1;
+    items.forEach((entry) => entry.item.classList.remove('is-hover'));
+  }
   function leave() {
-    intent.leave(() => {
-      card.classList.remove('is-on');
-      hovered = -1;
-      items.forEach((entry) => entry.item.classList.remove('is-hover'));
-    });
+    intent.leave(hide);
+  }
+  function close() {
+    intent.stop();
+    hide();
   }
   function measure() {
     const room = innerHeight - TOP_MIN - BOTTOM_ROOM;

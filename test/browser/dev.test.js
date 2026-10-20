@@ -214,6 +214,22 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await dot.waitFor();
   });
 
+  await t.test('the dot stays clear of the AI chat button on wide and narrow screens', async () => {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 375, height: 760 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await dot.waitFor();
+      const boxes = await page.evaluate(() => {
+        const box = (element) => element.getBoundingClientRect().toJSON();
+        return { dot: box(document.querySelector('#bake-dev').shadowRoot.querySelector('.dot')), chat: box(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher')) };
+      });
+      assert.ok(boxes.dot.bottom <= boxes.chat.top && boxes.dot.right <= viewport.width, `the dot covers the chat button at ${viewport.width} pixels: ${JSON.stringify(boxes)}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+  });
+
   await t.test('the problems list and the dot only fade when the reader prefers reduced motion', async () => {
     const transitions = () => page.evaluate(() => [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => getComputedStyle(element).transitionProperty));
     assert.ok((await transitions()).every((property) => property.includes('translate')));

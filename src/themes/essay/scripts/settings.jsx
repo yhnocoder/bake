@@ -1,7 +1,8 @@
-import { For, createSignal } from 'solid-js';
+import { For, createSignal, onMount } from 'solid-js';
 import { render } from 'solid-js/web';
 import { labelsFor } from '../labels.js';
 import { SETTINGS, storageKey } from '../settings.js';
+import { closeOnEscape } from './escape.js';
 import { layoutChanged } from './motion.js';
 
 export const SETTING_EVENT = 'bk:setting';
@@ -46,11 +47,13 @@ function Settings(props) {
   const [open, setOpen] = createSignal(false);
   let root;
   let toggle;
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || !open()) return;
-    setOpen(false);
-    toggle.focus();
-  });
+  onMount(() =>
+    closeOnEscape(root, () => {
+      if (!open()) return;
+      setOpen(false);
+      toggle.focus();
+    }),
+  );
   document.addEventListener('pointerdown', (event) => {
     if (open() && !root.contains(event.target)) setOpen(false);
   });
