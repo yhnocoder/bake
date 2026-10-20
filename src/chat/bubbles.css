@@ -37,10 +37,6 @@
     content-visibility 0s allow-discrete;
 }
 
-.bk-chat-thread {
-  pointer-events: auto;
-}
-
 .bk-chat:not([data-open]) > :is(.bk-chat-bubbles, .bk-chat-composer) {
   pointer-events: none;
   transition:
