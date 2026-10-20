@@ -705,7 +705,7 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
-  await t.test('on phones scrolling down hides the buttons, scrolling up shows them, and the setting turns this off', async () => {
+  await t.test('on phones scrolling down fades the buttons out in place with reduced motion, scrolling up shows them, and the setting turns this off', async () => {
     const { page, context } = await open({ viewport: { width: 375, height: 760 }, hasTouch: true });
     const placed = (opacity) =>
       page
@@ -732,8 +732,23 @@ test('the table of contents', async (t) => {
       await settle(page);
     };
     assert.equal(await placed('1'), true);
+    await page.evaluate(() => {
+      const handle = document.querySelector('.bk-toc-handle');
+      window.handleFrames = [];
+      const record = () => {
+        window.handleFrames.push({ opacity: parseFloat(getComputedStyle(handle).opacity), left: handle.getBoundingClientRect().left });
+        window.handleRecording = requestAnimationFrame(record);
+      };
+      record();
+    });
     await scrollBy(600);
     assert.equal(await placed('0'), true);
+    const frames = await page.evaluate(() => {
+      cancelAnimationFrame(window.handleRecording);
+      return window.handleFrames;
+    });
+    assert.ok(frames.some((frame) => frame.opacity > 0 && frame.opacity < 1), 'the handle disappeared without fading');
+    assert.ok(frames.every((frame) => frame.left === 0), 'the handle moved while it faded');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden');
     assert.deepEqual(await focusable(), [false, false]);
     await scrollBy(-200);

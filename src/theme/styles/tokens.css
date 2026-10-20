@@ -50,7 +50,12 @@
   --selection: color-mix(in srgb, var(--accent) 24%, transparent);
   --selection-quiet: color-mix(in srgb, var(--accent) 9%, transparent);
   --flash: color-mix(in srgb, var(--accent) 14%, transparent);
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-fast: 0.12s;
+  --motion: 0.2s;
+  --motion-slow: 0.3s;
+  --fade: 0.2s;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-distance: 1;
   --font-wenkai: 'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
   --font-sans: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-heading: var(--font-wenkai);
@@ -159,4 +164,13 @@
   --layer-chat-ask: 76;
   --layer-chat-panel: 77;
   --layer-toast: 80;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0s;
+    --motion: 0s;
+    --motion-slow: 0s;
+    --motion-distance: 0;
+  }
 }

@@ -29,7 +29,7 @@ const easings = new WeakMap()
 
 export function fadeIn(element) {
   if (!element || prefersReducedMotion()) return
-  if (!easings.has(element)) easings.set(element, getComputedStyle(element).getPropertyValue('--ease-out').trim() || 'ease-out')
+  if (!easings.has(element)) easings.set(element, getComputedStyle(element).getPropertyValue('--ease').trim() || 'ease-out')
   element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: easings.get(element) })
 }
 

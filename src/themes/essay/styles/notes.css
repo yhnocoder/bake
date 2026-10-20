@@ -9,13 +9,13 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--mark) 60%, transparent);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease-out;
+  transition: opacity var(--motion-slow) ease-out;
 }
 
 .bk-tintable.bk-tinted::after,
 .bk-notes-layer .bk-sidenote.is-active::after {
   opacity: 1;
-  transition-duration: 0.15s;
+  transition-duration: var(--motion-fast);
 }
 
 .bk-sidenote {

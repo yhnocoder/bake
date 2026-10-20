@@ -26,12 +26,12 @@
   background: var(--mark);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease-out;
+  transition: opacity var(--motion-slow) ease-out;
 }
 
 .sidenote-ref.is-active a::before {
   opacity: 1;
-  transition-duration: 0.15s;
+  transition-duration: var(--motion-fast);
 }
 
 .bk-sidenote-number {

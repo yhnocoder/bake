@@ -36,7 +36,7 @@
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.15s;
+  transition: scrollbar-color var(--motion-fast);
 }
 
 .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):hover:where(:not(.component-box *)) {
@@ -364,7 +364,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   color: var(--ink-2);
   user-select: none;
   -webkit-user-select: none;
-  transition: color 0.3s ease-out;
+  transition: color var(--motion-slow) ease-out;
 }
 
 .bk-article details.fold > summary:where(:not(.component-box *))::before {
@@ -375,12 +375,12 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   border-radius: inherit;
   background: var(--surface-2);
   opacity: 0;
-  transition: opacity 0.2s ease-out;
+  transition: opacity var(--motion) ease-out;
 }
 
 .bk-article details.fold > summary:hover:where(:not(.component-box *))::before {
   opacity: 1;
-  transition-duration: 0.12s;
+  transition-duration: var(--motion-fast);
 }
 
 .bk-article .example-result details.fold > summary:where(:not(.component-box *))::before,
@@ -401,7 +401,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     center / contain no-repeat;
   rotate: -90deg;
-  transition: rotate 0.22s var(--ease-out);
+  transition: rotate var(--motion) var(--ease);
 }
 
 .bk-article details.fold[open] > summary:where(:not(.component-box *))::after {
@@ -414,7 +414,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 
 .bk-article details.fold > summary:active:where(:not(.component-box *)) {
   color: var(--accent);
-  transition: color 0.12s ease-out;
+  transition: color var(--motion-fast) ease-out;
 }
 
 .bk-article details.fold:where(:not(.component-box *))::details-content {
@@ -575,11 +575,11 @@ h4 + .bk-references {
   content: '↗';
   display: inline-block;
   margin-left: 0.3em;
-  transition: transform 0.2s var(--ease-out);
+  transition: transform var(--motion) var(--ease);
 }
 
 .bk-article .embed-source a:hover:where(:not(.component-box *))::after {
-  transform: translate(2px, -2px);
+  transform: translate(calc(2px * var(--motion-distance)), calc(-2px * var(--motion-distance)));
 }
 
 .bk-article .embed-source cite:where(:not(.component-box *)) {
@@ -731,11 +731,5 @@ h4 + .bk-references {
 
   .bk-article :is(.example-result, .example-source > pre.shiki):where(:not(.component-box *)) {
     padding: 14px 16px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bk-article .embed-source a:hover:where(:not(.component-box *))::after {
-    transform: none;
   }
 }

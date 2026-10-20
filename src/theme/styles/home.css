@@ -1,7 +1,12 @@
 html:has(> body > .bk-home) {
   --home-bar-height: 72px;
-  scroll-behavior: smooth;
   scroll-padding-top: var(--home-bar-height);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(> body > .bk-home) {
+    scroll-behavior: smooth;
+  }
 }
 
 .bk-home {
@@ -60,7 +65,7 @@ html:has(> body > .bk-home) {
   clip-path: inset(0 -100vmax -28px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s;
+  transition: opacity var(--motion);
 }
 
 .bk-home .bk-home-bar[data-stuck]::before {
@@ -100,7 +105,7 @@ html:has(> body > .bk-home) {
   line-height: 1.5;
   text-decoration: none;
   white-space: nowrap;
-  transition: scale 0.12s;
+  transition: scale var(--motion-fast);
 }
 
 .bk-home .bk-chip::before {
@@ -113,7 +118,7 @@ html:has(> body > .bk-home) {
   background: var(--chip-fill);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.18s;
+  transition: opacity var(--motion);
 }
 
 .bk-home .bk-chip:hover {
@@ -208,7 +213,7 @@ html:has(> body > .bk-home) {
     0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent),
     var(--segment-shadow);
   transform: translateX(calc(var(--i) * (100% + 2px)));
-  transition: transform 0.24s var(--ease-out);
+  transition: transform var(--motion) var(--ease);
 }
 
 .bk-home .bk-switch-options button {
@@ -219,7 +224,7 @@ html:has(> body > .bk-home) {
   background: none;
   color: var(--ink-2);
   font-size: 12px;
-  transition: scale 0.12s;
+  transition: scale var(--motion-fast);
 }
 
 .bk-home .bk-switch[data-control='columns'] button {
@@ -336,7 +341,7 @@ html:has(> body > .bk-home) {
   color: var(--ink);
   text-decoration: none;
   transform-origin: top left;
-  transition: translate 0.2s var(--ease-out);
+  transition: translate var(--motion) var(--ease);
 }
 
 .bk-home .bk-card::before,
@@ -347,7 +352,7 @@ html:has(> body > .bk-home) {
   border-radius: inherit;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s var(--ease-out);
+  transition: opacity var(--motion) var(--ease);
 }
 
 .bk-home .bk-card::before {
@@ -361,7 +366,7 @@ html:has(> body > .bk-home) {
 }
 
 .bk-home .bk-card:is(:hover, :focus-visible, [data-active]) {
-  translate: 0 -3px;
+  translate: 0 calc(-3px * var(--motion-distance));
 }
 
 .bk-home .bk-card:is(:hover, :focus-visible, [data-active])::before,
@@ -394,11 +399,11 @@ html:has(> body > .bk-home) {
 }
 
 .bk-home .bk-card-fallback {
-  transition: scale 0.4s var(--ease-out);
+  transition: scale var(--motion-slow) var(--ease);
 }
 
 .bk-home .bk-card:is(:hover, :focus-visible) .bk-card-fallback {
-  scale: 1.03;
+  scale: calc(1 + 0.03 * var(--motion-distance));
 }
 
 .bk-home .bk-card-fallback img {
@@ -554,20 +559,6 @@ html:has(> body > .bk-home) {
 
   .bk-home .bk-chips::-webkit-scrollbar {
     display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bk-home .bk-card,
-  .bk-home .bk-card-fallback,
-  .bk-home .bk-switch-options::before {
-    transition: none;
-  }
-
-  .bk-home .bk-card:is(:hover, :focus-visible, [data-active]),
-  .bk-home .bk-card:is(:hover, :focus-visible) .bk-card-fallback {
-    translate: none;
-    scale: none;
   }
 }
 

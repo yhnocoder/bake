@@ -69,7 +69,7 @@
   overflow: hidden;
   outline: 2px solid transparent;
   outline-offset: -2px;
-  transition: outline-color 0.15s var(--ease-out);
+  transition: outline-color var(--motion-fast) var(--ease);
 }
 
 .bt-grid[data-packed] > .bt-card[data-rows][data-active] {
@@ -88,7 +88,7 @@
   margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
   background: linear-gradient(to bottom, transparent, var(--surface));
   pointer-events: none;
-  transition: opacity 0.2s var(--ease-out);
+  transition: opacity var(--motion) var(--ease);
 }
 
 .bt-grid[data-packed] > .bt-card[data-overflow][data-end]::after {
@@ -261,13 +261,13 @@
   background: var(--mark);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease-out;
+  transition: opacity var(--motion-slow) ease-out;
 }
 
 .bt-article .bk-sidenote.is-active .bk-sidenote-number::before,
 .bt-notes .bk-sidenote.is-active::before {
   opacity: 1;
-  transition-duration: 0.15s;
+  transition-duration: var(--motion-fast);
 }
 
 .bt-notes .bk-sidenote {

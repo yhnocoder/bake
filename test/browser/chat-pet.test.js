@@ -309,7 +309,7 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     await page.locator('.bk-chat-note').first().waitFor();
     const box = await chat.boundingBox();
     assert.ok(box.x >= 0 && box.x + box.width <= 375 && box.y >= 0 && box.y + box.height <= 700, JSON.stringify(box));
-    assert.equal(await launcher.evaluate((element) => getComputedStyle(element).transform), 'none');
+    assert.equal(await launcher.evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).isIdentity), true);
     assert.equal(
       await page
         .locator('.bk-chat-bubble')

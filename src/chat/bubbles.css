@@ -19,8 +19,8 @@
   font-size: 13.5px;
   line-height: 1.6;
   pointer-events: none;
-  translate: 0 6px;
-  transition: translate 0.24s var(--ease-out, ease-out);
+  translate: 0 calc(6px * var(--motion-distance));
+  transition: translate var(--motion) var(--ease);
 }
 
 .bk-chat * {
@@ -39,7 +39,7 @@
     0 12px 32px -12px color-mix(in srgb, var(--ink) 25%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
-  transition: opacity 0.2s var(--ease-out, ease-out);
+  transition: opacity var(--fade) var(--ease);
 }
 
 .bk-chat::before,
@@ -89,8 +89,8 @@
 .bk-chat-composer {
   pointer-events: auto;
   transition:
-    opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out),
+    opacity var(--fade) var(--ease),
+    translate var(--motion) var(--ease),
     visibility 0s,
     content-visibility 0s allow-discrete;
 }
@@ -98,10 +98,10 @@
 .bk-chat:not([data-open]) > :is(.bk-chat-bubbles, .bk-chat-note-card, .bk-chat-composer) {
   pointer-events: none;
   transition:
-    opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out),
-    visibility 0s 0.2s,
-    content-visibility 0s 0.2s allow-discrete;
+    opacity var(--fade) var(--ease),
+    translate var(--motion) var(--ease),
+    visibility 0s var(--fade),
+    content-visibility 0s var(--fade) allow-discrete;
 }
 
 .bk-chat:not([data-open]) > .bk-chat-bubbles {
@@ -120,10 +120,10 @@
   .bk-chat > :is(.bk-chat-bubbles, .bk-chat-note-card, .bk-chat-composer) {
     pointer-events: none;
     transition:
-      opacity 0.2s var(--ease-out, ease-out),
-      translate 0.24s var(--ease-out, ease-out),
-      visibility 0s 0.2s,
-      content-visibility 0s 0.2s allow-discrete;
+      opacity var(--fade) var(--ease),
+      translate var(--motion) var(--ease),
+      visibility 0s var(--fade),
+      content-visibility 0s var(--fade) allow-discrete;
   }
 
   .bk-chat > .bk-chat-bubbles {
@@ -182,14 +182,14 @@
   font-family: var(--font-body, inherit);
   overflow-wrap: anywhere;
   transition:
-    opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out);
+    opacity var(--fade) var(--ease),
+    translate var(--motion) var(--ease);
 }
 
 @starting-style {
   .bk-chat-bubble {
     opacity: 0;
-    translate: 0 6px;
+    translate: 0 calc(6px * var(--motion-distance));
   }
 }
 
@@ -360,9 +360,9 @@
   overflow: hidden;
   opacity: 0;
   transition:
-    block-size 0.2s var(--ease-out, ease-out),
-    opacity 0.2s,
-    content-visibility 0.2s allow-discrete;
+    block-size var(--motion) var(--ease),
+    opacity var(--fade),
+    content-visibility var(--fade) allow-discrete;
 }
 
 .bk-chat-reasoning[open]::details-content {
@@ -403,7 +403,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
-  transition: color 0.15s;
+  transition: color var(--motion-fast);
 }
 
 .bk-chat-link:hover {
@@ -497,8 +497,8 @@
   color: var(--bg);
   font-size: 12px;
   transition:
-    opacity 0.15s,
-    scale 0.12s;
+    opacity var(--motion-fast),
+    scale var(--motion-fast);
 }
 
 .bk-chat-send:disabled {
@@ -527,8 +527,8 @@
   background: none;
   color: var(--ink-3);
   transition:
-    background-color 0.15s,
-    color 0.15s;
+    background-color var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .bk-chat-icon:hover,
@@ -566,7 +566,7 @@
   border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--card-shadow);
-  animation: bk-chat-pop 0.16s var(--ease-out, ease-out);
+  animation: bk-chat-pop var(--fade) var(--ease);
 }
 
 .bk-chat-scopes-kind {
@@ -648,7 +648,7 @@
   color: var(--ink);
   font-size: 13px;
   text-align: left;
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast);
 }
 
 .bk-chat-menu-item:hover:not(:disabled) {
@@ -792,7 +792,7 @@
   isolation: isolate;
   user-select: none;
   -webkit-user-select: none;
-  transition: color 0.15s;
+  transition: color var(--motion-fast);
 }
 
 .bk-chat-prompt-tabs button::before {
@@ -804,7 +804,7 @@
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--motion-fast);
 }
 
 .bk-chat-prompt-tabs button[aria-selected='true'] {
@@ -844,7 +844,7 @@
   color: var(--ink);
   font: 13px/1.55 var(--font-ui, inherit);
   resize: none;
-  transition: box-shadow 0.15s;
+  transition: box-shadow var(--motion-fast);
 }
 
 .bk-chat-prompt textarea:focus,
@@ -887,7 +887,7 @@
   color: var(--accent);
   font-size: 13px;
   text-align: left;
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast);
 }
 
 .bk-chat-history-new:hover {
@@ -930,7 +930,7 @@
   color: var(--ink);
   font-size: 13px;
   text-align: left;
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast);
 }
 
 .bk-chat-history-row:hover .bk-chat-history-open,
@@ -951,7 +951,7 @@
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  transition: opacity 0.12s;
+  transition: opacity var(--motion-fast);
 }
 
 .bk-chat-badge {
@@ -979,9 +979,9 @@
   opacity: 0;
   translate: 0 -50%;
   transition:
-    opacity 0.12s,
-    color 0.12s,
-    background-color 0.12s;
+    opacity var(--motion-fast),
+    color var(--motion-fast),
+    background-color var(--motion-fast);
 }
 
 .bk-chat-history-delete svg {
@@ -1064,7 +1064,7 @@
 @starting-style {
   .bk-chat[data-open] > .bk-chat-note-card {
     opacity: 0;
-    translate: 0 8px;
+    translate: 0 calc(8px * var(--motion-distance));
   }
 }
 
@@ -1090,8 +1090,8 @@
   color: var(--ink-3);
   font-size: 12px;
   transition:
-    background-color 0.15s,
-    color 0.15s;
+    background-color var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .bk-chat-note-version {
@@ -1137,8 +1137,8 @@
   scrollbar-color: transparent transparent;
   scrollbar-width: thin;
   transition:
-    opacity 0.2s,
-    scrollbar-color 0.15s;
+    opacity var(--motion),
+    scrollbar-color var(--motion-fast);
 }
 
 .bk-chat-note-body:hover,
@@ -1294,9 +1294,9 @@
   color: var(--ink);
   font: 11.5px var(--font-ui, inherit);
   transition:
-    scale 0.12s,
-    filter 0.12s,
-    opacity 0.15s;
+    scale var(--motion-fast),
+    filter var(--motion-fast),
+    opacity var(--motion-fast);
 }
 
 .bk-chat-note-button[data-primary] {
@@ -1355,12 +1355,12 @@
   box-shadow: 0 -10px 20px -14px color-mix(in srgb, var(--ink) 35%, transparent);
   font-family: var(--font-ui, inherit);
   opacity: 0;
-  translate: 0 6px;
+  translate: 0 calc(6px * var(--motion-distance));
   visibility: hidden;
   transition:
-    opacity 0.14s var(--ease-out, ease-out),
-    translate 0.16s var(--ease-out, ease-out),
-    visibility 0s 0.16s;
+    opacity var(--fade) var(--ease),
+    translate var(--motion) var(--ease),
+    visibility 0s var(--fade);
 }
 
 .bk-chat-redo[data-open] {
@@ -1368,8 +1368,8 @@
   translate: none;
   visibility: visible;
   transition:
-    opacity 0.14s var(--ease-out, ease-out),
-    translate 0.16s var(--ease-out, ease-out);
+    opacity var(--fade) var(--ease),
+    translate var(--motion) var(--ease);
 }
 
 .bk-chat-redo label {
@@ -1390,7 +1390,7 @@
   color: var(--ink);
   font: 13px/1.55 var(--font-ui, inherit);
   resize: none;
-  transition: box-shadow 0.15s;
+  transition: box-shadow var(--motion-fast);
 }
 
 .bk-chat-redo textarea::placeholder {
@@ -1412,9 +1412,9 @@
   color: var(--ink-2);
   font: 11.5px var(--font-ui, inherit);
   transition:
-    color 0.15s,
-    scale 0.12s,
-    filter 0.12s;
+    color var(--motion-fast),
+    scale var(--motion-fast),
+    filter var(--motion-fast);
 }
 
 .bk-chat-redo-chip:hover {
@@ -1430,48 +1430,6 @@
 @keyframes bk-chat-pop {
   from {
     opacity: 0;
-    translate: 0 4px;
-  }
-}
-
-@keyframes bk-chat-pop-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bk-chat {
-    translate: none;
-  }
-
-  @starting-style {
-    .bk-chat-bubble {
-      translate: none;
-    }
-  }
-
-  .bk-chat-scopes,
-  .bk-chat-menu,
-  .bk-chat-history,
-  .bk-chat-prompt {
-    animation-name: bk-chat-pop-fade;
-  }
-
-  .bk-chat-note-card,
-  .bk-chat-redo {
-    translate: none;
-  }
-
-  @starting-style {
-    .bk-chat[data-open] > .bk-chat-note-card {
-      translate: none;
-    }
-  }
-
-  .bk-chat-reasoning::details-content {
-    transition:
-      opacity 0.2s,
-      content-visibility 0.2s allow-discrete;
+    translate: 0 calc(4px * var(--motion-distance));
   }
 }

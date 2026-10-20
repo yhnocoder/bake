@@ -54,7 +54,7 @@
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
-  transition: transform 0.12s var(--ease-out);
+  transition: transform var(--motion-fast) var(--ease);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -66,7 +66,7 @@
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
-  transition: transform 0.12s var(--ease-out);
+  transition: transform var(--motion-fast) var(--ease);
 }
 
 .bk-kit-slider input:hover::-webkit-slider-thumb {
@@ -121,7 +121,7 @@
   color: var(--ink-2);
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.12s;
+  transition: color var(--motion-fast);
 }
 
 .bk-kit-segment::before {
@@ -135,7 +135,7 @@
     0 0 0 0.5px var(--hair),
     var(--segment-shadow);
   opacity: 0;
-  transition: opacity 0.12s;
+  transition: opacity var(--motion-fast);
 }
 
 .bk-kit-segment:is(:hover, [aria-pressed='true'], :has(:checked)) {
@@ -179,7 +179,7 @@
   height: 18px;
   border-radius: 9px;
   background: var(--switch-off, var(--line-2));
-  transition: background-color 0.2s;
+  transition: background-color var(--motion);
 }
 
 .bk-kit-switch::after {
@@ -193,7 +193,7 @@
   background: var(--switch-thumb, var(--surface));
   box-shadow: var(--switch-thumb-shadow);
   pointer-events: none;
-  transition: transform 0.2s var(--ease-out);
+  transition: transform var(--motion) var(--ease);
 }
 
 .bk-kit-switch:is(:has(:checked), [aria-checked='true'] > *) {
@@ -240,18 +240,3 @@
   outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .bk-kit-segment::before,
-  .bk-kit-switch,
-  .bk-kit-switch::after {
-    transition: none;
-  }
-
-  .bk-kit-slider input::-webkit-slider-thumb {
-    transition: none;
-  }
-
-  .bk-kit-slider input::-moz-range-thumb {
-    transition: none;
-  }
-}

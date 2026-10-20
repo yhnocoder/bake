@@ -43,13 +43,13 @@ button:focus-visible {
   user-select: none;
   -webkit-user-select: none;
   opacity: calc(1 - var(--chat-hidden, 0));
-  transform: translateX(calc(var(--chat-hidden, 0) * (100% + var(--chat-right, 16px) + 8px)));
+  transform: translateX(calc(var(--chat-hidden, 0) * (100% + var(--chat-right, 16px) + 8px) * var(--motion-distance)));
   visibility: var(--chat-visibility, visible);
   transition:
-    scale 0.12s,
-    opacity 0.2s,
-    transform 0.25s var(--ease-out, ease-out),
-    visibility 0.25s;
+    scale var(--motion-fast),
+    opacity var(--fade),
+    transform var(--motion) var(--ease),
+    visibility var(--fade);
 }
 
 .bk-chat-launcher .bk-chat-pet {
@@ -80,7 +80,7 @@ button:focus-visible {
   box-shadow: var(--button-shadow);
   user-select: none;
   -webkit-user-select: none;
-  animation: bk-chat-fade 0.14s var(--ease-out, ease-out);
+  animation: bk-chat-fade var(--fade) var(--ease);
 }
 
 .bk-chat-ask[hidden] {
@@ -94,26 +94,7 @@ button:focus-visible {
 @keyframes bk-chat-fade {
   from {
     opacity: 0;
-    translate: 0 3px;
-  }
-}
-
-@keyframes bk-chat-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bk-chat-ask {
-    animation-name: bk-chat-fade-in;
-  }
-
-  .bk-chat-launcher {
-    transform: none;
-    transition:
-      opacity 0.2s,
-      visibility 0.2s;
+    translate: 0 calc(3px * var(--motion-distance));
   }
 }
 

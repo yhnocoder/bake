@@ -101,7 +101,7 @@ llm-glu-diagram {
 }
 .llm-fade,
 .llm-curve {
-  transition: opacity 0.12s var(--ease-out);
+  transition: opacity 0.12s var(--ease);
 }
 .llm-fade {
   opacity: 0;

@@ -237,10 +237,17 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   });
 
   await t.test('the problems list and the dot only fade when the reader prefers reduced motion', async () => {
-    const transitions = () => page.evaluate(() => [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => getComputedStyle(element).transitionProperty));
-    assert.ok((await transitions()).every((property) => property.includes('translate')));
+    const transitions = () =>
+      page.evaluate(() =>
+        [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => {
+          const style = getComputedStyle(element);
+          const durations = style.transitionDuration.split(', ').map(parseFloat);
+          return Object.fromEntries(style.transitionProperty.split(', ').map((property, index) => [property, durations[index % durations.length]]));
+        }),
+      );
+    assert.ok((await transitions()).every((duration) => duration.translate > 0));
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    assert.ok((await transitions()).every((property) => property.includes('opacity') && !property.includes('translate')));
+    assert.ok((await transitions()).every((duration) => duration.opacity > 0 && duration.translate === 0));
     await page.emulateMedia({ reducedMotion: null });
   });
 

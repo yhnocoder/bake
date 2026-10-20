@@ -66,7 +66,7 @@ body {
 }
 
 ::view-transition-group(root) {
-  animation-duration: 0.2s;
+  animation-duration: var(--motion);
 }
 
 ::selection {
@@ -88,7 +88,7 @@ a:where(:not(.component-box *)) {
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
   text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  transition: text-decoration-color 0.12s;
+  transition: text-decoration-color var(--motion-fast);
 }
 
 a:hover:where(:not(.component-box *)) {
@@ -142,7 +142,7 @@ button:where(:not(.component-box *)) {
   letter-spacing: 0.04em;
   color: var(--ink-3);
   text-decoration: none;
-  transition: color 0.12s;
+  transition: color var(--motion-fast);
 }
 
 .bk-site:hover {
@@ -212,8 +212,8 @@ button:where(:not(.component-box *)) {
   text-underline-offset: 4px;
   text-decoration-color: color-mix(in srgb, var(--ink-3) 35%, transparent);
   transition:
-    color 0.12s,
-    text-decoration-color 0.12s;
+    color var(--motion-fast),
+    text-decoration-color var(--motion-fast);
 }
 
 .bk-copy-source:hover {
@@ -363,8 +363,8 @@ button:where(:not(.component-box *)) {
   color: var(--ink-3);
   opacity: 0;
   transition:
-    opacity 0.15s,
-    color 0.12s;
+    opacity var(--motion-fast),
+    color var(--motion-fast);
 }
 
 :is(h2, h3, h4, h5, h6):hover > .bk-heading-link,
@@ -395,15 +395,5 @@ button:where(:not(.component-box *)) {
 @media (max-width: 599.98px) {
   .bk-heading-link {
     display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :where(:not(.component-box *, .bk-settings-panel, .bk-toast)),
-  :where(:not(.component-box *))::before,
-  :where(:not(.component-box *))::after {
-    transition-duration: 0s !important;
-    animation-duration: 0s !important;
-    scroll-behavior: auto !important;
   }
 }
