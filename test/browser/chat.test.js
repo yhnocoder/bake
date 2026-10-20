@@ -137,6 +137,31 @@ test('the AI chat on published pages', async (t) => {
     assert.deepEqual(problems, []);
   });
 
+  await t.test('the frosted glass lies under every part of the chat that asks for the key, at 1440 and 375 pixels', async (t) => {
+    for (const [width, height] of [[1440, 900], [375, 812]]) {
+      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width, height } } });
+      await page.goto(`${base}/2026-09/llm-act-fns/`);
+      await page.locator('.bk-chat-launcher').click();
+      await page.locator(KEY).waitFor();
+      await page.waitForTimeout(400);
+      const layout = await page.locator('.bk-chat').evaluate((chat) => {
+        const glass = chat.getBoundingClientRect();
+        const style = getComputedStyle(chat, '::before');
+        const parts = [...chat.querySelectorAll('.bk-chat-bubble, .bk-chat-composer')].map((part) => part.getBoundingClientRect()).filter((box) => box.width > 0);
+        return {
+          blur: style.backdropFilter.startsWith('blur('),
+          opacity: style.opacity,
+          parts: parts.length,
+          outside: parts.filter((box) => box.left < glass.left || box.right > glass.right || box.top < glass.top || box.bottom > glass.bottom).length,
+        };
+      });
+      assert.equal(layout.blur && layout.opacity === '1', true, `the glass blurs the page behind the chat at ${width} pixels`);
+      assert.ok(layout.parts >= 2, `the key instructions and the key field show at ${width} pixels`);
+      assert.equal(layout.outside, 0, `the key instructions and the key field lie on the glass at ${width} pixels`);
+      await page.close();
+    }
+  });
+
   await t.test('the passkey unlocks the key for 30 days in this browser, and only when a question is sent after that', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
