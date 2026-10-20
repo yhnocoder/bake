@@ -8,7 +8,7 @@ import { before, describe, test } from 'node:test';
 import { PNG } from 'pngjs';
 import sharp from 'sharp';
 import { INSTALL_CHROMIUM, SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH } from '../src/build/share-images.js';
-import { createSite, updateSite } from '../src/build/site.js';
+import { startDevServer } from '../src/dev/server.js';
 import { article, bake, cli, createBlog, readTree, writeFiles } from './blog.js';
 
 const config = `export default {
@@ -94,6 +94,7 @@ describe('share images', () => {
     assert.match(rope, /^2026-10\/rope-[0-9a-f]{12}\.png$/);
     assert.match(vector, /^2026-10\/vector-[0-9a-f]{12}\.png$/);
     assert.deepEqual(readFileSync(join(dir, 'dist/og', covered)), cover);
+    assert.equal(covered, `2026-10/covered-${createHash('sha256').update(cover).digest('hex').slice(0, 12)}.png`);
     assert.deepEqual(readFileSync(join(dir, 'dist/og', photoImage)), photo);
     const raster = PNG.sync.read(readFileSync(join(dir, 'dist/og', vector)));
     assert.deepEqual([raster.width, raster.height], [400, 210]);
@@ -144,47 +145,30 @@ describe('share images', () => {
     assert.deepEqual(pixel(PNG.sync.read(readFileSync(join(dir, 'dist/og/2026-10', card))), 904, 315), MAGENTA);
   });
 
-  test('the name of a card changes with its title, its preview and the files the preview imports', async (t) => {
+  test('the name of a card changes with its title, its preview and the files the preview imports', (t) => {
     const dir = createBlog(t, blogFiles);
-    const site = createSite(dir, { shareImages: true });
-    const pathAfter = async (changes) => {
+    const nameAfter = (changes) => {
       writeFiles(dir, changes);
-      const result = await updateSite(site, Object.keys(changes));
-      assert.deepEqual(result.errors, []);
-      return result.shareImages.find((image) => image.owner === ROPE).path;
+      assert.equal(bake(dir, 'build').stderr, '');
+      return readdirSync(join(dir, 'dist/og/2026-10')).find((name) => name.startsWith('rope-'));
     };
-    const first = (await updateSite(site)).shareImages.find((image) => image.owner === ROPE).path;
-    assert.match(first, /^og\/2026-10\/rope-[0-9a-f]{12}\.png$/);
-    assert.equal(await pathAfter({ 'content/posts/plain/index.md': article({ title: 'Plain 2', slug: 'plain', date: '2026-09-02', extra: 'category: notes\n' }) }), first);
-    const afterPreview = await pathAfter({ 'content/posts/rope/preview.js': preview.replace('colour;', 'colour;\n  element.dataset.drawn = "";') });
+    const first = nameAfter({});
+    assert.match(first, /^rope-[0-9a-f]{12}\.png$/);
+    assert.equal(nameAfter({ 'content/posts/plain/index.md': article({ title: 'Plain 2', slug: 'plain', date: '2026-09-02', extra: 'category: notes\n' }) }), first);
+    const afterPreview = nameAfter({ 'content/posts/rope/preview.js': preview.replace('colour;', 'colour;\n  element.dataset.drawn = "";') });
     assert.notEqual(afterPreview, first);
-    const afterImport = await pathAfter({ 'content/posts/rope/colour.js': "export const colour = '#00ffff';\n" });
+    const afterImport = nameAfter({ 'content/posts/rope/colour.js': "export const colour = '#00ffff';\n" });
     assert.notEqual(afterImport, afterPreview);
-    const afterTitle = await pathAfter({ [ROPE]: article({ title: 'Rope 2', slug: 'rope', date: '2026-10-14', extra: 'category: ml\npreview: preview.js\nsummary: Rotary positions.\n' }) });
+    const afterTitle = nameAfter({ [ROPE]: article({ title: 'Rope 2', slug: 'rope', date: '2026-10-14', extra: 'category: ml\npreview: preview.js\nsummary: Rotary positions.\n' }) });
     assert.notEqual(afterTitle, afterImport);
-  });
-
-  test('the name of a cover ends with the first 12 hexadecimal digits of the SHA-256 of the cover file', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': config,
-      'content/posts/covered/index.md': article({ title: 'Covered', slug: 'covered', date: '2026-10-01', extra: 'category: notes\ncover: cover.png\n' }),
-    });
-    writeFileSync(join(dir, 'content/posts/covered/cover.png'), cover);
-    const result = await updateSite(createSite(dir, { shareImages: true }));
-    assert.deepEqual(result.errors, []);
-    const hash = createHash('sha256').update(cover).digest('hex').slice(0, 12);
-    assert.deepEqual(result.shareImages.map((image) => image.path), [`og/2026-10/covered-${hash}.png`]);
   });
 
   test('bake dev draws no share images and writes no image tags', async (t) => {
     const dir = createBlog(t, blogFiles);
-    const result = await updateSite(createSite(dir, { drafts: true, base: '/' }));
-    assert.deepEqual(result.errors, []);
-    assert.deepEqual(result.shareImages, []);
-    const rope = result.pages.find((page) => page.article.file === ROPE);
-    const html = rope.outputs.find((output) => output.path === '2026-10/rope/index.html').render();
+    const server = await startDevServer(dir, { port: 0, print: () => {} });
+    t.after(() => server.close());
+    const html = await (await fetch(new URL('2026-10/rope/', server.url))).text();
     assert.deepEqual(imageTags(html), ['<meta name="twitter:card" content="summary">']);
-    assert.ok(result.pages.every((page) => page.outputs.every((output) => !output.path.startsWith('og/'))));
   });
 
   test('reports a preview that throws at its front matter field together with the errors of other articles and leaves dist/ unchanged', (t) => {
@@ -216,20 +200,21 @@ describe('share images', () => {
     assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), ['marker.txt']);
   });
 
-  test('reports a cover that is not an image and public files in og/', async (t) => {
+  test('reports a cover that is not an image and public files in og/', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': config,
       'content/posts/rope/index.md': article({ extra: 'category: ml\ncover: notes.txt\n' }),
       'content/posts/rope/notes.txt': 'not an image\n',
       'public/og/2026-10/rope.png': 'png\n',
     });
-    const result = await updateSite(createSite(dir, { shareImages: true }));
-    assert.deepEqual(
-      result.errors.map((error) => `${error.file}:${error.line}:${error.column} ${error.message}`),
+    assert.equal(
+      bake(dir, 'build').stderr,
       [
         'content/posts/rope/index.md:6:8 cover "notes.txt" must be a PNG, JPEG, GIF, WebP, AVIF or SVG image',
         'public/og/2026-10/rope.png:1:1 dist/og/ is reserved for the files Bake writes',
-      ],
+        '2 errors, dist/ was not written',
+        '',
+      ].join('\n'),
     );
   });
 });

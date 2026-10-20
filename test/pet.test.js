@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync, symlinkSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
-import { createSite, updateSite } from '../src/build/site.js';
 import { readPet } from '../src/chat/pet-files.js';
-import { formatError } from '../src/report.js';
-import { bake, createBlog, readTree, writeFiles } from './blog.js';
+import { startDevServer } from '../src/dev/server.js';
+import { bake, cli, createBlog, readTree, writeFiles } from './blog.js';
 
 const builtIn = join(import.meta.dirname, '../src/chat/pets');
 
@@ -38,9 +39,16 @@ async function noiseSheet() {
 }
 
 async function petFiles(dir) {
-  const site = createSite(dir);
-  const result = await updateSite(site);
-  return { errors: result.errors.map(formatError), files: Object.fromEntries(result.siteFiles.filter((file) => file.path.startsWith('_bake/pet/')).map((file) => [file.path, file.render()])) };
+  // why: the build runs in a child process without blocking, so the pet server of the test can answer it
+  const child = spawn(process.execPath, [cli, 'build'], { cwd: dir });
+  let stderr = '';
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+  const [status] = await once(child, 'exit');
+  const errors = status === 0 ? [] : stderr.trimEnd().split('\n').slice(0, -1);
+  const pet = join(dir, 'dist/_bake/pet');
+  return { errors, files: existsSync(pet) ? Object.fromEntries(Object.entries(readTree(pet)).map(([path, content]) => [`_bake/pet/${path}`, content])) : {} };
 }
 
 async function serveFiles(t, files) {
@@ -201,11 +209,16 @@ describe('chat pets', () => {
   test('reads a pet folder again in bake dev when one of its files changes', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': config('pets/bun'), 'pets/bun/pet.json': '{"displayName":"Bun","spritesheetPath":"sheet.png"}' });
     writeFiles(dir, { 'pets/bun/sheet.png': await sheet(1536, 1872) });
-    const site = createSite(dir, { drafts: true });
-    const first = await updateSite(site);
-    assert.equal(JSON.parse(first.siteFiles.find((file) => file.path === '_bake/pet/pet.json').render()).displayName, 'Bun');
-    writeFiles(dir, { 'pets/bun/pet.json': '{"displayName":"Roll","spritesheetPath":"sheet.png"}' });
-    const second = await updateSite(site, ['pets/bun/pet.json']);
-    assert.equal(JSON.parse(second.siteFiles.find((file) => file.path === '_bake/pet/pet.json').render()).displayName, 'Roll');
+    const server = await startDevServer(dir, { port: 0, print: () => {} });
+    t.after(() => server.close());
+    const name = async () => (await (await fetch(new URL('_bake/pet/pet.json', server.url))).json()).displayName;
+    assert.equal(await name(), 'Bun');
+    const deadline = Date.now() + 10000;
+    // why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the file is written until bake dev serves the new name
+    while ((await name()) !== 'Roll') {
+      assert.ok(Date.now() < deadline, 'bake dev did not read the changed pet.json');
+      writeFiles(dir, { 'pets/bun/pet.json': '{"displayName":"Roll","spritesheetPath":"sheet.png"}' });
+      await new Promise((done) => setTimeout(done, 200));
+    }
   });
 });

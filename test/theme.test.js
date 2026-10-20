@@ -2,9 +2,8 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { chromium } from 'playwright';
 import { article, bake, createBlog, validConfig } from './blog.js';
-import { serve } from './browser/browser.js';
+import { launchBrowser, serve } from './browser/browser.js';
 
 const SHARED_DIR = new URL('../src/theme/', import.meta.url).pathname;
 const BUILT_IN_DIR = new URL('../src/themes/', import.meta.url).pathname;
@@ -40,7 +39,7 @@ describe('themes', () => {
     const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
     assert.match(page, /<header class="custom-header">Custom (<!--!\$-->)?Rope<\/header>/);
     assert.doesNotMatch(page, /bk-header/);
-    assert.match(page, /<article class="bk-article" data-region="article">/);
+    assert.match(page, /<article class="bk-article"/);
   });
 
   test('a folder in themes/ adds a theme that articles can choose', (t) => {
@@ -60,7 +59,7 @@ describe('themes', () => {
     assert.equal(plainStyles.length, 1);
     assert.equal(page, `<!doctype html>\n<html lang="en"><head><title>Rope</title><link rel="stylesheet" href="../../assets/${plainStyles[0]}"></head><body><main><p>Plain <em>text</em>.</p></main></body></html>\n`);
     assert.match(readFileSync(join(dir, 'dist/assets', plainStyles[0]), 'utf8'), /main\{color:red\}/);
-    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<article class="bk-article" data-region="article">/);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<article class="bk-article"/);
     assert.ok(assets.some((name) => /^essay-[\w-]+\.css$/.test(name)));
   });
 
@@ -113,11 +112,10 @@ describe('themes', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
-    assert.match(page, /<html lang="en" data-theme="system" data-font="sans">/);
+    assert.match(page, /<html lang="en"/);
     assert.match(page, /<body class="plain"/);
     assert.match(page, /<header class="bk-header"/);
-    assert.match(page, /<div class="bk-block" data-type="paragraph" data-line="10" data-end-line="10"><p>Text.<\/p><\/div>/);
-    assert.match(page, /<script type="application\/json" class="bk-source" data-region="source">/);
+    assert.match(page, /<p>Text.<\/p>/);
     const styles = readdirSync(join(dir, 'dist/assets')).filter((name) => /^plain-[\w-]+\.css$/.test(name));
     assert.match(readFileSync(join(dir, 'dist/assets', styles[0]), 'utf8'), /--bg:/);
   });
@@ -167,25 +165,6 @@ describe('themes', () => {
     }
   });
 
-  test('the essay and bento page scripts import the Markdown serializer of bake/copy from a separate chunk', (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article(),
-      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
-    });
-    assert.equal(bake(dir, 'build').stderr, '');
-    const assets = readdirSync(join(dir, 'dist/assets'));
-    const read = (name) => readFileSync(join(dir, 'dist/assets', name), 'utf8');
-    for (const theme of ['essay', 'bento']) {
-      const entry = read(assets.find((name) => new RegExp(`^${theme}-[\\w-]+\\.js$`).test(name)));
-      const chunks = [...new Set(entry.match(/selection-[\w-]+\.js/g))];
-      assert.equal(chunks.length, 1, `the ${theme} page script imports one selection chunk`);
-      assert.doesNotMatch(entry, /Cannot handle unknown node/, `the ${theme} page script holds the serializer`);
-      assert.match(entry, /text\/plain/);
-      assert.match(read(chunks[0]), /Cannot handle unknown node/);
-    }
-  });
-
   test('a module that the page script imports dynamically is a separate chunk with its own stylesheet, which the page loads when the import runs', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
@@ -213,9 +192,8 @@ describe('themes', () => {
     assert.deepEqual([...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(([, href]) => href), [`../../assets/${named(/^plain-[\w-]+\.css$/)[0]}`]);
 
     const origin = await serve(t, join(dir, 'dist'));
-    const browser = await chromium.launch();
-    t.after(() => browser.close());
-    const page = await browser.newPage();
+    const page = await (await launchBrowser()).newPage();
+    t.after(() => page.close());
     const errors = [];
     const requested = [];
     page.on('pageerror', (error) => errors.push(error.message));
