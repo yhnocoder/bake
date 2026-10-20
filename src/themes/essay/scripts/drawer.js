@@ -1,8 +1,5 @@
-import { SETTING_EVENT } from './settings.jsx';
 import { chapterCard, createElement } from './toc-card.js';
 
-const TOP_ZONE = 40;
-const TRAVEL = 8;
 const CLOSE_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
 export function drawerView(context) {
@@ -86,36 +83,6 @@ export function drawerView(context) {
     { signal },
   );
 
-  let lastTop = scrollY;
-  let travel = 0;
-  const hideButtons = (hidden) => root.classList.toggle('bk-buttons-hidden', hidden);
-  const autohide = () => root.dataset.buttons === 'autohide';
-  addEventListener(
-    'scroll',
-    () => {
-      const top = scrollY;
-      const delta = top - lastTop;
-      lastTop = top;
-      if (context.jumping()) return;
-      if (!autohide() || isOpen() || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
-        travel = 0;
-        hideButtons(false);
-        return;
-      }
-      travel = Math.sign(delta) === Math.sign(travel) ? travel + delta : delta;
-      if (travel > TRAVEL) hideButtons(true);
-      else if (travel < -TRAVEL) hideButtons(false);
-    },
-    { passive: true, signal },
-  );
-  document.addEventListener(
-    SETTING_EVENT,
-    (event) => {
-      if (event.detail.name === 'buttons' && !autohide()) hideButtons(false);
-    },
-    { signal },
-  );
-
   return {
     update(state) {
       number.textContent = state.chapter < 0 ? labels.toc : outline.chapters[state.chapter].number;
@@ -139,13 +106,11 @@ export function drawerView(context) {
       if (document.activeElement === document.body) drawer.focus({ preventScroll: true });
     },
     jumped() {
-      travel = 0;
-      hideButtons(false);
       if (isOpen()) setOpen(false);
     },
     destroy() {
       abort.abort();
-      root.classList.remove('bk-drawer-open', 'bk-buttons-hidden');
+      root.classList.remove('bk-drawer-open');
       handle.remove();
       scrim.remove();
       drawer.remove();

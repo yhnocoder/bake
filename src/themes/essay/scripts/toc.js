@@ -1,4 +1,5 @@
 import { labelsFor } from '../labels.js';
+import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
 import { followLink } from './heading-links.jsx';
 import { CONTENT_EVENT, LAYOUT_EVENT, oncePerFrame } from './motion.js';
@@ -39,7 +40,9 @@ export function startToc(article) {
     go(id) {
       jumping = true;
       view.jumped?.();
-      followLink(`#${encodeURIComponent(id)}`).then(() =>
+      const jump = followLink(`#${encodeURIComponent(id)}`);
+      showButtonsDuring(jump);
+      jump.then(() =>
         requestAnimationFrame(() => {
           jumping = false;
           update();

@@ -129,6 +129,14 @@ async function pointAt(page, locator) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 2 });
 }
 
+async function scrollInSteps(page, delta) {
+  for (let step = 0; step < 5; step += 1) {
+    await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
+    await page.waitForTimeout(30);
+  }
+  await settle(page);
+}
+
 async function scrollToHeading(page, id) {
   await page.evaluate((target) => scrollTo(0, document.getElementById(target).getBoundingClientRect().top + scrollY - 60), id);
   await settle(page);
@@ -140,6 +148,7 @@ test('the table of contents', async (t) => {
     'content/posts/toc/index.md': article({ title: '目录', slug: 'toc', body }),
     'content/posts/dots/index.md': article({ title: '圆点', slug: 'dots', extra: 'toc: dots\n', body }),
     'content/posts/long/index.md': article({ title: 'Long', slug: 'long', body: longBody }),
+    'content/posts/plain/index.md': article({ title: '无目录', slug: 'plain', body: filler('正文', 12) }),
     'components/page-box.js': pageBox,
   });
   const result = bake(dir, 'build');
@@ -650,6 +659,25 @@ test('the table of contents', async (t) => {
     await scrollBy(800);
     assert.equal(await hidden(), false);
     assert.equal(await placed('1'), true);
+    await context.close();
+  });
+
+  await t.test('on phones an article without a table of contents hides the settings button while scrolling down and shows it on scrolling up', async () => {
+    const { page, context } = await open({ path: 'plain', viewport: { width: 375, height: 760 }, hasTouch: true });
+    const state = () =>
+      page.evaluate(() => ({
+        hidden: document.documentElement.classList.contains('bk-buttons-hidden'),
+        chat: getComputedStyle(document.documentElement).getPropertyValue('--chat-hidden').trim(),
+        settings: getComputedStyle(document.querySelector('.bk-settings')).opacity,
+      }));
+    assert.deepEqual([await page.locator('.bk-toc').count(), await page.locator('.bk-toc-handle').count()], [0, 0]);
+    assert.deepEqual(await state(), { hidden: false, chat: '', settings: '1' });
+    await scrollInSteps(page, 600);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden', null, { timeout: 2000 });
+    assert.deepEqual(await state(), { hidden: true, chat: '1', settings: '0' });
+    await scrollInSteps(page, -200);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).opacity === '1', null, { timeout: 2000 });
+    assert.deepEqual(await state(), { hidden: false, chat: '', settings: '1' });
     await context.close();
   });
 
