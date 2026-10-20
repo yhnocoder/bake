@@ -27,7 +27,15 @@
   visibility: var(--chat-visibility, visible);
   transition:
     opacity 0.2s,
-    visibility 0.25s;
+    visibility 0s;
+}
+
+@container style(--chat-visibility: hidden) {
+  .bk-chat[data-open] {
+    transition:
+      opacity 0.2s,
+      visibility 0s 0.2s;
+  }
 }
 
 .bk-chat-bubbles {

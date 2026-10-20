@@ -465,6 +465,38 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await shadow(page, 'return root.activeElement?.className ?? null;'), 'bk-chat-launcher');
   });
 
+  await t.test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides fades out before it leaves the keyboard order', async (t) => {
+    const { context, page } = await openBrowser(t, base);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto(`${base}/2026-10/syntax/`);
+    const launcher = page.locator('.bk-chat-launcher');
+    const focused = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'), null, { timeout: 2000 });
+    for (let round = 0; round < 6; round += 1) {
+      if (round === 2) {
+        await setUpKey(page);
+        await page.keyboard.press('Escape');
+        await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+      }
+      if (round === 4) await page.reload();
+      await launcher.click();
+      await focused();
+      await page.keyboard.press('Escape');
+      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+      await launcher.focus();
+      await page.keyboard.press('Enter');
+      await focused();
+      await page.keyboard.press('Escape');
+      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+    }
+    await launcher.click();
+    await focused();
+    const visibility = () => shadow(page, 'return getComputedStyle(root.querySelector(".bk-chat")).visibility;');
+    await page.evaluate(() => document.documentElement.style.cssText = '--chat-hidden: 1; --chat-visibility: hidden');
+    assert.equal(await visibility(), 'visible');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat')).visibility === 'hidden');
+  });
+
   await t.test('a rejected key is reported before any passkey is created', async (t) => {
     const { page, api } = await openBrowser(t, base);
     api.models = { status: 401, body: '{"error":{"message":"Authentication Fails"}}' };
