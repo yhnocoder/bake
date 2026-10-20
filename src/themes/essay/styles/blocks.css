@@ -312,10 +312,13 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 }
 
 .bk-article .aside-title:where(:not(.component-box *)) {
-  margin: 0 0 6px;
-  font-size: 13px;
+  margin: 0 0 4px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
   line-height: 1.6;
-  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
 }
 
 .bk-article :is(.aside, .quote, blockquote, details.fold, .example-result, [data-block], [data-width], td, th, li) > :last-child:where(:not(.component-box *)) {
@@ -341,8 +344,10 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 }
 
 .bk-article .quote > figcaption:where(:not(.component-box *)) {
-  margin-top: 10px;
-  font-size: 14px;
+  margin-top: 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--ink-3);
 }
 
@@ -356,17 +361,42 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 }
 
 .bk-article details.fold > summary:where(:not(.component-box *)) {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin: 0 -8px;
+  padding: 2px 8px;
   list-style: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 700;
   font-size: 16px;
   color: var(--ink-2);
   user-select: none;
   -webkit-user-select: none;
   transition: color 0.3s ease-out;
+}
+
+.bk-article details.fold > summary:where(:not(.component-box *))::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--surface-2);
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.bk-article details.fold > summary:hover:where(:not(.component-box *))::before {
+  opacity: 1;
+  transition-duration: 0.12s;
+}
+
+.bk-article .example-result details.fold > summary:where(:not(.component-box *))::before,
+.bk-article :is(.aside, .quote, blockquote) details.fold > summary:where(:not(.component-box *))::before {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 .bk-article details.fold > summary:where(:not(.component-box *))::-webkit-details-marker {
@@ -382,7 +412,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     center / contain no-repeat;
   rotate: -90deg;
-  transition: rotate 0.2s var(--ease-out);
+  transition: rotate 0.22s var(--ease-out);
 }
 
 .bk-article details.fold[open] > summary:where(:not(.component-box *))::after {
@@ -399,18 +429,22 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 }
 
 .bk-article details.fold:where(:not(.component-box *))::details-content {
-  padding-left: 20px;
-  border-left: 2px solid var(--line-2);
+  padding-left: 18px;
+  border-left: 2px solid var(--line);
   font-size: 16px;
 }
 
 .bk-article details.fold[open]:where(:not(.component-box *))::details-content {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .bk-article a.citation:where(:not(.component-box *)) {
   white-space: nowrap;
-  text-decoration: none;
+  text-decoration-color: transparent;
+}
+
+.bk-article a.citation:hover:where(:not(.component-box *)) {
+  text-decoration-color: color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .bk-references {
@@ -450,7 +484,6 @@ h4 + .bk-references {
   margin: 4px 0;
   padding-left: calc(2.4em + 8px);
   border-radius: 4px;
-  transition: background-color 1s;
 }
 
 .bk-article ol.references > li:where(:not(.component-box *))::before {
@@ -464,6 +497,13 @@ h4 + .bk-references {
   color: var(--ink-3);
   user-select: none;
   -webkit-user-select: none;
+}
+
+.bk-article ol.references + ul.references:where(:not(.component-box *)) {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  color: var(--ink-2);
 }
 
 .bk-article .references > li > p:where(:not(.component-box *)) {

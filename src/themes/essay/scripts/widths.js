@@ -14,10 +14,22 @@ export function startWidths(article) {
   });
   read();
   layout();
-  new ResizeObserver(layout).observe(article);
+  let observedWidth = null;
+  new ResizeObserver(([entry]) => {
+    if (entry.contentRect.width === observedWidth) return;
+    observedWidth = entry.contentRect.width;
+    layout();
+  }).observe(article);
   addEventListener('resize', layout);
   document.fonts.ready.then(layout);
-  article.addEventListener('toggle', layout, true);
+  article.addEventListener(
+    'toggle',
+    (event) => {
+      const block = event.target.closest('.bk-block[data-width="auto"]');
+      if (block !== null && !declaresNaturalWidth(block)) layout();
+    },
+    true,
+  );
   document.addEventListener(CONTENT_EVENT, () => {
     read();
     layout();
@@ -26,38 +38,51 @@ export function startWidths(article) {
 
 function resolveWidths(article, blocks) {
   const body = article.clientWidth;
-  const wide = lengthIn(article, 'var(--wide-width)');
   const auto = blocks.filter((block) => block.dataset.width === 'auto');
   for (const block of blocks) {
-    if (block.dataset.width !== 'auto') block.dataset.resolved = block.dataset.width;
+    if (block.dataset.width !== 'auto') resolve(block, block.dataset.width);
   }
-  const declared = auto.filter((block) => getComputedStyle(block).getPropertyValue('--natural-width').trim() !== '');
+  const declared = auto.filter(declaresNaturalWidth);
   const measured = auto.filter((block) => !declared.includes(block));
-  for (const block of measured) block.dataset.resolved = 'body';
-  const needsWide = new Set([
-    ...declared.filter((block) => naturalWidth(block) > body + 0.5),
-    ...measured.filter((block) => overflows(block)),
-  ]);
-  for (const block of auto) block.dataset.resolved = needsWide.has(block) && wide > body + 0.5 ? 'wide' : 'body';
+  for (const block of measured) resolve(block, 'body');
+  const [wide, ...naturals] = naturalWidths([{ host: article, length: 'var(--wide-width)' }, ...declared.map(naturalWidthProbe)]);
+  const needsWide = new Set([...declared.filter((block, index) => naturals[index] > body + 0.5), ...measured.filter((block) => overflows(block))]);
+  for (const block of auto) resolve(block, needsWide.has(block) && wide > body + 0.5 ? 'wide' : 'body');
+}
+
+function resolve(block, width) {
+  if (block.dataset.resolved !== width) block.dataset.resolved = width;
+}
+
+function declaresNaturalWidth(block) {
+  return getComputedStyle(block).getPropertyValue('--natural-width').trim() !== '';
 }
 
 export function naturalWidth(block) {
-  const selector = NATURAL_WIDTH_HOSTS[block.dataset.type];
-  const host = (selector === undefined ? null : block.querySelector(selector)) ?? block;
-  const width = lengthIn(host, 'var(--natural-width)');
-  if (host === block) return width;
-  const style = getComputedStyle(host);
-  const edges = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((sum, name) => sum + parseFloat(style[name]), 0);
-  return width + edges;
+  return naturalWidths([naturalWidthProbe(block)])[0];
 }
 
-function lengthIn(host, length) {
-  const probe = document.createElement('div');
-  probe.style.cssText = `position:absolute;visibility:hidden;height:0;padding:0;border:0;width:${length}`;
-  host.append(probe);
-  const width = probe.getBoundingClientRect().width;
-  probe.remove();
-  return width;
+function naturalWidthProbe(block) {
+  const selector = NATURAL_WIDTH_HOSTS[block.dataset.type];
+  const host = (selector === undefined ? null : block.querySelector(selector)) ?? block;
+  return { host, length: 'var(--natural-width)', edges: host !== block };
+}
+
+function naturalWidths(requests) {
+  const probes = requests.map(({ host, length }) => {
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:absolute;visibility:hidden;height:0;padding:0;border:0;width:${length}`;
+    host.append(probe);
+    return probe;
+  });
+  const widths = requests.map(({ host, edges }, index) => {
+    const width = probes[index].getBoundingClientRect().width;
+    if (!edges) return width;
+    const style = getComputedStyle(host);
+    return width + ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((sum, name) => sum + parseFloat(style[name]), 0);
+  });
+  for (const probe of probes) probe.remove();
+  return widths;
 }
 
 export function overflows(block) {

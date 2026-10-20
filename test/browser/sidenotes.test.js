@@ -138,7 +138,7 @@ test('sidenotes', async (t) => {
       ['6'],
     );
     await wide.click('details.fold > summary');
-    await wide.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    await wide.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     await wide.waitForTimeout(50);
     const opened = await wide.evaluate(measureNotes);
     checkNotes(opened, 'stress article with the fold open');

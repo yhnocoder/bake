@@ -88,7 +88,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
 
   await t.test('saving the Markdown replaces the changed block in place and keeps the scroll position and open folds', async () => {
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
     const before = await scrollPosition();
     await page.evaluate(() => {
@@ -136,10 +136,13 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     }));
     assert.deepEqual(state, { notes: [['1The note next to the edited paragraph.', true]], unresolved: 0 });
     await page.click('details.fold > summary');
-    assert.ok(await page.evaluate(() => document.querySelector('details.fold').getAnimations().length > 0), 'closing the replaced fold does not animate');
+    await page.waitForFunction(() => {
+      const fold = document.querySelector('details.fold');
+      return fold.open && Number(getComputedStyle(fold, '::details-content').opacity) < 1;
+    });
     await page.waitForFunction(() => !document.querySelector('details.fold').open);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     edit('gives a width.\n```\n', 'gives a width.\n```\n\nSee [the far section](/2026-10/live/#far).\n');
     const link = page.locator('.bk-article a.internal-link', { hasText: 'the far section' });
     await link.waitFor();
