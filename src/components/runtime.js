@@ -1,10 +1,11 @@
-import { loaders } from 'bake:component-loaders';
+import { files, loaders } from 'bake:component-loaders';
 
 const FRAME = 'figure.component[data-component]';
 const BOX = '.component-box';
 const NEAR_DISTANCE = 800;
 const NEAR_SCREENS = 1.5;
 const definitions = new Map();
+const SLOW_CONNECTIONS = ['slow-2g', '2g'];
 
 function define(name) {
   if (!definitions.has(name)) {
@@ -61,35 +62,59 @@ async function start(frame) {
   }
 }
 
-const observer = new IntersectionObserver(
-  (entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      observer.unobserve(entry.target);
-      start(entry.target);
-    }
-  },
-  { rootMargin: `${Math.max(NEAR_DISTANCE, innerHeight * NEAR_SCREENS)}px 0px` },
-);
+function nearMargin() {
+  return `${Math.max(NEAR_DISTANCE, innerHeight * NEAR_SCREENS)}px 0px`;
+}
+function createObserver(margin) {
+  const created = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        created.unobserve(entry.target);
+        start(entry.target);
+      }
+    },
+    { rootMargin: margin },
+  );
+  return created;
+}
+let margin = nearMargin();
+let observer = createObserver(margin);
 function observeFrames() {
   const frames = [...document.querySelectorAll(FRAME)].filter((frame) => frame.dataset.state === undefined);
   for (const frame of frames) observer.observe(frame);
   return frames;
 }
-function defineInTurn(names) {
-  const [name, ...rest] = names;
-  if (name === undefined) return;
-  define(name)
-    // why: a definition that fails is reported by start when its frame comes near the viewport
-    .catch(() => {})
-    .then(() => setTimeout(() => defineInTurn(rest)));
+function distanceFromViewport(frame) {
+  const { top, bottom } = frame.getBoundingClientRect();
+  return Math.max(0, top - innerHeight, -bottom);
 }
-function defineAll(frames) {
-  defineInTurn([...new Set(frames.map((frame) => frame.dataset.component))]);
+function prefetchAll(frames) {
+  const connection = navigator.connection;
+  if (connection?.saveData || SLOW_CONNECTIONS.includes(connection?.effectiveType)) return;
+  const waiting = frames.filter((frame) => frame.dataset.state === undefined);
+  const distances = new Map(waiting.map((frame) => [frame, distanceFromViewport(frame)]));
+  waiting.sort((a, b) => distances.get(a) - distances.get(b));
+  const addresses = new Set(waiting.flatMap((frame) => files[frame.dataset.component].map((file) => new URL(file, import.meta.url).href)));
+  for (const address of addresses) {
+    if (performance.getEntriesByName(address).length > 0) continue;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.crossOrigin = '';
+    link.href = address;
+    document.head.append(link);
+  }
 }
 
 const frames = observeFrames();
-if (document.readyState === 'complete') defineAll(frames);
-else addEventListener('load', () => defineAll(frames), { once: true });
-document.addEventListener('bake:content', () => defineAll(observeFrames()));
+if (document.readyState === 'complete') prefetchAll(frames);
+else addEventListener('load', () => prefetchAll(frames), { once: true });
+document.addEventListener('bake:content', () => prefetchAll(observeFrames()));
+addEventListener('resize', () => {
+  if (nearMargin() === margin) return;
+  margin = nearMargin();
+  observer.disconnect();
+  observer = createObserver(margin);
+  observeFrames();
+});
 addEventListener('beforeprint', () => document.querySelectorAll(FRAME).forEach(start));

@@ -1,5 +1,5 @@
 import { readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const RUNTIME_FILE = join(import.meta.dirname, 'runtime.js');
@@ -13,6 +13,7 @@ const KIT_SCRIPT = /\.jsx?$/;
 const PREAMBLE_MODULE = 'bake:preamble';
 const MATH_FONT_MODULE = 'bake:math-font';
 const LOADERS_MODULE = 'bake:component-loaders';
+const FILES_MARKER = 'bake:component-files';
 const FONT_DIR = join(dirname(fileURLToPath(import.meta.resolve('@mathjax/mathjax-newcm-font/js/svg.js'))), 'svg/dynamic');
 const NODE_MATH_MODULE = ["export async function texToSvg() {", "  throw new Error('texToSvg typesets formulas in the browser, inside the component code');", '}', ''].join('\n');
 
@@ -41,11 +42,35 @@ export function browserModules({ preamble, components }) {
     {
       [PREAMBLE_MODULE]: () => `export const definitions = ${JSON.stringify(preamble.map((definition) => definition.tex))};\n`,
       [MATH_FONT_MODULE]: () => lazyImports('fontFiles', fontFiles()),
-      [LOADERS_MODULE]: () => lazyImports('loaders', components.map((component) => [component.name, component.path])),
+      [LOADERS_MODULE]: () =>
+        [lazyImports('loaders', components.map((component) => [component.name, component.path])), `export const files = JSON.parse(${JSON.stringify(FILES_MARKER)});`, ''].join('\n'),
     },
     { [MATH_MODULE]: MATH_FILE, [KIT_MODULE]: KIT_FILE },
   );
-  return { ...modules, transform: markKitModulesSideEffectFree };
+  return { ...modules, transform: markKitModulesSideEffectFree, generateBundle: (options, bundle) => writeComponentFiles(bundle, components) };
+}
+
+function writeComponentFiles(bundle, components) {
+  const chunks = new Map(Object.values(bundle).filter((output) => output.type === 'chunk').map((chunk) => [chunk.fileName, chunk]));
+  const names = new Map(components.map((component) => [component.path, component.name]));
+  const runtime = [...chunks.values()].find((chunk) => chunk.isEntry);
+  const files = {};
+  for (const chunk of chunks.values()) {
+    if (names.has(chunk.facadeModuleId)) files[names.get(chunk.facadeModuleId)] = chunkFiles(chunk, chunks, runtime).map((file) => posix.relative(posix.dirname(runtime.fileName), file));
+  }
+  runtime.code = runtime.code.replace(new RegExp(`(["'\`])${FILES_MARKER}\\1`), () => JSON.stringify(JSON.stringify(files)));
+}
+
+function chunkFiles(chunk, chunks, runtime) {
+  const files = new Set();
+  const visit = (current) => {
+    if (current === runtime || files.has(current.fileName)) return;
+    files.add(current.fileName);
+    for (const css of current.viteMetadata?.importedCss ?? []) files.add(css);
+    for (const file of current.imports) visit(chunks.get(file));
+  };
+  visit(chunk);
+  return [...files];
 }
 
 function runtimePreamble(address) {

@@ -306,14 +306,72 @@ test('components run in the browser', async (t) => {
     await other.close();
   });
 
-  await t.test('once the page has loaded, the code of a component far below the screen is loaded before the component starts', async () => {
+  await t.test('once the page has loaded, the code of a component far below the screen is downloaded before the component starts and runs only when it starts', async () => {
     const page = await open('below');
     await waitForReady(page, 1);
     await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]text-view-[\w-]{8}\.js$/.test(entry.name) && entry.responseEnd > 0));
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null), null);
+    assert.equal(await page.evaluate(() => customElements.get('text-view') === undefined), true);
     await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
     await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
     assert.deepEqual(page.problems, []);
+    await page.close();
+  });
+
+  await t.test('after a resize, a component starts within the larger of 800 pixels and one and a half heights of the new viewport', async () => {
+    const page = await open('below', { viewport: { width: 1440, height: 1000 } });
+    await waitForReady(page, 1);
+    await page.setViewportSize({ width: 1440, height: 500 });
+    const scrollToDistance = (distance) =>
+      page.evaluate((below) => {
+        const frame = [...document.querySelectorAll('figure.component')].at(-1);
+        scrollTo(0, frame.getBoundingClientRect().top + scrollY - innerHeight - below);
+      }, distance);
+    const lastState = () => page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null);
+    await scrollToDistance(1000);
+    await page.waitForTimeout(300);
+    assert.equal(await lastState(), null);
+    await scrollToDistance(700);
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+    await page.close();
+  });
+
+  await t.test('with Save-Data or a 2G connection, the code of a component far below the screen loads only when the component starts', async () => {
+    for (const connection of [{ saveData: true, effectiveType: '4g' }, { saveData: false, effectiveType: '2g' }]) {
+      const page = await open(null);
+      await page.addInitScript((value) => Object.defineProperty(Navigator.prototype, 'connection', { get: () => value }), connection);
+      const requests = [];
+      page.on('request', (request) => requests.push(request.url()));
+      await page.goto(`${origin}/2026-10/below/`, { waitUntil: 'load' });
+      await waitForReady(page, 1);
+      await page.waitForTimeout(500);
+      assert.deepEqual(requests.filter((url) => /[/]text-view-[\w-]{8}\.js$/.test(url)), [], JSON.stringify(connection));
+      await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+      await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+      await page.close();
+    }
+  });
+
+  await t.test('a component far below the screen starts when its code could not be loaded right after the page loaded', async () => {
+    const page = await open(null);
+    let blocked = true;
+    let aborted;
+    const firstAbort = new Promise((resolve) => {
+      aborted = resolve;
+    });
+    await page.route(/[/]text-view-[\w-]{8}\.js$/, async (route) => {
+      if (!blocked) return route.continue();
+      await route.abort();
+      aborted();
+    });
+    await page.goto(`${origin}/2026-10/below/`);
+    await waitForReady(page, 1);
+    await firstAbort;
+    await page.waitForTimeout(200);
+    blocked = false;
+    await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+    await page.waitForFunction(() => ['ready', 'failed'].includes([...document.querySelectorAll('figure.component')].at(-1).dataset.state));
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state), 'ready');
     await page.close();
   });
 
