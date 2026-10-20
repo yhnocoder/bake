@@ -8,6 +8,8 @@ export function convert(tex, display = false) {
     converted.set(
       key,
       texToSvg(tex, { display }).then((svg) => {
+        svg.setAttribute('role', 'img')
+        svg.setAttribute('aria-label', tex)
         const attribute = (name) => svg.getAttribute(name)
         const shift = Number((attribute('style') || '').match(/vertical-align:\s*(-?[\d.]+)ex/)?.[1] || 0)
         return {
@@ -38,7 +40,7 @@ export async function texInSvg(tex, size, x, y, align = 'middle', color = 'var(-
     height,
     left,
     top,
-    markup: `<svg x="${left}" y="${top}" width="${width}" height="${height}" viewBox="${math.viewBox}" overflow="visible" fill="currentColor" style="color:${color || 'var(--ink)'}">${math.body}</svg>`,
+    markup: `<svg role="img" aria-label="${escapeText(tex).replace(/"/g, '&quot;')}" x="${left}" y="${top}" width="${width}" height="${height}" viewBox="${math.viewBox}" overflow="visible" fill="currentColor" style="color:${color || 'var(--ink)'}">${math.body}</svg>`,
   }
 }
 
@@ -66,7 +68,7 @@ export async function labelInSvg(text, size, x, y, align = 'middle', color = 'va
     .map((piece) => {
       const at = left
       left += piece.width
-      if (piece.math) return piece.math.markup.replace(/^<svg x="[^"]*"/, `<svg x="${at}"`)
+      if (piece.math) return piece.math.markup.replace(/ x="[^"]*"/, ` x="${at}"`)
       return `<text x="${at}" y="${y}" xml:space="preserve" style="font-size:${size}px;font-family:var(--font-ui);fill:${color || 'var(--ink)'}">${escapeText(piece.text)}</text>`
     })
     .join('')

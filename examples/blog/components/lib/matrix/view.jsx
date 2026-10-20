@@ -61,6 +61,8 @@ export function SvgTex(props) {
       )}
       {box() && (
         <svg
+          role="img"
+          aria-label={props.tex}
           x={box().left}
           y={box().top}
           width={box().width}

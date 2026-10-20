@@ -1,24 +1,32 @@
 import { createSignal } from 'solid-js'
 
 const typeset = new Map()
-const [version, setVersion] = createSignal(0)
 
 function request(tex) {
   if (!typeset.has(tex)) {
-    typeset.set(tex, null)
+    const [state, setState] = createSignal(null)
+    typeset.set(tex, state)
     import('bake/math')
       .then(({ texToSvg }) => texToSvg(tex))
       .then((svg) => {
-        typeset.set(tex, svg)
-        setVersion((value) => value + 1)
+        svg.setAttribute('role', 'img')
+        svg.setAttribute('aria-label', tex)
+        setState(svg)
+      })
+      .catch((error) => {
+        console.error(`the TeX label "${tex}" cannot be typeset: ${error.message}`)
+        setState(false)
       })
   }
-  return typeset.get(tex)
+  return typeset.get(tex)()
 }
 
 export function texSvg(tex) {
-  version()
   return request(tex)?.cloneNode(true) ?? null
+}
+
+export function texFailed(tex) {
+  return request(tex) === false
 }
 
 export function texBox(tex, emSize) {
@@ -39,7 +47,7 @@ export function richNodes(source) {
   return segments(source).map((part) => {
     if (!part.math) return document.createTextNode(part.text)
     const svg = texSvg(part.text)
-    if (!svg) return document.createTextNode('')
+    if (!svg) return document.createTextNode(texFailed(part.text) ? part.text : '')
     svg.classList.add('llm-tex')
     return svg
   })

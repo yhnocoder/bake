@@ -4,7 +4,7 @@ import { chainArrows, drawChain } from './lib/matrix/graph.js'
 import { SketchView, useWidth } from './lib/matrix/view.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 900, narrowHeight: { ratio: 0.235 } }
+export const layout = { width: 'body', height: 900, narrowHeight: { ratio: 0.234 } }
 
 const norm = (name, mark) => ({ op: '$\\mathrm{RMSNorm}$', w: `$\\gamma_{${name}}$：$d$`, fp: true, mark })
 const attention = {

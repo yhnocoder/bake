@@ -1,6 +1,6 @@
-llm-llm-plot,
-glu-heatmap,
-ffn-glu-diagram {
+llm-act-plot,
+llm-glu-heatmap,
+llm-glu-diagram {
   display: block;
   color: var(--ink);
   font-family: var(--font-ui);
