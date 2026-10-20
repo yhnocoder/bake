@@ -1,26 +1,35 @@
 #!/usr/bin/env node
 import { build } from './build/build.js';
 import { newArticle } from './build/new-article.js';
+import { newBlog } from './build/new-blog.js';
 import { configNotFoundError, hasConfig } from './config/bake-config.js';
+import { openInBrowser } from './dev/open.js';
 import { DEFAULT_HOST, DEFAULT_PORT, startDevServer } from './dev/server.js';
 import { errorCountLine, formatError } from './report.js';
 
 const usage = `Usage: bake <command>
 
 Commands:
+  init [folder]      Create a blog with bake.config.js and a first post in folder, the current folder by default
   new <path>         Create content/posts/<path>/index.md as a draft
-  dev                Serve the blog at http://localhost:4321/ and update pages on save
+  dev                Serve the blog at http://localhost:4321/, open it in the browser and update pages on save
   build              Check the blog and generate the static site into dist/
 
 Options:
   --port <number>    Port for bake dev; when it is in use, the next free port is used
   --host <address>   Address that bake dev listens on, 127.0.0.1 by default; 0.0.0.0 serves the local network
-  -h, --help         Show this help`;
+  --no-open          Do not open the browser when bake dev starts
+  -h, --help         Show this help
+
+Open bake dev at localhost rather than 127.0.0.1: the AI chat stores its key with a passkey,
+and browsers do not create passkeys for an IP address.`;
 
 const [command, ...args] = process.argv.slice(2);
 
 if (command === '--help' || command === '-h') {
   console.log(usage);
+} else if (command === 'init') {
+  runInit(args);
 } else if (command === 'new') {
   runNew(args);
 } else if (command === 'build') {
@@ -29,6 +38,15 @@ if (command === '--help' || command === '-h') {
   await runDev(args);
 } else {
   fail(command === undefined ? usage : `Unknown command ${command}\n\n${usage}`);
+}
+
+function runInit(args) {
+  if (args.length > 1 || args[0]?.startsWith('-')) return fail('Usage: bake init [folder]');
+  const folder = args[0] ?? '.';
+  const result = newBlog(folder, localDate(new Date()));
+  if (result.error) return fail(result.error);
+  const next = folder === '.' ? 'bake dev' : `cd ${folder} && bake dev`;
+  console.log([`Created a blog in ${result.root}:`, ...result.files.map((file) => `  ${file}`), `The first post is at ${result.url}. Next: ${next}`].join('\n'));
 }
 
 function runNew(args) {
@@ -49,7 +67,7 @@ async function runBuild(args) {
 
 async function runDev(args) {
   const options = devOptions(args);
-  if (options === null) return fail('Usage: bake dev [--port <number>] [--host <address>]');
+  if (options === null) return fail('Usage: bake dev [--port <number>] [--host <address>] [--no-open]');
   if (!hasConfig(process.cwd())) return fail(formatError(configNotFoundError()));
   let server;
   try {
@@ -57,21 +75,29 @@ async function runDev(args) {
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error));
   }
+  if (options.open && process.stdout.isTTY) openInBrowser(server.url);
   process.once('SIGINT', () => server.close().then(() => process.exit(0)));
   server.stopped.then(fail);
 }
 
 function devOptions(args) {
   const values = {};
-  for (let index = 0; index < args.length; index += 2) {
-    const [name, value] = [args[index], args[index + 1]];
-    if ((name !== '--port' && name !== '--host') || Object.hasOwn(values, name) || value === undefined) return null;
+  for (let index = 0; index < args.length; index += 1) {
+    const name = args[index];
+    if (Object.hasOwn(values, name)) return null;
+    if (name === '--no-open') {
+      values[name] = true;
+      continue;
+    }
+    const value = args[index + 1];
+    if ((name !== '--port' && name !== '--host') || value === undefined) return null;
     values[name] = value;
+    index += 1;
   }
   const port = values['--port'] ?? String(DEFAULT_PORT);
   const host = values['--host'] ?? DEFAULT_HOST;
   if (!/^\d+$/.test(port) || Number(port) > 65535 || host === '' || host.startsWith('-')) return null;
-  return { port: Number(port), host };
+  return { port: Number(port), host, open: values['--no-open'] !== true };
 }
 
 function fail(message) {
