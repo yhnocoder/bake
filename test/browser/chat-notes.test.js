@@ -240,6 +240,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await card.locator('.bk-chat-note-foot').getByRole('button', { name: '重新整理' }).click();
     const redo = card.locator('.bk-chat-redo[data-open] textarea');
     await redo.waitFor();
+    assert.equal(await page.evaluate(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.id), 'bk-chat-redo-request');
     assert.equal(await card.locator('.bk-chat-redo label').textContent(), '想怎么改这篇笔记？');
     await page.keyboard.press('Enter');
     assert.equal(await redo.getAttribute('placeholder'), '先写一句要求，比如：写短一点');
@@ -328,6 +329,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
     const form = page.locator('.bk-chat-prompt');
     await form.waitFor();
+    assert.equal(await page.evaluate(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.id), 'bk-chat-prompt-text');
     assert.equal(await form.locator('label').textContent(), '给 AI 的额外要求');
     await page.keyboard.type('回答不超过三句话。');
     await page.keyboard.press('Escape');

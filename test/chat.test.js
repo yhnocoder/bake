@@ -7,12 +7,12 @@ import { basename, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
-import { chatTools, matchingScopes, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
+import { chatTools, matchingScopes, pageAddress, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
 import { chatLabels } from '../src/chat/labels.js';
 import { PetError, sheetFile } from '../src/chat/reader-pet.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
-import { HISTORY_CHARACTERS, HISTORY_LIMIT, deleteConversation, historyGroups, historyKey, readHistory, roundMessages, saveConversation, storedRound } from '../src/chat/history.js';
+import { HISTORY_CHARACTERS, HISTORY_LIMIT, NOTE_VERSION_LIMIT, addNoteVersion, deleteConversation, historyGroups, historyKey, readHistory, roundMessages, saveConversation, storedRound } from '../src/chat/history.js';
 import { checkNote, citedEntries, exportMarkdown, noteFileName, noteHtml, notePrompt, noteTitle } from '../src/chat/note.js';
 import { linkTarget, replyHtml } from '../src/chat/reply.js';
 import { openKey, sealKey } from '../src/chat/vault.js';
@@ -526,7 +526,8 @@ describe('AI chat history', () => {
     );
     assert.ok(storage.getItem(historyKey(root)).length <= HISTORY_CHARACTERS);
     const note = { versions: [{ markdown: '# N', articles: 0, rounds: 1, request: null, date: '2026-10-20' }], index: 0 };
-    const good = [conversation('good'), { ...conversation('noted'), note }];
+    const failedRead = { ...conversation('noted').rounds[0], reads: [{ label: '/2099-01/nothing/', url: null, failed: true, done: true }] };
+    const good = [conversation('good'), { ...conversation('noted'), note, rounds: [failedRead] }];
     const bad = [
       { ...conversation('round'), rounds: [{}] },
       { ...conversation('ask'), rounds: [{ ...conversation('ask').rounds[0], ask: { content: 'Q' } }] },
@@ -544,6 +545,20 @@ describe('AI chat history', () => {
       readHistory(root, { storage }).map((item) => item.id),
       ['good', 'noted'],
     );
+  });
+
+  test('keeps the ten newest versions of a note and shows the newest', () => {
+    let note = null;
+    for (let index = 0; index < NOTE_VERSION_LIMIT + 3; index += 1) note = addNoteVersion(note, { markdown: `# ${index}` });
+    assert.equal(note.versions.length, 10);
+    assert.deepEqual([note.versions[0].markdown, note.versions.at(-1).markdown, note.index], ['# 3', '# 12', 9]);
+  });
+
+  test('gives an article page the address of its folder, also when it is opened as index.html', () => {
+    assert.equal(pageAddress(root, '/blog/2026-10/rope/'), '/2026-10/rope/');
+    assert.equal(pageAddress(root, '/blog/2026-10/rope/index.html'), '/2026-10/rope/');
+    assert.equal(pageAddress(root, '/blog/'), '/');
+    assert.equal(pageAddress(root, '/blog/index.html'), '/');
   });
 
   test('lists the conversations of one article on its page and groups every conversation by article on the homepage', () => {

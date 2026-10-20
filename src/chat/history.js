@@ -52,6 +52,11 @@ export function historyGroups(list, { address, home }) {
   return [...groups.values()];
 }
 
+export function addNoteVersion(note, version) {
+  const versions = [...(note?.versions ?? []).slice(1 - NOTE_VERSION_LIMIT), version];
+  return { versions, index: versions.length - 1 };
+}
+
 export function storedRound(message) {
   return {
     ask: message.ask,
@@ -99,7 +104,7 @@ function isRound(round) {
     round.ask.bubble.scopes.every((label) => typeof label === 'string') &&
     typeof round.content === 'string' &&
     Array.isArray(round.reads) &&
-    round.reads.every((read) => isObject(read) && typeof read.label === 'string' && typeof read.url === 'string')
+    round.reads.every((read) => isObject(read) && typeof read.label === 'string' && (read.url === null || typeof read.url === 'string'))
   );
 }
 

@@ -6,7 +6,7 @@ import styles from './bubbles.css?inline';
 import { READ_ARTICLE, articlePage, catalogEntry, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
 import { answer } from './conversation.js';
 import { ApiError, checkKey, complete } from './deepseek.js';
-import { NOTE_VERSION_LIMIT, deleteConversation, historyGroups, localDate, readHistory, roundMessages, saveConversation, storedRound } from './history.js';
+import { addNoteVersion, deleteConversation, historyGroups, localDate, readHistory, roundMessages, saveConversation, storedRound } from './history.js';
 import { HistoryList } from './history-list.jsx';
 import { MAX_INSTRUCTIONS, readInstructions, saveInstructions } from './instructions.js';
 import { NoteCard } from './note-card.jsx';
@@ -389,8 +389,7 @@ function Chat(props) {
       });
       const checked = checkNote(message.content, { root, catalog: known, base: article()?.address });
       if (checked.markdown === '') throw new EmptyNote();
-      const versions = [...(studyNote()?.versions ?? []).slice(1 - NOTE_VERSION_LIMIT), { markdown: checked.markdown, articles: checked.articles, rounds: rounds.length, request, date: localDate() }];
-      setStudyNote({ versions, index: versions.length - 1 });
+      setStudyNote(addNoteVersion(studyNote(), { markdown: checked.markdown, articles: checked.articles, rounds: rounds.length, request, date: localDate() }));
       persist();
       if (progress !== null && present(progress)) remove(progress);
       setNoteHint('');
