@@ -611,6 +611,21 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-preview.is-on').count(), 1, 'Escape during a composition closes the preview card');
   });
 
+  await t.test('an Enter that confirms a candidate of an input method in Safari, with keyCode 229 after the composition ended, neither picks a scope nor sends the question', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    const input = page.locator(QUESTION);
+    await input.pressSequentially('@');
+    await page.locator('.bk-chat-scopes [role="listbox"]').waitFor();
+    const requests = api.requests.length;
+    await input.dispatchEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true, composed: true, cancelable: true });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.deepEqual(await page.locator('.bk-chat-composer .bk-chat-chip').allTextContents(), [], 'the Enter picked a scope');
+    assert.equal(await input.inputValue(), '@');
+    assert.equal(api.requests.length, requests, 'the Enter sent the question');
+  });
+
   await t.test('a click where the bubbles were reaches the page while a closed chat fades out, at 1440 and 375 pixels', async (t) => {
     for (const [width, height] of [
       [1440, 900],

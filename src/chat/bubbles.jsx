@@ -2,6 +2,7 @@ import { For, Show, createEffect, createSignal, onCleanup, onMount } from 'solid
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { selectionMarkdown } from '../copy/copy.js';
+import { composing } from '../keys.js';
 import styles from './bubbles.css?inline';
 import { CHAT_RULES, READ_ARTICLE, articlePage, catalogEntry, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
 import { answer } from './conversation.js';
@@ -20,7 +21,6 @@ const THINKING_KEY = 'bk-chat-thinking';
 const SCOPE_QUERY = /@([^\s@]*)$/;
 const CONTEXT_LENGTH = /context length/i;
 const DEEPSEEK_KEYS = 'https://platform.deepseek.com/api_keys';
-const composing = (event) => event.isComposing || event.keyCode === 229;
 
 export function createChat({ shadow, root, labels, pet, petSource, launcher }) {
   const style = document.createElement('style');
@@ -479,7 +479,7 @@ function Chat(props) {
         setActive((active() + (event.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length);
         return;
       }
-      if ((event.key === 'Enter' || event.key === 'Tab') && !event.isComposing) {
+      if ((event.key === 'Enter' || event.key === 'Tab') && !composing(event)) {
         event.preventDefault();
         pick(shown[Math.min(active(), shown.length - 1)]);
         return;
@@ -872,7 +872,7 @@ function Settings(props) {
             spellcheck={false}
             onInput={(event) => setAddress(event.currentTarget.value)}
             onKeyDown={(event) => {
-              if (event.key !== 'Enter' || event.isComposing) return;
+              if (event.key !== 'Enter' || composing(event)) return;
               event.preventDefault();
               use();
             }}
@@ -972,7 +972,7 @@ function PromptForm(props) {
               value={name === 'instructions' ? props.prompts.instructions : (props.prompts[name] ?? props.builtIn[name])}
               ref={(element) => (fields[name] = element)}
               on:keydown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.isComposing) save(event);
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !composing(event)) save(event);
               }}
             />
           </div>
