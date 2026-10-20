@@ -35,7 +35,7 @@ export function texBox(tex, emSize) {
   if (!svg) return null
   const [, minY, width, height] = svg.getAttribute('viewBox').split(/\s+/).map(Number)
   const scale = emSize / 1000
-  return { svg, width: width * scale, height: height * scale, ascent: -minY * scale }
+  return { svg, scale, width: width * scale, height: height * scale, ascent: -minY * scale }
 }
 
 export const segments = (source) =>
