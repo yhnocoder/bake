@@ -28,7 +28,11 @@ export function startNotes(article) {
     if (note === null) return;
     event.preventDefault();
     const box = note.getBoundingClientRect();
-    if (box.top < 0 || box.bottom > innerHeight) note.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+    const card = note.closest('.bt-card[data-overflow]');
+    const frame = card?.getBoundingClientRect();
+    const clipped = frame !== undefined && (box.top < frame.top || box.bottom > frame.bottom);
+    if (clipped) card.focus({ preventScroll: true });
+    if (clipped || box.top < 0 || box.bottom > innerHeight) note.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
     flash(note);
   });
 }

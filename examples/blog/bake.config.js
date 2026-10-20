@@ -5,7 +5,7 @@ export default {
   language: 'zh-CN',
   theme: 'essay',
   toc: 'notes',
-  themes: { bento: { columns: 4 } },
+  themes: { bento: { columns: 6, rowHeight: 24 } },
   home: { columns: 3, groupBy: 'category' },
   categories: [
     { id: 'writing', name: '写法', color: '#985b57', desc: 'Bake 支持的 Markdown 写法和它们生成的页面。' },

@@ -50,7 +50,11 @@ const HEADING_ATTRIBUTES = {
   id: { text: 'an anchor name, for example {#intro}' },
   toc: { text: 'a short title in quotes, for example toc="Short title"' },
   width: WIDTH,
+  cols: { count: 'a whole number of card columns from 1 to 6, for example cols=2', most: 6 },
+  rows: { count: 'a whole number of card rows from 1 to 200, for example rows=12', most: 200 },
 };
+const SECTION_ATTRIBUTES = ['width', 'cols', 'rows'];
+const COUNT = /^[1-9]\d*$/;
 const IMAGE_FLOATS = ['left', 'right'];
 const IMAGE_ATTRIBUTES = {
   width: { size: 'image width' },
@@ -468,7 +472,7 @@ class ArticleParser {
       if (parsed.error) this.report(position, parsed.error);
       const attributes = this.checkAttributes(parsed.attributes, HEADING_ATTRIBUTES, 'heading', position);
       node.attributes = attributes;
-      if (attributes.width !== undefined && node.depth !== 2) this.report(position, 'width only applies to ## headings');
+      for (const name of SECTION_ATTRIBUTES) if (attributes[name] !== undefined && node.depth !== 2) this.report(position, `${name} only applies to ## headings`);
       if (attributes.id !== undefined) this.addAnchor(attributes.id, position);
     }
   }
@@ -859,6 +863,8 @@ class ArticleParser {
           ...this.headingFields(node),
           number: String(sections.length + 1).padStart(2, '0'),
           width: node.attributes.width,
+          cols: count(node.attributes.cols),
+          rows: count(node.attributes.rows),
           line: node.position.start.line,
           endLine: node.position.end.line,
           titleSidenotes: this.referencedSidenotes(node),
@@ -988,7 +994,12 @@ class ArticleParser {
 function attributeProblem(name, rule, value) {
   if (rule.choices !== undefined) return choiceProblem(name, rule.choices, value);
   if (rule.size !== undefined) return sizeProblem(rule.size, value, 'image');
+  if (rule.count !== undefined) return typeof value === 'string' && COUNT.test(value) && Number(value) <= rule.most ? null : `${name} must be ${rule.count}`;
   return typeof value === 'string' ? null : `${name} must be ${rule.text}`;
+}
+
+function count(value) {
+  return value === undefined ? undefined : Number(value);
 }
 
 function blockType(node) {

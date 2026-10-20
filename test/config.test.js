@@ -27,7 +27,7 @@ describe('bake.config.js', () => {
       language: 'en',
       theme: 'essay',
       toc: 'notes',
-      themes: { essay: {}, bento: { columns: 4 } },
+      themes: { essay: {}, bento: { columns: 6, rowHeight: 24 } },
       home: { columns: 3, groupBy: 'month' },
       categories: [],
       chat: { pet: 'crt-monitor' },
@@ -161,7 +161,7 @@ describe('bake.config.js', () => {
     const options = "export const options = { density: { label: 'Density', type: 'enum', options: ['loose', 'tight'], default: 'loose' }, rule: { label: 'Rule', type: 'boolean', default: true } };\n";
     const { config, lines } = await load(t, { 'bake.config.js': `export default { ${base}, themes: { mine: { density: 'tight' } } };\n`, 'themes/mine/options.js': options });
     assert.deepEqual(lines, []);
-    assert.deepEqual(config.themes, { essay: {}, bento: { columns: 4 }, mine: { density: 'tight', rule: true } });
+    assert.deepEqual(config.themes, { essay: {}, bento: { columns: 6, rowHeight: 24 }, mine: { density: 'tight', rule: true } });
   });
 
   test('reports a wrong option value of a blog theme with the field and the allowed values', async (t) => {
