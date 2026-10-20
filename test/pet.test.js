@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
 import { createSite, updateSite } from '../src/build/site.js';
+import { readPet } from '../src/chat/pet-files.js';
 import { formatError } from '../src/report.js';
 import { bake, createBlog, readTree, writeFiles } from './blog.js';
 
@@ -45,14 +46,15 @@ async function petFiles(dir) {
 async function serveFiles(t, files) {
   const server = createServer((request, response) => {
     const body = files[request.url];
-    if (body === undefined) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200).end(body);
+    if (body === undefined) response.writeHead(404).end();
+    else if (typeof body === 'function') body(response);
+    else response.writeHead(200).end(body);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => server.close());
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
   return `http://127.0.0.1:${server.address().port}`;
 }
 
@@ -166,6 +168,34 @@ describe('chat pets', () => {
       const failing = createBlog(t, { 'bake.config.js': config(`${base}${path}`) });
       assert.deepEqual((await petFiles(failing)).errors, [`bake.config.js:5:16 chat.pet: ${message}`]);
     }
+  });
+
+  test('resolves spritesheetPath against the address that a redirect of pet.json leads to', async (t) => {
+    const good = await sheet(1536, 1872, 'webp');
+    const base = await serveFiles(t, {
+      '/old/pet.json': (response) => response.writeHead(302, { location: '/new/pet.json' }).end(),
+      '/new/pet.json': '{"displayName":"Bun","spritesheetPath":"sheet.webp"}',
+      '/new/sheet.webp': good,
+    });
+    const { errors, files } = await petFiles(createBlog(t, { 'bake.config.js': config(`${base}/old/pet.json`) }));
+    assert.deepEqual(errors, []);
+    assert.deepEqual(files['_bake/pet/spritesheet.webp'], good);
+  });
+
+  test('reports a pet address that does not answer within 30 seconds', async (t) => {
+    let requested;
+    const reached = new Promise((resolve) => (requested = resolve));
+    const base = await serveFiles(t, { '/slow/pet.json': () => requested() });
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const problems = [];
+    const reading = readPet(import.meta.dirname, `${base}/slow/pet.json`, (file, message) => problems.push(message));
+    await reached;
+    t.mock.timers.tick(29_999);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(problems, []);
+    t.mock.timers.tick(1);
+    assert.equal(await reading, null);
+    assert.deepEqual(problems, [`cannot download ${base}/slow/pet.json: no answer within 30 seconds`]);
   });
 
   test('reads a pet folder again in bake dev when one of its files changes', async (t) => {

@@ -1,4 +1,4 @@
-import { markdownLineEnding } from 'micromark-util-character';
+import { markdownLineEnding, markdownSpace } from 'micromark-util-character';
 
 const BACKSLASH = 92;
 const CLOSING = { 40: 41, 91: 93 };
@@ -58,8 +58,8 @@ function tokenizeTex(effects, ok, nok) {
       effects.consume(code);
       return escaped;
     }
+    if (!markdownSpace(code)) size++;
     effects.consume(code);
-    size++;
     return content;
   }
 

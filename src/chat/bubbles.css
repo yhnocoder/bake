@@ -15,11 +15,9 @@
   pointer-events: none;
   opacity: 0;
   translate: 0 6px;
-  visibility: hidden;
   transition:
     opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out),
-    visibility 0s 0.2s;
+    translate 0.24s var(--ease-out, ease-out);
 }
 
 .bk-chat * {
@@ -27,26 +25,56 @@
 }
 
 .bk-chat[data-open] {
-  pointer-events: auto;
   opacity: calc(1 - var(--chat-hidden, 0));
   translate: none;
-  visibility: var(--chat-visibility, visible);
+}
+
+.bk-chat-bubbles,
+.bk-chat-composer {
+  pointer-events: auto;
   transition:
-    opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out),
-    visibility 0s;
+    visibility 0s,
+    content-visibility 0s allow-discrete;
+}
+
+.bk-chat-thread {
+  pointer-events: auto;
+}
+
+.bk-chat:not([data-open]) > :is(.bk-chat-bubbles, .bk-chat-composer) {
+  pointer-events: none;
+  transition:
+    visibility 0s 0.2s,
+    content-visibility 0s 0.2s allow-discrete;
+}
+
+.bk-chat:not([data-open]) > .bk-chat-bubbles {
+  content-visibility: hidden;
+}
+
+.bk-chat:not([data-open]) > .bk-chat-composer {
+  visibility: hidden;
 }
 
 @container style(--chat-visibility: hidden) {
-  .bk-chat[data-open] {
+  .bk-chat > :is(.bk-chat-bubbles, .bk-chat-composer) {
+    pointer-events: none;
     transition:
-      opacity 0.2s var(--ease-out, ease-out),
-      translate 0.24s var(--ease-out, ease-out),
-      visibility 0s 0.2s;
+      visibility 0s 0.2s,
+      content-visibility 0s 0.2s allow-discrete;
+  }
+
+  .bk-chat > .bk-chat-bubbles {
+    content-visibility: hidden;
+  }
+
+  .bk-chat > .bk-chat-composer {
+    visibility: hidden;
   }
 }
 
 .bk-chat-bubbles {
+  contain-intrinsic-block-size: auto 0px;
   display: flex;
   flex-direction: column-reverse;
   max-height: 230px;
@@ -72,6 +100,8 @@
 }
 
 .bk-chat-bubble {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px auto 40px;
   flex: none;
   max-width: 92%;
   margin: 0;
@@ -90,7 +120,7 @@
 }
 
 @starting-style {
-  .bk-chat[data-open] .bk-chat-bubble {
+  .bk-chat-bubble {
     opacity: 0;
     translate: 0 6px;
   }
@@ -640,7 +670,7 @@
   }
 
   @starting-style {
-    .bk-chat[data-open] .bk-chat-bubble {
+    .bk-chat-bubble {
       translate: none;
     }
   }

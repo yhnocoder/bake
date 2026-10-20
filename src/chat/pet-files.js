@@ -104,11 +104,11 @@ function fileInside(dir, name) {
 }
 
 async function downloadPet(url, report) {
-  const text = await download(url, PET_JSON_MAX_BYTES, report);
-  if (text === null) return null;
-  const json = petJson(text.toString('utf8'), (message) => report(`${url}: ${message}`));
+  const pet = await download(url, PET_JSON_MAX_BYTES, report);
+  if (pet === null) return null;
+  const json = petJson(pet.bytes.toString('utf8'), (message) => report(`${url}: ${message}`));
   if (json === null) return null;
-  const sheetUrl = new URL(json.spritesheetPath, url);
+  const sheetUrl = new URL(json.spritesheetPath, pet.url);
   if (!isUrl(sheetUrl.href)) {
     report(`${url}: spritesheetPath ${JSON.stringify(json.spritesheetPath)} is not an http or https address`);
     return null;
@@ -116,18 +116,25 @@ async function downloadPet(url, report) {
   const sheet = await download(sheetUrl.href, PET_MAX_BYTES, report);
   if (sheet === null) return null;
   const reportSheet = (message) => report(`${sheetUrl.href}: ${message}`);
-  const image = await sheetImage(sheet, reportSheet);
-  return image === null ? null : { name: json.displayName, sheet, image, reportSheet };
+  const image = await sheetImage(sheet.bytes, reportSheet);
+  return image === null ? null : { name: json.displayName, sheet: sheet.bytes, image, reportSheet };
 }
 
 async function download(url, limit, report) {
-  let response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error(`no answer within ${DOWNLOAD_TIMEOUT / 1000} seconds`)), DOWNLOAD_TIMEOUT);
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT), redirect: 'follow' });
+    return await read(url, limit, report, controller.signal);
   } catch (error) {
     report(`cannot download ${url}: ${error.cause?.message ?? error.message}`);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function read(url, limit, report, signal) {
+  const response = await fetch(url, { signal, redirect: 'follow' });
   if (!response.ok) {
     report(`cannot download ${url}: the server answered ${response.status}`);
     return null;
@@ -143,7 +150,7 @@ async function download(url, limit, report) {
     }
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks);
+  return { bytes: Buffer.concat(chunks), url: response.url };
 }
 
 function petJson(text, report) {

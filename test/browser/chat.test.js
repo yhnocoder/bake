@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { cpSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
@@ -46,7 +47,9 @@ async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {
       if (url.origin === PETS) {
         api.petRequests.push({ path: url.pathname, headers: request.headers() });
         const file = api.pets[url.pathname];
-        return route.fulfill(file === undefined ? { status: 404, headers: CORS } : { status: 200, headers: CORS, body: file });
+        if (file === undefined) return route.fulfill({ status: 404, headers: CORS });
+        if (file.hang) return new Promise(() => {});
+        return route.fulfill({ status: 200, headers: CORS, body: file });
       }
       if (url.origin !== 'https://api.deepseek.com') return route.abort();
       if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
@@ -165,7 +168,7 @@ function mainThreadTasks(trace) {
   const main = events.find((event) => event.name === 'thread_name' && event.args.name === 'CrRendererMain');
   return events
     .filter((event) => event.pid === main.pid && event.tid === main.tid && event.name === 'RunTask' && event.ph === 'X')
-    .map((event) => Math.round((event.tdur ?? event.dur) / 100) / 10)
+    .map((event) => Math.round(event.dur / 100) / 10)
     .sort((a, b) => b - a);
 }
 
@@ -352,7 +355,7 @@ test('the AI chat on published pages', async (t) => {
     assert.equal((await storage(page)).local['bk-chat-key'], undefined);
   });
 
-  await t.test('stopping an answer keeps the text written so far and sends it with the next question, and screen readers hear a reply only when it is done', async (t) => {
+  await t.test('stopping an answer keeps the text written so far and sends it with the next question, and screen readers hear a reply only when it is done, also a reply equal to the one before', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
@@ -384,6 +387,12 @@ test('the AI chat on published pages', async (t) => {
         ['user', '接着说'],
       ],
     );
+    const announced = await status.locator('span').elementHandle();
+    api.answers.push({ body: text('继续。') });
+    await ask(page, '再说一遍');
+    await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').nth(2).waitFor();
+    assert.equal(await status.textContent(), '继续。');
+    assert.equal(await announced.evaluate((element) => element.isConnected), false);
   });
 
   await t.test('a new chat started while an answer streams drops that answer from the bubbles and from the next request', async (t) => {
@@ -478,6 +487,27 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await shadow(page, 'return root.activeElement?.className ?? null;'), 'bk-chat-launcher');
   });
 
+  await t.test('Escape with the chat settings open closes only the settings, a second Escape closes the chat, and the settings read the pet of the site once', async (t) => {
+    const { page } = await openBrowser(t, base);
+    const petReads = [];
+    page.on('request', (request) => request.url().endsWith('/_bake/pet/pet.json') && petReads.push(request.url()));
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await openSettings(page);
+    await page.locator('.bk-chat-credit').waitFor();
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat-menu').waitFor({ state: 'detached' });
+    await openSettings(page);
+    await page.locator('.bk-chat-credit').waitFor();
+    assert.equal(petReads.length, 1);
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat-menu').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('.bk-chat[data-open]').count(), 1);
+    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+  });
+
   await t.test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides fades out before it leaves the keyboard order', async (t) => {
     const { context, page } = await openBrowser(t, base);
     const cdp = await context.newCDPSession(page);
@@ -504,10 +534,16 @@ test('the AI chat on published pages', async (t) => {
     }
     await launcher.click();
     await focused();
-    const visibility = () => shadow(page, 'return getComputedStyle(root.querySelector(".bk-chat")).visibility;');
+    const hidden = () => {
+      const root = document.querySelector('[data-bake-chat]').shadowRoot;
+      return [getComputedStyle(root.querySelector('.bk-chat-composer')).visibility, getComputedStyle(root.querySelector('.bk-chat-bubbles')).contentVisibility];
+    };
     await page.evaluate(() => document.documentElement.style.cssText = '--chat-hidden: 1; --chat-visibility: hidden');
-    assert.equal(await visibility(), 'visible');
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat')).visibility === 'hidden');
+    assert.deepEqual(await page.evaluate(hidden), ['visible', 'visible']);
+    await page.waitForFunction(() => {
+      const root = document.querySelector('[data-bake-chat]').shadowRoot;
+      return getComputedStyle(root.querySelector('.bk-chat-composer')).visibility === 'hidden' && getComputedStyle(root.querySelector('.bk-chat-bubbles')).contentVisibility === 'hidden';
+    });
   });
 
   await t.test('a rejected key is reported before any passkey is created', async (t) => {
@@ -666,7 +702,7 @@ test('the AI chat on published pages', async (t) => {
     await watchPet(page);
     await setUpKey(page);
     const input = page.locator(QUESTION);
-    const list = page.locator('.bk-chat-scopes[role="listbox"]');
+    const list = page.locator('.bk-chat-scopes [role="listbox"]');
     const chips = () => page.locator('.bk-chat-composer .bk-chat-chip > span').allTextContents();
     const combobox = () => input.evaluate((element) => ['role', 'aria-autocomplete', 'aria-expanded', 'aria-controls', 'aria-activedescendant'].map((name) => element.getAttribute(name)));
     assert.deepEqual(await combobox(), ['combobox', 'list', 'false', null, null]);
@@ -705,6 +741,12 @@ test('the AI chat on published pages', async (t) => {
     await input.press('ArrowDown');
     await input.press('Enter');
     assert.deepEqual(await chips(), ['@数学', '@雅可比矩阵']);
+    await input.pressSequentially('@没有这一项');
+    await page.locator('.bk-chat-scopes-none').waitFor();
+    assert.equal(await page.locator('[role="listbox"] .bk-chat-scopes-none').count(), 0);
+    assert.equal(await list.count(), 0);
+    assert.deepEqual(await combobox(), ['combobox', 'list', 'false', null, null]);
+    await input.fill('');
     await input.pressSequentially('@');
     await list.waitFor();
     await input.press('Escape');
@@ -759,43 +801,78 @@ test('the AI chat on published pages', async (t) => {
       seen[colorScheme] = await shadow(
         page,
         `const style = (selector, property) => getComputedStyle(root.querySelector(selector))[property];
-        return { bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: style('.bk-chat-ask', 'boxShadow'), pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
+        const token = (name) => {
+          const probe = document.body.appendChild(document.createElement('div'));
+          probe.style.boxShadow = \`var(\${name})\`;
+          const value = getComputedStyle(probe).boxShadow;
+          probe.remove();
+          return value;
+        };
+        return { button: token('--button-shadow'), card: token('--card-shadow'), bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: style('.bk-chat-ask', 'boxShadow'), pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
       );
+      const { button, card, bubble, composer, menu, ask: askButton } = seen[colorScheme];
+      const report = JSON.stringify(seen[colorScheme]);
+      assert.ok(bubble.endsWith(`, ${button}`), report);
+      assert.ok(composer.endsWith(`, ${button}`), report);
+      assert.equal(menu, card, report);
+      assert.equal(askButton, button, report);
     }
-    for (const part of Object.keys(seen.light)) assert.notEqual(seen.light[part], seen.dark[part], `the ${part} has the same shadow in both schemes: ${seen.light[part]}`);
+    for (const part of ['bubble', 'composer', 'menu', 'ask']) assert.notEqual(seen.light[part], seen.dark[part], `the ${part} has the same shadow in both schemes: ${seen.light[part]}`);
+    assert.match(seen.light.pet, /^drop-shadow\(rgba\(0, 0, 0, 0\) /, seen.light.pet);
+    assert.doesNotMatch(seen.dark.pet, /rgba\(0, 0, 0, 0\)/, seen.dark.pet);
   });
 
-  await t.test('opening and closing a chat with a long conversation runs no main-thread task over 25 milliseconds of CPU time at a quarter of the CPU speed, apart from one such as garbage collection, at 1440 and 375 pixels', async (t) => {
+  await t.test('opening and closing the chat at a quarter of the CPU speed takes at most 25 milliseconds longer with 30 rounds of conversation than with one, and no main-thread task takes longer than 60 milliseconds, at 1440 and 375 pixels', async (t) => {
     const { context, page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
-    for (let round = 0; round < 4; round += 1) {
-      api.answers.push({ body: text(`第 ${round + 1} 个回答，公式 $x^${round}$。\n\n${'这是一段较长的回答文字。'.repeat(6)}`, 40) });
+    const launcher = page.locator('.bk-chat-launcher');
+    const cdp = await context.newCDPSession(page);
+    const cycle = async () => {
+      const box = await launcher.boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.locator('.bk-chat[data-open]').waitFor({ state: 'attached' });
+      await page.waitForTimeout(400);
+      await page.keyboard.press('Escape');
+      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+      await page.waitForTimeout(400);
+    };
+    const measure = async () => {
+      await page.keyboard.press('Escape');
+      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      const longest = {};
+      for (const width of [1440, 375]) {
+        await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
+        await page.waitForTimeout(400);
+        await cycle();
+        await cdp.send('HeapProfiler.collectGarbage');
+        await context.browser().startTracing(page, { categories: ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+        for (let round = 0; round < 3; round += 1) await cycle();
+        longest[width] = mainThreadTasks(JSON.parse(await context.browser().stopTracing()))[0];
+      }
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await launcher.click();
+      await page.locator(QUESTION).waitFor();
+      return longest;
+    };
+    const answer = (round) => text(`第 ${round + 1} 个回答，公式 $x^${round} + \\frac{a_${round}}{b}$ 和 $\\sum_{i=1}^{n} y_i^2$。\n\n${'这是一段较长的回答文字。'.repeat(6)}\n\n$$\n\\int_0^1 f_${round}(x)\\,dx\n$$`, 400);
+    for (let round = 0; round < 30; round += 1) {
+      if (round === 1) var short = await measure();
+      api.answers.push({ body: answer(round) });
       await ask(page, `问题 ${round + 1}`);
       await page.locator('.bk-chat-reply[data-done]').nth(round).waitFor();
     }
-    const launcher = page.locator('.bk-chat-launcher');
-    await page.keyboard.press('Escape');
-    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-    const longest = {};
+    const long = await measure();
+    const report = JSON.stringify({ short, long });
     for (const width of [1440, 375]) {
-      await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
-      await page.waitForTimeout(600);
-      await context.browser().startTracing(page, { categories: ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline'] });
-      for (let round = 0; round < 3; round += 1) {
-        await launcher.click();
-        await page.waitForTimeout(400);
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(400);
-      }
-      longest[width] = mainThreadTasks(JSON.parse(await context.browser().stopTracing()));
+      assert.ok(long[width] <= short[width] + 25, report);
+      assert.ok(long[width] <= 60, report);
     }
-    assert.ok(longest[1440][1] <= 25 && longest[375][1] <= 25, JSON.stringify({ 1440: longest[1440].slice(0, 3), 375: longest[375].slice(0, 3) }));
   });
 
-  await t.test('a reader chooses a pet by the link of its pet.json, and a link that is too large or has the wrong size leaves the pet unchanged', async (t) => {
+  await t.test('a reader chooses a pet by the link of its pet.json, and a pet.json or a sheet that is too large or a sheet with the wrong size leaves the pet unchanged', async (t) => {
     const { page, api } = await openBrowser(t, base);
     api.pets['/bun/pet.json'] = JSON.stringify({ id: 'bun', displayName: '<b>Bun</b>', spritesheetPath: 'art/sheet.webp', script: 'alert(1)' });
     api.pets['/bun/art/sheet.webp'] = await petSheet(1536, 1872);
@@ -805,6 +882,7 @@ test('the AI chat on published pages', async (t) => {
     api.pets['/wrong/sheet.png'] = await petSheet(192, 208, 'png');
     api.pets['/text/pet.json'] = JSON.stringify({ displayName: 'Text', spritesheetPath: 'sheet.png' });
     api.pets['/text/sheet.png'] = '<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1872"/>';
+    api.pets['/huge/pet.json'] = JSON.stringify({ displayName: 'Huge', spritesheetPath: 'sheet.png', padding: ' '.repeat(64 * 1024) });
     await page.goto(`${base}/2026-10/syntax/`);
     const frame = () => shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-frame').src;");
     const siteFrame = await frame();
@@ -822,6 +900,7 @@ test('the AI chat on published pages', async (t) => {
       await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…');
     };
     for (const [path, message] of [
+      ['/huge/pet.json', 'pet.json 超过 64 KB。'],
       ['/big/pet.json', '形象图片超过 5 MB。'],
       ['/wrong/pet.json', '形象图片是 192x208 像素，需要 1536x1872 或 1536x2288。'],
       ['/text/pet.json', '形象图片不是 PNG 或 WebP 图片。'],
@@ -871,6 +950,42 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.evaluate((url) => fetch(url).then(() => 'read', () => 'revoked'), blob), 'revoked');
     assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
     await credit.waitFor();
+  });
+
+  await t.test('a reader pet link that redirects resolves its spritesheetPath against the new address, and a link that does not answer within 30 seconds leaves the pet unchanged', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    const sheet = await petSheet(1536, 1872);
+    const requested = [];
+    const server = createServer((request, response) => {
+      requested.push(request.url);
+      if (request.url === '/old/pet.json') response.writeHead(302, { ...CORS, location: '/new/pet.json' }).end();
+      else if (request.url === '/new/pet.json') response.writeHead(200, CORS).end(JSON.stringify({ displayName: 'Bun', spritesheetPath: 'sheet.webp' }));
+      else if (request.url === '/new/sheet.webp') response.writeHead(200, CORS).end(sheet);
+      else response.writeHead(404, CORS).end();
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => server.close());
+    api.pets['/slow/pet.json'] = { hang: true };
+    await page.clock.install();
+    await page.goto(`${base}/2026-10/syntax/`);
+    await openSettings(page);
+    const field = page.locator('.bk-chat-pet-form input[name="pet"]');
+    const status = page.locator('.bk-chat-pet-status');
+    const settled = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…');
+    await field.fill(`${PETS}/slow/pet.json`);
+    await field.press('Enter');
+    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent === '正在读取…');
+    await page.clock.fastForward(29_000);
+    assert.equal(await status.textContent(), '正在读取…');
+    await page.clock.fastForward(1_000);
+    await settled();
+    assert.equal(await status.textContent(), '这个链接在 30 秒内没有回应。');
+    assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
+    await field.fill(`http://127.0.0.1:${server.address().port}/old/pet.json`);
+    await field.press('Enter');
+    await settled();
+    assert.equal(await status.textContent(), '已换成 Bun。');
+    assert.deepEqual(requested, ['/old/pet.json', '/new/pet.json', '/new/sheet.webp']);
   });
 
   for (const reducedMotion of ['no-preference', 'reduce']) {

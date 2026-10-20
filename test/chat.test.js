@@ -122,6 +122,7 @@ describe('AI chat replies', () => {
     assert.equal(replyHtml('```\n\\[x\\]\n```', { root }), '<pre><code>\\[x\\]\n</code></pre>');
     assert.equal(replyHtml('An open \\(x stays text.', { root }), '<p>An open (x stays text.</p>');
     assert.equal(replyHtml('An empty \\(\\) and \\[ ] stay text.', { root }), '<p>An empty () and [ ] stay text.</p>');
+    assert.equal(replyHtml('Blank \\( \\) and \\[\n\\] stay text.', { root }), '<p>Blank ( ) and [\n] stay text.</p>');
   });
 
   test('resolves links against the site root, opens external links in a new tab and drops unsafe ones', () => {

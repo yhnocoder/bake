@@ -63,16 +63,16 @@ export async function readerPetSheet(address) {
 
 async function fetchPet(address) {
   const url = webAddress(address);
-  const text = new TextDecoder().decode(await download(url, PET_JSON_MAX_BYTES));
+  const pet = await download(url, PET_JSON_MAX_BYTES, 'jsonLarge');
   let json;
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(new TextDecoder().decode(pet.bytes));
   } catch {
     throw new PetError('json');
   }
   if (typeof json?.displayName !== 'string' || json.displayName.trim() === '' || typeof json.spritesheetPath !== 'string') throw new PetError('json');
-  const sheetUrl = webAddress(new URL(json.spritesheetPath, url).href);
-  return { url, name: json.displayName.trim(), sheet: sheetFile(await download(sheetUrl, PET_MAX_BYTES)) };
+  const sheetUrl = webAddress(new URL(json.spritesheetPath, pet.url).href);
+  return { url, name: json.displayName.trim(), sheet: sheetFile((await download(sheetUrl, PET_MAX_BYTES, 'large')).bytes) };
 }
 
 export function sheetFile(bytes) {
@@ -102,34 +102,32 @@ function imageHeader(bytes) {
   return null;
 }
 
-async function download(url, limit) {
-  let response;
+async function download(url, limit, tooLarge) {
   try {
-    response = await fetch(url, { ...REQUEST, signal: AbortSignal.timeout(TIMEOUT) });
+    return await read(url, limit, tooLarge, AbortSignal.timeout(TIMEOUT));
   } catch (error) {
+    if (error instanceof PetError) throw error;
     throw error.name === 'TimeoutError' ? new PetError('timeout') : new PetError('network', error.message);
   }
+}
+
+async function read(url, limit, tooLarge, signal) {
+  const response = await fetch(url, { ...REQUEST, signal });
   if (!response.ok) throw new PetError('network', String(response.status));
   if (Number(response.headers.get('content-length')) > limit) {
     await response.body?.cancel();
-    throw new PetError('large');
+    throw new PetError(tooLarge);
   }
   const reader = response.body.getReader();
   const chunks = [];
   let size = 0;
   for (;;) {
-    let read;
-    try {
-      read = await reader.read();
-    } catch (error) {
-      throw error.name === 'TimeoutError' ? new PetError('timeout') : new PetError('network', error.message);
-    }
-    const { done, value } = read;
+    const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
     if (size > limit) {
       await reader.cancel();
-      throw new PetError('large');
+      throw new PetError(tooLarge);
     }
     chunks.push(value);
   }
@@ -139,7 +137,7 @@ async function download(url, limit) {
     bytes.set(chunk, offset);
     offset += chunk.length;
   }
-  return bytes;
+  return { bytes, url: response.url };
 }
 
 function webAddress(address) {
