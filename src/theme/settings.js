@@ -1,13 +1,13 @@
+import { HOME_COLUMNS, TOC_STYLES } from '../choices.js';
+
 export const SETTINGS = {
-  toc: { values: ['notes', 'tabs', 'dots', 'ticks'], initial: (article) => article.toc },
+  toc: { values: TOC_STYLES, initial: (article) => article.toc },
   theme: { values: ['system', 'light', 'dark'], initial: () => 'system' },
   font: { values: ['sans', 'wenkai'], initial: () => 'sans' },
   buttons: { values: ['autohide', 'always'], initial: () => 'autohide' },
 };
 
 export const SITE_SETTINGS = ['theme', 'font'];
-
-export const HOME_COLUMNS = ['3', '4', '5'];
 
 export function storageKey(name) {
   return `bk-${name}`;
@@ -27,6 +27,6 @@ export function prepaintScript(pageSteps = '') {
 }
 
 export function homePrepaintSteps(groups) {
-  const choices = JSON.stringify({ group: groups, columns: HOME_COLUMNS });
+  const choices = JSON.stringify({ group: groups, columns: HOME_COLUMNS.map(String) });
   return `try{var h=${choices},e=document.documentElement.dataset;for(var n in h){var c=localStorage.getItem('${storageKey('')}'+n);var i=h[n].indexOf(c);if(i>=0){e[n]=c;document.documentElement.style.setProperty('--'+n+'-index',i)}}}catch(x){}`;
 }

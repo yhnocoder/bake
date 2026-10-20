@@ -93,14 +93,14 @@ function handlers(context) {
     math: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
     code: (state, node) => highlightCode(context.highlighter, node.value, node.lang ?? undefined),
     table: (state, node) => element('div', { className: ['table-scroll'] }, [defaultHandlers.table(state, node)]),
-    image: (state, node) => imageElement(node, true, relocate),
+    image: (state, node) => imageElement(node, true, excerpt, relocate),
     figure(state, node) {
       const [image, caption] = node.children;
       const float = image.attributes.float === undefined ? {} : { dataFloat: image.attributes.float };
       const figcaption = caption === undefined ? [] : [element('figcaption', {}, state.all(caption))];
       const { boxWidth } = image.published;
       const style = boxWidth === undefined ? {} : { style: `width:${boxWidth}` };
-      return element('figure', { className: ['figure'], ...float, ...style }, [imageElement(image, false, relocate), ...figcaption]);
+      return element('figure', { className: ['figure'], ...float, ...style }, [imageElement(image, false, excerpt, relocate), ...figcaption]);
     },
     blockquote(state, node) {
       const last = node.children.at(-1);
@@ -219,11 +219,12 @@ function cellContent(state, cell) {
   return state.wrap(state.all(cell), true);
 }
 
-function imageElement(node, sized, relocate) {
+function imageElement(node, sized, excerpt, relocate) {
   const { width, height, boxWidth } = node.published;
   const src = RELATIVE_URL.test(node.published.src) ? relocate(node.published.src) : node.published.src;
   const style = sized && boxWidth !== undefined ? { style: `width:${boxWidth};height:auto` } : {};
-  return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...style }, []);
+  const source = excerpt === undefined ? { dataSrc: node.url } : {};
+  return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...style, ...source, ...writtenAttributes(node.attributes) }, []);
 }
 
 function element(tagName, properties, children) {

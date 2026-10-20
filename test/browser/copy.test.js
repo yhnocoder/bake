@@ -3,6 +3,7 @@ import { cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import { parse } from '../article.js';
 import { article, bake, createBlog, validConfig } from '../blog.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
@@ -267,8 +268,33 @@ test('a converted citation, reference entry and internal link keep a key or an a
   await context.close();
 });
 
-test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list', async (t) => {
-  const body = '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n';
+test('a converted image keeps the address and the attributes written in the source, and an embedded image links to its published file', async (t) => {
+  const body = '## Dots\n\n:::aside\nDots ![dot](dot.png){width=40px height=10px} and ![dot](dot.png){height=12px} inline.\n\n![Figure](dot.png){width=200px float=left}\n\nAfter the figure.\n:::\n';
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body }),
+    'content/posts/rope/dot.png': await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer(),
+    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: ':::embed\n/2026-10/rope/#dots\n:::\n' }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  const images = (address) => `ots ![dot](${address}){width=40px height=10px} and ![dot](${address}){height=12px} inline.\n\n![Figure](${address}){width=200px float=left}\n\nAft`;
+  await openWithSelectionModule(page, `${base}/2026-10/rope/`);
+  await select(page, { selector: '.aside p', contains: 'Dots', text: 'ots' }, { selector: '.aside p', contains: 'After', text: 'Aft', after: true });
+  assert.equal((await copied(page)).text, `:::aside\n${images('dot.png')}\n:::`);
+  await openWithSelectionModule(page, `${base}/2026-10/host/`);
+  await select(page, { selector: '.embed .aside p', contains: 'Dots', text: 'ots' }, { selector: '.embed .aside p', contains: 'After', text: 'Aft', after: true });
+  assert.equal((await copied(page)).text, `:::aside\n${images(`${base}/2026-10/rope/dot.webp`)}\n:::`);
+  await context.close();
+});
+
+test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list, and an image with unreadable data-attributes as a plain image', async (t) => {
+  const body = '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n\n<p>Raw shows <img src="q.png" alt="q" data-attributes="oops"> and <img src="r.png" alt="r" data-attributes="{&quot;x} y&quot;:&quot;1&quot;,&quot;width&quot;:{&quot;a&quot;:1},&quot;height&quot;:&quot;12px&quot;}"> here.</p>\n';
   const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
@@ -282,6 +308,8 @@ test('a citation and a reference list without data-key, which only raw HTML can 
   assert.equal((await copied(page)).text, 'cites [\\[1\\]](#keys) before');
   await select(page, { selector: '.bk-article li', contains: 'First', text: 'irst' }, { selector: '.bk-article li', contains: 'Second', text: 'Sec', after: true });
   assert.equal((await copied(page)).text, '1. irst plain entry.\n2. Sec');
+  await select(page, { selector: '.bk-article p', contains: 'shows', text: 'shows' }, { selector: '.bk-article p', contains: 'shows', text: ' here', after: true });
+  assert.equal((await copied(page)).text, `shows ![q](${base}/2026-10/rope/q.png) and ![r](${base}/2026-10/rope/r.png){height=12px} here`);
   await context.close();
 });
 

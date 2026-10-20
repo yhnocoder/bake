@@ -1,3 +1,4 @@
+import { FontLinks } from './font-links.jsx';
 import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
 import { prepaintScript, settingAttributes } from './settings.js';
@@ -16,6 +17,7 @@ export function ArticleDocument(props) {
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
+        <FontLinks hrefs={assets.fonts} />
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
           <script type="module" src={src} />

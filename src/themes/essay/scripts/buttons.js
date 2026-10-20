@@ -18,7 +18,7 @@ export function startButtons() {
       const delta = top - lastTop;
       lastTop = top;
       if (jumping) return;
-      if (notesColumnScreen.matches || !autohide() || root.classList.contains('bk-drawer-open') || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
+      if (notesColumnScreen.matches || !autohide() || root.classList.contains('bk-toc-drawer-open') || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
         showButtons();
         return;
       }

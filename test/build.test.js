@@ -95,6 +95,7 @@ describe('bake build', () => {
     const assets = Object.keys(tree).filter((path) => path.startsWith('assets/'));
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.js$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.css$/.test(path)).length, 1);
+    assert.equal(assets.filter((path) => /^assets\/fonts-[\w-]+\.css$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/chat-[\w-]+\.js$/.test(path)).length, 1);
     for (const path of assets.filter((asset) => /^assets\/(essay|chat)-[\w-]+\.(js|css)$/.test(asset))) assert.ok(page.includes(`../../${path}`), `the page links ${path}`);
     assert.equal(tree['2026-10/rope/index.md'].toString(), readFileSync(join(dir, 'content/posts/2026-10/rope/index.md'), 'utf8'));
@@ -102,6 +103,19 @@ describe('bake build', () => {
     assert.equal(tree['2026-08/demo/index.html'].toString(), '<!doctype html><p>demo</p>\n');
     assert.equal(tree.CNAME.toString(), 'example.com\n');
     assert.deepEqual(stagingFolders(dir), []);
+  });
+
+  test('gives the essay and the bento pages one font face stylesheet', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
+    });
+    assert.equal(bake(dir, 'build').status, 0);
+    const tree = readTree(join(dir, 'dist'));
+    const fonts = Object.keys(tree).filter((path) => /^assets\/[\w-]*fonts-[\w-]+\.css$/.test(path));
+    assert.equal(fonts.length, 1, fonts.join());
+    for (const page of ['2026-10/rope/index.html', '2026-10/gelu/index.html', 'index.html']) assert.ok(tree[page].toString().includes(fonts[0]), `${page} links ${fonts[0]}`);
   });
 
   test('prints 1 page for a single article', (t) => {
@@ -176,6 +190,25 @@ describe('bake build', () => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/a/index.md': '---\ntitle: A\n---\n' });
     assert.equal(bake(dir, 'build').status, 1);
     assert.equal(existsSync(join(dir, 'dist')), false);
+  });
+
+  test('reports a broken options.js of a theme together with the other problems of bake.config.js', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': "export default {\n  title: 'Test Blog', url: 'https://example.com', language: 'en',\n  toc: 'x',\n  themes: { mine: { density: 2 } },\n};\n",
+      'themes/mine/options.js': 'export const options = { a: 1 };\n',
+      'content/posts/rope/index.md': article(),
+    });
+    const result = bake(dir, 'build');
+    assert.equal(
+      result.stderr,
+      [
+        'bake.config.js:3:8 toc must be notes, tabs, dots or ticks, got "x"',
+        `themes/mine/options.js:1:1 mine: option "a" must be declared as an object such as { label: 'Range', type: 'number', default: 4 }, got 1`,
+        '2 errors, dist/ was not written',
+        '',
+      ].join('\n'),
+    );
+    assert.equal(result.status, 1);
   });
 
   test('reports a public file that needs a folder where an article writes a file', (t) => {
@@ -280,7 +313,7 @@ describe('bake build', () => {
     assert.deepEqual(articleFiles(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/index.md', '2026-10/rope/small.jpg', '2026-10/rope/small.webp', 'index.html']);
     assert.deepEqual(tree['2026-10/rope/small.jpg'], small);
     assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
-    assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
+    assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async" data-src="angles.png">/);
     assert.doesNotMatch(tree['2026-10/rope/index.html'].toString(), /mjx/i);
   });
 

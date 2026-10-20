@@ -1,5 +1,8 @@
 import { fragmentOf, idOfFragment } from '../fragments.js';
+import { writeAttribute } from '../markdown/attributes.js';
 import { serializeMarkdown } from '../markdown/serialize.js';
+
+const ATTRIBUTE_NAME = /^[A-Za-z_][\w-]*$/;
 
 export const UI = '[data-ui]';
 
@@ -207,7 +210,7 @@ export class MarkdownWriter {
     if (element.matches('a.citation[data-key]')) return [{ type: 'citation', key: element.dataset.key }];
     if (element.matches('a.eqref')) return [{ type: 'eqref', label: idOfFragment(hashOf(element.getAttribute('href'))) }];
     if (element.matches('br')) return [{ type: 'break' }];
-    if (element.matches('img')) return [image(element, element.style.width === '' ? {} : { width: element.style.width })];
+    if (element.matches('img')) return [image(element)];
     if (element.matches('code')) return [{ type: 'inlineCode', value: this.selectedText(element) }];
     const inner = this.inline(element);
     if (inner.every(isBlank)) return inner;
@@ -257,11 +260,8 @@ export class MarkdownWriter {
     const element = figure.querySelector('img');
     const caption = figure.querySelector(':scope > figcaption');
     if (element === null) return this.blocks(figure);
-    const attributes = {};
-    if (figure.style.width !== '') attributes.width = figure.style.width;
-    if (figure.dataset.float !== undefined) attributes.float = figure.dataset.float;
     const title = caption === null ? null : tidy(serializeMarkdown({ type: 'root', children: paragraph(this.whole(caption, () => this.inline(caption))) }));
-    return [{ type: 'paragraph', children: [{ ...image(element, attributes), title }] }];
+    return [{ type: 'paragraph', children: [{ ...image(element), title }] }];
   }
 
   fold(details) {
@@ -354,8 +354,9 @@ function tightList(children) {
   return { type: 'list', ordered: false, spread: false, children };
 }
 
-function image(element, attributes) {
-  return { type: 'image', url: element.getAttribute('src'), alt: element.getAttribute('alt') ?? '', attributes };
+function image(element) {
+  const url = element.dataset.src ?? new URL(element.getAttribute('src'), element.baseURI).href;
+  return { type: 'image', url, alt: element.getAttribute('alt') ?? '', attributes: writtenAttributes(element) };
 }
 
 function paragraph(nodes) {
@@ -419,7 +420,14 @@ function alignmentOf(align) {
 }
 
 function writtenAttributes(element) {
-  return JSON.parse(element.dataset.attributes ?? '{}');
+  let attributes;
+  try {
+    attributes = JSON.parse(element.dataset.attributes ?? '{}');
+  } catch {
+    return {};
+  }
+  if (attributes === null || typeof attributes !== 'object' || Array.isArray(attributes)) return {};
+  return Object.fromEntries(Object.entries(attributes).filter(([name, value]) => ATTRIBUTE_NAME.test(name) && (value === true || typeof value === 'string') && writeAttribute(name, value) !== null));
 }
 
 function dedentDefinition(lines) {
