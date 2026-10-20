@@ -27,4 +27,10 @@ $$
 \frac{\partial L}{\partial x} = J^{T} \frac{\partial L}{\partial y}
 $$
 
+写成分量，第 $j$ 个输入的梯度是对所有输出的求和：
+
+$$
+\frac{\partial L}{\partial x_j} = \frac{\partial L}{\partial y_1} \frac{\partial y_1}{\partial x_j} + \frac{\partial L}{\partial y_2} \frac{\partial y_2}{\partial x_j} + \cdots + \frac{\partial L}{\partial y_m} \frac{\partial y_m}{\partial x_j} = \sum_{i=1}^{m} \frac{\partial L}{\partial y_i} J_{ij}
+$$
+
 实际计算时不必写出整个矩阵。逐元素的激活函数的雅可比矩阵是对角矩阵，所以这一步只需要把梯度和激活函数的导数逐元素相乘。
