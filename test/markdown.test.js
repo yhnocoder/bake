@@ -296,6 +296,27 @@ describe('writing Markdown', () => {
     assert.equal(outline(article.sections[0].blocks[1].html), '<p>a ==b== \\eqref{x} [@key] a * b *c*</p>');
     assert.equal(outline(article.sections[0].blocks[2].html), '<p>:::fold</p>');
   });
+
+  test('escapes every asterisk of a run next to text, also in strong text, next to an escaped character and in a table cell, so the text renders unchanged', async () => {
+    const cell = (value) => ({ type: 'tableCell', children: [text(value)] });
+    const tree = {
+      type: 'root',
+      children: [
+        paragraph(text('x**a**')),
+        paragraph(text('中**文**')),
+        paragraph({ type: 'strong', children: [text('2**3 = 8')] }),
+        paragraph(text('a *`b`* and *[c]* d')),
+        { type: 'table', align: [null], children: [{ type: 'tableRow', children: [cell('h')] }, { type: 'tableRow', children: [cell('**a**')] }] },
+      ],
+    };
+    const { article, errors } = await parse(serializeMarkdown(tree));
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      article.intro.map((block) => outline(block.html).replace(/<[^>]+>|\s/g, '')),
+      ['x**a**', '中**文**', '2**3=8', 'a*`b`*and*[c]*d', 'h**a**'],
+    );
+    assert.deepEqual(article.intro.map((block) => /<em>/.test(block.html)), [false, false, false, false, false]);
+  });
 });
 
 describe('inline syntax', () => {

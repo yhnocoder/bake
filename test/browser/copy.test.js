@@ -287,6 +287,8 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
     ['1\\. Not a list item', '1. Not', 'list'],
     ['\\- Not a list either', '- Not', 'list'],
     ['\\> Not a quote at all', '> Not', 'quote'],
+    ['Stars: x\\*\\*a\\*\\*, 中\\*\\*文\\*\\* and a \\*\\`b\\`\\* here.', 'x**a**', 'here'],
+    ['**2\\*\\*3 = 8** is strong text', '2**3', 'strong'],
     ['中文，标点：“引号”（括号）！还有 snake_case 和 a * b。', '标点', 'b'],
     ['Noncharacter: a\uFDD0b and \uFDD0\uFDD0 here.', 'a\uFDD0b', 'here'],
     ['\uFDD0# Not a heading after a noncharacter', '\uFDD0#', 'heading'],

@@ -10,9 +10,10 @@ import { equationReferencesToMarkdown } from './eqref-syntax.js';
 import { highlightToMarkdown } from './highlight-syntax.js';
 
 const CONSTRUCTS_WITHOUT_EMPHASIS = ['autolink', 'destinationLiteral', 'destinationRaw', 'reference', 'titleQuote', 'titleApostrophe'];
+// why: safe() drops an escape whose only condition is a neighbour it escapes; a pattern with only before and one with only after, both matching the same asterisks, make the escape unconditional
 const ASTERISK_NEXT_TO_TEXT = [
-  { character: '*', before: '\\S', inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_EMPHASIS },
-  { character: '*', after: '\\S', inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_EMPHASIS },
+  { character: '*', before: '(?<=\\S)|(?=\\*\\S)', inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_EMPHASIS },
+  { character: '*', after: '(?<=\\S\\*)|(?=\\S)', inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_EMPHASIS },
 ];
 
 const OPTIONS = {
