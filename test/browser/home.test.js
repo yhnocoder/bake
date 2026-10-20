@@ -233,6 +233,25 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
+  await t.test('a preview keeps running while either the pointer or the keyboard focus stays on its card', async () => {
+    const { context, page } = await open();
+    const gate = cardIn('category', '2026-10/gate/');
+    const running = (selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview').dataset.state);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.drawn === 'yes', gate);
+    await page.locator(gate).focus();
+    await page.hover(gate);
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(100);
+    assert.equal(await running(gate), 'running', 'the pointer left a focused card');
+    await page.hover(gate);
+    await page.locator(gate).evaluate((card) => card.blur());
+    await page.waitForTimeout(100);
+    assert.equal(await running(gate), 'running', 'the focus left a hovered card');
+    await page.mouse.move(5, 5);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', gate);
+    await context.close();
+  });
+
   await t.test('clicking the chip of the group on screen does not keep the highlight from following the scroll', async () => {
     const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
     const settled = () =>
