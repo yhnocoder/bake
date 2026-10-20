@@ -124,7 +124,7 @@ describe('headings and anchors', () => {
       ],
     );
     assert.deepEqual(article.sections[0].blocks.map((block) => block.html), ['<p>A.</p>', '<h3 id="inner">Inner</h3>', '<p>B.</p>']);
-    assert.deepEqual(article.sections[0].blocks[1], { type: 'heading', line: 13, endLine: 13, html: '<h3 id="inner">Inner</h3>', depth: 3, id: 'inner', title: 'Inner', text: 'Inner', toc: 'Inner' });
+    assert.deepEqual(article.sections[0].blocks[1], { type: 'heading', line: 13, endLine: 13, html: '<h3 id="inner">Inner</h3>', sidenotes: [], depth: 3, id: 'inner', title: 'Inner', text: 'Inner', toc: 'Inner' });
     assert.deepEqual(article.toc, [
       { id: 'one', number: '01', title: '1st', recap: undefined, children: [{ id: 'inner', title: 'Inner', recap: undefined }] },
       { id: 'second', number: '02', title: 'Second', recap: undefined, children: [] },
@@ -321,10 +321,39 @@ describe('sidenotes', () => {
     assert.deepEqual(
       article.sidenotes.map((note) => ({ ...note, html: outline(note.html) })),
       [
-        { number: 1, id: 'sidenote-1', label: 'b', line: 10, endLine: 11, html: '<p>Note b,\ncontinued.</p>' },
-        { number: 2, id: 'sidenote-2', label: 'a', line: 9, endLine: 9, html: '<p>Note <em>a</em> with $x$.</p>' },
+        { number: 1, id: 'sidenote-1', label: 'b', line: 10, endLine: 11, html: '<p>Note b,\ncontinued.</p>', sidenotes: [] },
+        { number: 2, id: 'sidenote-2', label: 'a', line: 9, endLine: 9, html: '<p>Note <em>a</em> with $x$.</p>', sidenotes: [] },
       ],
     );
+  });
+
+  test('lists the sidenotes that each block, heading, recap and sidenote refers to, in the order of their first reference', async () => {
+    const body = [
+      'Intro[^a].',
+      '## Title[^b]',
+      ':::recap\nRecap[^c].\n:::',
+      'Text[^d], then[^a] and again[^d].',
+      '### Part[^e]',
+      ':::recap\nPart recap[^f].\n:::',
+      'Plain text.',
+      '[^a]: A.\n[^b]: B refers to[^g].\n[^c]: C.\n[^d]: D.\n[^e]: E.\n[^f]: F.\n[^g]: G.',
+    ].join('\n\n');
+    const article = await parsed(`${body}\n`);
+    const [section] = article.sections;
+    assert.deepEqual(article.intro.map((block) => block.sidenotes), [[1]]);
+    assert.deepEqual([section.titleSidenotes, section.recapSidenotes], [[2], [4]]);
+    assert.deepEqual(section.blocks.map((block) => block.sidenotes), [[5, 1], [6], []]);
+    assert.deepEqual(section.subsections.map(({ titleSidenotes, recapSidenotes }) => [titleSidenotes, recapSidenotes]), [[[6], [7]]]);
+    assert.deepEqual(article.sidenotes.map((note) => [note.label, note.number, note.sidenotes]), [
+      ['a', 1, []],
+      ['b', 2, [3]],
+      ['g', 3, []],
+      ['c', 4, []],
+      ['d', 5, []],
+      ['e', 6, []],
+      ['f', 7, []],
+    ]);
+    assert.deepEqual((await parsed('## Plain\n\nText.\n')).sections[0].recapSidenotes, []);
   });
 
   test('reports an undefined footnote at its position inside a list item and keeps it as text', async () => {
