@@ -10,7 +10,7 @@ import { chatLabels } from '../src/chat/labels.js';
 import { PetError, sheetFile } from '../src/chat/reader-pet.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
-import { linkTarget, normalizeMath, replyHtml } from '../src/chat/reply.js';
+import { linkTarget, replyHtml } from '../src/chat/reply.js';
 import { openKey, sealKey } from '../src/chat/vault.js';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 
@@ -113,10 +113,15 @@ describe('AI chat replies', () => {
     );
   });
 
-  test('converts \\( \\) and \\[ \\] delimiters outside code', () => {
-    assert.equal(normalizeMath('Inline \\(x^2\\) and `\\(code\\)`.'), 'Inline $x^2$ and `\\(code\\)`.');
-    assert.equal(normalizeMath('\\[ \\sum_i x_i \\]'), '\n$$\n\\sum_i x_i\n$$\n');
-    assert.equal(normalizeMath('```\n\\[x\\]\n```'), '```\n\\[x\\]\n```');
+  test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', () => {
+    const math = (tex, display = false) => `<${display ? 'div' : 'span'} class="bk-chat-math" data-tex="${tex}"${display ? ' data-display="true"' : ''}>${tex}</${display ? 'div' : 'span'}>`;
+    assert.equal(replyHtml('Inline \\(x^2\\) and `\\(code\\)`.', { root }), `<p>Inline ${math('x^2')} and <code>\\(code\\)</code>.</p>`);
+    assert.equal(replyHtml('\\[ \\sum_i x_i \\]', { root }), math('\\sum_i x_i', true));
+    assert.equal(replyHtml('\\[\na \\\\\nb\n\\]', { root }), math('a \\\\\nb', true));
+    assert.equal(replyHtml('So \\[x\\] here.', { root }), `<p>So ${math('x', true).replace(/div/g, 'span')} here.</p>`);
+    assert.equal(replyHtml('```\n\\[x\\]\n```', { root }), '<pre><code>\\[x\\]\n</code></pre>');
+    assert.equal(replyHtml('An open \\(x stays text.', { root }), '<p>An open (x stays text.</p>');
+    assert.equal(replyHtml('An empty \\(\\) and \\[ ] stay text.', { root }), '<p>An empty () and [ ] stay text.</p>');
   });
 
   test('resolves links against the site root, opens external links in a new tab and drops unsafe ones', () => {
