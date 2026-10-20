@@ -8,6 +8,8 @@ const everyInteraction = process.env.BAKE_FRAMES === 'all';
 const SYNTAX = '/2026-10/syntax/';
 const BENTO = '/2026-10/activations/';
 const HOME = '/';
+const ACTIVATIONS = '/2026-09/llm-act-fns/';
+const MATRIX = '/2026-09/matrix-calculus/';
 
 const WHEEL_STEP = 120;
 const WHEEL_INTERVAL = 50;
@@ -18,6 +20,11 @@ const knownFailures = [
   { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'the longest frame takes 50 to 100 ms in five of five runs', task: 'perf-fixes' },
   { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 67 to 100 ms in five of five runs', task: 'content-paint' },
   { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 83 to 117 ms in five of five runs', task: 'content-paint' },
+  { name: 'scrolling the whole llm-act-fns article at 1440 pixels', reason: 'the longest frame takes 100 to 117 ms in five of five runs', task: 'long-article-frames' },
+  { name: 'scrolling the whole llm-act-fns article at 375 pixels', reason: 'the longest frame takes 67 to 83 ms in five of five runs', task: 'long-article-frames' },
+  { name: 'scrolling the whole matrix-calculus article at 1440 pixels', reason: '6 to 8 percent of the frames are slower than the budget and the longest frame takes 83 to 100 ms in five of five runs', task: 'long-article-frames' },
+  { name: 'scrolling the whole matrix-calculus article at 375 pixels', reason: 'the longest frame takes 100 to 117 ms in five of five runs', task: 'long-article-frames' },
+  { name: 'dragging a slider of matrix-gradient-field in the matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 ms in one of five runs', task: 'long-article-frames' },
   { name: 'resizing the bento article at 1440 pixels', reason: '8 to 14 percent of the frames are dropped and the longest frame takes 67 to 100 ms in five of five runs', task: 'bento-redesign' },
 ];
 
@@ -65,7 +72,7 @@ async function hoverSidenote(page, device) {
     await page.mouse.move(x, y - 80);
     await page.waitForTimeout(500);
     const hovers = await page.evaluate(() => window.sidenoteHovers);
-    assert.ok(hovers >= 15, `the pointer entered the sidenote number ${hovers} of 20 times`);
+    assert.equal(hovers, 20, `the pointer entered the sidenote number ${hovers} of 20 times`);
   };
 }
 
@@ -154,6 +161,32 @@ async function dragPlot(page) {
   };
 }
 
+function dragSlider(component) {
+  return async (page) => {
+    const frames = page.locator(`figure.component[data-component="${component}"]`);
+    for (let index = 0; index < (await frames.count()); index += 1) {
+      const frame = frames.nth(index);
+      if (!(await frame.evaluate((element) => element.checkVisibility()))) continue;
+      await frame.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      await page.waitForFunction((element) => element.dataset.state === 'ready', await frame.elementHandle());
+      if ((await frame.getByRole('slider').count()) === 0) continue;
+      await settle(page);
+      const slider = await frame.getByRole('slider').first().boundingBox();
+      return async () => {
+        const y = slider.y + slider.height / 2;
+        await page.mouse.move(slider.x + 4, y);
+        await page.mouse.down();
+        await paced(40, 2000, (step) => page.mouse.move(slider.x + 4 + ((slider.width - 8) * (step + 1)) / 40, y));
+        await paced(40, 2000, (step) => page.mouse.move(slider.x + slider.width - 4 - ((slider.width - 8) * (step + 1)) / 40, y));
+        await page.mouse.up();
+        await page.mouse.move(5, 5);
+        await page.waitForTimeout(400);
+      };
+    }
+    assert.fail(`no visible ${component} has a slider`);
+  };
+}
+
 async function toggleFold(page) {
   const summary = page.locator('.bk-article details.fold > summary').first();
   await summary.evaluate((element) => element.scrollIntoView({ block: 'center' }));
@@ -195,6 +228,10 @@ const interactions = [
   { name: 'dragging the slider of the function plot in the bento article', path: BENTO, devices: BOTH, nightly: true, prepare: dragPlot },
   { name: 'resizing the bento article', path: BENTO, devices: ['desktop'], nightly: true, prepare: resizeColumns },
   { name: 'scrolling the whole homepage', path: HOME, devices: BOTH, nightly: true, prepare: scroll() },
+  { name: 'scrolling the whole llm-act-fns article', path: ACTIVATIONS, devices: BOTH, nightly: true, prepare: scroll() },
+  { name: 'dragging a slider of llm-act-plot in the llm-act-fns article', path: ACTIVATIONS, devices: BOTH, nightly: true, prepare: dragSlider('llm-act-plot') },
+  { name: 'scrolling the whole matrix-calculus article', path: MATRIX, devices: BOTH, nightly: true, prepare: scroll() },
+  { name: 'dragging a slider of matrix-gradient-field in the matrix-calculus article', path: MATRIX, devices: BOTH, nightly: true, prepare: dragSlider('matrix-gradient-field') },
 ];
 
 function caseName(interaction, device) {
