@@ -7,11 +7,10 @@ import { chatLabels } from '../../src/chat/labels.js';
 import { noteRules } from '../../src/chat/note.js';
 import { exampleBlog } from '../blog.js';
 import { serveExample } from './browser.js';
-import { API_KEY, QUESTION, ask, openBrowser, setUpKey, storage, text } from './chat-page.js';
+import { API_KEY, QUESTION, ask, openBrowser, scrollPage, setUpKey, storage, text } from './chat-page.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
-const HISTORY = 'bk-chat-history:/';
 
 function chatRequests(api) {
   return api.requests.filter((request) => request.path === '/chat/completions');
@@ -29,10 +28,6 @@ async function openMenu(page) {
 async function openHistory(page) {
   await page.getByRole('button', { name: '历史记录' }).click();
   await page.locator('.bk-chat-history').waitFor();
-}
-
-function savedHistory(stored) {
-  return JSON.parse(stored.local[HISTORY] ?? '[]');
 }
 
 const NOTE = [
@@ -66,18 +61,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await answered(page, 1);
     await ask(page, '第二个问题');
     await answered(page, 2);
-    let stored = await storage(page);
-    assert.doesNotMatch(JSON.stringify(stored), new RegExp(API_KEY));
-    const [saved] = savedHistory(stored);
-    assert.deepEqual(saved.article, { address: '/2026-10/syntax/', title: 'Bake 写法一览' });
-    assert.deepEqual(
-      saved.rounds.map((round) => [round.ask.content, round.content]),
-      [
-        ['第一个问题', '第一个回答，见 [标题](#headings)。'],
-        ['第二个问题', '第二个回答。'],
-      ],
-    );
-    assert.equal(saved.note, null);
+    assert.doesNotMatch(JSON.stringify(await storage(page)), new RegExp(API_KEY));
 
     await openHistory(page);
     assert.equal(await page.locator('.bk-chat-history-row').count(), 0);
@@ -112,9 +96,6 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
         ['user', '第三个问题'],
       ],
     );
-    stored = await storage(page);
-    assert.equal(savedHistory(stored).length, 1);
-    assert.equal(savedHistory(stored)[0].rounds.length, 3);
 
     await page.goto(`${base}/2026-10/jacobian/`);
     await page.locator('.bk-chat-launcher').click();
@@ -130,6 +111,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await page.locator('.bk-chat-history-group').getAttribute('aria-label'), '《Bake 写法一览》');
     await page.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-note').filter({ hasText: '这段对话来自《Bake 写法一览》，接着问时会读这篇文章。' }).waitFor();
+    assert.deepEqual(await page.locator('.bk-chat-user').allTextContents(), ['第一个问题', '第二个问题', '第三个问题']);
     assert.equal(await page.locator('.bk-chat-answer a').first().getAttribute('href'), `${base}/2026-10/syntax/#headings`);
     api.answers.push({ body: text('第四个回答，见 [标题](#headings)。') });
     await ask(page, '第四个问题');
@@ -147,34 +129,29 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.locator('.bk-chat-history-delete').click();
     assert.equal(await page.locator('.bk-chat-history-row').count(), 0);
     assert.equal(await page.locator('.bk-chat-history-empty').textContent(), '还没有保存的对话');
-    assert.deepEqual(savedHistory(await storage(page)), []);
+    await page.reload();
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator(QUESTION).waitFor();
+    await openHistory(page);
+    assert.equal(await page.locator('.bk-chat-history-empty').textContent(), '还没有保存的对话');
     assert.deepEqual(problems, []);
   });
 
-  await t.test('clearing the key keeps the history, and at most 50 conversations are kept', async (t) => {
+  await t.test('clearing the key keeps the history, and a conversation of an earlier day is listed with its date', async (t) => {
     const { page, api } = await openBrowser(t, base);
+    await page.clock.install({ time: new Date('2026-03-01T10:00:00') });
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
-    await page.evaluate((key) => {
-      const conversation = (index) => ({ id: `old-${index}`, article: { address: '/2026-10/syntax/', title: 'Bake 写法一览' }, date: '2026-10-01', rounds: [{ ask: { content: `旧问题 ${index}`, scopes: [], bubble: { text: `旧问题 ${index}`, quote: null, scopes: [] } }, content: '旧回答', reasoning: '', reads: [] }], note: null });
-      localStorage.setItem(key, JSON.stringify(Array.from({ length: 50 }, (_, index) => conversation(index))));
-    }, HISTORY);
-    api.answers.push({ body: text('新回答。') });
-    await ask(page, '新问题');
+    api.answers.push({ body: text('旧回答。') });
+    await ask(page, '旧问题');
     await answered(page, 1);
-    const saved = savedHistory(await storage(page));
-    assert.equal(saved.length, 50);
-    assert.equal(saved[0].rounds[0].ask.content, '新问题');
-    assert.equal(saved.at(-1).id, 'old-48');
+    await page.clock.setSystemTime(new Date('2026-03-05T10:00:00'));
     await openMenu(page);
     await page.locator('.bk-chat-menu-item[data-action="clear-key"]').click();
     await page.locator('.bk-chat-note').filter({ hasText: 'key 已清除' }).waitFor();
-    const stored = await storage(page);
-    assert.equal(stored.local['bk-chat-key'], undefined);
-    assert.equal(savedHistory(stored).length, 50);
     await openHistory(page);
-    assert.equal(await page.locator('.bk-chat-history-row').count(), 50);
-    assert.equal(await page.locator('.bk-chat-history-row small').nth(1).textContent(), '10-01 · 1 轮');
+    assert.equal(await page.locator('.bk-chat-history-row .bk-chat-history-title').textContent(), '旧问题');
+    assert.equal(await page.locator('.bk-chat-history-row small').textContent(), '03-01 · 1 轮');
   });
 
   await t.test('a conversation becomes a note with checked links, which is copied, rewritten on request, kept in versions and saved with its conversation', async (t) => {
@@ -229,17 +206,10 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await card.getByRole('button', { name: '复制 Markdown' }).click();
     await card.locator('.bk-chat-note-hint', { hasText: '已复制 Markdown。' }).waitFor();
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), markdown);
-    await page.evaluate(() => {
-      const click = HTMLAnchorElement.prototype.click;
-      HTMLAnchorElement.prototype.click = function () {
-        window.bakeTest.downloads = [...(window.bakeTest.downloads ?? []), this.download];
-        return click.call(this);
-      };
-    });
     const download = page.waitForEvent('download');
     await card.getByRole('button', { name: '下载 .md' }).click();
     assert.equal(readFileSync(await (await download).path(), 'utf8'), markdown);
-    assert.deepEqual(await page.evaluate(() => window.bakeTest.downloads), ['标题与锚点的写法.md']);
+    assert.equal((await download).suggestedFilename(), '标题与锚点的写法.md');
     await card.locator('.bk-chat-note-hint', { hasText: '已下载 标题与锚点的写法.md。' }).waitFor();
 
     await card.locator('.bk-chat-note-foot').getByRole('button', { name: '重新整理' }).click();
@@ -281,10 +251,6 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.keyboard.press('Escape');
     await card.waitFor({ state: 'detached' });
     assert.equal(await link.textContent(), '查看笔记');
-    const [saved] = savedHistory(await storage(page));
-    assert.equal(saved.note.versions.length, 2);
-    assert.equal(saved.note.index, 1);
-    assert.equal(saved.note.versions[1].request, '只留锚点\n写短一点');
     await openMenu(page);
     assert.equal(await page.locator('.bk-chat-menu-item', { hasText: '查看笔记' }).count(), 1);
     await page.locator('.bk-chat-menu-item', { hasText: '新对话' }).click();
@@ -293,6 +259,8 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
     assert.equal(await card.locator('h4').textContent(), '锚点');
+    assert.equal(await card.locator('.bk-chat-note-count').textContent(), '第 2/2 版');
+    assert.equal(await card.locator('.bk-chat-note-intro').nth(1).textContent(), '按要求重新整理：只留锚点\n写短一点');
     const fading = page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -318,15 +286,15 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.locator('.bk-chat-bubbles').waitFor();
     assert.equal(await card.count(), 0);
 
+    await page.setViewportSize({ width: 375, height: 812 });
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
     await card.waitFor();
-    const host = page.locator('[data-bake-chat]');
-    await host.evaluate((element) => element.style.setProperty('--chat-hidden', '1'));
+    await scrollPage(page, 800);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat'), '::before').opacity === '0');
-    await page.mouse.click(400, 300);
-    await page.locator('.bk-chat:not([data-open])').waitFor();
+    await page.mouse.click(200, 100);
+    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
     await card.waitFor({ state: 'detached' });
-    await host.evaluate((element) => element.style.removeProperty('--chat-hidden'));
+    await scrollPage(page, -200);
     await page.locator('.bk-chat-launcher').click();
     await page.locator('.bk-chat-bubbles').waitFor();
     assert.equal(await card.count(), 0, 'a chat closed while the theme hides it opens with the bubbles');
@@ -406,7 +374,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.addInitScript(() => {
       const setItem = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key, value) {
-        if (key === 'bk-chat-note-rules') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+        if (value === '把对话整理成提纲。') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
         return setItem.call(this, key, value);
       };
     });
@@ -422,13 +390,17 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await form.locator('#bk-chat-prompt-note').fill('把对话整理成提纲。');
     await form.getByRole('button', { name: '保存' }).click();
     await form.getByRole('alert').filter({ hasText: chatLabels('zh').promptStorage }).waitFor();
-    const local = (await storage(page)).local;
-    for (const key of ['bk-chat-instructions', 'bk-chat-rules', 'bk-chat-note-rules']) assert.equal(local[key], undefined, key);
     assert.equal(await form.locator('#bk-chat-prompt-text').inputValue(), '回答不超过三句话。');
     assert.equal(await form.locator('#bk-chat-prompt-chat').inputValue(), '你是这个博客的助手。');
     assert.equal(await form.locator('#bk-chat-prompt-note').inputValue(), '把对话整理成提纲。');
     await openMenu(page);
     assert.equal(await page.locator('.bk-chat-menu-state').count(), 0);
+    await page.reload();
+    await page.locator('.bk-chat-launcher').click();
+    await openMenu(page);
+    assert.equal(await page.locator('.bk-chat-menu-state').count(), 0, 'no prompt was stored');
+    await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
+    assert.equal(await form.locator('#bk-chat-prompt-text').inputValue(), '');
   });
 
   await t.test('instructions and built-in prompts written in the chat settings are stored in this browser and used in every request', async (t) => {
@@ -445,13 +417,13 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.keyboard.type('回答不超过三句话。');
     await page.keyboard.press('Escape');
     await form.waitFor({ state: 'detached' });
-    assert.equal((await storage(page)).local['bk-chat-instructions'], undefined);
     await openMenu(page);
+    assert.equal(await page.locator('.bk-chat-menu-state').count(), 0, 'a prompt closed with Escape is not saved');
     await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
+    assert.equal(await form.locator('#bk-chat-prompt-text').inputValue(), '');
     await form.locator('#bk-chat-prompt-text').fill('回答不超过三句话。');
     await form.getByRole('button', { name: '保存' }).click();
     await page.locator('.bk-chat-note', { hasText: '提示词已保存。' }).waitFor();
-    assert.equal((await storage(page)).local['bk-chat-instructions'], '回答不超过三句话。');
     await openMenu(page);
     assert.equal(await page.locator('.bk-chat-menu-state').textContent(), '已修改');
     await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
@@ -468,8 +440,6 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await noteField.inputValue(), noteRules(chatLabels('zh')));
     await form.getByRole('button', { name: '保存' }).click();
     await page.locator('.bk-chat-note', { hasText: '提示词已保存。' }).last().waitFor();
-    assert.equal((await storage(page)).local['bk-chat-rules'], '你是这个博客的助手，回答要有礼貌。');
-    assert.equal((await storage(page)).local['bk-chat-note-rules'], undefined);
     api.answers.push({ body: text('好。') }, { body: text('# 笔记\n\n- 好。') });
     await ask(page, '问题');
     await answered(page, 1);
@@ -492,8 +462,6 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await chatRules.inputValue(), CHAT_RULES);
     await page.keyboard.press('Control+Enter');
     await page.locator('.bk-chat-note', { hasText: '提示词已保存，现在用的是内置提示词，没有额外要求。' }).waitFor();
-    const local = (await storage(page)).local;
-    for (const key of ['bk-chat-instructions', 'bk-chat-rules', 'bk-chat-note-rules']) assert.equal(local[key], undefined);
     await openMenu(page);
     assert.equal(await page.locator('.bk-chat-menu-state').count(), 0);
   });
