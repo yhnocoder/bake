@@ -51,7 +51,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
       build(serverConfig(alias, locate, siteTheme)),
       browserBuild({ input: { [name]: locate(CLIENT_FILE) }, plugins: [solid()], alias }),
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
-      fontsFile === null ? null : browserBuild({ input: { [`${name}-fonts`]: fontsFile }, alias }),
+      fontsFile === null ? null : browserBuild({ input: { fonts: fontsFile }, alias }),
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
     return {

@@ -94,8 +94,8 @@ describe('bake build', () => {
     assert.match(tree['2026-09/series/index.html'].toString(), /<h1 class="bk-title">Series<\/h1>/);
     const assets = Object.keys(tree).filter((path) => path.startsWith('assets/'));
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.js$/.test(path)).length, 1);
-    assert.equal(assets.filter((path) => /^assets\/essay-(?!fonts-)[\w-]+\.css$/.test(path)).length, 1);
-    assert.equal(assets.filter((path) => /^assets\/essay-fonts-[\w-]+\.css$/.test(path)).length, 1);
+    assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.css$/.test(path)).length, 1);
+    assert.equal(assets.filter((path) => /^assets\/fonts-[\w-]+\.css$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/chat-[\w-]+\.js$/.test(path)).length, 1);
     for (const path of assets.filter((asset) => /^assets\/(essay|chat)-[\w-]+\.(js|css)$/.test(asset))) assert.ok(page.includes(`../../${path}`), `the page links ${path}`);
     assert.equal(tree['2026-10/rope/index.md'].toString(), readFileSync(join(dir, 'content/posts/2026-10/rope/index.md'), 'utf8'));
@@ -103,6 +103,19 @@ describe('bake build', () => {
     assert.equal(tree['2026-08/demo/index.html'].toString(), '<!doctype html><p>demo</p>\n');
     assert.equal(tree.CNAME.toString(), 'example.com\n');
     assert.deepEqual(stagingFolders(dir), []);
+  });
+
+  test('gives the essay and the bento pages one font face stylesheet', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
+    });
+    assert.equal(bake(dir, 'build').status, 0);
+    const tree = readTree(join(dir, 'dist'));
+    const fonts = Object.keys(tree).filter((path) => /^assets\/[\w-]*fonts-[\w-]+\.css$/.test(path));
+    assert.equal(fonts.length, 1, fonts.join());
+    for (const page of ['2026-10/rope/index.html', '2026-10/gelu/index.html', 'index.html']) assert.ok(tree[page].toString().includes(fonts[0]), `${page} links ${fonts[0]}`);
   });
 
   test('prints 1 page for a single article', (t) => {

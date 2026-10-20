@@ -41,11 +41,11 @@ test('every stacking layer variable that the styles use is defined', () => {
   assert.deepEqual([...used].filter((name) => !defined.has(name)).sort(), []);
 });
 
-test('no rule tests the root element with :has() on its descendants', () => {
+test('no rule tests the root element or the body with :has() on its descendants', () => {
   const problems = [];
   for (const file of cssFiles(SRC)) {
     const css = readFileSync(file, 'utf8');
-    for (const match of css.matchAll(/(?:html|:root)[^\s,{]*:has\(\s*([^)]*)\)/g)) {
+    for (const match of css.matchAll(/(?<![\w-])(?:html|:root|body)[^\s,{]*:has\(\s*([^)]*)\)/g)) {
       if (!match[1].startsWith('>')) problems.push(`${relative(SRC, file)}: ${match[0]}`);
     }
   }
