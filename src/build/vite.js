@@ -1,7 +1,7 @@
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileStart } from '../report.js';
 
-const BAKE_ROOT = join(import.meta.dirname, '../..');
+export const BAKE_ROOT = join(import.meta.dirname, '../..');
 
 const SHARED_PACKAGES = ['solid-js'];
 const LOCATION_SUFFIX = / \(\d+:\d+\)$/;

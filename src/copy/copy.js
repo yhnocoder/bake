@@ -15,7 +15,8 @@ const KEPT_ATTRIBUTES = {
 };
 
 export function articleSource() {
-  return JSON.parse(document.querySelector(SOURCE).textContent);
+  const element = document.querySelector(SOURCE);
+  return element === null ? null : JSON.parse(element.textContent);
 }
 
 export function copyArticle() {
@@ -24,7 +25,7 @@ export function copyArticle() {
 }
 
 export function startCopy(article, { copied }) {
-  if (document.querySelector(SOURCE) === null) throw new Error('bake/copy needs the source of the article in script.bk-source');
+  if (articleSource() === null) throw new Error('bake/copy needs the source of the article in script.bk-source');
   document.addEventListener('copy', (event) => {
     const selection = getSelection();
     if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) return;
@@ -37,7 +38,7 @@ export function startCopy(article, { copied }) {
   });
 }
 
-function selectionMarkdown(range, article) {
+export function selectionMarkdown(range, article) {
   const clamped = clampTo(range, article);
   if (clamped === null) return null;
   const lines = articleSource().split('\n').map((line) => line.replace(/\r$/, ''));

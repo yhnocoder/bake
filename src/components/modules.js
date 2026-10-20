@@ -24,6 +24,17 @@ export function nodeModules() {
   return virtualModules('bake-node-modules', { [MATH_MODULE]: () => NODE_MATH_MODULE }, { [KIT_MODULE]: KIT_FILE });
 }
 
+export function chatModules(preambleAddress) {
+  return virtualModules(
+    'bake-chat-modules',
+    {
+      [PREAMBLE_MODULE]: () => runtimePreamble(preambleAddress),
+      [MATH_FONT_MODULE]: () => lazyImports('fontFiles', fontFiles()),
+    },
+    { [MATH_MODULE]: MATH_FILE },
+  );
+}
+
 export function browserModules({ preamble, components }) {
   const modules = virtualModules(
     'bake-browser-modules',
@@ -35,6 +46,17 @@ export function browserModules({ preamble, components }) {
     { [MATH_MODULE]: MATH_FILE, [KIT_MODULE]: KIT_FILE },
   );
   return { ...modules, transform: markKitModulesSideEffectFree };
+}
+
+function runtimePreamble(address) {
+  return [
+    `const path = ${JSON.stringify(address)};`,
+    'const address = new URL(path, import.meta.url);',
+    'const response = await fetch(address);',
+    "if (!response.ok) throw new Error(`${address} answered ${response.status}`);",
+    'export const definitions = await response.json();',
+    '',
+  ].join('\n');
 }
 
 function markKitModulesSideEffectFree(code, id) {

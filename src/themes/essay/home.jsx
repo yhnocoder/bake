@@ -25,6 +25,9 @@ export default function Home(props) {
         {assets.scripts.map((src) => (
           <script defer src={src} />
         ))}
+        {assets.modules.map((src) => (
+          <script type="module" src={src} />
+        ))}
       </head>
       <body class="bk-page">
         <div class="bk-home">
