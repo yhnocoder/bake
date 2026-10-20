@@ -1,4 +1,5 @@
 .bt-page {
+  --bt-scale: var(--reader-scale, 1);
   --bt-gutter: 104px;
   --bt-gap: 6px;
   --bt-measure: 46em;
@@ -67,8 +68,8 @@
 .bt-grid[data-packed] > .bt-card[data-rows] {
   height: calc(var(--bt-rows) * var(--bt-row-height) + (var(--bt-rows) - 1) * var(--bt-gap));
   overflow: hidden;
-  outline: 1px solid transparent;
-  outline-offset: -1px;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
   transition: outline-color 0.15s var(--ease-out);
 }
 
@@ -76,7 +77,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  outline-color: var(--line-2);
+  outline-color: var(--accent);
 }
 
 .bt-grid[data-packed] > .bt-card[data-overflow]::after {
@@ -120,7 +121,7 @@
   --scroll-cover: var(--surface);
   background: var(--surface);
   box-shadow: var(--shadow);
-  font-size: calc(var(--bt-text-size) * var(--reader-scale, 1));
+  font-size: calc(var(--bt-text-size) * var(--bt-scale));
   line-height: calc(var(--bt-leading) + var(--leading-shift, 0));
 }
 
@@ -131,29 +132,29 @@
 
 .bt-card > h2:where(:not(.component-box *)) {
   margin: 0 0 14px;
-  font-size: calc(var(--bt-title-size) * var(--reader-scale, 1));
+  font-size: calc(var(--bt-title-size) * var(--bt-scale));
   line-height: var(--bt-title-leading);
 }
 
 .bt-card > h2 > .bk-chapter-number {
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--bt-scale));
 }
 
 .bt-card > h2 > .bk-heading-link {
   left: -1em;
-  font-size: 18px;
+  font-size: calc(18px * var(--bt-scale));
 }
 
 .bt-card > h3:where(:not(.component-box *)) {
   margin: 26px 0 8px;
-  font-size: calc((var(--bt-title-size) - 3px) * var(--reader-scale, 1));
+  font-size: calc((var(--bt-title-size) - 3px) * var(--bt-scale));
   line-height: var(--bt-title-leading);
 }
 
 .bt-card > :is(h4, h5, h6):where(:not(.component-box *)) {
   margin: 22px 0 6px;
-  font-size: 15.5px;
+  font-size: calc(15.5px * var(--bt-scale));
 }
 
 .bt-card > .bt-recap:where(:not(.component-box *)) {
@@ -164,7 +165,7 @@
   margin: -6px 0 18px;
   padding-left: 0;
   border-left: 0;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--bt-scale));
   line-height: 1.7;
   color: var(--recap);
   text-wrap: pretty;
@@ -175,7 +176,7 @@
 }
 
 .bt-card .embed h2:where(:not(.component-box *)) {
-  font-size: 18px;
+  font-size: calc(18px * var(--bt-scale));
   line-height: 1.5;
 }
 
@@ -228,7 +229,7 @@
 
 .bt-article .sidenote-ref {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--bt-scale));
   font-style: normal;
   font-weight: 400;
   line-height: 0;
@@ -271,7 +272,7 @@
   margin: -2px -8px;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--bt-scale));
   line-height: 1.7;
   color: var(--ink-2);
 }
@@ -296,7 +297,7 @@
   border-radius: 3px;
   padding: 0 2px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--bt-scale));
   color: var(--accent);
 }
 

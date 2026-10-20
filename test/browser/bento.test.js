@@ -52,6 +52,10 @@ Text.
 
 ## Fixed {cols=3 rows=4}
 
+A short paragraph with a note.[^fixed]
+
+[^fixed]: A note that the rows of this card hide.
+
 ${'A long paragraph that does not fit into four rows. '.repeat(30)}
 
 Last line.
@@ -72,7 +76,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   t.after(() => rmSync(english, { recursive: true, force: true }));
   writeFiles(english, {
     'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', themes: { bento: { columns: 2 } } };\n",
-    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: 'Text before the first section.\n\n## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n' }),
+    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: `Text before the first section.\n\n## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n\n## Four {rows=2}\n\n${'Text that does not fit into two rows. '.repeat(20)}\n` }),
   });
   const englishBuild = bake(english, 'build');
   assert.equal(englishBuild.stderr, '');
@@ -113,7 +117,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);
     const grid = await page.evaluate(gridLayout);
-    assert.deepEqual({ columns: grid.columns, spans: grid.spans, inOrder: grid.inOrder }, { columns: 2, spans: { One: 1, Two: 1, Three: 2 }, inOrder: true });
+    assert.deepEqual({ columns: grid.columns, spans: grid.spans, inOrder: grid.inOrder }, { columns: 2, spans: { One: 1, Two: 1, Three: 2, Four: 1 }, inOrder: true });
     await page.close();
   });
 
@@ -252,9 +256,57 @@ test('the bento theme lays out sections as cards', async (t) => {
       document.dispatchEvent(new CustomEvent('bake:content'));
     });
     await page.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-hint'));
-    assert.match(await card.getAttribute('data-hint'), /^内容超出卡片 \d+ 像素，rows 至少写 \d+$/);
+    const [, pixels, rows] = /^内容超出卡片 (\d+) 像素，rows 至少写 (\d+)$/.exec(await card.getAttribute('data-hint'));
+    const fit = await card.evaluate((element, rows) => {
+      const style = getComputedStyle(element);
+      const gap = parseFloat(getComputedStyle(element.parentElement).rowGap);
+      const rowHeight = parseFloat(style.getPropertyValue('--bt-row-height'));
+      const needed = element.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+      const height = (count) => count * rowHeight + (count - 1) * gap;
+      return { overflow: Math.ceil(element.scrollHeight - element.clientHeight), fits: height(rows) >= needed, fitsWithOneLess: height(rows - 1) >= needed };
+    }, Number(rows));
+    assert.deepEqual(fit, { overflow: Number(pixels), fits: true, fitsWithOneLess: false });
+    const englishPage = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await englishPage.goto(`${englishOrigin}/2026-10/cards/`);
+    await settle(englishPage);
+    await englishPage.evaluate(() => {
+      const marker = document.createElement('script');
+      marker.type = 'application/json';
+      marker.dataset.bakeDev = '';
+      document.head.append(marker);
+      document.dispatchEvent(new CustomEvent('bake:content'));
+    });
+    await englishPage.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-hint'));
+    assert.match(await englishPage.locator('.bt-card[data-rows]').getAttribute('data-hint'), /^Content is \d+ px taller than the card; set rows to at least \d+$/);
+    await englishPage.close();
     await resize(page, 375);
     assert.equal(await card.evaluate((element) => element.hasAttribute('data-overflow') || element.scrollHeight > element.clientHeight + 1), false);
+    await page.close();
+  });
+
+  await t.test('a click on a sidenote number chooses its card and scrolls the note into view when the rows of the card hide it, and the chosen card has an outline in the accent colour', async () => {
+    const page = await open('bento-cards');
+    const card = page.locator('.bt-card[data-rows]');
+    await card.locator('.sidenote-ref a').scrollIntoViewIfNeeded();
+    const hidden = await card.evaluate((element) => element.querySelector('.bk-sidenote').getBoundingClientRect().top >= element.getBoundingClientRect().bottom);
+    assert.equal(hidden, true);
+    await card.locator('.sidenote-ref a').click();
+    await page.waitForFunction(() => {
+      const card = document.querySelector('.bt-card[data-rows]');
+      const note = card.querySelector('.bk-sidenote').getBoundingClientRect();
+      const frame = card.getBoundingClientRect();
+      return note.top >= frame.top && note.bottom <= frame.bottom && note.top >= 0 && note.bottom <= innerHeight;
+    });
+    const outline = await card.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--accent)';
+      element.append(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      return { active: element.hasAttribute('data-active'), width: style.outlineWidth, color: style.outlineColor === accent };
+    });
+    assert.deepEqual(outline, { active: true, width: '2px', color: true });
     await page.close();
   });
 

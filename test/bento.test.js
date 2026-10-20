@@ -52,7 +52,7 @@ page
 
 Text.
 
-## Too wide {cols=9}
+## Too wide {cols=6}
 
 Text.
 `;

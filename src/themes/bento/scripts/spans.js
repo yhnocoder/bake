@@ -31,6 +31,7 @@ export function placeCards(article) {
   const boxes = cards.map((card) => ({ height: card.getBoundingClientRect().height, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, end: card.scrollTop + card.clientHeight >= card.scrollHeight - 1 }));
   const tops = Array(columns).fill(0);
   const hint = devHint();
+  const borders = cards.length === 0 ? 0 : verticalBorders(cards[0]);
   cards.forEach((card, index) => {
     const span = spans.get(card);
     const { height, scrollHeight, clientHeight, end } = boxes[index];
@@ -51,7 +52,7 @@ export function placeCards(article) {
     setAttribute(card, 'data-overflow', overflow > 1 ? '' : null);
     setAttribute(card, 'data-end', overflow > 1 && end ? '' : null);
     setAttribute(card, 'tabindex', overflow > 1 ? '0' : null);
-    setAttribute(card, 'data-hint', hint !== null && overflow > 1 ? hint(Math.ceil(overflow), Math.ceil((scrollHeight + 2 + gap) / (rowHeight + gap))) : null);
+    setAttribute(card, 'data-hint', hint !== null && overflow > 1 ? hint(Math.ceil(overflow), Math.ceil((scrollHeight + borders + gap) / (rowHeight + gap))) : null);
   });
   setStyle(grid, 'height', `${Math.max(0, ...tops) - gap}px`);
 }
@@ -89,6 +90,11 @@ function wideCards(cards) {
 function horizontalPadding(element) {
   const style = getComputedStyle(element);
   return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+}
+
+function verticalBorders(element) {
+  const style = getComputedStyle(element);
+  return parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
 }
 
 function devHint() {

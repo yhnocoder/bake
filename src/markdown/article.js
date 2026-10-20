@@ -50,8 +50,8 @@ const HEADING_ATTRIBUTES = {
   id: { text: 'an anchor name, for example {#intro}' },
   toc: { text: 'a short title in quotes, for example toc="Short title"' },
   width: WIDTH,
-  cols: { count: 'a whole number of card columns from 1 up, for example cols=2' },
-  rows: { count: 'a whole number of card rows from 1 up, for example rows=12' },
+  cols: { count: 'a whole number of card columns from 1 to 6, for example cols=2', most: 6 },
+  rows: { count: 'a whole number of card rows from 1 to 200, for example rows=12', most: 200 },
 };
 const SECTION_ATTRIBUTES = ['width', 'cols', 'rows'];
 const COUNT = /^[1-9]\d*$/;
@@ -994,7 +994,7 @@ class ArticleParser {
 function attributeProblem(name, rule, value) {
   if (rule.choices !== undefined) return choiceProblem(name, rule.choices, value);
   if (rule.size !== undefined) return sizeProblem(rule.size, value, 'image');
-  if (rule.count !== undefined) return typeof value === 'string' && COUNT.test(value) ? null : `${name} must be ${rule.count}`;
+  if (rule.count !== undefined) return typeof value === 'string' && COUNT.test(value) && Number(value) <= rule.most ? null : `${name} must be ${rule.count}`;
   return typeof value === 'string' ? null : `${name} must be ${rule.text}`;
 }
 
