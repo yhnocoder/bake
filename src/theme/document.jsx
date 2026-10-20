@@ -1,7 +1,7 @@
 import { FontLinks } from './font-links.jsx';
 import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
-import { prepaintScript, settingAttributes } from './settings.js';
+import { lightWenkaiSteps, prepaintScript, settingAttributes } from './settings.js';
 
 export function ArticleDocument(props) {
   const { site, article, assets, labels } = props;
@@ -13,7 +13,7 @@ export function ArticleDocument(props) {
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
         <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
-        <script innerHTML={prepaintScript()} />
+        <script innerHTML={prepaintScript(lightWenkaiSteps(assets.lazyStyles['wenkai-light']))} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}

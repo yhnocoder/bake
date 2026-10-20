@@ -153,7 +153,7 @@ button:where(:not(.component-box *)) {
   margin: 0 0 18px;
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: clamp(32px, 5vw, 46px);
+  font-size: calc(clamp(32px, 5vw, 46px) * var(--reader-scale));
   line-height: 1.25;
   letter-spacing: -0.01em;
   text-wrap: balance;
@@ -162,7 +162,7 @@ button:where(:not(.component-box *)) {
 .bk-summary {
   max-width: 40em;
   margin: 0 0 22px;
-  font-size: 18px;
+  font-size: calc(18px * var(--reader-scale));
   line-height: 1.8;
   color: var(--ink-2);
 }
@@ -247,6 +247,15 @@ button:where(:not(.component-box *)) {
   margin-left: var(--body-left);
   width: var(--body-width);
   overflow-wrap: break-word;
+  font-size: var(--reading-size);
+  font-weight: var(--body-weight);
+  line-height: calc(1.85 + var(--leading-shift));
+}
+
+.bk-article .component-box {
+  font-size: var(--body-size);
+  font-weight: 400;
+  line-height: 1.85;
 }
 
 .bk-article > :first-child:where(:not(.component-box *)),
@@ -255,11 +264,12 @@ button:where(:not(.component-box *)) {
 }
 
 .bk-article p:where(:not(.component-box *)) {
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
 }
 
 .bk-article strong:where(:not(.component-box *)) {
-  font-weight: 700;
+  font-weight: var(--strong-weight);
+  color: var(--strong-color);
 }
 
 .bk-article mark:where(:not(.component-box *)) {
@@ -282,7 +292,7 @@ button:where(:not(.component-box *)) {
 }
 
 .bk-article :is(ul, ol):where(:not(.component-box *)) {
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
   padding-left: 22px;
 }
 
@@ -315,19 +325,19 @@ button:where(:not(.component-box *)) {
 
 .bk-article h2:where(:not(.component-box *)) {
   margin: 72px 0 14px;
-  font-size: 30px;
+  font-size: calc(30px * var(--reader-scale));
   line-height: 1.3;
 }
 
 .bk-article h3:where(:not(.component-box *)) {
   margin: 40px 0 10px;
-  font-size: 21px;
+  font-size: calc(21px * var(--reader-scale));
   line-height: 1.4;
 }
 
 .bk-article :is(h4, h5, h6):where(:not(.component-box *)) {
   margin: 28px 0 8px;
-  font-size: 18px;
+  font-size: calc(18px * var(--reader-scale));
   line-height: 1.5;
 }
 
@@ -336,7 +346,7 @@ button:where(:not(.component-box *)) {
   margin-bottom: 10px;
   font-family: var(--font-mono);
   font-weight: 500;
-  font-size: 13px;
+  font-size: calc(13px * var(--reader-scale));
   line-height: 1.5;
   letter-spacing: 0.1em;
   color: var(--ink-3);
@@ -374,11 +384,11 @@ button:where(:not(.component-box *)) {
 
   .bk-article h2:where(:not(.component-box *)) {
     margin-top: 56px;
-    font-size: 26px;
+    font-size: calc(26px * var(--reader-scale));
   }
 
   .bk-article h3:where(:not(.component-box *)) {
-    font-size: 20px;
+    font-size: calc(20px * var(--reader-scale));
   }
 }
 

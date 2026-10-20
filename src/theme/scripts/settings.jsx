@@ -12,7 +12,10 @@ const THEME_EVENT = 'bake:theme';
 export const settingRows = [
   { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], list: true, layout: {} },
   { name: 'theme', label: (labels) => labels.theme, option: (labels, value) => labels.themes[value] },
-  { name: 'font', label: (labels) => labels.font, option: (labels, value) => labels.fonts[value], layout: { arrange: true } },
+  { name: 'font', fades: true, label: (labels) => labels.font, option: (labels, value) => labels.fonts[value], layout: { arrange: true } },
+  { name: 'size', fades: true, label: (labels) => labels.size, option: (labels, value) => labels.sizes[value], glyph: () => 'A', layout: { arrange: true } },
+  { name: 'weight', fades: true, label: (labels) => labels.weight, option: (labels, value) => labels.weights[value], layout: { arrange: true } },
+  { name: 'spacing', fades: true, label: (labels) => labels.spacing, option: (labels, value) => labels.spacings[value], layout: { arrange: true } },
   { name: 'buttons', label: (labels) => labels.buttons, toggle: { on: 'autohide', off: 'always', text: (labels) => labels.hideButtons } },
 ];
 
@@ -31,16 +34,26 @@ export function chooseSetting(name, value) {
     switchTheme(value);
     return;
   }
-  document.documentElement.dataset[name] = value;
-  document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
-  const layout = settingRows.find((row) => row.name === name)?.layout;
-  if (layout !== undefined) requestLayout(layout);
+  const row = settingRows.find((candidate) => candidate.name === name);
+  const apply = (now) => {
+    document.documentElement.dataset[name] = value;
+    document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
+    if (row?.layout !== undefined) requestLayout({ ...row.layout, now });
+    loadLightWenkai();
+  };
+  if (row?.fades) fadePage(() => apply(true));
+  else apply(false);
+}
+
+function loadLightWenkai() {
+  const { font, weight } = document.documentElement.dataset;
+  if (font === 'wenkai' && weight === 'light') import('./wenkai-light.js');
 }
 
 const darkScheme = matchMedia('(prefers-color-scheme: dark)');
 
 function switchTheme(value) {
-  fadeColours(() => {
+  fadePage(() => {
     document.documentElement.dataset.theme = value;
     document.documentElement.dataset.scheme = value === 'system' ? systemScheme() : value;
     document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name: 'theme', value } }));
@@ -48,14 +61,14 @@ function switchTheme(value) {
   });
 }
 
-function coloursFade() {
+function pageFades() {
   return document.startViewTransition !== undefined && !reducedMotion.matches && document.visibilityState === 'visible';
 }
 
 let fade = null;
 
-function fadeColours(apply) {
-  if (!coloursFade()) {
+function fadePage(apply) {
+  if (!pageFades()) {
     apply();
     return;
   }
@@ -84,7 +97,7 @@ function endFadeOnPress() {
 
 function followSystemScheme() {
   if (settingValue('theme') !== 'system') return;
-  fadeColours(() => {
+  fadePage(() => {
     document.documentElement.dataset.scheme = systemScheme();
     document.dispatchEvent(new CustomEvent(THEME_EVENT));
   });
@@ -97,6 +110,7 @@ export function startSettings() {
   render(() => <Settings labels={labels} />, host);
   darkScheme.addEventListener('change', followSystemScheme);
   endFadeOnPress();
+  loadLightWenkai();
 }
 
 function Settings(props) {
@@ -188,8 +202,15 @@ function OptionsRow(props) {
       <div class="bk-settings-options" role="group" aria-label={row.label(labels)}>
         <For each={SETTINGS[row.name].values}>
           {(value) => (
-            <button type="button" data-value={value} aria-pressed={String(settingValue(row.name) === value)} onClick={() => chooseSetting(row.name, value)}>
-              {row.option(labels, value)}
+            <button
+              type="button"
+              data-value={value}
+              aria-label={row.glyph === undefined ? undefined : row.option(labels, value)}
+              title={row.glyph === undefined ? undefined : row.option(labels, value)}
+              aria-pressed={String(settingValue(row.name) === value)}
+              onClick={() => chooseSetting(row.name, value)}
+            >
+              {row.glyph === undefined ? row.option(labels, value) : row.glyph(value)}
             </button>
           )}
         </For>

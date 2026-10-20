@@ -4,10 +4,15 @@ export const SETTINGS = {
   toc: { values: TOC_STYLES, initial: (article) => article.toc },
   theme: { values: ['system', 'light', 'dark'], initial: () => 'system' },
   font: { values: ['sans', 'wenkai'], initial: () => 'sans' },
+  size: { values: ['small', 'medium', 'large', 'larger'], initial: () => 'medium' },
+  weight: { values: ['light', 'regular', 'bold'], initial: () => 'regular' },
+  spacing: { values: ['tight', 'normal', 'loose'], initial: () => 'normal' },
   buttons: { values: ['autohide', 'always'], initial: () => 'autohide' },
 };
 
 export const SITE_SETTINGS = ['theme', 'font'];
+
+export const READING_SETTINGS = [...SITE_SETTINGS, 'size', 'weight', 'spacing'];
 
 export function storageKey(name) {
   return `bk-${name}`;
@@ -24,6 +29,11 @@ export function prepaintScript(pageSteps = '') {
   const settingSteps = `try{var s=${choices},d=document.documentElement.dataset;for(var k in s){var v=localStorage.getItem('${storageKey('')}'+k);if(d[k]!==undefined&&s[k].indexOf(v)>=0)d[k]=v}}catch(e){}`;
   const schemeSteps = `var t=document.documentElement.dataset.theme;if(t!==undefined)document.documentElement.dataset.scheme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;`;
   return `if(${JSON.stringify(MODULE_SCRIPT_SCHEMES)}.indexOf(location.protocol)>=0){document.documentElement.dataset.script='on';${settingSteps}${schemeSteps}${pageSteps}}`;
+}
+
+export function lightWenkaiSteps(href) {
+  if (href === undefined) return '';
+  return `var w=document.documentElement.dataset;if(w.font==='wenkai'&&w.weight==='light'){var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(href)};document.head.appendChild(l)}`;
 }
 
 export function homePrepaintSteps(groups) {

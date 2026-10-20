@@ -80,13 +80,15 @@ export function drawerView(view) {
   });
 
   let progress = null;
+  let chapter = null;
   return {
     update(next) {
-      const text = next.chapter < 0 ? labels.toc : outline.chapters[next.chapter].number;
-      if (number.textContent !== text) number.textContent = text;
       const shown = next.progress.toFixed(3);
       if (shown !== progress) capsule.style.setProperty('--progress', shown);
       progress = shown;
+      if (next.chapter === chapter) return;
+      chapter = next.chapter;
+      number.textContent = next.chapter < 0 ? labels.toc : outline.chapters[next.chapter].number;
       buttons.forEach((button, buttonIndex) => {
         button.classList.toggle('is-current', buttonIndex === Math.max(0, next.chapter));
         button.classList.toggle('is-read', buttonIndex < next.chapter);

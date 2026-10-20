@@ -1,8 +1,8 @@
-import { ArticleDocument, Header, labelsFor } from 'bake/theme';
+import { ArticleDocument, Header, READING_SETTINGS, labelsFor } from 'bake/theme';
 import { Article } from './article.jsx';
 import { Toc } from './toc.jsx';
 
-const SETTINGS = ['toc', 'theme', 'font', 'buttons'];
+const SETTINGS = ['toc', ...READING_SETTINGS, 'buttons'];
 
 export default function Page(props) {
   const { site, article, assets } = props;
