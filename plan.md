@@ -197,6 +197,8 @@ At the end of this step, document the component interface (exports, attributes, 
 
 ### 7. Remaining simplifications
 
+- `test/dev.test.js` "prints problems as file:line:col lines" timed out once in a full `npm test` run during step 6 and passed in five later runs; find the cause.
+
 - `src/build/site.js`: replace the hand-written rebuild conditions with input tracking per cached result; on a save, redo only what depends on the changed file. Start the theme build before the article loop. Write `dist` files concurrently.
 - Split the `Chat` function in `src/chat/bubbles.jsx` (757 lines) by concern, and split `ArticleParser` in `src/markdown/article.js` into parsing, linking and structure modules.
 - Example components: use the kit `SvgTex`, `linearScale`, `samplePath` and plot components; keep one copy of the activation functions and one colormap helper; remove the duplicated component pairs.
