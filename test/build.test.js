@@ -27,7 +27,7 @@ export default function Page(props) {
 }
 `;
 
-const siteFiles = ['404.html', '_bake/articles.json', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
+const siteFiles = ['404.html', '_bake/articles.json', '_bake/pet/LICENSE.txt', '_bake/pet/frame.webp', '_bake/pet/pet.json', '_bake/pet/spritesheet.webp', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
 
 function articleFiles(tree) {
   return Object.keys(tree).filter((path) => !path.startsWith('assets/') && !path.startsWith('og/') && !siteFiles.includes(path));
@@ -177,6 +177,25 @@ describe('bake build', () => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/a/index.md': '---\ntitle: A\n---\n' });
     assert.equal(bake(dir, 'build').status, 1);
     assert.equal(existsSync(join(dir, 'dist')), false);
+  });
+
+  test('reports a broken options.js of a theme together with the other problems of bake.config.js', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': "export default {\n  title: 'Test Blog', url: 'https://example.com', language: 'en',\n  toc: 'x',\n  themes: { mine: { density: 2 } },\n};\n",
+      'themes/mine/options.js': 'export const options = { a: 1 };\n',
+      'content/posts/rope/index.md': article(),
+    });
+    const result = bake(dir, 'build');
+    assert.equal(
+      result.stderr,
+      [
+        'bake.config.js:3:8 toc must be notes, tabs, dots or ticks, got "x"',
+        `themes/mine/options.js:1:1 mine: option "a" must be declared as an object such as { label: 'Range', type: 'number', default: 4 }, got 1`,
+        '2 errors, dist/ was not written',
+        '',
+      ].join('\n'),
+    );
+    assert.equal(result.status, 1);
   });
 
   test('reports a public file that needs a folder where an article writes a file', (t) => {

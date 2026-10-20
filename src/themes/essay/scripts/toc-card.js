@@ -1,10 +1,12 @@
 import { fragmentOf } from 'bake/fragments';
-import { closeOnEscape } from './escape.js';
+import { closeOnEscape, reducedMotion } from 'bake/theme/client';
 
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';
 const HIDE_DELAY = 200;
 const WARM_TIME = 400;
+const EDGE = 12;
+export const ENTRY_GAP = 12;
 
 export function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -47,7 +49,11 @@ export function readOutline(nav) {
     }
     chapters.push(chapter);
   }
-  return { chapters, entries };
+  return { chapters, entries, leads: new Map() };
+}
+
+export function outlineKey(outline) {
+  return JSON.stringify(outline.chapters.map((chapter) => [chapter.id, chapter.number, chapter.title, chapter.recap, chapter.sections.map((section) => [section.id, section.title, section.recap])]));
 }
 
 export function chapterCard(context, chapterIndex, state) {
@@ -63,7 +69,7 @@ export function chapterCard(context, chapterIndex, state) {
   card.append(head);
   if (chapter.recap !== undefined) card.append(summary('div', 'bk-toc-card-recap bk-toc-card-chapter-recap', chapter.recap));
   else {
-    const lead = leadOf(chapter.heading);
+    const lead = leadOf(context.outline, chapter.heading);
     if (lead !== null) card.append(summary('p', 'bk-toc-card-lead bk-toc-card-chapter-lead', lead));
   }
   if (chapter.sections.length > 0) {
@@ -76,7 +82,7 @@ export function chapterCard(context, chapterIndex, state) {
       row.append(createElement('span', 'bk-toc-card-section-title', section.title));
       if (section.recap !== undefined) row.append(summary('span', 'bk-toc-card-recap', section.recap));
       else {
-        const lead = leadOf(section.heading);
+        const lead = leadOf(context.outline, section.heading);
         if (lead !== null) row.append(summary('span', 'bk-toc-card-lead', lead));
       }
       list.append(row);
@@ -86,96 +92,209 @@ export function chapterCard(context, chapterIndex, state) {
   return card;
 }
 
-export function hoverIntent(delay) {
+export function createCardHost({ variant, showDelay }) {
+  const panel = variant === 'panel';
+  const joined = variant === 'tabs';
+  const on = panel ? 'is-open' : 'is-on';
+  const frame = createElement('div', panel ? 'bk-toc-panel' : joined ? 'bk-toc-index' : `bk-toc-popover is-${variant}`);
+  const scroller = joined ? createElement('div', 'bk-toc-index-body') : frame;
+  const tab = joined ? createElement('a', 'bk-toc-index-tab') : null;
+  if (joined) {
+    tab.tabIndex = -1;
+    frame.append(tab, scroller);
+  }
+  const element = panel ? frame : createElement('div', `bk-toc-place is-${variant}`);
+  if (!panel) element.append(frame);
+  let parts = null;
+  let shownChapter = -1;
+  let shownKey = '';
+  let pointed = null;
+  let dismissed = null;
   let showTimer = 0;
   let hideTimer = 0;
   let warmUntil = 0;
-  let shown = false;
-  let dismissed = null;
+  const isShown = () => frame.classList.contains(on);
+  const shown = () => (isShown() ? shownChapter : -1);
+  const insideParts = (target) => target instanceof Node && parts.columns.some((column) => column.contains(target));
+
+  function render(chapter, keepScroll) {
+    const state = parts.context.state();
+    const scrollTop = keepScroll ? scroller.scrollTop : 0;
+    scroller.replaceChildren(chapterCard(parts.context, chapter, state));
+    scroller.scrollTop = scrollTop;
+    shownKey = stateKey(state);
+    if (!joined) return;
+    const { id, number } = parts.context.outline.chapters[chapter];
+    tab.href = fragmentOf(id);
+    tab.textContent = number;
+    tab.classList.toggle('is-current', chapter === Math.max(0, state.chapter));
+  }
+  function position() {
+    if (panel || shownChapter < 0) return;
+    const spot = parts.anchor(shownChapter);
+    const floor = innerHeight - (joined ? parts.context.reserve : EDGE);
+    scroller.style.maxHeight = `${floor - EDGE}px`;
+    const top = clamp(spot.top, EDGE, floor - Math.min(scroller.scrollHeight, floor - EDGE));
+    element.style.transform = `translate(${spot.left}px, ${top}px)`;
+    if (!joined) return;
+    tab.style.top = `${spot.tabTop - top}px`;
+    tab.style.height = `${spot.tabHeight}px`;
+  }
+  function mark(reveal) {
+    for (const entry of parts.entries) entry.classList.toggle('is-hover', entry === pointed);
+    if (variant !== 'ticks') return;
+    for (const row of frame.querySelectorAll('[data-index]')) {
+      const hovered = row.dataset.index === pointed?.dataset.index;
+      row.classList.toggle('is-hover', hovered);
+      if (hovered && reveal) keepVisible(frame, row, !reducedMotion.matches);
+    }
+  }
+  function show(chapter) {
+    const wasShown = isShown();
+    if (!panel && (chapter !== shownChapter || !wasShown)) render(chapter, wasShown && chapter === shownChapter);
+    shownChapter = chapter;
+    if (wasShown) position();
+    else withoutTransition([element], position);
+    mark(true);
+    frame.classList.add(on);
+    if (!wasShown) parts.shown?.();
+  }
+  function hide() {
+    frame.classList.remove(on);
+    shownChapter = -1;
+    pointed = null;
+    mark(false);
+  }
+  function point(chapter, entry, now = false) {
+    if (!now && entry === dismissed) return;
+    dismissed = null;
+    pointed = entry;
+    mark(false);
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    if (now || isShown() || performance.now() < warmUntil) show(chapter);
+    else showTimer = setTimeout(() => show(chapter), showDelay);
+  }
+  function leave() {
+    dismissed = null;
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      if (isShown()) warmUntil = performance.now() + WARM_TIME;
+      hide();
+    }, HIDE_DELAY);
+  }
+  function close() {
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    dismissed = frame.matches(':hover') || parts.columns.some((column) => column.matches(':hover')) ? pointed : null;
+    hide();
+  }
+  function routeKeyboard(groups) {
+    const links = () => [...frame.querySelectorAll('.bk-toc-card a[href]')];
+    for (const [index, group] of groups.entries()) {
+      group.at(-1).addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || event.shiftKey || shown() !== index) return;
+        const first = links()[0];
+        if (first === undefined) return;
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      });
+    }
+    frame.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab' || shown() < 0) return;
+      const all = links();
+      const index = shown();
+      if (event.shiftKey && event.target === all[0]) {
+        event.preventDefault();
+        groups[index].at(-1).focus({ preventScroll: true });
+      } else if (!event.shiftKey && event.target === all.at(-1) && index + 1 < groups.length) {
+        event.preventDefault();
+        groups[index + 1][0].focus({ preventScroll: true });
+      }
+    });
+  }
+
   return {
-    get shown() {
-      return shown;
+    frame,
+    connect(view, context) {
+      const groups = view.chapters;
+      parts = { context, anchor: view.anchor, shown: view.shown, columns: view.columns, entries: groups.flat() };
+      for (const [chapter, group] of groups.entries()) {
+        for (const entry of group) {
+          entry.addEventListener('pointerenter', () => point(chapter, entry));
+          entry.addEventListener('focus', () => point(chapter, entry, entry.matches(':focus-visible')));
+          if (panel) {
+            entry.addEventListener('click', (event) => {
+              event.preventDefault();
+              point(chapter, entry, true);
+            });
+          }
+        }
+      }
+      for (const column of parts.columns) {
+        column.addEventListener('pointerleave', (event) => {
+          if (!frame.contains(event.relatedTarget)) leave();
+        });
+      }
+      frame.addEventListener('pointerenter', () => clearTimeout(hideTimer));
+      frame.addEventListener('pointerleave', (event) => {
+        if (!insideParts(event.relatedTarget)) leave();
+      });
+      if (variant === 'ticks') {
+        frame.addEventListener('pointerover', (event) => {
+          const row = event.target.closest('[data-index]');
+          if (row === null) return;
+          pointed = parts.entries.find((entry) => entry.dataset.index === row.dataset.index) ?? pointed;
+          mark(false);
+        });
+      }
+      if (panel) {
+        frame.addEventListener('click', (event) => {
+          if (event.target.closest('a') !== null) close();
+        });
+      } else routeKeyboard(groups);
+      for (const target of [frame, ...parts.entries]) {
+        target.addEventListener('focusout', (event) => {
+          if (!frame.contains(event.relatedTarget) && !insideParts(event.relatedTarget)) leave();
+        });
+      }
+      closeOnEscape(frame, () => {
+        const wasShown = isShown();
+        const index = shown();
+        // why: the entry takes the focus while the card is still shown, because its focus listener opens the card when it is closed
+        if (!panel && index >= 0 && frame.contains(document.activeElement)) groups[index].at(-1).focus({ preventScroll: true });
+        close();
+        return wasShown;
+      });
+      context.host.append(element);
     },
-    enter(show, now, entry) {
-      if (!now && entry === dismissed) return;
-      dismissed = null;
-      clearTimeout(hideTimer);
+    update(state) {
+      if (panel || !isShown() || stateKey(state) === shownKey) return;
+      render(shownChapter, true);
+      if (joined) position();
+      mark(false);
+    },
+    refresh() {
+      if (!panel && isShown()) render(shownChapter, true);
+    },
+    relayout() {
+      if (isShown()) position();
+    },
+    destroy() {
       clearTimeout(showTimer);
-      const run = () => {
-        shown = true;
-        show();
-      };
-      if (now || shown || performance.now() < warmUntil) run();
-      else showTimer = setTimeout(run, delay);
-    },
-    stay() {
       clearTimeout(hideTimer);
-    },
-    leave(hide) {
-      dismissed = null;
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => {
-        if (shown) warmUntil = performance.now() + WARM_TIME;
-        shown = false;
-        hide();
-      }, HIDE_DELAY);
-    },
-    stop() {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-      shown = false;
-    },
-    dismiss(entry, elements) {
-      this.stop();
-      dismissed = elements.some((element) => element?.matches(':hover')) ? entry : null;
+      element.remove();
     },
   };
 }
 
-export function cardKeyboard({ groups, card, shown, leave, close }) {
-  const links = () => [...card.querySelectorAll('.bk-toc-card a[href]')];
-  for (const [index, group] of groups.entries()) {
-    group.at(-1).addEventListener('keydown', (event) => {
-      if (event.key !== 'Tab' || event.shiftKey || shown() !== index) return;
-      const first = links()[0];
-      if (first === undefined) return;
-      event.preventDefault();
-      first.focus({ preventScroll: true });
-    });
-  }
-  card.addEventListener('keydown', (event) => {
-    if (event.key !== 'Tab') return;
-    const all = links();
-    const index = shown();
-    if (index < 0) return;
-    if (event.shiftKey && event.target === all[0]) {
-      event.preventDefault();
-      groups[index].at(-1).focus({ preventScroll: true });
-    } else if (!event.shiftKey && event.target === all.at(-1) && index + 1 < groups.length) {
-      event.preventDefault();
-      groups[index + 1][0].focus({ preventScroll: true });
-    }
-  });
-  const entries = groups.flat();
-  const inside = (element) => element instanceof Node && (card.contains(element) || entries.some((entry) => entry.parentElement.contains(element)));
-  for (const element of [card, ...entries]) {
-    element.addEventListener('focusout', (event) => {
-      if (!inside(event.relatedTarget)) leave();
-    });
-  }
-  closeOnEscape(card, () => {
-    const index = shown();
-    // why: the entry takes the focus while the card is still shown, because its focus listener opens the card when it is closed
-    if (index >= 0 && card.contains(document.activeElement)) groups[index].at(-1).focus({ preventScroll: true });
-    close();
-  });
-}
-
-export function floorFor(left) {
-  const toggle = document.querySelector('.bk-settings-toggle')?.getBoundingClientRect();
-  if (toggle === undefined || left >= toggle.right) return innerHeight - 12;
-  return Math.min(innerHeight - 12, toggle.top - 8);
+export function withoutTransition(elements, change) {
+  for (const element of elements) element.style.transition = 'none';
+  change();
+  // why: reading the style applies the change while the transitions are off, so the change does not animate
+  for (const element of elements) getComputedStyle(element).transform;
+  for (const element of elements) element.style.transition = '';
 }
 
 export function keepVisible(box, row, smooth) {
@@ -195,6 +314,15 @@ export function clamp(value, low, high) {
   return Math.min(high, Math.max(low, value));
 }
 
+export function bottomReserve(host) {
+  const probe = createElement('div');
+  probe.style.cssText = 'position: fixed; height: var(--ui-reserve)';
+  host.append(probe);
+  const height = probe.offsetHeight;
+  probe.remove();
+  return height;
+}
+
 function summary(tag, className, html) {
   const element = createElement(tag, className);
   element.append(cleaned(html));
@@ -206,12 +334,10 @@ function fullTitle(chapter) {
   return text === null || text === undefined ? document.createTextNode(chapter.title) : cleaned(text.innerHTML);
 }
 
-const leads = new WeakMap();
-
-function leadOf(heading) {
+function leadOf(outline, heading) {
   if (heading === null) return null;
-  if (!leads.has(heading)) leads.set(heading, findLead(heading));
-  return leads.get(heading);
+  if (!outline.leads.has(heading)) outline.leads.set(heading, findLead(heading));
+  return outline.leads.get(heading);
 }
 
 function findLead(heading) {

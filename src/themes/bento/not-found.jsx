@@ -1,1 +1,1 @@
-export { default } from '../essay/not-found.jsx';
+export { NotFound as default } from 'bake/theme';

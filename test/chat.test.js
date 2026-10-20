@@ -6,10 +6,13 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { blogPrompt, blogTools, readArticle, READ_ARTICLE, articlePrompt } from '../src/chat/context.js';
+import sharp from 'sharp';
+import { chatTools, matchingScopes, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
+import { chatLabels } from '../src/chat/labels.js';
+import { PetError, sheetFile } from '../src/chat/reader-pet.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
-import { linkTarget, normalizeMath, replyHtml } from '../src/chat/reply.js';
+import { linkTarget, replyHtml } from '../src/chat/reply.js';
 import { openKey, sealKey } from '../src/chat/vault.js';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 
@@ -155,7 +158,7 @@ describe('AI chat bundle cache', () => {
     writeFileSync(path, JSON.stringify({ ...index, toolchain: { ...index.toolchain, vite: '0.0.0' } }));
     await buildChat(temporary);
     assert.equal(cacheIndex(temporary).index.toolchain.vite, installedVersion('vite'));
-    const figure = join(bakeRoot, 'src/chat/figure.js');
+    const figure = join(bakeRoot, 'src/chat/pet.js');
     writeFileSync(path, JSON.stringify({ ...index, inputs: index.inputs.filter(([file]) => file !== figure) }));
     await buildChat(temporary);
     assert.ok(cacheIndex(temporary).index.inputs.some(([file]) => file === figure));
@@ -172,10 +175,16 @@ describe('AI chat replies', () => {
     );
   });
 
-  test('converts \\( \\) and \\[ \\] delimiters outside code', () => {
-    assert.equal(normalizeMath('Inline \\(x^2\\) and `\\(code\\)`.'), 'Inline $x^2$ and `\\(code\\)`.');
-    assert.equal(normalizeMath('\\[ \\sum_i x_i \\]'), '\n$$\n\\sum_i x_i\n$$\n');
-    assert.equal(normalizeMath('```\n\\[x\\]\n```'), '```\n\\[x\\]\n```');
+  test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', () => {
+    const math = (tex, display = false) => `<${display ? 'div' : 'span'} class="bk-chat-math" data-tex="${tex}"${display ? ' data-display="true"' : ''}>${tex}</${display ? 'div' : 'span'}>`;
+    assert.equal(replyHtml('Inline \\(x^2\\) and `\\(code\\)`.', { root }), `<p>Inline ${math('x^2')} and <code>\\(code\\)</code>.</p>`);
+    assert.equal(replyHtml('\\[ \\sum_i x_i \\]', { root }), math('\\sum_i x_i', true));
+    assert.equal(replyHtml('\\[\na \\\\\nb\n\\]', { root }), math('a \\\\\nb', true));
+    assert.equal(replyHtml('So \\[x\\] here.', { root }), `<p>So ${math('x', true).replace(/div/g, 'span')} here.</p>`);
+    assert.equal(replyHtml('```\n\\[x\\]\n```', { root }), '<pre><code>\\[x\\]\n</code></pre>');
+    assert.equal(replyHtml('An open \\(x stays text.', { root }), '<p>An open (x stays text.</p>');
+    assert.equal(replyHtml('An empty \\(\\) and \\[ ] stay text.', { root }), '<p>An empty () and [ ] stay text.</p>');
+    assert.equal(replyHtml('Blank \\( \\) and \\[\n\\] stay text.', { root }), '<p>Blank ( ) and [\n] stay text.</p>');
   });
 
   test('resolves links against the site root, opens external links in a new tab and drops unsafe ones', () => {
@@ -220,10 +229,10 @@ describe('DeepSeek streaming', () => {
       ),
     );
     const partials = [];
-    const result = await complete({ key: 'test-key', messages: [{ role: 'user', content: 'Hi' }], tools: blogTools, thinking: true, fetch, onDelta: (message) => partials.push(message.reasoning_content) });
+    const result = await complete({ key: 'test-key', messages: [{ role: 'user', content: 'Hi' }], tools: chatTools, thinking: true, fetch, onDelta: (message) => partials.push(message.reasoning_content) });
     assert.equal(requests[0].url, 'https://api.deepseek.com/chat/completions');
     assert.equal(requests[0].init.headers.authorization, 'Bearer test-key');
-    assert.deepEqual(requests[0].body, { model: 'deepseek-flash', messages: [{ role: 'user', content: 'Hi' }], stream: true, thinking: { type: 'enabled' }, tools: blogTools, tool_choice: 'auto' });
+    assert.deepEqual(requests[0].body, { model: 'deepseek-flash', messages: [{ role: 'user', content: 'Hi' }], stream: true, thinking: { type: 'enabled' }, tools: chatTools, tool_choice: 'auto' });
     assert.deepEqual(partials.slice(0, 2), ['Think ', 'Think more.']);
     assert.deepEqual(result, {
       finish: 'tool_calls',
@@ -255,7 +264,7 @@ describe('AI chat conversation', () => {
       key: 'k',
       system: 'System.',
       history: [{ role: 'user', content: 'What is rope?' }],
-      tools: blogTools,
+      tools: chatTools,
       thinking: true,
       fetch,
       runTool: async (name, args) => {
@@ -281,7 +290,7 @@ describe('AI chat conversation', () => {
     const toolRound = () => stream(delta({ tool_calls: [{ index: 0, id: 'c', function: { name: READ_ARTICLE, arguments: 'not json' } }] }, 'tool_calls'));
     const { fetch, requests } = fakeFetch(...Array.from({ length: MAX_TOOL_ROUNDS }, toolRound), stream(delta({ content: 'Done.' }, 'stop')));
     const seen = [];
-    const { turn } = await answer({ key: 'k', system: 'S', history: [], tools: blogTools, thinking: false, fetch, runTool: async (name, args) => (seen.push(args), { content: 'x', label: 'X' }) });
+    const { turn } = await answer({ key: 'k', system: 'S', history: [], tools: chatTools, thinking: false, fetch, runTool: async (name, args) => (seen.push(args), { content: 'x', label: 'X' }) });
     assert.deepEqual(
       requests.map((request) => request.body.tool_choice),
       [...Array(MAX_TOOL_ROUNDS).fill('auto'), 'none'],
@@ -302,22 +311,59 @@ describe('AI chat context', () => {
     ],
   };
 
+  const page = { address: '/2026-10/rope/', title: 'Rope', article: { source: '# Source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }, { id: 'pairs', depth: 3, title: 'Pairs' }] } };
+
   test('lists every article with its address and sections in the prompt for the whole blog', () => {
-    const prompt = blogPrompt({ address: '/', title: 'Test Blog', article: null }, catalog);
+    const prompt = systemPrompt({ page: { address: '/', title: 'Test Blog', article: null }, catalog });
     assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is on the page \/\./);
     assert.ok(prompt.includes('{"address":"/2026-10/rope/","title":"Rope","date":"2026-10-19","summary":"Rotary.","sections":["#angles 01 Angles | #pairs Pairs"]}'));
     assert.ok(prompt.includes('{"address":"/2026-09/demo/","title":"Demo","date":"2026-09-05","tags":["html"]}'));
+    assert.ok(!prompt.includes('<article'));
   });
 
-  test('puts the source and the headings of the article in the prompt for one article', () => {
-    const prompt = articlePrompt({
-      site: 'Test Blog',
-      title: 'Rope',
-      address: '/2026-10/rope/',
-      article: { source: '# Source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }, { id: 'pairs', depth: 3, title: 'Pairs' }] },
-    });
-    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog"\. The reader is reading the article "Rope" at \/2026-10\/rope\/\./);
-    assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>$/);
+  test('puts the source and the headings of the article and then the other articles in the prompt on an article page', () => {
+    const prompt = systemPrompt({ page, catalog });
+    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is reading the article "Rope" at \/2026-10\/rope\/\./);
+    assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>\n/);
+    assert.ok(prompt.indexOf('</article>') < prompt.indexOf('{"address":"/2026-09/demo/"'));
+  });
+
+  test('offers articles, months, categories and tags as scopes and filters them by the typed text', () => {
+    const options = scopeOptions({ ...catalog, articles: [...catalog.articles, { url: '2026-10/gelu/', title: 'GELU', date: '2026-10-02', category: 'ML', tags: ['html', 'act'], sections: [] }] }, chatLabels('zh-CN'));
+    assert.deepEqual(
+      options.map(({ kind, id, label, meta, urls }) => [kind, id, label, meta, urls.join(' ')]),
+      [
+        ['article', 'article:2026-10/rope/', 'Rope', '2026-10', '2026-10/rope/'],
+        ['article', 'article:2026-09/demo/', 'Demo', '2026-09', '2026-09/demo/'],
+        ['article', 'article:2026-10/gelu/', 'GELU', '2026-10', '2026-10/gelu/'],
+        ['month', 'month:2026-10', '2026-10', '2 篇', '2026-10/rope/ 2026-10/gelu/'],
+        ['month', 'month:2026-09', '2026-09', '1 篇', '2026-09/demo/'],
+        ['topic', 'category:ML', 'ML', '分类 · 1 篇', '2026-10/gelu/'],
+        ['topic', 'tag:html', '#html', '标签 · 2 篇', '2026-09/demo/ 2026-10/gelu/'],
+        ['topic', 'tag:act', '#act', '标签 · 1 篇', '2026-10/gelu/'],
+      ],
+    );
+    assert.deepEqual(
+      matchingScopes(options, 'HTML', [options.find((option) => option.id === 'tag:html')]).map((option) => option.id),
+      [],
+    );
+    assert.deepEqual(
+      matchingScopes(options, '2026-09', []).map((option) => option.id),
+      ['article:2026-09/demo/', 'month:2026-09'],
+    );
+  });
+
+  test('limits the prompt to the chosen scopes, with the sources of chosen articles and the list of articles in chosen months and topics', () => {
+    const options = scopeOptions(catalog, chatLabels('en'));
+    const scopes = ['article:2026-10/rope/', 'month:2026-09'].map((id) => options.find((option) => option.id === id));
+    const prompt = systemPrompt({ page, catalog, scopes, sources: [{ url: '2026-10/rope/', title: 'Rope', content: '# Rope source' }] });
+    assert.match(prompt, /The reader limited the question to Rope, 2026-09\./);
+    assert.match(prompt, /<article address="\/2026-10\/rope\/" title="Rope">\n# Rope source\n<\/article>/);
+    assert.ok(prompt.includes('{"address":"/2026-09/demo/"'));
+    assert.ok(!prompt.includes('{"address":"/2026-10/rope/"'));
+    assert.ok(!prompt.includes('# Source'));
+    const quoted = systemPrompt({ page, catalog, scopes, sources: [{ url: '2026-10/rope/', title: 'Rope "and" <RoPE> & co', content: '' }] });
+    assert.match(quoted, /<article address="\/2026-10\/rope\/" title="Rope &quot;and&quot; &lt;RoPE&gt; &amp; co">/);
   });
 
   test('reads an article by its address in any common form and reports unknown addresses', async () => {
@@ -342,5 +388,34 @@ describe('AI chat key storage', () => {
     assert.equal(await openKey(secret, sealed), 'sk-test-0123456789');
     assert.notEqual((await sealKey(secret, 'sk-test-0123456789')).data, sealed.data);
     await assert.rejects(openKey(crypto.getRandomValues(new Uint8Array(32)), sealed));
+  });
+});
+
+describe('reader pet sheets', () => {
+  const image = (width, height, format, options = {}) =>
+    sharp({ create: { width, height, channels: options.alpha === false ? 3 : 4, background: { r: 10, g: 20, b: 30, alpha: 0.5 } } })
+      [format](options.settings ?? {})
+      .toBuffer();
+
+  test('reads the size of a PNG, a lossy, a lossless and an extended WebP sheet from its header and types the blob', async () => {
+    for (const [bytes, type, rows] of [
+      [await image(1536, 1872, 'png'), 'image/png', 9],
+      [await image(1536, 2288, 'webp', { alpha: false }), 'image/webp', 11],
+      [await image(1536, 1872, 'webp', { settings: { lossless: true } }), 'image/webp', 9],
+      [await image(1536, 2288, 'webp'), 'image/webp', 11],
+    ]) {
+      const sheet = sheetFile(new Uint8Array(bytes));
+      assert.deepEqual([sheet.blob.type, sheet.blob.size, sheet.rows], [type, bytes.length, rows]);
+    }
+  });
+
+  test('rejects a sheet that is not a PNG or WebP image and reports the size of a sheet of another size', async () => {
+    for (const bytes of [await image(1536, 1872, 'jpeg', { alpha: false }), Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), Buffer.alloc(0)]) {
+      assert.throws(() => sheetFile(new Uint8Array(bytes)), (error) => error instanceof PetError && error.code === 'image');
+    }
+    for (const [format, settings] of [['png', {}], ['webp', {}], ['webp', { lossless: true }]]) {
+      const bytes = await image(192, 208, format, { settings });
+      assert.throws(() => sheetFile(new Uint8Array(bytes)), (error) => error instanceof PetError && error.code === 'size' && error.detail === '192x208');
+    }
   });
 });

@@ -1,4 +1,5 @@
-import { EASING, layoutChanged, reducedMotion } from './motion.js';
+import { requestLayout } from './layout.js';
+import { EASING, reducedMotion } from './motion.js';
 
 const OPEN_DURATION = 220;
 const CLOSE_DURATION = 140;
@@ -27,7 +28,7 @@ export function startFolds(article) {
   });
   addEventListener('afterprint', () => {
     for (const fold of openedForPrint.splice(0)) fold.open = false;
-    layoutChanged();
+    requestLayout();
   });
 }
 
@@ -38,23 +39,23 @@ export function openFoldsAround(target) {
     settle(fold, true);
     opened = true;
   }
-  if (opened) layoutChanged();
+  if (opened) requestLayout();
 }
 
 function toggleFold(fold) {
   const opening = !fold.open || closing.has(fold);
   if (reducedMotion.matches) {
     settle(fold, opening);
-    layoutChanged();
+    requestLayout();
     return;
   }
   const from = fold.open ? { opacity: Number(getComputedStyle(fold, CONTENT).opacity), transform: getComputedStyle(fold, CONTENT).transform } : ENTERING;
   settle(fold, true);
   if (opening) {
-    layoutChanged();
+    requestLayout();
     const animation = fold.animate([from, SHOWN], { pseudoElement: CONTENT, duration: OPEN_DURATION, easing: EASING });
     running.set(fold, animation);
-    animation.finished.then(layoutChanged, () => {});
+    animation.finished.then(() => requestLayout(), () => {});
     return;
   }
   closing.add(fold);
@@ -63,7 +64,7 @@ function toggleFold(fold) {
   animation.finished.then(
     () => {
       settle(fold, false);
-      layoutChanged();
+      requestLayout();
     },
     () => {},
   );

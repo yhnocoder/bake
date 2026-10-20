@@ -3,7 +3,6 @@ import { join, posix } from 'node:path';
 import { describeValue, listChoices } from '../report.js';
 
 export const BUILT_IN_THEMES = Object.freeze(['essay', 'bento']);
-export const TOC_STYLES = Object.freeze(['notes', 'tabs', 'dots', 'ticks']);
 export const WIDTHS = Object.freeze(['body', 'wide', 'page']);
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;

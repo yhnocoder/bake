@@ -738,12 +738,12 @@ const tocBody = [
 
 const TOC_VIEWS = [
   { style: 'notes', width: 1440, parts: ['.bk-toc-marker', '.bk-toc-chapter[data-state="current"]'], titles: '.bk-toc-chapters' },
-  { style: 'notes', width: 1024, parts: ['.bk-ticks', '.bk-toc-panel', '.bk-toc-panel .bk-toc-marker', '.bk-tick.is-current'], titles: '.bk-toc-panel .bk-toc-chapters' },
-  { style: 'tabs', width: 1440, parts: ['.bk-tabs', '.bk-tab.is-current'], titles: '.bk-tabs' },
-  { style: 'dots', width: 1024, parts: ['.bk-dots', '.bk-dot-item.is-current'], titles: '.bk-dots' },
-  { style: 'ticks', width: 1440, parts: ['.bk-ticks', '.bk-popover.is-ticks', '.bk-tick.is-current'], titles: null },
-  { style: 'dots', width: 375, parts: ['.bk-toc-handle', '.bk-drawer', '.bk-drawer-scrim', '.bk-drawer-dot.is-current'], titles: '.bk-drawer-index' },
-  { style: 'tabs', width: 375, parts: ['.bk-toc-handle', '.bk-drawer', '.bk-drawer-scrim', '.bk-drawer-tab.is-current'], titles: '.bk-drawer-index' },
+  { style: 'notes', width: 1024, parts: ['.bk-toc-ticks', '.bk-toc-panel', '.bk-toc-panel .bk-toc-marker', '.bk-toc-tick.is-current'], titles: '.bk-toc-panel .bk-toc-chapters' },
+  { style: 'tabs', width: 1440, parts: ['.bk-toc-tabs', '.bk-toc-tab.is-current'], titles: '.bk-toc-tabs' },
+  { style: 'dots', width: 1024, parts: ['.bk-toc-dots', '.bk-toc-dot-item.is-current'], titles: '.bk-toc-dots' },
+  { style: 'ticks', width: 1440, parts: ['.bk-toc-ticks', '.bk-toc-popover.is-ticks', '.bk-toc-tick.is-current'], titles: null },
+  { style: 'dots', width: 375, parts: ['.bk-toc-handle', '.bk-toc-drawer', '.bk-toc-drawer-scrim', '.bk-toc-drawer-dot.is-current'], titles: '.bk-toc-drawer-index' },
+  { style: 'tabs', width: 375, parts: ['.bk-toc-handle', '.bk-toc-drawer', '.bk-toc-drawer-scrim', '.bk-toc-drawer-tab.is-current'], titles: '.bk-toc-drawer-index' },
 ];
 
 test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async (t) => {
@@ -762,7 +762,7 @@ test('bake dev rebuilds every table of contents style from the saved headings an
         parts: parts.map((selector) => document.querySelectorAll(selector).length),
         children: ui.children.length,
         entries: document.querySelectorAll('.bk-toc [data-target]').length,
-        ticks: document.querySelectorAll('.bk-tick').length,
+        ticks: document.querySelectorAll('.bk-toc-tick').length,
         titles: titles === null ? null : [...document.querySelectorAll(titles)].flatMap((element) => [element.textContent, ...[...element.querySelectorAll('[aria-label]')].map((labelled) => labelled.getAttribute('aria-label'))]).join(' '),
       };
     }, view);
@@ -782,18 +782,18 @@ test('bake dev rebuilds every table of contents style from the saved headings an
       const before = await snapshot(view);
       const drawer = () =>
         page.evaluate(() => ({
-          open: document.querySelector('.bk-drawer').classList.contains('is-open'),
-          selected: [...document.querySelectorAll('.bk-drawer-index button')].findIndex((button) => button.classList.contains('is-selected')),
-          title: document.querySelector('.bk-drawer-detail .bk-toc-card-title').textContent,
-          scroll: document.querySelector('.bk-drawer-detail').scrollTop,
+          open: document.querySelector('.bk-toc-drawer').classList.contains('is-open'),
+          selected: [...document.querySelectorAll('.bk-toc-drawer-index button')].findIndex((button) => button.classList.contains('is-selected')),
+          title: document.querySelector('.bk-toc-drawer-detail .bk-toc-card-title').textContent,
+          scroll: document.querySelector('.bk-toc-drawer-detail').scrollTop,
         }));
       let drawerBefore = null;
       if (view.width < 1000) {
         await page.click('.bk-toc-handle');
-        await page.waitForFunction(() => document.querySelector('.bk-drawer').getBoundingClientRect().left === 0);
-        await page.locator('.bk-drawer-index button').nth(1).click();
+        await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().left === 0);
+        await page.locator('.bk-toc-drawer-index button').nth(1).click();
         await page.evaluate(() => {
-          document.querySelector('.bk-drawer-detail').scrollTop = 30;
+          document.querySelector('.bk-toc-drawer-detail').scrollTop = 30;
         });
         drawerBefore = await drawer();
         assert.ok(drawerBefore.scroll > 0, `the drawer of the ${view.style} style does not scroll`);

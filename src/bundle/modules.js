@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const SRC_DIR = join(import.meta.dirname, '..');
 const PREAMBLE_MODULE = 'bake:preamble';
 const MATH_FONT_MODULE = 'bake:math-font';
+export const MATHJAX_CHUNK = 'mathjax';
 const FONT_DIR = join(dirname(fileURLToPath(import.meta.resolve('@mathjax/mathjax-newcm-font/js/svg.js'))), 'svg/dynamic');
 
 export const PUBLIC_MODULES = Object.freeze([

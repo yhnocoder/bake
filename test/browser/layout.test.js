@@ -52,6 +52,12 @@ ${wideTable('Example cell', 8)}
 `,
 });
 
+const manyBlocksBody = Array.from(
+  { length: 30 },
+  (_, section) =>
+    `## Section ${section + 1}\n\n${Array.from({ length: 10 }, (_, index) => `$$\nx_{${section}} + y_{${index}} = ${section * 10 + index}\n$$\n\n\`\`\`text\nline ${index}\n\`\`\``).join('\n\n')}\n`,
+).join('\n');
+
 const tocBody = '## First\n\nText.\n\n## Second\n\nText.\n';
 
 const widthsArticle = article({
@@ -97,6 +103,8 @@ test('the essay theme lays out articles', async (t) => {
     'content/posts/widths/index.md': widthsArticle,
     'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\ncategory: writing\n', body: tocBody }),
     'content/posts/tabs/index.md': article({ title: 'Tabs', slug: 'tabs', extra: 'toc: tabs\ncategory: writing\n', body: tocBody }),
+    'content/posts/many-blocks/index.md': article({ title: 'Many blocks', slug: 'many-blocks', extra: 'category: writing\n', body: manyBlocksBody }),
+    'content/posts/many-cards/index.md': article({ title: 'Many cards', slug: 'many-cards', extra: 'category: writing\ntheme: bento\n', body: manyBlocksBody }),
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
@@ -125,6 +133,74 @@ test('the essay theme lays out articles', async (t) => {
       await page.close();
     }
     assert.deepEqual(overflowing, []);
+  });
+
+  await t.test('a resize of the window measures the article in one layout pass and publishes the positions with bk:layout', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      window.layoutProbe = { reads: 0, observed: 0, passes: [] };
+      for (const type of [Element, Range]) {
+        const read = type.prototype.getBoundingClientRect;
+        type.prototype.getBoundingClientRect = function () {
+          window.layoutProbe.reads += 1;
+          return read.call(this);
+        };
+      }
+      const observe = ResizeObserver.prototype.observe;
+      ResizeObserver.prototype.observe = function (target, options) {
+        if (target.matches?.('.bk-article')) window.layoutProbe.observed += 1;
+        return observe.call(this, target, options);
+      };
+      document.addEventListener('bk:layout', (event) => {
+        const headings = [...document.querySelectorAll('.bk-article h2[id]')];
+        window.layoutProbe.passes.push({ headings: headings.every((heading) => event.detail.headings.has(heading)), blocks: event.detail.blocks.every((block) => ['wide', 'page'].includes(block.element.dataset.resolved)), top: event.detail.article.top });
+      });
+    });
+    await page.goto(`${origin}/2026-10/syntax/`);
+    await settle(page);
+    await page.evaluate(() => {
+      window.layoutProbe.reads = 0;
+      window.layoutProbe.passes = [];
+    });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await settle(page);
+    const probe = await page.evaluate(() => window.layoutProbe);
+    assert.equal(probe.observed, 1);
+    assert.ok(probe.passes.length >= 1);
+    assert.ok(probe.passes.every((pass) => pass.headings && pass.blocks && pass.top > 0));
+    assert.ok(probe.reads < 150, `${probe.reads} reads of getBoundingClientRect in one resize`);
+    await page.close();
+  });
+
+  await t.test('a fold inside an example and a change of the table of contents style measure no natural width again', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      window.naturalWidthProbes = 0;
+      const append = Element.prototype.append;
+      Element.prototype.append = function (...nodes) {
+        window.naturalWidthProbes += nodes.filter((node) => node instanceof HTMLElement && node.style.width === 'var(--natural-width)').length;
+        return append.apply(this, nodes);
+      };
+    });
+    await page.goto(`${origin}/2026-10/syntax/`);
+    await settle(page);
+    const probes = async (action) => {
+      await page.evaluate(() => (window.naturalWidthProbes = 0));
+      await action();
+      await settle(page);
+      return page.evaluate(() => window.naturalWidthProbes);
+    };
+    const fold = page.locator('.bk-block[data-type="example"] .example-result details.fold > summary').first();
+    await fold.scrollIntoViewIfNeeded();
+    await settle(page);
+    assert.equal(await probes(() => fold.click()), 0);
+    assert.equal(await probes(() => fold.click()), 0);
+    await page.getByRole('button', { name: '设置' }).click();
+    const styles = page.locator('.bk-settings-panel [role="radio"]');
+    assert.equal(await probes(() => styles.nth(2).click()), 0);
+    assert.equal(await probes(() => styles.nth(1).click()), 0);
+    assert.equal(await probes(() => styles.nth(0).click()), 0);
+    await page.close();
   });
 
   await t.test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async () => {
@@ -271,12 +347,10 @@ test('the essay theme lays out articles', async (t) => {
     await lightSystem.close();
   });
 
-  await t.test('display math shows a scroll shadow only on an overflowing side, during and after a theme switch', async () => {
+  await t.test('display math shows a scroll shadow only on an overflowing side in both schemes, also in the first frame after a theme switch', async () => {
     const problems = [];
     for (const width of [1440, 375]) {
       const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Animation.enable');
       const edges = async () => {
         const boxes = await page.evaluate(() =>
           [...document.querySelectorAll('.bk-article mjx-container[display]')].map((formula) => {
@@ -300,13 +374,11 @@ test('the essay theme lays out articles', async (t) => {
       await page.locator('mjx-container[display]').nth(1).scrollIntoViewIfNeeded();
       await settle(page);
       await check('in the light scheme');
-      await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
-      await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
-      await page.waitForTimeout(600);
-      const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      assert.ok(!['rgb(245, 246, 244)', 'rgb(17, 20, 19)'].includes(background), `the switch is still running, ${background}`);
-      await check('while switching to the dark scheme');
-      await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 });
+      await page.evaluate(async () => {
+        document.documentElement.dataset.theme = 'dark';
+        await new Promise((done) => requestAnimationFrame(done));
+      });
+      await check('in the first frame of the dark scheme');
       await page.waitForTimeout(400);
       await check('in the dark scheme');
       if (width === 375) assert.ok((await edges()).some((edge) => edge.overflows), 'a formula overflows on a phone');
@@ -411,6 +483,23 @@ test('the essay theme lays out articles', async (t) => {
     };
     assert.deepEqual(await labels('stress'), []);
     assert.deepEqual(await labels('widths'), ['参考文献']);
+  });
+
+  await t.test('placing blocks and cards forces a fixed number of layouts however many blocks an article has', async () => {
+    const layoutsOnResize = async (path) => {
+      const page = await open(path);
+      const session = await page.context().newCDPSession(page);
+      await session.send('Performance.enable');
+      const count = async () => (await session.send('Performance.getMetrics')).metrics.find((metric) => metric.name === 'LayoutCount').value;
+      const before = await count();
+      await page.setViewportSize({ width: 1400, height: 900 });
+      await settle(page);
+      const layouts = (await count()) - before;
+      await page.close();
+      return layouts;
+    };
+    const layouts = { 'many-blocks': await layoutsOnResize('many-blocks'), 'many-cards': await layoutsOnResize('many-cards') };
+    assert.deepEqual(Object.entries(layouts).filter(([, count]) => count > 30), []);
   });
 });
 

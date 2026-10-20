@@ -1,14 +1,8 @@
 export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-export const LAYOUT_EVENT = 'bk:layout';
-
 export const CONTENT_EVENT = 'bake:content';
 
 export const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
-
-export function layoutChanged() {
-  document.dispatchEvent(new CustomEvent(LAYOUT_EVENT));
-}
 
 export function oncePerFrame(callback) {
   let pending = false;

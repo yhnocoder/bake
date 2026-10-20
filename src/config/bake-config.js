@@ -3,17 +3,17 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
+import { DEFAULT_PET, petSourceProblem } from './pet.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { TOC_STYLES, choiceProblem, slugProblem } from './rules.js';
+import { HOME_COLUMNS, TOC_STYLES } from '../choices.js';
+import { choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
 
-const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'bento', 'home', 'categories'];
-const BENTO_FIELDS = ['columns'];
+const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'themes', 'home', 'categories', 'chat'];
+const CHAT_FIELDS = ['pet'];
 const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
-const HOME_COLUMNS = [3, 4, 5];
-const MAX_BENTO_COLUMNS = 6;
 const GROUP_BY = ['category', 'month'];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -25,7 +25,7 @@ export function hasConfig(root) {
   return statSync(join(root, CONFIG_FILE), { throwIfNoEntry: false })?.isFile() ?? false;
 }
 
-export async function loadBakeConfig(root, themes, errors) {
+export async function loadBakeConfig(root, themes, optionProblem, errors) {
   if (!hasConfig(root)) {
     errors.push(configNotFoundError());
     return null;
@@ -48,16 +48,21 @@ export async function loadBakeConfig(root, themes, errors) {
   }
   const locate = sourceLocator(program);
   const count = errors.length;
-  const config = validateConfig(exported, themes, (path, part, message) => errors.push(errorAt(CONFIG_FILE, locate(path, part), message)));
+  const config = validateConfig(exported, themes, optionProblem, (path, part, message) => errors.push(errorAt(CONFIG_FILE, locate(path, part), message)));
   return errors.length === count ? deepFreeze(config) : null;
 }
 
-function validateConfig(value, themes, report) {
+export function configPosition(root, path) {
+  const program = parse(readFileSync(join(root, CONFIG_FILE), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+  return sourceLocator(program)(path, 'value');
+}
+
+function validateConfig(value, themes, optionProblem, report) {
   if (!isPlainObject(value)) {
     report([], 'value', `the default export of ${CONFIG_FILE} must be an object, got ${describeValue(value)}`);
     return null;
   }
-  reportUnknownFields(value, FIELDS, [], report);
+  reportUnknownFields(value, FIELDS, [], report, { bento: 'theme options are written under themes, such as themes: { bento: { columns: 4 } }' });
   const field = (path, problem) => {
     if (problem) report(path, 'value', problem);
   };
@@ -70,13 +75,14 @@ function validateConfig(value, themes, report) {
   required('url', urlProblem);
   required('language', (language) => textProblem('language', language));
   const theme = value.theme ?? 'essay';
-  field(['theme'], choiceProblem('theme', themes, theme));
+  field(['theme'], choiceProblem('theme', [...themes.keys()], theme));
   const toc = value.toc ?? 'notes';
   field(['toc'], choiceProblem('toc', TOC_STYLES, toc));
   const categories = validateCategories(value.categories ?? [], report);
-  const bento = section(value, 'bento', BENTO_FIELDS, report);
-  const bentoColumns = bento.columns ?? 4;
-  field(['bento', 'columns'], Number.isInteger(bentoColumns) && bentoColumns >= 1 && bentoColumns <= MAX_BENTO_COLUMNS ? null : `bento.columns must be an integer from 1 to ${MAX_BENTO_COLUMNS}, got ${describeValue(bentoColumns)}`);
+  const options = validateThemeOptions(value, themes, optionProblem, report);
+  const chat = section(value, 'chat', CHAT_FIELDS, report);
+  const pet = chat.pet ?? DEFAULT_PET;
+  field(['chat', 'pet'], petSourceProblem(pet));
   const home = section(value, 'home', HOME_FIELDS, report);
   const homeColumns = home.columns ?? 3;
   field(['home', 'columns'], choiceProblem('home.columns', HOME_COLUMNS, homeColumns));
@@ -92,19 +98,42 @@ function validateConfig(value, themes, report) {
     language: value.language,
     theme,
     toc,
-    bento: { columns: bentoColumns },
+    themes: options,
     home: { columns: homeColumns, groupBy },
     categories,
+    chat: { pet },
   };
 }
 
-function section(config, name, fields, report) {
+function validateThemeOptions(config, themes, optionProblem, report) {
+  const written = section(config, 'themes', [...themes.keys()], report, (name) => `themes.${name} names no theme; the themes are ${[...themes.keys()].join(', ')}`);
+  return Object.fromEntries(
+    [...themes].map(([name, declarations]) => {
+      if (declarations === null) return [name, {}];
+      const values = isPlainObject(written[name]) ? written[name] : {};
+      if (written[name] !== undefined && !isPlainObject(written[name])) report(['themes', name], 'value', `themes.${name} must be an object, got ${describeValue(written[name])}`);
+      else reportUnknownFields(values, Object.keys(declarations), ['themes', name], report);
+      const options = Object.fromEntries(
+        Object.entries(declarations).map(([option, declaration]) => {
+          if (!Object.hasOwn(values, option)) return [option, declaration.default];
+          const problem = optionProblem(declaration, values[option]);
+          if (problem !== null) report(['themes', name, option], 'value', `themes.${name}.${option} ${problem}`);
+          return [option, values[option]];
+        }),
+      );
+      return [name, options];
+    }),
+  );
+}
+
+function section(config, name, fields, report, unknown) {
   const value = config[name] ?? {};
   if (!isPlainObject(value)) {
     report([name], 'value', `${name} must be an object, got ${describeValue(value)}`);
     return {};
   }
-  reportUnknownFields(value, fields, [name], report);
+  if (unknown === undefined) reportUnknownFields(value, fields, [name], report);
+  else for (const key of Object.keys(value).filter((key) => !fields.includes(key))) report([name, key], 'key', unknown(key));
   return value;
 }
 
@@ -140,9 +169,9 @@ function validateCategories(categories, report) {
   });
 }
 
-function reportUnknownFields(object, fields, path, report) {
+function reportUnknownFields(object, fields, path, report, hints = {}) {
   for (const name of Object.keys(object)) {
-    if (!fields.includes(name)) report([...path, name], 'key', `unknown config field "${[...labelPath(path), name].join('.')}"`);
+    if (!fields.includes(name)) report([...path, name], 'key', `unknown config field "${[...labelPath(path), name].join('.')}"${Object.hasOwn(hints, name) ? `; ${hints[name]}` : ''}`);
   }
 }
 

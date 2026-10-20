@@ -14,7 +14,7 @@ function cssFiles(folder) {
 }
 
 test('every width media query in the styles uses a breakpoint of screens.js or the phone screen width', () => {
-  const screens = readFileSync(join(SRC, 'themes/essay/scripts/screens.js'), 'utf8');
+  const screens = readFileSync(join(SRC, 'theme/scripts/screens.js'), 'utf8');
   const screenWidths = [...screens.matchAll(/min-width: (\d+)px/g)].map((match) => Number(match[1]));
   assert.deepEqual(screenWidths, [1340, 1000]);
   const breakpoints = new Set([...screenWidths, PHONE_SCREEN_WIDTH]);
@@ -53,7 +53,7 @@ test('no rule tests the root element with :has() on its descendants', () => {
 });
 
 test('the essay fonts use an installed LXGW WenKai before the files of lxgw-wenkai-webfont, in both weights', () => {
-  const css = readFileSync(join(SRC, 'themes/essay/styles/fonts.css'), 'utf8');
+  const css = readFileSync(join(SRC, 'theme/styles/fonts.css'), 'utf8');
   const lastImport = css.lastIndexOf('@import');
   const localFaces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)]
     .filter((match) => match[1].includes("'LXGW WenKai'"))

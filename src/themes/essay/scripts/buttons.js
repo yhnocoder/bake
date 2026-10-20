@@ -1,5 +1,4 @@
-import { notesColumnScreen } from './screens.js';
-import { SETTING_EVENT } from './settings.jsx';
+import { SETTING_EVENT, notesColumnScreen } from 'bake/theme/client';
 
 const TOP_ZONE = 40;
 const TRAVEL = 8;
@@ -19,13 +18,13 @@ export function startButtons() {
       const delta = top - lastTop;
       lastTop = top;
       if (jumping) return;
-      if (notesColumnScreen.matches || !autohide() || root.classList.contains('bk-drawer-open') || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
+      if (notesColumnScreen.matches || !autohide() || root.classList.contains('bk-toc-drawer-open') || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
         showButtons();
         return;
       }
       travel = Math.sign(delta) === Math.sign(travel) ? travel + delta : delta;
-      if (travel > TRAVEL) root.classList.add(HIDDEN_CLASS);
-      else if (travel < -TRAVEL) root.classList.remove(HIDDEN_CLASS);
+      if (travel > TRAVEL) hideButtons();
+      else if (travel < -TRAVEL) showButtons();
     },
     { passive: true },
   );
@@ -43,5 +42,9 @@ export function showButtonsDuring(jump) {
 
 function showButtons() {
   travel = 0;
-  document.documentElement.classList.remove(HIDDEN_CLASS);
+  if (document.documentElement.classList.contains(HIDDEN_CLASS)) document.documentElement.classList.remove(HIDDEN_CLASS);
+}
+
+function hideButtons() {
+  if (!document.documentElement.classList.contains(HIDDEN_CLASS)) document.documentElement.classList.add(HIDDEN_CLASS);
 }

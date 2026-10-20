@@ -1,20 +1,25 @@
-import { labelsFor } from '../labels.js';
+import { CONTENT_EVENT, LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, labelsFor, leftColumnScreen, notesColumnScreen, oncePerFrame } from 'bake/theme/client';
 import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
-import { followLink } from './heading-links.jsx';
-import { CONTENT_EVENT, LAYOUT_EVENT, oncePerFrame } from './motion.js';
-import { leftColumnScreen, notesColumnScreen } from './screens.js';
-import { SETTING_EVENT } from './settings.jsx';
-import { readOutline } from './toc-card.js';
-import { dotsView } from './toc-dots.js';
-import { notesColumn, notesRailView } from './toc-notes.js';
-import { tabsView } from './toc-tabs.js';
-import { ticksView } from './toc-ticks.js';
+import { bottomReserve, createCardHost, outlineKey, readOutline } from './toc-card.js';
+import { DOTS_CARD, dotsView } from './toc-dots.js';
+import { RAIL_CARD, notesView, railView } from './toc-notes.js';
+import { TABS_CARD, tabsView } from './toc-tabs.js';
+import { TICKS_CARD, ticksView } from './toc-ticks.js';
 
 const READING_LINE = 0.25;
 const READING_LINE_MAX = 200;
 const DONE_SHARE = 0.85;
-const VIEWS = { rail: notesRailView, tabs: tabsView, dots: dotsView, ticks: ticksView, drawer: drawerView };
+const DRAWER = { view: drawerView };
+const TABS = { view: tabsView, card: TABS_CARD };
+const DOTS = { view: dotsView, card: DOTS_CARD };
+const TICKS = { view: ticksView, card: TICKS_CARD };
+const STYLES = {
+  notes: { left: { view: notesView }, notes: { view: railView, card: RAIL_CARD }, phone: DRAWER },
+  tabs: { left: TABS, notes: TABS, phone: DRAWER },
+  dots: { left: DOTS, notes: DOTS, phone: DRAWER },
+  ticks: { left: TICKS, notes: TICKS, phone: DRAWER },
+};
 
 export function startToc(article) {
   const nav = document.querySelector('.bk-toc');
@@ -23,70 +28,62 @@ export function startToc(article) {
   const host = document.createElement('div');
   host.className = 'bk-toc-ui';
   document.body.insertBefore(host, document.querySelector('.bk-shell'));
+  const outline = readOutline(nav);
+  const labels = labelsFor(root.lang);
   let jumping = false;
   let state = null;
-  let kind = null;
-  let mountedStyle = null;
+  let mounted = null;
   let view = null;
+  let card = null;
   let crossing = [];
 
-  const context = {
-    outline: readOutline(nav),
-    labels: labelsFor(root.lang),
-    host,
-    article,
-    jumping: () => jumping,
-    state: () => state,
-    go(hash) {
-      jumping = true;
-      view.jumped?.();
-      const jump = followLink(hash);
-      showButtonsDuring(jump);
-      jump.then(() =>
-        requestAnimationFrame(() => {
-          jumping = false;
-          update();
-        }),
-      );
-    },
+  const go = (hash) => {
+    jumping = true;
+    view.jumped?.();
+    const jump = followLink(hash);
+    showButtonsDuring(jump);
+    jump.then(() =>
+      requestAnimationFrame(() => {
+        jumping = false;
+        update();
+      }),
+    );
   };
-  let column = notesColumn(nav, context);
-  const notesView = () => ({
-    columns: [nav.querySelector('.bk-toc-column')],
-    update: (next) => column.update(next),
-    relayout: () => column.relayout(),
-    destroy() {},
-  });
-
-  const update = oncePerFrame(() => {
-    state = readingState(context.outline, article);
+  const draw = () => {
+    state = readingState(outline, currentLayout(article));
     view.update(state);
+    card?.update(state);
     const yielding = crossing.some(isOnScreen);
     for (const element of view.columns ?? []) {
       element.classList.toggle('is-yielding', yielding);
       element.inert = yielding;
     }
-  });
-  const layout = oncePerFrame(() => {
+  };
+  const update = oncePerFrame(draw);
+  const layout = () => {
     view.relayout?.();
-    crossing = blocksCrossing(view.columns ?? [], article);
-    update();
-  });
+    card?.relayout();
+    crossing = blocksCrossing(view.columns ?? [], currentLayout(article));
+    draw();
+  };
   const mount = (again = false) => {
-    const style = root.dataset.toc;
-    const next = !notesColumnScreen.matches ? 'drawer' : style === 'notes' ? (leftColumnScreen.matches ? 'notes' : 'rail') : style;
-    if (next === kind && style === mountedStyle && !again) return;
+    const style = root.dataset.toc in STYLES ? root.dataset.toc : 'notes';
+    const screen = leftColumnScreen.matches ? 'left' : notesColumnScreen.matches ? 'notes' : 'phone';
+    const spec = STYLES[style][screen];
+    const key = spec === DRAWER ? `${style} drawer` : spec;
+    if (key === mounted && !again) return;
     view?.destroy();
+    card?.destroy();
     for (const element of document.querySelectorAll('.is-yielding')) {
       element.classList.remove('is-yielding');
       element.inert = false;
     }
-    kind = next;
-    mountedStyle = style;
-    view = kind === 'notes' ? notesView() : VIEWS[kind](context);
-    state = readingState(context.outline, article);
-    view.update(state);
-    if (kind === 'notes') column.show();
+    mounted = key;
+    state = readingState(outline, currentLayout(article));
+    card = spec.card === undefined ? null : createCardHost(spec.card);
+    const reserve = bottomReserve(host);
+    view = spec.view({ outline, labels, style, host, card, go, nav, article, reserve, jumping: () => jumping, state: () => state });
+    card?.connect(view, { outline, labels, host, reserve, state: () => state });
     layout();
   };
 
@@ -95,17 +92,22 @@ export function startToc(article) {
     const link = event.target.closest('a[href^="#"]');
     if (link === null) return;
     event.preventDefault();
-    context.go(link.getAttribute('href'));
+    go(link.getAttribute('href'));
   };
   nav.addEventListener('click', onClick);
   host.addEventListener('click', onClick);
   const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add('is-ready')));
   const reread = () => {
+    const next = readOutline(nav);
+    const same = outlineKey(next) === outlineKey(outline);
+    Object.assign(outline, next);
+    if (same) {
+      card?.refresh();
+      view.refresh?.();
+      return;
+    }
     nav.classList.remove('is-ready');
     const saved = view.saved?.() ?? null;
-    column.destroy();
-    context.outline = readOutline(nav);
-    column = notesColumn(nav, context);
     mount(true);
     if (saved !== null) view.restore(saved);
     settle();
@@ -113,11 +115,8 @@ export function startToc(article) {
   mount();
   settle();
   addEventListener('scroll', update, { passive: true });
-  addEventListener('resize', layout);
   document.addEventListener(LAYOUT_EVENT, layout);
-  document.fonts.addEventListener('loadingdone', layout);
   document.addEventListener(CONTENT_EVENT, reread);
-  new ResizeObserver(layout).observe(article);
   leftColumnScreen.addEventListener('change', () => mount());
   notesColumnScreen.addEventListener('change', () => mount());
   document.addEventListener(SETTING_EVENT, (event) => {
@@ -125,11 +124,11 @@ export function startToc(article) {
   });
 }
 
-function readingState(outline, article) {
+function readingState(outline, measured) {
   const { entries, chapters } = outline;
   const height = innerHeight;
   const line = Math.min(height * READING_LINE, READING_LINE_MAX);
-  const tops = entries.map((entry) => (entry.heading === null ? Infinity : entry.heading.getBoundingClientRect().top));
+  const tops = entries.map((entry) => (measured.headings.get(entry.heading) ?? Infinity) - scrollY);
   let entry = -1;
   for (const [index, top] of tops.entries()) {
     if (top <= line) entry = index;
@@ -137,7 +136,7 @@ function readingState(outline, article) {
   }
   const atEnd = scrollY > 0 && scrollY + height >= document.documentElement.scrollHeight - 4;
   if (atEnd) entry = entries.length - 1;
-  const articleBottom = article.getBoundingClientRect().bottom;
+  const articleBottom = measured.article.bottom - scrollY;
   let entryDone = atEnd;
   if (entry >= 0 && !atEnd) {
     const top = tops[entry];
@@ -160,16 +159,12 @@ function readingState(outline, article) {
   };
 }
 
-function blocksCrossing(columns, article) {
-  const spans = columns.map((column) => column.getBoundingClientRect()).filter((box) => box.width > 0);
+function blocksCrossing(columns, measured) {
+  const spans = columns.map((column) => column.getBoundingClientRect()).filter((box) => box.width > 0).map((box) => ({ left: box.left + scrollX, right: box.right + scrollX }));
   if (spans.length === 0) return [];
-  return [...article.querySelectorAll('.bk-block')].filter((block) => {
-    const box = block.getBoundingClientRect();
-    return box.height > 0 && spans.some((span) => box.left < span.right && box.right > span.left);
-  });
+  return measured.blocks.filter((block) => block.height > 0 && spans.some((span) => block.left < span.right && block.right > span.left));
 }
 
 function isOnScreen(block) {
-  const box = block.getBoundingClientRect();
-  return box.bottom > 0 && box.top < innerHeight;
+  return block.bottom - scrollY > 0 && block.top - scrollY < innerHeight;
 }

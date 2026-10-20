@@ -110,6 +110,8 @@ ${spacer}
 `,
   }),
   'content/posts/gelu/index.md': article({ slug: 'gelu', body: ':::grid-view\n:::\n' }),
+  'content/posts/below/index.md': article({ slug: 'below', body: `:::grid-view\n:::\n\n${spacer}\n\n:::text-view\n:::\n` }),
+  'content/posts/later/index.md': article({ slug: 'later', body: `:::grid-view\n:::\n\n${spacer}\n\n:::count-view\n:::\n\n${spacer}\n\n:::tex-view\n:::\n` }),
   'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
   'content/posts/source/index.md': article({ slug: 'source', body: '## Grid {#grid}\n\n:::grid-view{mode=far}\n:::\n' }),
   'content/posts/embedder/index.md': article({ slug: 'embedder', body: 'An article without components of its own.\n\n:::embed\n/2026-10/source/#grid\n:::\n' }),
@@ -305,6 +307,117 @@ test('components run in the browser', async (t) => {
     await other.close();
   });
 
+  await t.test('once the page has loaded, the code of a component far below the screen is downloaded before the component starts and runs only when it starts', async () => {
+    const page = await open('below');
+    await waitForReady(page, 1);
+    await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]text-view-[\w-]{8}\.js$/.test(entry.name) && entry.responseEnd > 0));
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null), null);
+    assert.equal(await page.evaluate(() => customElements.get('text-view') === undefined), true);
+    await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+    const downloads = await page.evaluate(() => performance.getEntriesByType('resource').filter((entry) => /[/]text-view-[\w-]{8}\.js$/.test(entry.name)).map((entry) => entry.transferSize));
+    assert.equal(downloads.filter((size) => size > 0).length, 1, `the component reads its code from the HTTP cache: ${downloads}`);
+    assert.deepEqual(page.problems, []);
+    await page.close();
+  });
+
+  await t.test('the files of components far below the screen are downloaded one component after another, nearest first, with the Solid wrapper of a Solid component and without MathJax', async () => {
+    const page = await open('later');
+    await waitForReady(page, 1);
+    const pattern = { count: /[/](count-view|solid-element)-[\w-]{8}\.(js|css)$/, tex: /[/](tex-view|math)-[\w-]{8}\.js$/ };
+    await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]tex-view-[\w-]{8}\.js$/.test(entry.name) && entry.responseEnd > 0));
+    await page.waitForTimeout(300);
+    const entries = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name, startTime, responseEnd }) => ({ name, startTime, responseEnd })));
+    const count = entries.filter((entry) => pattern.count.test(entry.name));
+    const tex = entries.filter((entry) => pattern.tex.test(entry.name));
+    assert.ok(count.some((entry) => /solid-element/.test(entry.name)), entries.map((entry) => entry.name).join(', '));
+    assert.ok(Math.max(...count.map((entry) => entry.responseEnd)) <= Math.min(...tex.map((entry) => entry.startTime)), JSON.stringify({ count, tex }));
+    assert.ok(!entries.some((entry) => /[/]mathjax-[\w-]{8}\.js$/.test(entry.name)), 'MathJax is downloaded only when a component that needs it starts');
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('figure.component')].map((frame) => frame.dataset.state ?? null)), ['ready', null, null]);
+    await page.close();
+  });
+
+  await t.test('a download in advance that a starting component cancelled is downloaded again before its own component starts', async () => {
+    const page = await open(null);
+    let delayed = false;
+    let firstRequest;
+    const requested = new Promise((resolve) => {
+      firstRequest = resolve;
+    });
+    await page.route(/[/]count-view-[\w-]{8}\.js$/, async (route) => {
+      if (delayed) return route.continue();
+      delayed = true;
+      firstRequest();
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue().catch(() => {});
+    });
+    await page.goto(`${origin}/2026-10/later/`);
+    await waitForReady(page, 1);
+    await requested;
+    await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+    await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]count-view-[\w-]{8}\.js$/.test(entry.name) && entry.initiatorType === 'fetch' && entry.responseStatus === 200));
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('figure.component')].map((frame) => frame.dataset.state ?? null)), ['ready', null, 'ready']);
+    await page.close();
+  });
+
+  await t.test('after a resize, a component starts within the larger of 800 pixels and one and a half heights of the new viewport', async () => {
+    const page = await open('below', { viewport: { width: 1440, height: 1000 } });
+    await waitForReady(page, 1);
+    await page.setViewportSize({ width: 1440, height: 500 });
+    const scrollToDistance = (distance) =>
+      page.evaluate((below) => {
+        const frame = [...document.querySelectorAll('figure.component')].at(-1);
+        scrollTo(0, frame.getBoundingClientRect().top + scrollY - innerHeight - below);
+      }, distance);
+    const lastState = () => page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null);
+    await scrollToDistance(1000);
+    await page.waitForTimeout(300);
+    assert.equal(await lastState(), null);
+    await scrollToDistance(700);
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+    await page.close();
+  });
+
+  await t.test('with Save-Data or a 2G connection, the code of a component far below the screen loads only when the component starts', async () => {
+    for (const connection of [{ saveData: true, effectiveType: '4g' }, { saveData: false, effectiveType: '2g' }]) {
+      const page = await open(null);
+      await page.addInitScript((value) => Object.defineProperty(Navigator.prototype, 'connection', { get: () => value }), connection);
+      const requests = [];
+      page.on('request', (request) => requests.push(request.url()));
+      await page.goto(`${origin}/2026-10/below/`, { waitUntil: 'load' });
+      await waitForReady(page, 1);
+      await page.waitForTimeout(500);
+      assert.deepEqual(requests.filter((url) => /[/]text-view-[\w-]{8}\.js$/.test(url)), [], JSON.stringify(connection));
+      await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+      await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+      await page.close();
+    }
+  });
+
+  await t.test('a component far below the screen starts when its code could not be loaded right after the page loaded', async () => {
+    const page = await open(null);
+    let blocked = true;
+    let aborted;
+    const firstAbort = new Promise((resolve) => {
+      aborted = resolve;
+    });
+    await page.route(/[/]text-view-[\w-]{8}\.js$/, async (route) => {
+      if (!blocked) return route.continue();
+      await route.abort();
+      aborted();
+    });
+    await page.goto(`${origin}/2026-10/below/`);
+    await waitForReady(page, 1);
+    await firstAbort;
+    await page.waitForTimeout(200);
+    blocked = false;
+    await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+    await page.waitForFunction(() => ['ready', 'failed'].includes([...document.querySelectorAll('figure.component')].at(-1).dataset.state));
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state), 'ready');
+    await page.close();
+  });
+
   await t.test('the article styles of the essay theme do not reach the content of a component', async () => {
     const page = await open('text');
     await waitForReady(page);
@@ -365,12 +478,13 @@ test('components run in the browser', async (t) => {
     assert.equal(await themes(), 0);
     await page.click('.bk-settings-toggle');
     await page.click('[data-setting="theme"] [data-value="dark"]');
-    assert.equal(await themes(), 1);
+    await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '1');
     await page.click('[data-setting="theme"] [data-value="system"]');
-    assert.equal(await themes(), 2);
+    await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '2');
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '3');
     await page.click('[data-setting="theme"] [data-value="light"]');
+    await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '4');
     await page.emulateMedia({ colorScheme: 'light' });
     assert.equal(await themes(), 4);
     await page.close();
