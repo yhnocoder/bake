@@ -4,7 +4,7 @@ The project works but has grown hard to control. This plan simplifies code, test
 
 ## Decisions
 
-Kept as features: the AI chat with pets (including the 30-day "remember" of the chat key), the four table of contents styles and the reader settings, copying as Markdown, the bento theme, the frame time gate and the performance budgets, share images, theme overrides, CHANGELOG.md and the npm publishing setup.
+Kept as features: the AI chat with pets (including the 30-day "remember" of the chat key), the four table of contents styles and the reader settings, copying as Markdown, the bento theme, the frame time gate and the performance budgets, share images, theme overrides, CHANGELOG.md and the npm publishing setup. CHANGELOG.md is not changed in this cleanup.
 
 Removed: the screenshot comparison tooling, and the in-place partial update of `bake dev` (replaced by a full page reload that keeps the scroll position).
 
@@ -20,6 +20,8 @@ Tests test behavior, not implementation. They cover what a user of bake or a rea
 Playwright's pinned Chromium (build 1194, the one CI uses) is installed locally, so tests and measurements run with plain `chromium.launch()`. The installed Google Chrome is a fallback (`channel: 'chrome'`) if that build stops working.
 
 Verification is sized to the change: a change to documentation only runs no tests; a change to one feature runs the unit and browser tests of that feature; a change to shared code (build, theme layer, test helpers) runs `npm test` and the full browser suite. The full browser suite also runs at the end of steps 3, 6 and 7.
+
+The baseline measurements and their scripts are kept in `test-out/perf-baseline/` (ignored by git, read-only results). Do not delete or overwrite that folder, and keep `test-out/` in `.gitignore`. The final measurement runs `sh test-out/perf-baseline/run-all.sh <repo> test-out/perf-final`.
 
 ## Steps
 
@@ -39,9 +41,16 @@ This cleanup compares medians only. The baseline showed a median frame time of 1
 - Shrink TESTING.md to how to run the tests and how they are designed.
 - Remove every reference to CONTRIBUTING.md (README.md, TESTING.md, CLAUDE.md).
 - Drop the accepted gaps that no longer matter; a gap that still matters becomes a `knownFailures` entry or a code comment.
-- README.md: fix it to match the code, including the chat key, which is remembered for 30 days (`src/chat/vault.js`). Add what a user needs and is missing: installation and the Node version, the component interface (`params`, `layout`, default export, `bake/kit`), and the complete list of files a theme must provide.
-- Bring CHANGELOG.md up to date with the user-visible changes after #111.
+- README.md: fix it to match the code, including the chat key, which is remembered for 30 days (`src/chat/vault.js`). Add installation and the Node version. The component interface and the theme interface are documented in README.md at the end of step 6, because steps 5 and 6 change them.
 - `make check` depends on `node_modules`. `make example` serves with `scripts/static-server.js`.
+
+### 1b. Faster test runs
+
+The unit tests are slow because every `bake build` they spawn loads the whole pipeline and launches Chromium, so speed them up before the steps that change code:
+- `src/cli.js` imports the whole build pipeline for every command; load each command's modules with `await import()` in its branch.
+- Cache the compiled theme the way `src/chat/bundle.js` caches the chat bundle, and reuse share images by the digest in their file name, so repeated test builds do not recompile or relaunch the browser.
+- One test helper that builds a copy of the example blog once per test file (start from `buildExample` in `test/browser/chat-page.js`), used by the files that build the unchanged example blog.
+Measure `npm test` before and after and record both times here.
 
 ### 2. Removals
 
@@ -56,8 +65,6 @@ This cleanup compares medians only. The baseline showed a median frame time of 1
 - Review every test file for tests of implementation details and rewrite or delete them; merge tests that guard the same behavior. `test/browser/chat.test.js` and `test/browser/copy.test.js` build several blogs each; build one per file.
 - `test/frames/frames.test.js` opens only the syntax article, the bento article and the homepage. Add the two long real articles, `llm-act-fns` and `matrix-calculus`: scrolling the whole article and dragging a control of one of their components, in the nightly set.
 - `test/frames/frames.test.js`: the hover case passes with 15 of 20 events; find the cause instead of tolerating misses.
-- `src/cli.js` imports the whole build pipeline for every command; load each command's modules with `await import()` in its branch.
-- Cache the compiled theme the way `src/chat/bundle.js` caches the chat bundle, and reuse share images by the digest in their file name, so repeated test builds do not recompile or relaunch the browser.
 - CI: run jobs in the Playwright container image matching the pinned version instead of installing system packages; drop `needs: performance` from the nightly `frames` job; rebalance the unit shards if they stay uneven.
 
 ### 4. Input fix
@@ -81,6 +88,8 @@ Write the design into this file under "Theme and core design" before implementin
 ### 6. Implement the design
 
 Implement step 5 in commits that each keep the tests green. Delete the special cases each part replaces. Duplicates between the two themes (sidenote highlighting CSS and JS, the client entry files) and the three styles of segmented controls and switches go into the shared layer or the kit.
+
+At the end of this step, document the component interface (exports, attributes, `bake/kit`, `bake/math`) and the theme interface (required files, props, options, overrides) in README.md for blog authors.
 
 ### 7. Remaining simplifications
 
