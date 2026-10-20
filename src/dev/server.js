@@ -1,25 +1,33 @@
-import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { isIP, isIPv4, isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { contentType } from '../build/content-types.js';
 import { escapeMarkup } from '../build/escape.js';
-import { errorCount, formatError } from '../report.js';
+import { describeValue, errorCount, formatError } from '../report.js';
 import { missingPage } from './missing.js';
+import { rewriteSource, sourceVersion } from './params.js';
 import { createPreview } from './preview.js';
 import { watchBlog } from './watch.js';
 
 export const DEFAULT_PORT = 4321;
+export const DEFAULT_HOST = '127.0.0.1';
+const WILDCARD_HOSTS = new Set(['0.0.0.0', '::']);
+const TOKEN_HEADER = 'x-bake-token';
 const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
-const CLIENT_FILES = { 'client.js': 'text/javascript; charset=utf-8', 'client.css': 'text/css; charset=utf-8' };
+const MAX_REQUEST_BYTES = 1024 * 1024;
+const CLIENT_DIR = join(import.meta.dirname, 'client');
+const CLIENT_FILES = new Set(readdirSync(CLIENT_DIR));
 
-export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = console.log } = {}) {
+export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
   const preview = createPreview(root);
   const serverId = randomUUID();
+  const token = randomBytes(32).toString('base64url');
   const clients = new Set();
   let printedProblems = '';
 
@@ -50,12 +58,18 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
   });
 
   async function respond(request, response) {
+    const requestHost = hostName(request.headers.host);
+    if (!allowedHost(requestHost, host)) {
+      response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+      return response.end(requestHost === null ? 'bake dev refuses requests without a Host header' : `bake dev refuses requests for the host ${requestHost}; open the page at localhost or at an IP address`);
+    }
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname === `${DEV_PREFIX}events`) return openEvents(request, response);
+    if (pathname === `${DEV_PREFIX}params`) return answerParams(request, response);
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
-    if (clientFile !== null && Object.hasOwn(CLIENT_FILES, clientFile)) {
-      response.writeHead(200, { 'content-type': CLIENT_FILES[clientFile], 'cache-control': 'no-store' });
-      return response.end(readFileSync(join(import.meta.dirname, clientFile)));
+    if (clientFile !== null && CLIENT_FILES.has(clientFile)) {
+      response.writeHead(200, { 'content-type': contentType(clientFile), 'cache-control': 'no-store' });
+      return response.end(readFileSync(join(CLIENT_DIR, clientFile)));
     }
     let path;
     try {
@@ -71,7 +85,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
     if (found === null) return sendHtml(response, 404, injectClient(missingPage(pathname, preview.listing()), { missing: true }));
     const { output, page } = found;
     const body = output.from === undefined ? await output.render() : readFileSync(output.from);
-    if (extname(output.path) === '.html') return sendHtml(response, 200, injectClient(String(body), clientData(root, page)));
+    if (extname(output.path) === '.html') return sendHtml(response, 200, injectClient(String(body), clientData(root, page, token)));
     response.writeHead(200, { 'content-type': contentType(output.path), 'cache-control': 'no-store' });
     response.end(body);
   }
@@ -82,6 +96,21 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
     send(response, 'problems', problemsData(preview.problems()));
     clients.add(response);
     request.on('close', () => clients.delete(response));
+  }
+
+  async function answerParams(request, response) {
+    if (request.method !== 'POST') return sendJson(response, 405, { error: 'send the parameters with POST' });
+    if (!sameToken(request.headers[TOKEN_HEADER], token)) return sendJson(response, 403, { error: 'the request does not carry the token of this bake dev run; reload the page' });
+    if (!sameOrigin(request)) return sendJson(response, 403, { error: 'parameters can only be sent from a page that bake dev serves' });
+    if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) return sendJson(response, 415, { error: 'send the parameters as application/json' });
+    let body;
+    try {
+      body = JSON.parse(await readBody(request));
+    } catch (error) {
+      return sendJson(response, 400, { error: `cannot read the request: ${error.message}` });
+    }
+    const [status, data] = changeParams(root, preview, body);
+    sendJson(response, status, data);
   }
 
   let waiting = [];
@@ -105,7 +134,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
     })();
   };
 
-  const listenedPort = await listen(server, port);
+  const listenedPort = await listen(server, port, host);
   let stop;
   const stopped = new Promise((done) => {
     stop = done;
@@ -120,11 +149,13 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, print = co
   const stopWatching = watchBlog(root, changed, (error) => {
     close().then(() => stop(`bake dev: cannot watch ${root}: ${error.message}`));
   });
-  const url = `http://localhost:${listenedPort}/`;
+  const url = `http://${addressHost(host)}:${listenedPort}/`;
   if (listenedPort !== port && port !== 0) print(`Port ${port} is in use, using port ${listenedPort}`);
-  print([`Serving the blog at ${url}`, ...networkAddresses().map((address) => `On the local network: http://${address}:${listenedPort}/`)].join('\n'));
+  const network = WILDCARD_HOSTS.has(host) ? networkAddresses().map((address) => `On the local network: http://${address}:${listenedPort}/`) : [];
+  print([`Serving the blog at ${url}`, ...network].join('\n'));
 
   return {
+    address: server.address().address,
     port: listenedPort,
     url,
     stopped,
@@ -139,13 +170,40 @@ export function networkAddresses() {
     .map((entry) => entry.address);
 }
 
-async function listen(server, port) {
+function addressHost(host) {
+  if (WILDCARD_HOSTS.has(host) || isLoopback(host)) return 'localhost';
+  return isIPv6(host) ? `[${host}]` : host;
+}
+
+function isLoopback(host) {
+  return host === 'localhost' || host === '::1' || (isIPv4(host) && host.startsWith('127.'));
+}
+
+export function hostName(header) {
+  if (typeof header !== 'string' || header === '') return null;
+  const match = /^\[([^\]]*)\](?::\d*)?$/.exec(header) ?? /^([^:]*)(?::\d*)?$/.exec(header);
+  return (match === null ? header : match[1]).toLowerCase();
+}
+
+export function allowedHost(name, host) {
+  if (name === null) return false;
+  return name === 'localhost' || name.endsWith('.localhost') || isIP(name) !== 0 || name === host.toLowerCase();
+}
+
+function sameToken(sent, token) {
+  if (typeof sent !== 'string') return false;
+  const expected = Buffer.from(token);
+  const actual = Buffer.from(sent);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+async function listen(server, port, host) {
   const last = port === 0 ? 0 : port + PORT_ATTEMPTS - 1;
   for (let candidate = port; ; candidate += 1) {
     try {
       await new Promise((done, fail) => {
         server.once('error', fail);
-        server.listen(candidate, () => {
+        server.listen(candidate, host, () => {
           server.off('error', fail);
           done();
         });
@@ -158,22 +216,94 @@ async function listen(server, port) {
   }
 }
 
-function clientData(root, page) {
+function clientData(root, page, token) {
   if (page === null) return {};
-  return { source: pathToFileURL(join(root, page.file)).pathname, file: page.file, outline: JSON.stringify(page.outline) };
+  return {
+    source: pathToFileURL(join(root, page.file)).pathname,
+    file: page.file,
+    outline: JSON.stringify(page.outline),
+    version: page.version,
+    components: JSON.stringify(page.components),
+    token,
+  };
+}
+
+function changeParams(root, preview, body) {
+  const { file, version, line, name, params, write } = isPlainObject(body) ? body : {};
+  const page = typeof file === 'string' ? preview.page(file) : null;
+  if (page === null) return [404, { error: `${describeValue(file)} is not an article that bake dev serves` }];
+  const component = typeof name === 'string' ? preview.component(name) : null;
+  if (component === null) return [400, { error: `unknown component ${describeValue(name)}` }];
+  if (!isPlainObject(params)) return [400, { error: 'params must map each parameter name to its value' }];
+  let source;
+  try {
+    source = readFileSync(join(root, file), 'utf8');
+  } catch {
+    source = null;
+  }
+  if (source === null || sourceVersion(source) !== version) return [409, { error: `${file} changed after this page was built; save it in your editor and try again` }];
+  const result = rewriteSource(source, line, name, component.params, params, page.files);
+  if (result.error !== undefined) return [400, { error: `${file}:${line} ${result.error}` }];
+  if (write === true && result.source !== source) writeFileSync(join(root, file), result.source);
+  return [200, { line: result.line, version: sourceVersion(write === true ? result.source : source) }];
+}
+
+function sameOrigin(request) {
+  const { origin, host } = request.headers;
+  if (origin === undefined) return true;
+  try {
+    return typeof host === 'string' && new URL(origin).host === host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+function readBody(request) {
+  return new Promise((done, fail) => {
+    const chunks = [];
+    let size = 0;
+    request.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BYTES) {
+        fail(new Error('the request is larger than 1 MB'));
+        request.destroy();
+      } else {
+        chunks.push(chunk);
+      }
+    });
+    request.on('end', () => done(Buffer.concat(chunks).toString('utf8')));
+    request.on('error', fail);
+  });
+}
+
+function sendJson(response, status, data) {
+  response.writeHead(status, { 'content-type': contentType('data.json'), 'cache-control': 'no-store' });
+  response.end(JSON.stringify(data));
+}
+
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function injectClient(html, data) {
   const attributes = Object.entries(data)
     .map(([name, value]) => (value === true ? ` data-${name}` : ` data-${name}="${escapeMarkup(value)}"`))
     .join('');
-  const script = `<script src="${DEV_PREFIX}client.js" data-bake-dev${attributes}></script>`;
+  const script = `<script type="module" src="${DEV_PREFIX}client.js" data-bake-dev${attributes}></script>`;
+  // why: a module script runs after parsing in document order, so it goes first in the head to see the regions before the deferred theme scripts insert nodes into them
+  const head = /<head(?:\s[^>]*)?>/i.exec(html);
+  if (head !== null) return `${html.slice(0, head.index + head[0].length)}${script}${html.slice(head.index + head[0].length)}`;
   const end = html.lastIndexOf('</body>');
   return end === -1 ? `${html}${script}` : `${html.slice(0, end)}${script}${html.slice(end)}`;
 }
 
 function sendHtml(response, status, html) {
-  response.writeHead(status, { 'content-type': contentType('index.html'), 'cache-control': 'no-store' });
+  response.writeHead(status, {
+    'content-type': contentType('index.html'),
+    'cache-control': 'no-store',
+    'x-frame-options': 'SAMEORIGIN',
+    'content-security-policy': "frame-ancestors 'self'",
+  });
   response.end(html);
 }
 

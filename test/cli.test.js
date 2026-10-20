@@ -25,10 +25,37 @@ describe('bake cli', () => {
     assert.equal(result.stderr, 'bake.config.js:1:1 bake.config.js not found, run bake from the blog root\n');
   });
 
-  test('dev rejects a port that is not a number', () => {
-    const result = bake('dev', '--port', 'http');
-    assert.equal(result.status, 1);
-    assert.equal(result.stderr, 'Usage: bake dev [--port <number>]\n');
+  test('dev rejects a port that is not a number and options that are unknown, repeated or without a value', () => {
+    for (const args of [['--port', 'http'], ['--port', '70000'], ['--host'], ['--host', ''], ['--host', '--port'], ['--port', '0', '--port', '1'], ['--host', 'a', '--host', 'b'], ['--bind', '0.0.0.0']]) {
+      const result = bake('dev', ...args);
+      assert.equal(result.status, 1, args.join(' '));
+      assert.equal(result.stderr, 'Usage: bake dev [--port <number>] [--host <address>]\n', args.join(' '));
+    }
+  });
+
+  test('--help names the --host option of dev', () => {
+    assert.match(bake('--help').stdout, /^  --host <address> {3}Address that bake dev listens on, 127\.0\.0\.1 by default/m);
+  });
+
+  test('dev accepts --host and --port in either order and prints the network addresses only for a wildcard host', { timeout: 30000 }, async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const serve = async (args) => {
+      const child = spawn(process.execPath, [cli, 'dev', ...args], { cwd: dir });
+      t.after(() => child.kill());
+      let output = '';
+      child.stdout.on('data', (chunk) => {
+        output += chunk;
+        if (/Serving the blog at /.test(output)) setTimeout(() => child.kill('SIGINT'), 100);
+      });
+      const [code] = await once(child, 'exit');
+      assert.equal(code, 0, output);
+      return output;
+    };
+    const local = await serve(['--host', '127.0.0.1', '--port', '0']);
+    assert.match(local, /^Serving the blog at http:\/\/localhost:\d+\/\n/);
+    assert.doesNotMatch(local, /On the local network/);
+    const wildcard = await serve(['--port', '0', '--host', '0.0.0.0']);
+    assert.match(wildcard, /^Serving the blog at http:\/\/localhost:(\d+)\/\n(On the local network: http:\/\/[\d.]+:\1\/\n)*/);
   });
 
   test('dev prints the address it serves and stops on an interrupt', { timeout: 30000 }, async (t) => {
