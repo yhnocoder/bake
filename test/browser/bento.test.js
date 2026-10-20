@@ -101,7 +101,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the column count follows bento.columns in bake.config.js', async () => {
+  await t.test('the column count follows themes.bento.columns in bake.config.js', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);

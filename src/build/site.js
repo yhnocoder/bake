@@ -99,9 +99,8 @@ async function readSettings(root) {
   const errors = [];
   const themeNames = availableThemes(root);
   const themeOptions = await readThemeOptions(root, themeNames, errors);
-  if (errors.length > 0) return { errors };
   const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
-  if (config === null) return { errors };
+  if (config === null || errors.length > 0) return { errors };
   const preamble = await readMathPreamble(root, errors);
   const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const componentErrors = [];

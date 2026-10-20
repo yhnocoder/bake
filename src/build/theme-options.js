@@ -37,11 +37,11 @@ async function readOptions(root, name, path, errors) {
     ({ options } = await import(`${pathToFileURL(path).href}?version=${createHash('sha256').update(source).digest('hex')}`));
   } catch (error) {
     errors.push(errorAt(file, fileStart, `${name}: ${OPTIONS_FILE} cannot be read: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`));
-    return {};
+    return null;
   }
   if (typeof options !== 'object' || options === null || Array.isArray(options)) {
     errors.push(errorAt(file, fileStart, `${name}: ${OPTIONS_FILE} must export options, an object that maps each option name to its declaration, got ${describeValue(options)}`));
-    return {};
+    return null;
   }
   const count = errors.length;
   for (const [option, declaration] of Object.entries(options)) {
@@ -51,5 +51,5 @@ async function readOptions(root, name, path, errors) {
       errors.push(errorAt(file, fileStart, `${name}: the default of option "${option}" ${optionProblem(declaration, declaration.default)}`));
     }
   }
-  return errors.length === count ? options : {};
+  return errors.length === count ? options : null;
 }

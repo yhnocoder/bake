@@ -109,6 +109,7 @@ function validateThemeOptions(config, themes, optionProblem, report) {
   const written = section(config, 'themes', [...themes.keys()], report, (name) => `themes.${name} names no theme; the themes are ${[...themes.keys()].join(', ')}`);
   return Object.fromEntries(
     [...themes].map(([name, declarations]) => {
+      if (declarations === null) return [name, {}];
       const values = isPlainObject(written[name]) ? written[name] : {};
       if (written[name] !== undefined && !isPlainObject(written[name])) report(['themes', name], 'value', `themes.${name} must be an object, got ${describeValue(written[name])}`);
       else reportUnknownFields(values, Object.keys(declarations), ['themes', name], report);
