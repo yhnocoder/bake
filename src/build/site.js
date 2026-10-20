@@ -103,13 +103,15 @@ async function readSettings(root) {
 
 async function compileThemes(site, published, config, errors) {
   const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
-  const themes = new Map();
-  for (const name of [...names].sort()) {
+  const sorted = [...names].sort();
+  await Promise.all(sorted.map(async (name) => {
     const siteTheme = name === config.theme;
-    if (site.themes.get(name)?.siteTheme !== siteTheme) {
-      const themeErrors = [];
-      site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
-    }
+    if (site.themes.get(name)?.siteTheme === siteTheme) return;
+    const themeErrors = [];
+    site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
+  }));
+  const themes = new Map();
+  for (const name of sorted) {
     const { theme, errors: themeErrors } = site.themes.get(name);
     errors.push(...themeErrors);
     themes.set(name, theme);
