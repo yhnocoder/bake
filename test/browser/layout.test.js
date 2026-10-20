@@ -164,6 +164,37 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
+  await t.test('a fold inside an example and a change of the table of contents style measure no natural width again', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      window.naturalWidthProbes = 0;
+      const append = Element.prototype.append;
+      Element.prototype.append = function (...nodes) {
+        window.naturalWidthProbes += nodes.filter((node) => node instanceof HTMLElement && node.style.width === 'var(--natural-width)').length;
+        return append.apply(this, nodes);
+      };
+    });
+    await page.goto(`${origin}/2026-10/syntax/`);
+    await settle(page);
+    const probes = async (action) => {
+      await page.evaluate(() => (window.naturalWidthProbes = 0));
+      await action();
+      await settle(page);
+      return page.evaluate(() => window.naturalWidthProbes);
+    };
+    const fold = page.locator('.bk-block[data-type="example"] .example-result details.fold > summary').first();
+    await fold.scrollIntoViewIfNeeded();
+    await settle(page);
+    assert.equal(await probes(() => fold.click()), 0);
+    assert.equal(await probes(() => fold.click()), 0);
+    await page.getByRole('button', { name: '设置' }).click();
+    const styles = page.locator('.bk-settings-panel [role="radio"]');
+    await styles.nth(2).click();
+    await settle(page);
+    assert.equal(await probes(() => styles.nth(0).click()), 0);
+    await page.close();
+  });
+
   await t.test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async () => {
     const page = await open('widths');
     const measure = () =>

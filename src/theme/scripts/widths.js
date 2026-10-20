@@ -27,7 +27,7 @@ function resolve(block, width) {
   if (block.dataset.resolved !== width) block.dataset.resolved = width;
 }
 
-function declaresNaturalWidth(block) {
+export function declaresNaturalWidth(block) {
   return getComputedStyle(block).getPropertyValue('--natural-width').trim() !== '';
 }
 

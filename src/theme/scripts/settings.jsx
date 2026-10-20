@@ -9,9 +9,9 @@ export const SETTING_EVENT = 'bk:setting';
 const THEME_EVENT = 'bake:theme';
 
 export const settingRows = [
-  { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], list: true, changesLayout: true },
+  { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], list: true, layout: {} },
   { name: 'theme', label: (labels) => labels.theme, option: (labels, value) => labels.themes[value] },
-  { name: 'font', label: (labels) => labels.font, option: (labels, value) => labels.fonts[value], changesLayout: true },
+  { name: 'font', label: (labels) => labels.font, option: (labels, value) => labels.fonts[value], layout: { arrange: true } },
   { name: 'buttons', label: (labels) => labels.buttons, toggle: { on: 'autohide', off: 'always', text: (labels) => labels.hideButtons } },
 ];
 
@@ -29,7 +29,8 @@ export function chooseSetting(name, value) {
   values[name][1](value);
   document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
   if (name === 'theme') document.dispatchEvent(new CustomEvent(THEME_EVENT));
-  if (settingRows.find((row) => row.name === name)?.changesLayout) requestLayout({ arrange: true });
+  const layout = settingRows.find((row) => row.name === name)?.layout;
+  if (layout !== undefined) requestLayout(layout);
 }
 
 export function startSettings() {

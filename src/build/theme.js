@@ -1,9 +1,9 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { build } from 'vite';
 import solid from 'vite-plugin-solid';
 import { publicModules } from '../bundle/modules.js';
-import { browserBuild, compileProblem, outputOf, viteConfig } from '../bundle/vite.js';
+import { blogPath, browserBuild, compileProblem, isInBlog, outputOf, viteConfig } from '../bundle/vite.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
 import { errorAt, fileStart } from '../report.js';
 
@@ -18,6 +18,9 @@ export const THEME_STYLES_PATH = '_bake/theme.css';
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const SHARED_DIR = join(import.meta.dirname, '../theme');
 const SHARED_MODULE = 'bake/theme';
+const SHARED_INDEX = join(SHARED_DIR, 'index.jsx');
+const RE_EXPORT = /export \{([^}]*)\} from '([^']+)'/g;
+const MISSING_BINDING = /"([^"]+)" is not exported/;
 const SHARED_EXPORTS = new Map([
   ['', 'index.jsx'],
   ['/client', 'client.js'],
@@ -56,7 +59,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
       script: client.entry,
     };
   } catch (error) {
-    errors.push(compileError(root, name, error));
+    errors.push(missingExport(root, error, locateShared) ?? compileError(root, name, error));
     return null;
   }
 }
@@ -127,6 +130,22 @@ function serverConfig(alias, locate, siteTheme) {
     ssr: { noExternal: true },
     build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { codeSplitting: false } } },
   };
+}
+
+function missingExport(root, error, locateShared) {
+  const cause = error.errors?.[0] ?? error;
+  if (cause.code !== 'MISSING_EXPORT') return null;
+  const binding = MISSING_BINDING.exec(cause.message)?.[1];
+  const exporter = cause.exporter === SHARED_INDEX ? reExportSource(binding, locateShared) : cause.exporter;
+  if (!isInBlog(root, exporter)) return null;
+  return errorAt(blogPath(root, exporter), fileStart, `the theme imports "${binding}" from this file, which does not export it`);
+}
+
+function reExportSource(binding, locateShared) {
+  for (const [, names, source] of readFileSync(SHARED_INDEX, 'utf8').matchAll(RE_EXPORT)) {
+    if (names.split(',').some((entry) => entry.trim().split(/\s+as\s+/).at(-1) === binding)) return locateShared(relative(SHARED_DIR, resolve(SHARED_DIR, source)));
+  }
+  return null;
 }
 
 function compileError(root, name, error) {

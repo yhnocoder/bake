@@ -1,5 +1,6 @@
 import { CONTENT_EVENT, oncePerFrame } from './motion.js';
 import { leftColumnScreen, notesColumnScreen, phoneScreen } from './screens.js';
+import { declaresNaturalWidth } from './widths.js';
 
 export const LAYOUT_EVENT = 'bk:layout';
 const REACHING_BLOCKS = '.bk-block[data-resolved="wide"], .bk-block[data-resolved="page"]';
@@ -45,13 +46,13 @@ export function startLayout(article, arrangements) {
   addEventListener('resize', () => schedule(true));
   for (const screen of [leftColumnScreen, notesColumnScreen, phoneScreen]) screen.addEventListener('change', () => schedule(true, true));
   document.fonts.ready.then(() => schedule(true, true));
-  document.fonts.addEventListener('loadingdone', () => schedule(true, true));
+  document.fonts.addEventListener('loadingdone', () => document.fonts.ready.then(() => schedule(true, true)));
   document.addEventListener(CONTENT_EVENT, () => schedule(true, true));
   article.addEventListener(
     'toggle',
     (event) => {
-      const widthBlock = event.target.closest(WIDTH_BLOCKS) !== null;
-      schedule(widthBlock, widthBlock);
+      const block = event.target.closest(WIDTH_BLOCKS);
+      schedule(block !== null && !declaresNaturalWidth(block));
     },
     true,
   );

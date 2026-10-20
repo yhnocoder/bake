@@ -280,6 +280,16 @@ describe('themes', () => {
     assert.equal(result.stderr, 'themes/essay/header.jsx:2:40 Unterminated regular expression.\n1 error, dist/ was not written\n');
   });
 
+  test('reports a file of the blog that replaces a file of bake/theme without an export the theme imports at that file', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'themes/essay/labels.js': 'export const nothing = 1;\n',
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, 'themes/essay/labels.js:1:1 the theme imports "labelsFor" from this file, which does not export it\n1 error, dist/ was not written\n');
+  });
+
   test('reports an article that the theme cannot render', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
