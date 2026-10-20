@@ -26,10 +26,12 @@ export function checkDeclarations(module) {
   return { params, layout: layout ?? {}, problems };
 }
 
-function paramProblems(name, declaration) {
-  const subject = `parameter "${name}"`;
-  if (RESERVED_PARAMS.includes(name)) return [`${subject} uses a name reserved for Bake; a component cannot declare ${listChoices(RESERVED_PARAMS)}`];
-  if (!PARAM_NAME.test(name)) return [`${subject} cannot be written as a Markdown attribute; use letters, digits, "_" and "-", starting with a letter or "_"`];
+const PARAMETER = { noun: 'parameter', reserved: RESERVED_PARAMS, written: 'as a Markdown attribute', setter: 'the article' };
+
+export function paramProblems(name, declaration, { noun, reserved, written, setter } = PARAMETER) {
+  const subject = `${noun} "${name}"`;
+  if (reserved.includes(name)) return [`${subject} uses a name reserved for Bake; a component cannot declare ${listChoices(reserved)}`];
+  if (!PARAM_NAME.test(name)) return [`${subject} cannot be written ${written}; use letters, digits, "_" and "-", starting with a letter or "_"`];
   if (!isPlainObject(declaration)) return [`${subject} must be declared as an object such as { label: 'Range', type: 'number', default: 4 }, got ${describeValue(declaration)}`];
   if (!PARAM_TYPES.includes(declaration.type)) return [`${subject} has the type ${describeValue(declaration.type)}; use ${listChoices(PARAM_TYPES)}`];
   const problems = [];
@@ -55,7 +57,7 @@ function paramProblems(name, declaration) {
     }
   }
   if (problems.length > 0) return problems;
-  if (!Object.hasOwn(declaration, 'default')) return [`${subject} needs a default, the value used when the article does not set it`];
+  if (!Object.hasOwn(declaration, 'default')) return [`${subject} needs a default, the value used when ${setter} does not set it`];
   const problem = valueProblem(declaration, declaration.default);
   return problem === null ? [] : [`the default of ${subject} ${problem}`];
 }

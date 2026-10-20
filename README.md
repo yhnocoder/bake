@@ -80,7 +80,7 @@ export default {
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
 | `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
-| `bento` | no | `{ columns }`: number of card columns in the `bento` theme on wide screens, an integer from 1 to 6. The default is 4. |
+| `themes` | no | The options of each theme, keyed by the theme name. The `bento` theme has one option, `columns`: the number of card columns on wide screens, an integer from 1 to 6, 4 by default, written as `themes: { bento: { columns: 4 } }`. A theme of the blog declares its options in `options.js` in its folder. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
 

@@ -63,7 +63,7 @@ function cards(html) {
 
 test('the bento theme renders each ## section as a card whose span follows its width', (t) => {
   const dir = createBlog(t, {
-    'bake.config.js': config(", bento: { columns: 5 }"),
+    'bake.config.js': config(", themes: { bento: { columns: 5 } }"),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body }),
   });
   const result = bake(dir, 'build');

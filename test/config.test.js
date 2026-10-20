@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { loadBakeConfig } from '../src/config/bake-config.js';
 import { availableThemes } from '../src/config/rules.js';
+import { readThemeOptions } from '../src/config/theme-options.js';
 import { formatError, sortErrors } from '../src/report.js';
 import { createBlog } from './blog.js';
 
 async function load(t, files) {
   const dir = createBlog(t, files);
   const errors = [];
-  const config = await loadBakeConfig(dir, availableThemes(dir), errors);
+  const themes = await readThemeOptions(dir, availableThemes(dir), errors);
+  const config = await loadBakeConfig(dir, themes, errors);
   return { config, lines: sortErrors(errors).map(formatError) };
 }
 
@@ -25,7 +27,7 @@ describe('bake.config.js', () => {
       language: 'en',
       theme: 'essay',
       toc: 'notes',
-      bento: { columns: 4 },
+      themes: { essay: {}, bento: { columns: 4 } },
       home: { columns: 3, groupBy: 'month' },
       categories: [],
     });
@@ -84,11 +86,13 @@ describe('bake.config.js', () => {
     ["url: @'ftp://example.com'", 'url must be an absolute http or https URL, got "ftp://example.com"'],
     ["theme: @'paper'", 'theme must be essay or bento, got "paper"'],
     ["toc: @'sidebar'", 'toc must be notes, tabs, dots or ticks, got "sidebar"'],
-    ['bento: @4', 'bento must be an object, got 4'],
-    ['bento: { columns: @0 }', 'bento.columns must be an integer from 1 to 6, got 0'],
-    ['bento: { columns: @7 }', 'bento.columns must be an integer from 1 to 6, got 7'],
-    ['bento: { columns: @100 }', 'bento.columns must be an integer from 1 to 6, got 100'],
-    ['bento: { columns: @2.5 }', 'bento.columns must be an integer from 1 to 6, got 2.5'],
+    ['themes: @4', 'themes must be an object, got 4'],
+    ['themes: { bento: @4 }', 'themes.bento must be an object, got 4'],
+    ['themes: { bento: { columns: @0 } }', 'themes.bento.columns must be between 1 and 6, got 0'],
+    ['themes: { bento: { columns: @7 } }', 'themes.bento.columns must be between 1 and 6, got 7'],
+    ['themes: { bento: { columns: @100 } }', 'themes.bento.columns must be between 1 and 6, got 100'],
+    ['themes: { bento: { columns: @2.5 } }', 'themes.bento.columns must be a whole number from 1 to 6, got 2.5'],
+    ["themes: { bento: { columns: @'4' } }", 'themes.bento.columns must be a number, got "4"'],
     ["home: @'grid'", 'home must be an object, got "grid"'],
     ['home: { columns: @6 }', 'home.columns must be 3, 4 or 5, got 6'],
     ["home: { groupBy: @'year' }", 'home.groupBy must be category or month, got "year"'],
@@ -132,7 +136,7 @@ describe('bake.config.js', () => {
       'export default {',
       `  ${base},`,
       '  colour: 1,',
-      '  bento: { columns: 4, rows: 2 },',
+      '  themes: { bento: { columns: 4, rows: 2 }, paper: {} },',
       "  categories: [{ id: 'ml', name: 'ML', color: '#000000', icon: 'x' }],",
       '};',
       '',
@@ -140,8 +144,38 @@ describe('bake.config.js', () => {
     const { lines } = await load(t, { 'bake.config.js': source });
     assert.deepEqual(lines, [
       'bake.config.js:3:3 unknown config field "colour"',
-      'bake.config.js:4:24 unknown config field "bento.rows"',
+      'bake.config.js:4:34 unknown config field "themes.bento.rows"',
+      'bake.config.js:4:45 themes.paper names no theme; the themes are essay, bento',
       'bake.config.js:5:58 unknown config field "categories[0].icon"',
+    ]);
+  });
+
+  test('reports the top-level bento field and names its place under themes', async (t) => {
+    const { config, lines } = await load(t, { 'bake.config.js': `export default {\n  ${base},\n  bento: { columns: 4 },\n};\n` });
+    assert.equal(config, null);
+    assert.deepEqual(lines, ['bake.config.js:3:3 unknown config field "bento"; theme options are written under themes, such as themes: { bento: { columns: 4 } }']);
+  });
+
+  test('reads the options that a theme of the blog declares and fills in their defaults', async (t) => {
+    const options = "export const options = { density: { label: 'Density', type: 'enum', options: ['loose', 'tight'], default: 'loose' }, rule: { label: 'Rule', type: 'boolean', default: true } };\n";
+    const { config, lines } = await load(t, { 'bake.config.js': `export default { ${base}, themes: { mine: { density: 'tight' } } };\n`, 'themes/mine/options.js': options });
+    assert.deepEqual(lines, []);
+    assert.deepEqual(config.themes, { essay: {}, bento: { columns: 4 }, mine: { density: 'tight', rule: true } });
+  });
+
+  test('reports a wrong option value of a blog theme with the field and the allowed values', async (t) => {
+    const options = "export const options = { density: { label: 'Density', type: 'enum', options: ['loose', 'tight'], default: 'loose' } };\n";
+    const { lines } = await load(t, { 'bake.config.js': `export default {\n  ${base},\n  themes: { mine: { density: 'dense' } },\n};\n`, 'themes/mine/options.js': options });
+    assert.deepEqual(lines, ['bake.config.js:3:30 themes.mine.density must be one of loose or tight, got "dense"']);
+  });
+
+  test('reports problems in the options of a theme at the start of its options.js', async (t) => {
+    const options = "export const options = { size: { label: 'Size', type: 'number', min: 1, max: 3, default: 5 }, data: { label: 'Data', type: 'file', default: 'a.json' }, plain: { type: 'text', default: '' } };\n";
+    const { lines } = await load(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': options });
+    assert.deepEqual(lines, [
+      'themes/mine/options.js:1:1 mine: the default of option "size" must be between 1 and 3, got 5',
+      'themes/mine/options.js:1:1 mine: option "data" has the type "file"; a theme option is set in bake.config.js and cannot name a file of an article',
+      'themes/mine/options.js:1:1 mine: option "plain" needs a label, the text shown next to its control',
     ]);
   });
 

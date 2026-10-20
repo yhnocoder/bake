@@ -4,6 +4,7 @@ import { chatBundle } from '../chat/bundle.js';
 import { bundleComponents } from '../components/bundle.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
+import { readThemeOptions } from '../config/theme-options.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
@@ -93,7 +94,9 @@ function shownPages(articles, pages, lastGood, config, errors) {
 async function readSettings(root) {
   const errors = [];
   const themeNames = availableThemes(root);
-  const config = await loadBakeConfig(root, themeNames, errors);
+  const themeOptions = await readThemeOptions(root, themeNames, errors);
+  if (errors.length > 0) return { errors };
+  const config = await loadBakeConfig(root, themeOptions, errors);
   if (config === null) return { errors };
   const preamble = await readMathPreamble(root, errors);
   const componentErrors = [];
@@ -125,13 +128,14 @@ function shareImagesOf(root, pages, config, assetFiles, errors) {
 }
 
 function siteProps(config) {
-  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url), bento: { columns: config.bento.columns } };
+  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
 }
 
 function homeOutput(entries, { config, themes, chat }, errors) {
   const html = renderSitePage(config, themes, 'the homepage', errors, (theme) =>
     theme.renderHome({
       site: siteProps(config),
+      options: config.themes[config.theme],
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
       assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', theme.scripts), modules: assetLinks('', [chat.entry]) },
@@ -144,6 +148,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
   const html = renderSitePage(config, themes, 'the 404 page', errors, (theme) =>
     theme.renderNotFound({
       site: siteProps(config),
+      options: config.themes[config.theme],
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
       assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, theme.scripts) },
     }),
@@ -301,6 +306,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
   const root = pageRoot(entry.url);
   const props = {
     site: siteProps(config),
+    options: config.themes[name],
     article: {
       title: entry.title,
       summary: entry.summary,
