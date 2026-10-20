@@ -19,7 +19,7 @@ import { indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
+import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
 
 const PUBLIC_DIR = 'public';
 
@@ -138,7 +138,7 @@ function homeOutput(entries, { config, themes, chat }, errors) {
       site: siteProps(config),
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
-      assets: { root: './', styles: theme.styles, scripts: theme.scripts, modules: [chat.entry] },
+      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', theme.scripts), modules: assetLinks('', [chat.entry]) },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -149,10 +149,14 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
     theme.renderNotFound({
       site: siteProps(config),
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
-      assets: { root: base, styles: theme.styles.map((path) => `${base}${path}`), scripts: theme.scripts.map((path) => `${base}${path}`) },
+      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, theme.scripts) },
     }),
   );
   return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
+}
+
+function assetLinks(root, paths) {
+  return paths.map((path) => `${root}${encodePath(path)}`);
 }
 
 function renderSitePage(config, themes, label, errors, render) {
@@ -317,9 +321,9 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
     },
     assets: {
       root,
-      styles: theme.styles.map((path) => `${root}${path}`),
-      scripts: theme.scripts.map((path) => `${root}${path}`),
-      modules: [...(content.components.length === 0 || bundle === null ? [] : [`${root}${bundle.runtime}`]), `${root}${chat.entry}`],
+      styles: assetLinks(root, theme.styles),
+      scripts: assetLinks(root, theme.scripts),
+      modules: assetLinks(root, [...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

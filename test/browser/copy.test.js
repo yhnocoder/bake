@@ -235,9 +235,13 @@ test('copying from an article gives the Markdown source of the selection', async
   await context.close();
 });
 
-test('a converted citation keeps its key as written, also when the key contains a percent sign', async (t) => {
-  const body = 'Gates help [@a%zz] and [@b%20c] here.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n';
-  const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
+test('a converted citation, reference entry and internal link keep a key or an anchor with a percent sign as written', async (t) => {
+  const body = '## Keys {#a%zz}\n\nGates help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/rope/#a%25zz) too.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n';
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body }),
+    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: ':::embed\n/2026-10/rope/#a%25zz\n:::\n' }),
+  });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
@@ -247,8 +251,11 @@ test('a converted citation keeps its key as written, also when the key contains 
   const page = await context.newPage();
   await page.goto(`${base}/2026-10/rope/`);
   const paragraph = '.bk-article p';
-  await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' here', after: true });
-  assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here');
+  await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' too', after: true });
+  assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/rope/#a%25zz) too');
+  await page.goto(`${base}/2026-10/host/`);
+  await select(page, { selector: '.embed li', contains: 'First', text: 'irst' }, { selector: '.embed li', contains: 'Second', text: 'Sec', after: true });
+  assert.equal((await copied(page)).text, ':::references\n- [@a%zz] irst.\n- [@b%20c] Sec\n:::');
   await context.close();
 });
 

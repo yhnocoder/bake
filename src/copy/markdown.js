@@ -1,3 +1,5 @@
+import { fragmentOf, idOfFragment } from '../fragments.js';
+
 export const UI = '[data-ui]';
 
 export const NOTE = '[data-sidenote][data-line]';
@@ -207,8 +209,8 @@ export class MarkdownWriter {
     if (element.matches(UI) || element.matches(NOTE) || element.matches('.component-box, svg, script, template')) return '';
     if (element.matches('mjx-container[data-tex]')) return element.getAttribute('display') === 'true' ? `$$${element.dataset.tex.trim()}$$` : `$${element.dataset.tex.trim()}$`;
     if (element.matches('sup.sidenote-ref[data-sidenote]')) return `[^${this.addNote(element.dataset.sidenote)}]`;
-    if (element.matches('a.citation')) return `[@${anchorOf(element.getAttribute('href')).replace(/^reference-/, '')}]`;
-    if (element.matches('a.eqref')) return `\\eqref{${decodeURIComponent(anchorOf(element.getAttribute('href')))}}`;
+    if (element.matches('a.citation')) return `[@${element.dataset.key}]`;
+    if (element.matches('a.eqref')) return `\\eqref{${idOfFragment(hashOf(element.getAttribute('href')))}}`;
     if (element.matches('br')) return '\\\n';
     if (element.matches('img')) return `![${element.getAttribute('alt') ?? ''}](${element.getAttribute('src')})${attributeText(element.style.width === '' ? {} : { width: element.style.width })}`;
     if (element.matches('input[type="checkbox"]')) return element.checked ? '[x] ' : '[ ] ';
@@ -219,7 +221,7 @@ export class MarkdownWriter {
     if (element.matches('strong, b')) return wrap('**', inner);
     if (element.matches('em, i, cite')) return wrap('*', inner);
     if (element.matches('del, s')) return wrap('~~', inner);
-    if (element.matches('a[href]')) return `[${inner}](${element.dataset.target ?? element.getAttribute('href')})`;
+    if (element.matches('a[href]')) return `[${inner}](${element.dataset.target === undefined ? element.getAttribute('href') : siteAddress(element.dataset.target)})`;
     if (element.matches(BLOCK)) return `${this.blocks(element)}\n`;
     return inner;
   }
@@ -253,7 +255,7 @@ export class MarkdownWriter {
   references(element) {
     const items = [...element.children]
       .filter((item) => item.matches('li') && this.hasSelection(item))
-      .map((item) => `- [@${(item.id || '').replace(/^reference-/, '')}] ${this.inline(item.querySelector('p') ?? item).trim()}`);
+      .map((item) => `- [@${item.dataset.key}] ${this.inline(item.querySelector('p') ?? item).trim()}`);
     return fence('references', {}, items.join('\n'));
   }
 
@@ -349,8 +351,13 @@ function indexOf(node) {
   return [...node.parentNode.childNodes].indexOf(node);
 }
 
-function anchorOf(href) {
-  return href.slice(href.indexOf('#') + 1);
+function hashOf(href) {
+  return href.slice(href.indexOf('#'));
+}
+
+function siteAddress(target) {
+  const hash = target.indexOf('#');
+  return hash === -1 ? target : `${target.slice(0, hash)}${fragmentOf(target.slice(hash + 1))}`;
 }
 
 function escapeText(text, inCell, mark) {

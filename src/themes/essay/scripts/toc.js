@@ -36,10 +36,10 @@ export function startToc(article) {
     article,
     jumping: () => jumping,
     state: () => state,
-    go(id) {
+    go(hash) {
       jumping = true;
       view.jumped?.();
-      followLink(`#${encodeURIComponent(id)}`).then(() =>
+      followLink(hash).then(() =>
         requestAnimationFrame(() => {
           jumping = false;
           update();
@@ -92,7 +92,7 @@ export function startToc(article) {
     const link = event.target.closest('a[href^="#"]');
     if (link === null) return;
     event.preventDefault();
-    context.go(decodeURIComponent(link.getAttribute('href').slice(1)));
+    context.go(link.getAttribute('href'));
   };
   nav.addEventListener('click', onClick);
   host.addEventListener('click', onClick);

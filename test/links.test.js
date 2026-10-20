@@ -179,7 +179,7 @@ describe('preview content', () => {
     const [section, paragraph, start, inside] = article.previews.map((preview) => outline(preview.html));
     assert.equal(
       section,
-      '<p>Let $y = f(u)$ and $u = g(x)$, then</p>\n$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$\n<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
+      '<p>Let $y = f(u)$ and $u = g(x)$, then</p>\n$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$\n<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-key="griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
     );
     assert.equal(paragraph, section.slice(section.lastIndexOf('<p>')));
     assert.equal(start, '<p>Intro paragraph.</p>');
@@ -223,7 +223,7 @@ describe(':::embed', () => {
         '<div class="embed"><div class="embed-part"><h2 data-attributes="{&#x22;id&#x22;:&#x22;chain-rule&#x22;}">Chain rule</h2>',
         '<p>Let $y = f(u)$ and $u = g(x)$, then</p>',
         '$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$',
-        '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
+        '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-key="griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
         '<p>A fourth block.</p>',
         '<h3 data-attributes="{&#x22;id&#x22;:&#x22;inside&#x22;}">Inside</h3>',
         '<p>Text inside.</p><p class="embed-source"><a href="../../2026-10/target/#chain-rule"><cite>Target</cite><span class="embed-number">1</span></a></p></div><div class="embed-part"><p>Intro paragraph.</p><p class="embed-source"><a href="../../2026-10/target/#opening"><cite>Target</cite></a></p></div></div>',
@@ -291,7 +291,7 @@ describe(':::embed', () => {
     const all = ids(html);
     assert.deepEqual(all.filter((id, index) => all.indexOf(id) !== index), []);
     assert.deepEqual(all.sort(), ['marker', 'reference-k']);
-    assert.match(article.intro[1].html, /<a class="citation" href="\.\.\/\.\.\/2026-10\/cited\/#reference-k" data-target="\/2026-10\/cited\/#reference-k">\[1\]<\/a>/);
+    assert.match(article.intro[1].html, /<a class="citation" href="\.\.\/\.\.\/2026-10\/cited\/#reference-k" data-key="k" data-target="\/2026-10\/cited\/#reference-k">\[1\]<\/a>/);
     assert.deepEqual(
       article.previews.map(({ target, kind, number, html: text }) => ({ target, kind, number, text })),
       [{ target: '/2026-10/cited/#reference-k', kind: 'reference', number: '1', text: 'The source entry.' }],

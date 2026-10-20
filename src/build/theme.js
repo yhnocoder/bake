@@ -16,8 +16,10 @@ export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const RENDER_ENTRY = 'bake:render';
-const COPY_MODULE = 'bake/copy';
-const COPY_FILE = join(import.meta.dirname, '../copy/copy.js');
+const BAKE_MODULES = new Map([
+  ['bake/copy', join(import.meta.dirname, '../copy/copy.js')],
+  ['bake/fragments', join(import.meta.dirname, '../fragments.js')],
+]);
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const RELATIVE_IMPORT = /^\.\.?[/]/;
 const CSS_IMPORT = /@import\s+(?:url\(\s*(['"]?)(\.\.?[/][^'"()\s]+)\1\s*\)|(['"])(\.\.?[/][^'"]+)\3)/gi;
@@ -79,7 +81,7 @@ function themeFiles(folders, locate) {
     name: 'bake-theme-files',
     enforce: 'pre',
     resolveId(source, importer) {
-      return source === COPY_MODULE ? COPY_FILE : resolveThemeFile(source, importer);
+      return BAKE_MODULES.get(source) ?? resolveThemeFile(source, importer);
     },
     transform(code, id) {
       if (!id.endsWith('.css')) return null;
