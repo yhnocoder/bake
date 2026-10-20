@@ -96,6 +96,99 @@ Write the design into this file under "Theme and core design" before implementin
 - Layout: widths decided at build time or with container queries where possible; runtime measurement only for the table of contents.
 - Copy as Markdown: slice the source using source positions on rendered nodes instead of converting rendered HTML back to Markdown.
 
+### Theme and core design
+
+Checked against the code at commit `e8cfe85`. Each part names its choice, the reason and what is deleted.
+
+### Ownership
+
+- Core (`src/build`, `src/config`, `src/markdown`, `src/render`, `src/components`, `src/chat`, `src/copy`, `src/dev`) owns the article structure, including the headings with their `toc` titles and recaps, which any theme may show; the configuration fields every site has; the validation of the options a theme declares; the component declarations and runtime; the AI chat; copying as Markdown; the generated client entry with its lifecycle; and the prepaint script. The chat stays on every article page and the homepage for every theme, because it is configured in `bake.config.js` as a feature of the site.
+- The shared theme layer `src/theme` stays, published as `bake/theme`, `bake/theme/client`, `bake/theme/settings` and `bake/theme/styles/*.css`. It holds the parts that both built-in themes use and a blog theme may use: the document shell with the edge areas, the header, blocks, sidenotes, the homepage, the 404 page, the settings panel, the five reading settings (color scheme, font, size, weight, spacing), the tokens including the motion tokens, the block styles, sidenote highlighting and the shared client modules. It knows nothing of a table of contents, a notes column or column widths.
+- A theme owns its page layout and the values of the width variables, its options and reader settings, its client modules and the labels only it uses. The essay table of contents labels, the `.bk-toc-*` rules in `src/theme/styles/settings.css` and `print.css`, the layout variables of `src/theme/styles/page.css` and its `:root[data-script]:not([data-toc='notes'])` rule move to `src/themes/essay`.
+
+### Options and reader settings
+
+One mechanism: `options.js` in the theme folder exports `options` and `settings`. It stays a data module without imports, which the build imports in Node as `src/build/theme-options.js` does today.
+- `options` are declared like component parameters and checked by the existing `paramProblems`. They are written in `bake.config.js` under `themes.<name>`, and in the front matter of an article that uses the theme, by their name. An option named like a core front matter field is reported in `options.js`. Essay declares `toc` (`notes`, `tabs`, `dots` or `ticks`, default `notes`); bento keeps `columns` and `rowHeight`.
+- `settings` are the reader settings a theme adds to the shared reading settings: `{ values, default, control }`, where `default` is a value or `{ option: 'toc' }` and `control` is `segmented`, `switch` or `list`. Essay declares `toc` (a list whose default is the article's `toc` option) and `buttons` (a switch). Bento declares none.
+- Consumers: `src/config/bake-config.js` drops the top-level `toc` field and keeps `validateThemeOptions`. `src/config/front-matter.js` reads `theme` first and accepts the options of that theme instead of `toc`. `src/build/site.js` passes `options`, the site values merged with the article values, and drops `article.toc`. `ArticleDocument` receives the declarations and writes the initial `data-<name>` attributes and the prepaint script from them, replacing the global `SETTINGS` of `src/theme/settings.js`. The theme client passes its `settings` to `startSettings(settings, { drawings })`, which builds the rows from the declarations; the drawings of the table of contents styles move to essay.
+- Deleted: `TOC_STYLES` in `src/choices.js`, the `toc` and `buttons` entries of `SETTINGS` and `settingRows`, `data-default-toc`, and `toc` in the core field lists.
+
+### Public theme interface and customization
+
+- Files: `page.jsx` (default export, props `site`, `article`, `assets`, `options`), `client.jsx` (default export `start(document)`, which returns a dispose function), and for the site theme `home.jsx`, `not-found.jsx` and `theme.css`; `fonts.css` and `options.js` are optional.
+- The built-in themes become public modules: `bake/themes/essay` exports `Page`, `Article` and `Toc`, `bake/themes/bento` exports `Page` and `Article`, and each has `/client`, `/options` and `/styles/*.css`.
+- A blog customizes a built-in theme with a theme folder of another name whose files import the parts they keep from `bake/themes/essay` and replace the others, such as a `page.jsx` that renders its own header. A blog folder named `themes/essay` or `themes/bento` is an error that names this way. Reason: one explicit way, and every error is an ordinary compile error at a file of the blog.
+- Deleted from `src/build/theme.js`: the lookup of a file in the blog folder, then the built-in folder, then the shared folder (`themeFolders`, `fileLocator`, `locateShared`, the resolver in `themeFileAlias` apart from the module aliases), `missingExport`, `reExportSource`, `RE_EXPORT` and `isShared`.
+
+### CSS boundary for components
+
+`@scope (.bk-article) to (.component-box)`, and `@scope (body) to (.component-box)` for the element rules of `page.css` such as `a`, `button` and `:focus`. Reason: `@scope` is supported by Chrome 118, Safari 17.4 and Firefox 146 (December 2025); a shadow root would need every component stylesheet and the kit CSS, which Vite loads into the document with each component chunk, adopted into each root, and selection, copying and MathJax glyphs referenced with `<use>` do not cross a shadow root. The guards sat inside `:where()`, so specificities do not change; a scoped rule now wins over an unscoped rule of equal specificity regardless of order. Rules for `.component-box` itself stay outside the scope. Deleted: the 157 `:where(:not(.component-box *))` guards (102 in `blocks.css`, 27 in `page.css`, 18 in `bento.css`, 8 in `print.css`, 2 in `notes.css`).
+
+### Container properties for block styles
+
+`blocks.css` reads custom properties for what a container changes: block and formula margins, the frame padding, border, radius, background and shadow, the wrapping of code lines and table cells, and the width variables `--body-width`, `--wide-width`, `--page-width` and `--page-shift`, which default to the full width. Bento sets them on `.bt-shell` and `.bt-card`, so the undo rules in `bento.css` lines 16-21 and 187-238 go. The `!important` rules in the print block of `bento.css` undo the inline `width`, `height` and `transform` that `src/themes/bento/scripts/spans.js` sets; the placement writes custom properties instead, which only `@media screen` rules read.
+
+### Edge areas
+
+`ArticleDocument` and the homepage render two fixed containers, `[data-edge="start"]` at the bottom left and `[data-edge="end"]` at the bottom right, which stack their children in a column. The settings button and the essay table of contents handle mount into the start area; the chat host and the `bake dev` overlay buttons mount into the end area. A theme hides an area with `data-hidden` on its container, which essay sets while it hides the buttons on scroll and while the drawer is open. The chat positions its bubbles from its host box. A theme that does not use `ArticleDocument` renders both containers itself. Deleted: `--chat-hidden`, `--chat-visibility`, `--chat-bottom`, `--chat-right` and their readers in `src/chat/entry.css`, `bubbles.css` and `src/dev/client/overlay.css`, the `@container style(--chat-visibility: hidden)` rule, the `bk-buttons-hidden` class and essay `toc.css` lines 1157-1172.
+
+### Motion tokens
+
+`tokens.css` defines `--motion-fast`, `--motion` and `--motion-slow` durations, `--ease`, and `--motion-distance`, a factor for translations. Under `prefers-reduced-motion: reduce` the durations become `0s` and the factor `0`, while `--fade`, the opacity fade of the settings panel, the toast and the edge areas, keeps its duration as today. Every transition and animation in the theme, chat, kit and dev CSS uses the tokens; custom properties reach the chat shadow root and the components by inheritance. Scripts keep `reducedMotion` for scrolling. Deleted: the rule in `page.css` lines 401-408, essay `toc.css` lines 1175-1189 and the reduced motion blocks of `blocks.css`, `home.css`, `settings.css`, the chat, the kit and the dev client.
+
+### Client lifecycle
+
+A module at `src/live.js` exports `livePage(start)`: it calls `start(document)` and, after each partial update of `bake dev`, calls the returned dispose function and `start` again. It is the only listener of the event that `src/dev/client/client.js` dispatches. The theme entry, which `src/build/theme.js` generates around the default export of `client.jsx`, the component runtime and the chat entry use it; the dev client calls the parameter bar scan directly. Every theme module becomes `startX(article)` returning a dispose function that removes its listeners, observers and created elements; modules that do not depend on the article, such as the settings panel, start once at the top level of `client.jsx`. The region names (`article`, `toc`, `source`, `glyphs`, `previews`, `words`) live in one module. Deleted: `CONTENT_EVENT` and seven listeners (`layout.js`, `preview-card.jsx`, essay `notes.js` and `toc.js`, `src/components/runtime.js`, `src/chat/bubbles.jsx`, `src/dev/client/param-bar.js`).
+
+### Widths
+
+A block whose natural width the build records (formulas, code in `ch`, figures and components with a pixel width) gets its width from CSS: `calc(var(--body-width) + clamp(0px, (var(--natural-width) - var(--body-width)) * 1000, var(--wide-width) - var(--body-width)))`, which is the body width when the block fits and the wide width otherwise. It applies without scripts and follows the reader's font size and font loading without measurement. Runtime measurement stays for blocks whose width only the browser knows (tables and components without a pixel width), for the table of contents and sidenote placement, which read block boxes instead of `data-resolved`, and for the bento spans and card placement, which need card heights. Deleted: the `declaredWidths` cache, `naturalWidthProbe` for declared blocks, and the font loading passes for them.
+
+### Component declarations
+
+The build parses each component file with Vite's `parseSync` (Oxc, part of Vite 8, which parses JSX) and evaluates the initializers of `export const params` and `export const layout` as literals: strings, numbers with a sign, booleans, `null`, arrays, objects, template strings without expressions, and names of top-level `const` declarations of the same file with such a value. Anything else is reported at its position. A default export that is a class extending `HTMLElement` is a custom element; any other default export is a Solid component. Reason over a sidecar file: a component stays one file. `llm-act-plot.jsx` inlines its `range()` helper and `presetNames`. Deleted: the Vite SSR server, `BROWSER_GLOBALS`, the `HTMLElement` stub, the `NODE_ENV` restore and the stack parsing in `src/components/read.js`, `src/components/node-math.js` with its alias, and the `asyncLoad` workaround in `src/render/math.js`.
+
+### Component heights
+
+Content height by default: a component without `layout.height` shows a placeholder of one theme token, `--component-placeholder-height`, until it is ready, and then takes the height of its content. `layout.height`, a number of pixels or `{ ratio }`, declares a fixed box that the component fills, as the plots and `glu-heatmap` do; the `height` Markdown attribute overrides it. Reason over build-time measurement: measuring would start Chromium on every build and in `bake dev`, and heights change with the reader's font size and the screen width. The frame gate and `componentsBlankOnScroll` check the ready state, and the runtime starts a component 1.5 screens ahead, so the height change happens below the viewport; above it, scroll anchoring keeps the visible content in place. Deleted: `narrowHeight`, `autoHeight`, height functions, `--component-narrow-*`, the `data-height="auto"` rules and `declaredHeight`.
+
+### Copy as Markdown
+
+`src/render/html.js` writes `data-src="start end"`, offsets into the article source, on every element made from a Markdown node with a position, block or inline. A selection boundary maps to an offset through the closest element with `data-src`: a text node covers the source between its positioned neighbours, maps character by character when its text equals that source, and otherwise moves the boundary to its nearer edge. The copied Markdown is the source between the two offsets, with the opening and closing markup of each inline element the selection cuts through, and the definitions of the footnotes it references. The HTML copy stays. `data-line` and `data-end-line` stay for `bake dev`. Deleted: `MarkdownWriter` and the selector tables of `src/copy/markdown.js`.
+
+### Accessible states and duplicates
+
+- The current entry of each table of contents style, of the rail and of the drawer, and the homepage chip of the group on screen get `aria-current="true"`; the drawer chapter whose card is shown gets `aria-expanded="true"`; tests read these. The bento card that scrolls after a click is a focusable scroll container, which assistive technology already reports, so it keeps `data-active` and its tests check scrolling.
+- Sidenote highlighting becomes one shared module and one rule set; essay keeps the notes column and bento keeps scrolling to a clipped note. The shared layer exports one function that starts the modules both themes start (toast, folds, heading links, copy, preview card, sidenote highlighting).
+- The segmented control and the switch exist in `settings.css`, `src/kit/controls.css` and `src/dev/client/switch.css`; one version in `src/kit/controls.css` serves the settings panel and the dev overlay.
+
+### Deliberate changes
+
+- `bake.config.js`: `toc` moves to `themes.essay.toc`. Front matter: a theme option can be set by its name, so `toc` stays valid in essay articles, becomes an error in bento articles, and bento articles can set `columns` and `rowHeight`.
+- Themes: a blog folder named after a built-in theme is an error; a blog reuses a built-in theme by importing `bake/themes/essay` or `bake/themes/bento`. `client.jsx` default-exports `start`.
+- Components: `params` and `layout` are literals; `narrowHeight`, `autoHeight` and height functions are removed; a component without `layout.height` takes the height of its content; an error thrown at the top level of a component module is shown by the page in the failed state and is no longer reported by `bake build`.
+- Readers: formulas, code and pixel-wide blocks get their width without scripts; content below a component can move when the component loads; the current table of contents entry and homepage chip are announced by assistive technology.
+
+### Implementation order for step 6
+
+1. `aria-current` and `aria-expanded`: essay `toc-*.js` and `drawer.js`, `src/theme/scripts/home.js`, their CSS selectors; `test/browser/toc.test.js`, `home.test.js`, `test/frames/frames.js`.
+2. Shared sidenote highlighting, the shared start function and one segmented control and switch: both themes' `notes.js`, `notes.css`, `bento.css`, `client.jsx`, `settings.css`, `src/kit/controls.css`, dev overlay; `sidenotes.test.js`, `bento.test.js`, `reader-settings.test.js`, `kit.test.js`, `dev.test.js`.
+3. Motion tokens: `tokens.css` and every CSS file with a transition; `reader-settings.test.js`, `toc.test.js`, `bento.test.js`, `chat.test.js`, plus one test that the drawer handle fades and does not move under reduced motion if none exists.
+4. `@scope`: `blocks.css`, `page.css`, `print.css`, essay `notes.css`, `bento.css`; `components.test.js`, `kit.test.js`, `layout.test.js`, `math.test.js`, plus one test that article paragraph and link styles do not reach an element inside a component if none exists.
+5. Container properties and bento placement through custom properties: `blocks.css`, `bento.css`, `spans.js`, `print.css`; `bento.test.js`, `layout.test.js`.
+6. Client lifecycle and region names: `src/live.js`, `src/build/theme.js` (generated entry), every theme script, `src/components/runtime.js`, `src/chat/bubbles.jsx` and `entry.js` (after the agent that edits `src/chat` has committed), `src/dev/client/client.js`, `param-bar.js`; `test/browser/dev.test.js`, `npm test`.
+7. Edge areas: `document.jsx`, `homepage.jsx`, `settings.jsx`, essay `buttons.js`, `drawer.js` and `toc.css`, `src/chat/entry.css`, `bubbles.css`, `src/dev/client/overlay.css`; `chat.test.js`, `bento.test.js`, `toc.test.js`, `dev.test.js`, the nightly frame cases for the phone drawer and the chat panel.
+8. Widths in CSS: `blocks.css`, `widths.js`, `layout.js`, essay `notes.js` and `toc.js`, bento `spans.js`; `layout.test.js`, `bento.test.js`, `sidenotes.test.js`, the frame gate.
+9. Options and reader settings: `options.js` of both themes, `src/theme/settings.js`, `settings.jsx`, `document.jsx`, `src/config/bake-config.js`, `front-matter.js`, `src/build/site.js`, `theme-options.js`, `src/choices.js`, essay layout CSS moved from `page.css`, labels, `examples/blog/bake.config.js`; `config.test.js`, `front-matter.test.js`, `theme.test.js`, `reader-settings.test.js`, `toc.test.js`.
+10. Theme interface: `src/build/theme.js`, `src/bundle/modules.js`, both themes' entry files; `theme.test.js`, where the shadowing tests become one test of a blog theme that imports essay and replaces its header, and `layers.test.js`.
+11. Component heights: `declarations.js`, `src/render/html.js`, `blocks.css`, every component in `examples/blog/components/` and the fixtures in the tests; `components.test.js` (unit and browser), `kit.test.js`, then `npm run test:frames` with `BAKE_FRAMES=all` and `make perf` for `componentsBlankOnScroll`.
+12. Static component declarations: `src/components/read.js`, `node-math.js`, `modules.js`, `src/render/math.js`, `llm-act-plot.jsx`; `components.test.js` with reported positions, `math.test.js`, `npm test`.
+13. Copy as Markdown from source offsets: `src/render/html.js`, `src/theme/content.jsx`, `src/copy/`; `copy.test.js`, `chat-notes.test.js`, and `make perf` for `htmlBytes`.
+14. README.md: the component interface and the theme interface, as step 6 below asks.
+
+Risks: the cascade of scoped rules can change a rule that relied on order; Safari has not supported scroll anchoring (check the current release in part 11), so there a component above the viewport that loads can move the visible content; `data-src` on inline elements adds to `htmlBytes`, whose limit is 64000 against 51248 measured; converting the example components to content height changes how each one sizes itself.
+
 ### 6. Implement the design
 
 Implement step 5 in commits that each keep the tests green. Delete the special cases each part replaces. Duplicates between the two themes (sidenote highlighting CSS and JS, the client entry files) and the three styles of segmented controls and switches go into the shared layer or the kit.
