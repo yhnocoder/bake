@@ -19,20 +19,11 @@ const WHEEL_STEP = 120;
 const WHEEL_INTERVAL = 50;
 
 const knownFailures = [
-  { name: 'scrolling the first 8000 pixels of the syntax article at 1440 pixels', reason: '10 to 23 percent of the frames are slower than the budget in five of five runs', task: 'toc-writes' },
-  { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: 'the restyle after the theme change takes one frame of 150 to 220 ms', task: 'perf-fixes' },
-  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'the restyle after the theme change takes one frame of 150 to 200 ms', task: 'perf-fixes' },
-  { name: 'scrolling the whole syntax article at 1440 pixels', reason: '5 to 18 percent of the frames are slower than the budget and the longest frame takes 150 to 200 ms', task: 'toc-writes' },
-  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 180 to 220 ms in five of five runs', task: 'toc-writes' },
-  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'up to 11 percent of the frames are slower than the budget in four of five runs', task: 'toc-writes' },
-  { name: 'opening and closing the table of contents drawer of the syntax article at 375 pixels', reason: 'opening the drawer takes one frame of 100 to 170 ms', task: 'toc-writes' },
-  { name: 'opening and closing the AI chat panel on the syntax article at 1440 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
-  { name: 'opening and closing the AI chat panel on the syntax article at 375 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
-  { name: 'dragging the slider of the function plot in the syntax article at 1440 pixels', reason: 'up to 13 percent of the frames are slower than the budget in two of five runs', task: 'kit-cleanup' },
-  { name: 'dragging the slider of the function plot in the syntax article at 375 pixels', reason: '5.5 percent of the frames are slower than the budget in one of five runs', task: 'kit-cleanup' },
-  { name: 'opening and closing a fold of the syntax article at 375 pixels', reason: 'one frame of 67 ms in one of five runs, and up to 3 percent dropped frames', task: 'viewport-measure' },
-  { name: 'dragging the slider of the function plot in the bento article at 375 pixels', reason: '29 to 34 percent of the frames are slower than the budget', task: 'bento-redesign' },
-  { name: 'resizing the bento article at 1440 pixels', reason: 'placing the cards again takes frames of 250 to 350 ms', task: 'bento-redesign' },
+  { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: '8 to 16 percent of the frames are slower than the budget and 10 to 19 percent are dropped in five of five runs', task: 'perf-fixes' },
+  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: '6 to 8 percent of the frames are dropped and the longest frame takes 67 to 100 ms in four of five runs', task: 'perf-fixes' },
+  { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 67 to 100 ms in five of five runs', task: 'toc-writes' },
+  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 83 to 117 ms in five of five runs', task: 'toc-writes' },
+  { name: 'resizing the bento article at 1440 pixels', reason: '8 to 14 percent of the frames are dropped and the longest frame takes 67 to 100 ms in five of five runs', task: 'bento-redesign' },
 ];
 
 function scroll(distance) {
