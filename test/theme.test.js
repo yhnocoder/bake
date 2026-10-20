@@ -118,6 +118,43 @@ describe('themes', () => {
     assert.match(readFileSync(join(dir, 'dist/assets', styles[0]), 'utf8'), /--bg:/);
   });
 
+  test('files of a theme of the blog never take the place of the files of bake/theme that have the same path', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: '## One\n\nText.\n' }),
+      'themes/plain/page.jsx': [
+        "import { ArticleDocument, Header, SITE_SETTINGS, labelsFor } from 'bake/theme';",
+        "import { mark } from './header.jsx';",
+        '',
+        'export default function Page(props) {',
+        '  const labels = labelsFor(props.site.language);',
+        '  return (',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} settings={SITE_SETTINGS} bodyClass={mark}>',
+        '      <Header site={props.site} article={props.article} home={props.assets.root} labels={labels} />',
+        '    </ArticleDocument>',
+        '  );',
+        '}',
+        '',
+      ].join('\n'),
+      'themes/plain/header.jsx': "export const mark = 'plain-own-header';\n",
+      'themes/plain/index.jsx': "export const ArticleDocument = 'shadowed';\n",
+      'themes/plain/client.js': "throw new Error('shadowed');\n",
+      'themes/plain/styles/tokens.css': '@import "bake/theme/styles/tokens.css";\n:root { --plain-own: 1; }\n',
+      'themes/plain/client.jsx': "import './styles/tokens.css';\nimport { startFolds } from 'bake/theme/client';\n\nstartFolds(document.querySelector('.bk-article'));\n",
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    assert.match(page, /<body class="plain-own-header"/);
+    assert.match(page, /<header class="bk-header"/);
+    const styles = readdirSync(join(dir, 'dist/assets')).filter((name) => /^plain-[\w-]+\.css$/.test(name));
+    const css = readFileSync(join(dir, 'dist/assets', styles[0]), 'utf8');
+    assert.match(css, /--bg:/);
+    assert.match(css, /--plain-own:/);
+    const scripts = readdirSync(join(dir, 'dist/assets')).filter((name) => /^plain-[\w-]+\.js$/.test(name));
+    assert.doesNotMatch(readFileSync(join(dir, 'dist/assets', scripts[0]), 'utf8'), /shadowed/);
+  });
+
   test('no file of the shared theme module has the path of a file in a built-in theme', () => {
     const files = (folder) => readdirSync(folder, { recursive: true }).filter((path) => path.includes('.'));
     const shared = new Set(files(SHARED_DIR));

@@ -36,6 +36,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   const own = themeFolders(root, name);
   const folders = [...own, SHARED_DIR];
   const locate = fileLocator(folders);
+  const locateShared = fileLocator(BUILT_IN_THEMES.includes(name) ? folders : [SHARED_DIR]);
   const count = errors.length;
   for (const file of [PAGE_FILE, CLIENT_FILE, ...(siteTheme ? [HOME_FILE, NOT_FOUND_FILE, THEME_STYLES_FILE] : [])]) {
     if (fileLocator(own)(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
@@ -43,9 +44,9 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   if (errors.length > count) return null;
   try {
     const [server, client, styles] = await Promise.all([
-      build(serverConfig(folders, locate, siteTheme)),
-      build(clientConfig(folders, locate, name)),
-      siteTheme ? build(stylesConfig(folders, locate)) : null,
+      build(serverConfig(folders, locate, locateShared, siteTheme)),
+      build(clientConfig(folders, locate, locateShared, name)),
+      siteTheme ? build(stylesConfig(folders, locate, locateShared)) : null,
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
     const files = outputOf(client).map(outputFile);
@@ -77,18 +78,19 @@ function fileLocator(folders) {
   return (path) => folders.map((folder) => join(folder, path)).find((file) => existsSync(file)) ?? null;
 }
 
-function themeFiles(folders, locate) {
+function themeFiles(folders, locate, locateShared) {
   const resolveThemeFile = (source, importer) => {
     if (importer === undefined) return null;
     if (source.startsWith(SHARED_MODULE)) {
       const path = SHARED_EXPORTS.get(source.slice(SHARED_MODULE.length));
-      return path === undefined ? null : locate(path);
+      return path === undefined ? null : locateShared(path);
     }
     if (!RELATIVE_IMPORT.test(source)) return null;
     const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
     if (folder === undefined) return null;
     const path = relative(folder, resolve(dirname(importer), source));
-    return path.startsWith('..') ? null : locate(path);
+    if (path.startsWith('..')) return null;
+    return folder === SHARED_DIR ? locateShared(path) : locate(path);
   };
   return {
     name: 'bake-theme-files',
@@ -136,21 +138,21 @@ function renderEntry(locate, siteTheme) {
   };
 }
 
-function sharedConfig(folders, locate, plugins) {
-  return viteConfig([themeFiles(folders, locate), ...plugins]);
+function sharedConfig(folders, locate, locateShared, plugins) {
+  return viteConfig([themeFiles(folders, locate, locateShared), ...plugins]);
 }
 
-function serverConfig(folders, locate, siteTheme) {
+function serverConfig(folders, locate, locateShared, siteTheme) {
   return {
-    ...sharedConfig(folders, locate, [renderEntry(locate, siteTheme), solid({ ssr: true, solid: { hydratable: false } })]),
+    ...sharedConfig(folders, locate, locateShared, [renderEntry(locate, siteTheme), solid({ ssr: true, solid: { hydratable: false } })]),
     ssr: { noExternal: true },
     build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { codeSplitting: false } } },
   };
 }
 
-function clientConfig(folders, locate, name) {
+function clientConfig(folders, locate, locateShared, name) {
   return {
-    ...sharedConfig(folders, locate, [solid()]),
+    ...sharedConfig(folders, locate, locateShared, [solid()]),
     base: './',
     build: {
       write: false,
@@ -170,9 +172,9 @@ function clientConfig(folders, locate, name) {
   };
 }
 
-function stylesConfig(folders, locate) {
+function stylesConfig(folders, locate, locateShared) {
   return {
-    ...sharedConfig(folders, locate, []),
+    ...sharedConfig(folders, locate, locateShared, []),
     base: './',
     build: {
       write: false,
