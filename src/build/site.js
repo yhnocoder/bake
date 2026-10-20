@@ -25,8 +25,8 @@ const PUBLIC_DIR = 'public';
 const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
-export function createSite(root, { drafts = false, base, shareImages = false } = {}) {
-  return { root, drafts, base, shareImages, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
+export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
+  return { root, drafts, base, shareImages, prefetch, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
 }
 
 export async function updateSite(site, changedPaths = null) {
@@ -103,13 +103,15 @@ async function readSettings(root) {
 
 async function compileThemes(site, published, config, errors) {
   const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
-  const themes = new Map();
-  for (const name of [...names].sort()) {
+  const sorted = [...names].sort();
+  await Promise.all(sorted.map(async (name) => {
     const siteTheme = name === config.theme;
-    if (site.themes.get(name)?.siteTheme !== siteTheme) {
-      const themeErrors = [];
-      site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
-    }
+    if (site.themes.get(name)?.siteTheme === siteTheme) return;
+    const themeErrors = [];
+    site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
+  }));
+  const themes = new Map();
+  for (const name of sorted) {
     const { theme, errors: themeErrors } = site.themes.get(name);
     errors.push(...themeErrors);
     themes.set(name, theme);
@@ -183,7 +185,7 @@ async function compileComponents(site, published, errors) {
     const { root, settings } = site;
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors), errors: bundleErrors };
+    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors };
   }
   errors.push(...site.bundle.errors);
   return site.bundle.bundle;

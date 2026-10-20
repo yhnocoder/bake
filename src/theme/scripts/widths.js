@@ -31,17 +31,13 @@ export function declaresNaturalWidth(block) {
   return getComputedStyle(block).getPropertyValue('--natural-width').trim() !== '';
 }
 
-export function naturalWidth(block) {
-  return naturalWidths([naturalWidthProbe(block)])[0];
-}
-
-function naturalWidthProbe(block) {
+export function naturalWidthProbe(block) {
   const selector = NATURAL_WIDTH_HOSTS[block.dataset.type];
   const host = (selector === undefined ? null : block.querySelector(selector)) ?? block;
   return { host, length: 'var(--natural-width)', edges: host !== block };
 }
 
-function naturalWidths(requests) {
+export function naturalWidths(requests) {
   const probes = requests.map(({ host, length }) => {
     const probe = document.createElement('div');
     probe.style.cssText = `position:absolute;visibility:hidden;height:0;padding:0;border:0;width:${length}`;

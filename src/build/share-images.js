@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { errorAt, fileStart } from '../report.js';
 import { contentType } from '../content-types.js';
@@ -84,6 +83,7 @@ export async function shareImageOutputs(root, images, assets, errors) {
 async function drawCards(images, assets, errors) {
   let browser;
   try {
+    const { chromium } = await import('playwright');
     browser = await chromium.launch();
   } catch (error) {
     const reason = String(error instanceof Error ? error.message : error).split('\n')[0];

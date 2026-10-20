@@ -297,7 +297,10 @@ describe('building components', () => {
         "import { createSignal } from 'solid-js';\nimport { scale } from './lib/shared.js';\nimport './lib/plot.css';\n\nexport const params = { range: { label: 'Range', type: 'number', default: 4 } };\nexport const layout = { height: 300 };\n\nexport default function FnPlot(props) {\n  const [count] = createSignal(scale);\n  return <svg class=\"plot-line\">{props.range * count()}</svg>;\n}\n",
       'components/grid-view.js': "import { scale } from './lib/shared.js';\n\nexport const layout = { height: 200 };\n\nexport default class GridView extends HTMLElement {\n  connectedCallback() {\n    this.textContent = String(scale);\n  }\n}\n",
       'components/unused-view.js': `${height}export default class UnusedView extends HTMLElement {}\n`,
-      'content/posts/rope/index.md': article({ body: ':::fn-plot{range=3}\nA plot.\n:::\n\n:::grid-view\n:::\n' }),
+      'components/lib/base-view.js': 'export class BaseView extends HTMLElement {}\n',
+      'components/left-view.js': `import { BaseView } from './lib/base-view.js';\n\n${height}export default class LeftView extends BaseView {}\n`,
+      'components/right-view.js': `import { BaseView } from './lib/base-view.js';\n\n${height}export default class RightView extends BaseView {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::fn-plot{range=3}\nA plot.\n:::\n\n:::grid-view\n:::\n\n:::left-view\n:::\n\n:::right-view\n:::\n' }),
       'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'No components.\n' }),
       'content/posts/draft/index.md': article({ slug: 'draft', extra: 'draft: true\n', body: ':::unused-view\n:::\n' }),
     });
@@ -315,6 +318,12 @@ describe('building components', () => {
     const runtimeSource = readFileSync(join(dir, 'dist/assets', runtime), 'utf8');
     assert.match(runtimeSource, /fn-plot-[\w-]+\.js/);
     assert.doesNotMatch(runtimeSource, /unused-view/);
+    const files = JSON.parse(JSON.parse(/JSON\.parse\(("(?:[^"\\]|\\.)*")\)/.exec(runtimeSource)[1]));
+    assert.deepEqual(Object.keys(files).sort(), ['fn-plot', 'grid-view', 'left-view', 'right-view']);
+    for (const file of Object.values(files).flat()) assert.ok(assets.includes(file), `${file} is published`);
+    const kinds = (name) => files[name].map((file) => file.replace(/-[\w-]{8}\.(js|css)$/, '.$1')).sort();
+    assert.ok(kinds('fn-plot').includes('fn-plot.js') && kinds('fn-plot').includes('fn-plot.css') && kinds('fn-plot').includes('solid-element.js'), kinds('fn-plot').join(', '));
+    for (const name of ['grid-view', 'left-view', 'right-view']) assert.ok(kinds(name).includes(`${name}.js`) && !kinds(name).includes('solid-element.js'), `${name}: ${kinds(name).join(', ')}`);
     const scripts = assets.filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
     assert.ok(!scripts.some((source) => source.includes('computations created outside')), 'no script contains the development build of Solid');
     const sources = assets.filter((name) => /\.(js|css)$/.test(name)).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));

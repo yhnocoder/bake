@@ -5,11 +5,11 @@ import { errorAt, fileStart } from '../report.js';
 import { COMPONENTS_DIR } from './read.js';
 import { RUNTIME_FILE, browserModules } from './modules.js';
 
-export async function bundleComponents(root, components, preamble, errors) {
+export async function bundleComponents(root, components, preamble, errors, { prefetch }) {
   try {
     const { entry, files } = await browserBuild({
       input: { components: RUNTIME_FILE },
-      plugins: [...browserModules({ preamble, components }), solid()],
+      plugins: [...browserModules({ preamble, components, prefetch }), solid()],
       alias: publicModules('components'),
     });
     return { runtime: entry, files };

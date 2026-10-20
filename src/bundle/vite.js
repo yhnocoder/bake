@@ -1,7 +1,7 @@
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { build } from 'vite';
 import { fileStart } from '../report.js';
-import { isMathJaxModule } from './modules.js';
+import { MATHJAX_CHUNK, isMathJaxModule } from './modules.js';
 
 export const BAKE_ROOT = join(import.meta.dirname, '../..');
 
@@ -37,7 +37,7 @@ export async function browserBuild({ input, plugins = [], alias = [], stylesheet
           entryFileNames: SCRIPT_FILE_NAME,
           chunkFileNames: SCRIPT_FILE_NAME,
           assetFileNames: (asset) => (stylesheet !== undefined && isStylesheet(asset) ? stylesheet : ASSET_FILE_NAME),
-          codeSplitting: { groups: [{ name: 'mathjax', test: isMathJaxModule }] },
+          codeSplitting: { groups: [{ name: MATHJAX_CHUNK, test: isMathJaxModule }] },
         },
       },
     },
