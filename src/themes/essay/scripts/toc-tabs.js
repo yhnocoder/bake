@@ -39,7 +39,7 @@ export function tabsView(context) {
     if (!root.contains(event.relatedTarget)) leave();
   });
   context.host.append(root, index.element);
-  cardKeyboard({ groups: items.map((item) => [item.tab]), card: index.element, shown: () => (index.shown() ? hovered : -1), leave: () => leave() });
+  cardKeyboard({ groups: items.map((item) => [item.tab]), card: index.element, shown: () => (index.shown() ? hovered : -1), leave: () => leave(), close: () => close() });
   let shownCurrent = null;
   let hovered = -1;
   let shownState = '';
@@ -49,14 +49,19 @@ export function tabsView(context) {
     intent.enter(() => {
       hovered = chapterIndex;
       index.show(chapterIndex, items[chapterIndex].tab);
-    }, now);
+    }, now, chapterIndex);
+  }
+  function hide() {
+    index.hide();
+    hovered = -1;
+    items.forEach((item) => item.tab.classList.remove('is-hover'));
   }
   function leave() {
-    intent.leave(() => {
-      index.hide();
-      hovered = -1;
-      items.forEach((item) => item.tab.classList.remove('is-hover'));
-    });
+    intent.leave(hide);
+  }
+  function close() {
+    intent.dismiss(hovered);
+    hide();
   }
   function layout(state) {
     const current = Math.max(0, state.chapter);

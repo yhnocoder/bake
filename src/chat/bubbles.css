@@ -3,7 +3,7 @@
   position: fixed;
   right: calc(var(--chat-right, 16px) + 76px + var(--bk-chat-gap));
   bottom: calc(var(--chat-bottom, 16px) + 8px);
-  z-index: 77;
+  z-index: var(--layer-chat-panel, 77);
   display: flex;
   box-sizing: border-box;
   flex-direction: column;

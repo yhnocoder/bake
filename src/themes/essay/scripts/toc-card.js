@@ -1,4 +1,5 @@
 import { fragmentOf } from 'bake/fragments';
+import { closeOnEscape } from './escape.js';
 
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';
@@ -90,11 +91,14 @@ export function hoverIntent(delay) {
   let hideTimer = 0;
   let warmUntil = 0;
   let shown = false;
+  let dismissed = null;
   return {
     get shown() {
       return shown;
     },
-    enter(show, now = false) {
+    enter(show, now, entry) {
+      if (!now && entry === dismissed) return;
+      dismissed = null;
       clearTimeout(hideTimer);
       clearTimeout(showTimer);
       const run = () => {
@@ -108,6 +112,7 @@ export function hoverIntent(delay) {
       clearTimeout(hideTimer);
     },
     leave(hide) {
+      dismissed = null;
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
@@ -121,10 +126,14 @@ export function hoverIntent(delay) {
       clearTimeout(hideTimer);
       shown = false;
     },
+    dismiss(entry) {
+      this.stop();
+      dismissed = entry;
+    },
   };
 }
 
-export function cardKeyboard({ groups, card, shown, leave }) {
+export function cardKeyboard({ groups, card, shown, leave, close }) {
   const links = () => [...card.querySelectorAll('.bk-toc-card a[href]')];
   for (const [index, group] of groups.entries()) {
     group.at(-1).addEventListener('keydown', (event) => {
@@ -155,6 +164,12 @@ export function cardKeyboard({ groups, card, shown, leave }) {
       if (!inside(event.relatedTarget)) leave();
     });
   }
+  closeOnEscape(card, () => {
+    const index = shown();
+    // why: the entry takes the focus while the card is still shown, because its focus listener opens the card when it is closed
+    if (index >= 0 && card.contains(document.activeElement)) groups[index].at(-1).focus({ preventScroll: true });
+    close();
+  });
 }
 
 export function floorFor(left) {
