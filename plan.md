@@ -67,6 +67,9 @@ Measure `npm test` before and after and record both times here.
 - `test/frames/frames.test.js`: the hover case passes with 15 of 20 events; find the cause instead of tolerating misses.
 - CI: run jobs in the Playwright container image matching the pinned version instead of installing system packages; drop `needs: performance` from the nightly `frames` job; rebalance the unit shards if they stay uneven.
 
+- Make the suites pass on macOS, the development machine. At the start of this step, on unchanged code, 8 unit tests fail on macOS (6 of them because the temporary folder is reported as `/var/...` and resolved as `/private/var/...`; 2 `bake dev` port tests for another reason), and 26 browser tests in `copy.test.js` and `bento.test.js` fail. Find each cause; fix the code when Bake itself handles the path wrongly, and the test otherwise.
+- `test/dev.test.js` "stops with a message when the blog folder can no longer be watched" sometimes hangs on macOS because it deletes the folder before the watcher has started reporting; wait for the watcher first.
+
 ### 4. Input fix
 
 - The IME composition check exists in several versions; `src/chat/bubbles.jsx` lines 482, 875 and 975 check only `event.isComposing`, so confirming a candidate with Enter in Safari triggers the action. One shared helper used at every call site, with a test.
