@@ -54,7 +54,7 @@ export function startToc(article) {
     destroy() {},
   });
 
-  const update = oncePerFrame(() => {
+  const draw = () => {
     state = readingState(context.outline, currentLayout(article));
     view.update(state);
     const yielding = crossing.some(isOnScreen);
@@ -62,12 +62,13 @@ export function startToc(article) {
       element.classList.toggle('is-yielding', yielding);
       element.inert = yielding;
     }
-  });
-  const layout = oncePerFrame(() => {
+  };
+  const update = oncePerFrame(draw);
+  const layout = () => {
     view.relayout?.();
     crossing = blocksCrossing(view.columns ?? [], currentLayout(article));
-    update();
-  });
+    draw();
+  };
   const mount = (again = false) => {
     const style = root.dataset.toc;
     const next = !notesColumnScreen.matches ? 'drawer' : style === 'notes' ? (leftColumnScreen.matches ? 'notes' : 'rail') : style;

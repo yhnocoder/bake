@@ -1,4 +1,5 @@
 import { CONTENT_EVENT, oncePerFrame } from './motion.js';
+import { leftColumnScreen, notesColumnScreen, phoneScreen } from './screens.js';
 
 export const LAYOUT_EVENT = 'bk:layout';
 const REACHING_BLOCKS = '.bk-block[data-resolved="wide"], .bk-block[data-resolved="page"]';
@@ -8,8 +9,8 @@ const WIDTH_BLOCKS = '.bk-block[data-width="auto"]';
 let schedule = () => {};
 let last = null;
 
-export function requestLayout({ arrange = false } = {}) {
-  schedule(arrange);
+export function requestLayout({ arrange = false, fresh = arrange } = {}) {
+  schedule(arrange, fresh);
 }
 
 export function currentLayout(article) {
@@ -19,17 +20,21 @@ export function currentLayout(article) {
 
 export function startLayout(article, arrangements) {
   let arrangePending = true;
+  let freshPending = true;
   let width = null;
   const pass = oncePerFrame(() => {
     if (arrangePending) {
+      const fresh = freshPending;
       arrangePending = false;
-      for (const arrangement of arrangements) arrangement(article);
+      freshPending = false;
+      for (const arrangement of arrangements) arrangement(article, { fresh });
     }
     last = measure(article);
     document.dispatchEvent(new CustomEvent(LAYOUT_EVENT, { detail: last }));
   });
-  schedule = (arrange) => {
+  schedule = (arrange, fresh = false) => {
     if (arrange) arrangePending = true;
+    if (fresh) freshPending = true;
     pass();
   };
   new ResizeObserver(([entry]) => {
@@ -38,10 +43,18 @@ export function startLayout(article, arrangements) {
     schedule(changed);
   }).observe(article);
   addEventListener('resize', () => schedule(true));
-  document.fonts.ready.then(() => schedule(true));
-  document.fonts.addEventListener('loadingdone', () => schedule(true));
-  document.addEventListener(CONTENT_EVENT, () => schedule(true));
-  article.addEventListener('toggle', (event) => schedule(event.target.closest(WIDTH_BLOCKS) !== null), true);
+  for (const screen of [leftColumnScreen, notesColumnScreen, phoneScreen]) screen.addEventListener('change', () => schedule(true, true));
+  document.fonts.ready.then(() => schedule(true, true));
+  document.fonts.addEventListener('loadingdone', () => schedule(true, true));
+  document.addEventListener(CONTENT_EVENT, () => schedule(true, true));
+  article.addEventListener(
+    'toggle',
+    (event) => {
+      const widthBlock = event.target.closest(WIDTH_BLOCKS) !== null;
+      schedule(widthBlock, widthBlock);
+    },
+    true,
+  );
   pass();
 }
 
