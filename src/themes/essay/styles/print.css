@@ -33,7 +33,7 @@
 
   .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
     overflow: visible;
-    mask-image: none !important;
+    background-image: none;
   }
 
   .bk-article pre.shiki:where(:not(.component-box *)) {

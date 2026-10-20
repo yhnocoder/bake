@@ -5,18 +5,11 @@ const NATURAL_WIDTH_HOSTS = { math: 'mjx-container[display]', code: 'pre.shiki' 
 
 export function startWidths(article) {
   let blocks = [];
-  let scrollers = [];
   const read = () => {
     blocks = [...article.querySelectorAll('.bk-block[data-width]')];
-    scrollers = [...article.querySelectorAll(SCROLLERS)];
-    for (const scroller of scrollers) {
-      const fades = oncePerFrame(() => updateFades(scroller));
-      scroller.addEventListener('scroll', fades, { passive: true });
-    }
   };
   const layout = oncePerFrame(() => {
     resolveWidths(article, blocks);
-    scrollers.forEach(updateFades);
     layoutChanged();
   });
   read();
@@ -69,11 +62,4 @@ function lengthIn(host, length) {
 
 export function overflows(block) {
   return [block, ...block.querySelectorAll(SCROLLERS)].some((element) => element.scrollWidth > element.clientWidth + 1);
-}
-
-function updateFades(scroller) {
-  const left = scroller.scrollLeft > 2;
-  const right = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 2;
-  scroller.toggleAttribute('data-fade-left', left);
-  scroller.toggleAttribute('data-fade-right', right);
 }

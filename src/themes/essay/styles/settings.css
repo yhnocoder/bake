@@ -225,25 +225,45 @@
 
 .bk-toast {
   position: fixed;
-  right: 16px;
-  bottom: calc(var(--ui-bottom) + var(--ui-button-height) + 10px);
+  left: 50%;
+  bottom: var(--ui-bottom);
   z-index: 80;
-  padding: 5px 12px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--ink) 92%, transparent);
-  color: var(--bg);
-  font: 12.5px/1.6 var(--font-ui);
+  display: flex;
+  align-items: center;
+  width: max-content;
+  max-width: calc(100vw - 128px);
+  min-height: var(--ui-button-height);
+  padding: 6px 16px;
+  border-radius: calc(var(--ui-button-height) / 2);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--card-shadow);
+  font: 12.5px/1.5 var(--font-ui);
+  overflow-wrap: anywhere;
   opacity: 0;
-  translate: 0 4px;
+  transform: translate(-50%, 6px);
   pointer-events: none;
   transition:
-    opacity 0.2s,
-    translate 0.2s var(--ease-out);
+    opacity 0.16s,
+    transform 0.2s var(--ease-out);
 }
 
 .bk-toast.is-on {
   opacity: 1;
-  translate: 0 0;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 999.98px) {
+  .bk-toast {
+    top: 16px;
+    bottom: auto;
+    max-width: calc(100vw - 32px);
+    transform: translate(-50%, -6px);
+  }
+
+  .bk-toast.is-on {
+    transform: translate(-50%, 0);
+  }
 }
 
 .bk-flash {
@@ -464,9 +484,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bk-settings-panel,
-  .bk-toast,
   .bk-preview {
     translate: 0 0;
+  }
+
+  .bk-toast {
+    transform: translate(-50%, 0);
   }
 
   .bk-preview,
