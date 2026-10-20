@@ -628,6 +628,37 @@ test('the table of contents', async (t) => {
     }
   });
 
+  await t.test('a change of the text metrics, such as a font that finishes loading, moves the tabs, the dots and the notes marker without a transition', async () => {
+    for (const style of ['tabs', 'dots', 'notes']) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await context.addInitScript((value) => localStorage.setItem('bk-toc', value), style);
+      const page = await context.newPage();
+      await page.goto(url);
+      await settle(page);
+      await scrollToHeading(page, 'chapter-3');
+      await page.waitForTimeout(600);
+      const { moved, moving } = await page.evaluate(async () => {
+        const entries = () => [...document.querySelectorAll('.bk-toc-tab, .bk-toc-dot-item, .bk-toc-marker')].map((entry) => `${getComputedStyle(entry).translate} ${getComputedStyle(entry).transform}`).join();
+        const before = entries();
+        const style = document.createElement('style');
+        style.textContent = '.bk-toc-ui *, .bk-toc * { font-size: 19px !important; letter-spacing: 0.3em !important; }';
+        document.head.append(style);
+        window.dispatchEvent(new Event('resize'));
+        for (let frame = 0; frame < 4; frame += 1) await new Promise((done) => requestAnimationFrame(done));
+        const running = document
+          .getAnimations()
+          .filter((animation) => animation instanceof CSSTransition && ['transform', 'translate'].includes(animation.transitionProperty))
+          .filter((animation) => animation.effect.target.closest('.bk-toc-ui, .bk-toc'))
+          .map((animation) => `${animation.effect.target.className} ${animation.transitionProperty}`);
+        for (const animation of document.getAnimations()) animation.finish();
+        return { moved: entries() !== before, moving: running };
+      });
+      assert.ok(moved, `the ${style} entries stayed in place`);
+      assert.deepEqual(moving, [], `${style} animated ${moving.join(', ')}`);
+      await context.close();
+    }
+  });
+
   const handleClass = (style) => (style === 'dots' ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab');
 
   await t.test('on phones a handle opens the drawer of chapters, a link in it jumps and closes it, and closing it returns the focus to the handle', async () => {

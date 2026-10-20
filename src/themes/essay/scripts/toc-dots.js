@@ -84,7 +84,7 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
       else measure();
     },
     relayout() {
-      if (current !== null) measure();
+      if (current !== null) withoutTransition(items.flatMap((entry) => [entry.item, entry.dot]), measure);
     },
     destroy() {
       root.remove();
