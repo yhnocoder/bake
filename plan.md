@@ -6,7 +6,7 @@ The project works but has grown hard to control. This plan simplifies code, test
 
 Kept as features: the AI chat with pets (including the 30-day "remember" of the chat key), the four table of contents styles and the reader settings, copying as Markdown, the bento theme, the frame time gate and the performance budgets, share images, theme overrides, CHANGELOG.md and the npm publishing setup. CHANGELOG.md is not changed in this cleanup.
 
-Removed: the screenshot comparison tooling, and the in-place partial update of `bake dev` (replaced by a full page reload that keeps the scroll position).
+Removed: the screenshot comparison tooling. The in-place partial update of `bake dev` stays, because the full page reload that step 2 tried was slower and blanked the components on the screen on every save.
 
 Documentation:
 - There is no developer documentation. Rules live in CLAUDE.md; knowledge the code cannot express goes into a code comment next to the code.
@@ -57,6 +57,7 @@ Measure `npm test` before and after and record both times here.
 - Delete the screenshot comparison: `scripts/screenshots.sh`, `scripts/capture-pages.js`, `scripts/compare-screenshots.js`, `scripts/screenshot-variants.js` (move the viewport sizes that other files need into one place), `test/compare-screenshots.test.js`, the Makefile target and the dependencies only it used.
 - Replace the partial update of `bake dev` with a full page reload that keeps the scroll position: delete `src/dev/client/regions.js` and the `bake:content` listeners in the theme, chat, component and table of contents modules. Keep an in-place update only where the component parameter bar needs it. Simplify the "last good version" of failing articles in `src/build/site.js` (`lastGood`, `articleErrorsOnly`, `shownPages`, `linkWithLastGood`) to keeping the previous output and showing the error overlay, as `src/dev/preview.js` already does for other errors.
 - After the change, measure hot update with the step 0 script. If the time until the new content is visible is clearly slower than the baseline (more than 1.5 times the baseline median, or more than 200 ms slower), or the reload is visibly disruptive (flash, lost scroll position, lost component state while editing), revert to the partial update and record the numbers in this file.
+- Result: the reload was reverted and the partial update kept; the commits that replaced it are on the local branch `invest/dev-reload`. Medians of 5 runs with the step 0 script, article edit, in ms (baseline, with the reload): syntax 162, 272; llm-act-fns 319, 392; matrix-calculus 699, 754. The component and config edits reload in both versions and stayed between 1400 and 1700 ms. The syntax article took 1.68 times the baseline. Timed inside the page, the reload showed the text after 192 ms against 187 ms for the partial update, so most of the difference is the script waiting for the new page. A screencast of matrix-calculus kept the scroll position and showed no unstyled content, but the component on the screen showed its placeholder for about 500 ms after every save and lost its state. After the revert, with the simplified handling of errors in `src/build/site.js`, the article edits took 183, 327 and 679 ms.
 
 ### 3. Test redesign
 
