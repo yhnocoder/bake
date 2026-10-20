@@ -551,7 +551,15 @@ function Chat(props) {
   const resize = new ResizeObserver(() => list && updateFade());
   onCleanup(() => resize.disconnect());
 
-  const placeholder = () => (view() === 'setup' ? labels.placeholder.key : scopes().length > 0 ? labels.placeholder.scoped : labels.placeholder[page.article === null ? 'blog' : 'article']);
+  const wideScreen = matchMedia('(min-width: 1000px)');
+  const [wide, setWide] = createSignal(wideScreen.matches);
+  const followWidth = () => setWide(wideScreen.matches);
+  wideScreen.addEventListener('change', followWidth);
+  onCleanup(() => wideScreen.removeEventListener('change', followWidth));
+  const placeholder = () => {
+    const texts = wide() ? labels.placeholder : labels.shortPlaceholder;
+    return view() === 'setup' ? texts.key : scopes().length > 0 ? texts.scoped : texts[page.article === null ? 'blog' : 'article'];
+  };
 
   return (
     <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>

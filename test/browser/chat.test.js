@@ -1267,7 +1267,19 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
       'none',
     );
     assert.equal(await page.locator('.bk-chat-composer').evaluate((element) => getComputedStyle(element).translate), 'none');
+    const placeholderFits = (selector) =>
+      page.locator(selector).evaluate((input) => {
+        const context = document.createElement('canvas').getContext('2d');
+        context.font = getComputedStyle(input).font;
+        return { text: input.placeholder, width: context.measureText(input.placeholder).width, room: input.clientWidth };
+      });
+    const keyFit = await placeholderFits(KEY);
+    assert.ok(keyFit.width <= keyFit.room, JSON.stringify(keyFit));
     await page.locator(KEY).fill(API_KEY);
+    await page.locator(KEY).press('Enter');
+    const questionFit = await placeholderFits(QUESTION);
+    assert.ok(questionFit.width <= questionFit.room, JSON.stringify(questionFit));
+    await page.locator(QUESTION).fill('标题的锚点是怎么来的？');
     for (const control of ['.bk-chat-send', '.bk-chat-icon']) assert.deepEqual(await page.locator(control).evaluateAll((elements) => [...new Set(elements.map((element) => getComputedStyle(element).cursor))]), ['pointer']);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
   });

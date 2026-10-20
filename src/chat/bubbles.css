@@ -223,6 +223,7 @@
 
 .bk-chat-note {
   align-self: flex-end;
+  max-width: 100%;
   padding: 0 4px;
   background: none;
   box-shadow: none;
@@ -435,6 +436,7 @@
   background: none;
   color: var(--ink);
   font: 13px var(--font-ui, inherit);
+  text-overflow: ellipsis;
   outline: none;
 }
 
@@ -732,6 +734,10 @@
 
 .bk-chat-pet-status[data-failed] {
   color: var(--accent);
+}
+
+.bk-chat-credit {
+  margin-bottom: 6px;
 }
 
 .bk-chat-credit a {
