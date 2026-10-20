@@ -420,4 +420,28 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-chat-primary').evaluate((element) => getComputedStyle(element).cursor), 'pointer');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
   });
+
+  await t.test('the entry and the panel take the colours and the color scheme that the page shows, from the system or from the theme setting', async (t) => {
+    for (const [colorScheme, theme] of [['dark', 'system'], ['light', 'dark'], ['dark', 'light']]) {
+      const { context, page } = await openBrowser(t, base, { contextOptions: { colorScheme, reducedMotion: 'reduce' } });
+      await context.addInitScript((value) => localStorage.setItem('bk-theme', value), theme);
+      await page.goto(`${base}/2026-10/syntax/`);
+      const launcher = page.locator('.bk-chat-launcher');
+      await launcher.click();
+      const panel = page.locator('.bk-chat-panel.is-open');
+      await panel.waitFor();
+      const expected = await page.evaluate(() => {
+        const probe = document.body.appendChild(document.createElement('div'));
+        probe.style.cssText = 'background-color: var(--surface); color: var(--ink); border-color: var(--ink-2)';
+        const style = getComputedStyle(probe);
+        return { surface: style.backgroundColor, ink: style.color, launcher: style.borderTopColor, scheme: style.colorScheme };
+      });
+      const shown = {
+        ...(await panel.evaluate((element) => ({ surface: getComputedStyle(element).backgroundColor, ink: getComputedStyle(element).color, scheme: getComputedStyle(element).colorScheme }))),
+        launcher: await launcher.evaluate((element) => getComputedStyle(element).color),
+      };
+      assert.deepEqual(shown, expected, `${theme} theme in the ${colorScheme} scheme`);
+      await context.close();
+    }
+  });
 });

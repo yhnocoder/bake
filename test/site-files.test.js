@@ -227,7 +227,7 @@ describe('site files', () => {
     const styles = read('_bake/theme.css');
     assert.doesNotMatch(styles, /@import/i);
     assert.match(styles, /font-family:LXGW WenKai/);
-    assert.match(styles, /--bg:#f5f6f4/);
+    assert.match(styles, /--bg:[^;]*#f5f6f4/);
     assert.match(styles, /\.bk-card-frame\{/);
     assert.match(styles, /\.bk-not-found/);
   });

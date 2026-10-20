@@ -2,7 +2,7 @@
   position: fixed;
   right: var(--chat-right, 16px);
   bottom: var(--chat-bottom, 16px);
-  z-index: 77;
+  z-index: var(--layer-chat-panel, 77);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
