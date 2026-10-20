@@ -1,4 +1,4 @@
-import { reducedMotion } from './motion.js';
+import { reducedMotion } from 'bake/theme/client';
 import { cardKeyboard, chapterCard, clamp, createElement, floorFor, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 70;
@@ -131,7 +131,7 @@ export function ticksView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.dismiss(pointed);
+    intent.dismiss(pointed, [ticks.rows[pointed], card]);
     hide();
   }
   return {

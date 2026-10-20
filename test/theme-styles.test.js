@@ -14,7 +14,7 @@ function cssFiles(folder) {
 }
 
 test('every width media query in the styles uses a breakpoint of screens.js or the phone screen width', () => {
-  const screens = readFileSync(join(SRC, 'themes/essay/scripts/screens.js'), 'utf8');
+  const screens = readFileSync(join(SRC, 'theme/scripts/screens.js'), 'utf8');
   const screenWidths = [...screens.matchAll(/min-width: (\d+)px/g)].map((match) => Number(match[1]));
   assert.deepEqual(screenWidths, [1340, 1000]);
   const breakpoints = new Set([...screenWidths, PHONE_SCREEN_WIDTH]);
@@ -29,4 +29,14 @@ test('every width media query in the styles uses a breakpoint of screens.js or t
     }
   }
   assert.deepEqual(problems, []);
+});
+
+test('every stacking layer variable that the styles use is defined', () => {
+  const code = readdirSync(SRC, { recursive: true })
+    .filter((name) => /\.(css|jsx?)$/.test(name))
+    .map((name) => readFileSync(join(SRC, name), 'utf8'))
+    .join('\n');
+  const defined = new Set([...code.matchAll(/(--layer-[a-z-]+)\s*:/g)].map(([, name]) => name));
+  const used = new Set([...code.matchAll(/var\((--layer-[a-z-]+)\)/g)].map(([, name]) => name));
+  assert.deepEqual([...used].filter((name) => !defined.has(name)).sort(), []);
 });

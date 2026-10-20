@@ -1,0 +1,399 @@
+:root {
+  --frame-width: min(1340px, 100cqw);
+  --toc-width: 200px;
+  --column-gap: 40px;
+  --notes-width: calc(240px - (1340px - var(--frame-width)));
+  --rail-width: 56px;
+  --body-width: 820px;
+  --wide-width: calc(var(--body-width) + var(--column-gap) + var(--notes-width));
+  --page-width: var(--frame-width);
+  --toc-left: calc((100cqw - var(--frame-width)) / 2);
+  --body-left: calc(var(--toc-left) + var(--toc-width) + var(--column-gap));
+  --page-shift: calc(var(--toc-left) - var(--body-left));
+}
+
+@media (min-width: 1340px) {
+  :root[data-script]:not([data-toc='notes']) {
+    --body-left: calc(var(--rail-width) + (100cqw - var(--rail-width) - var(--wide-width)) / 2);
+  }
+}
+
+@media (max-width: 1339.98px) {
+  :root {
+    --notes-width: 200px;
+    --toc-width: var(--rail-width);
+    --toc-left: 0px;
+    --body-width: min(820px, 100cqw - var(--rail-width) - 64px - var(--column-gap) - var(--notes-width));
+    --body-left: calc(var(--rail-width) + max(32px, (100cqw - var(--rail-width) - var(--wide-width)) / 2));
+    --page-width: var(--wide-width);
+    --page-shift: 0px;
+  }
+}
+
+@media (max-width: 999.98px) {
+  :root {
+    --body-width: min(820px, 100cqw - 32px);
+    --body-left: calc((100cqw - var(--body-width)) / 2);
+    --wide-width: var(--body-width);
+    --page-width: var(--body-width);
+    --page-shift: 0px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 24px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--body-size);
+  line-height: 1.85;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::view-transition-group(root) {
+  animation-duration: 0.2s;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+:is(.bk-chapter-number, .bk-heading-link, .sidenote-ref, .bk-sidenote-number)::selection,
+:is(.sidenote-ref, .bk-sidenote-number) *::selection {
+  background: var(--selection-quiet);
+}
+
+:where(a, button, summary, select, label, [role='button'], input:is([type='checkbox'], [type='radio'], [type='range'])):where(:not(:disabled)) {
+  cursor: pointer;
+}
+
+a:where(:not(.component-box *)) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: text-decoration-color 0.12s;
+}
+
+a:hover:where(:not(.component-box *)) {
+  text-decoration-color: var(--accent);
+}
+
+:focus:where(:not(.component-box *)) {
+  outline: none;
+}
+
+:focus-visible:where(:not(.component-box *)) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:where(:not(.component-box *)) {
+  font: inherit;
+  color: inherit;
+}
+
+.bk-glyphs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.bk-shell {
+  container-type: inline-size;
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 120px;
+}
+
+.bk-header {
+  margin-left: var(--body-left);
+  width: var(--body-width);
+  padding: 56px 0 36px;
+  margin-bottom: 44px;
+  border-bottom: 1px solid var(--line-2);
+  overflow-wrap: break-word;
+}
+
+.bk-site {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+
+.bk-site:hover {
+  color: var(--accent);
+}
+
+.bk-title {
+  margin: 0 0 18px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: clamp(32px, 5vw, 46px);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.bk-summary {
+  max-width: 40em;
+  margin: 0 0 22px;
+  font-size: 18px;
+  line-height: 1.8;
+  color: var(--ink-2);
+}
+
+.bk-meta {
+  --bk-meta-gap: 1.8em;
+  clip-path: inset(-8px -8px -8px 0);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+.bk-meta-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 4px;
+  margin-left: calc(-1 * var(--bk-meta-gap));
+}
+
+.bk-meta-items > *::before {
+  content: '·';
+  display: inline-block;
+  width: var(--bk-meta-gap);
+  text-align: center;
+}
+
+.bk-meta-items > .bk-tags::before {
+  margin-right: -6px;
+}
+
+.bk-draft {
+  color: var(--accent);
+}
+
+.bk-copy-source {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: color-mix(in srgb, var(--ink-3) 35%, transparent);
+  transition:
+    color 0.12s,
+    text-decoration-color 0.12s;
+}
+
+.bk-copy-source:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+:root:not([data-script]) .bk-copy {
+  display: none;
+}
+
+.bk-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bk-tag {
+  padding: 0.1em 0.45em;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-ligatures: none;
+  color: var(--ink-2);
+  letter-spacing: 0;
+}
+
+.bk-article {
+  position: relative;
+  margin-left: var(--body-left);
+  width: var(--body-width);
+  overflow-wrap: break-word;
+}
+
+.bk-article > :first-child:where(:not(.component-box *)),
+.bk-article > :first-child > :first-child:where(:not(.component-box *)) {
+  margin-top: 0;
+}
+
+.bk-article p:where(:not(.component-box *)) {
+  margin: 0 0 16px;
+}
+
+.bk-article strong:where(:not(.component-box *)) {
+  font-weight: 700;
+}
+
+.bk-article mark:where(:not(.component-box *)) {
+  background: linear-gradient(transparent 58%, var(--mark) 58%);
+  color: inherit;
+}
+
+.bk-article code:where(:not(.component-box *)) {
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  font-variant-ligatures: none;
+}
+
+.bk-article sup:where(:not(.component-box *)),
+.bk-article sub:where(:not(.component-box *)) {
+  line-height: 0;
+}
+
+.bk-article :is(ul, ol):where(:not(.component-box *)) {
+  margin: 0 0 16px;
+  padding-left: 22px;
+}
+
+.bk-article li:where(:not(.component-box *)) {
+  margin: 4px 0;
+}
+
+.bk-article li > p:where(:not(.component-box *)) {
+  margin-bottom: 8px;
+}
+
+.bk-article li > :is(ul, ol):where(:not(.component-box *)) {
+  margin-bottom: 0;
+}
+
+.bk-article hr:where(:not(.component-box *)) {
+  clear: both;
+  margin: 40px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.bk-article :is(h2, h3, h4, h5, h6):where(:not(.component-box *)) {
+  position: relative;
+  clear: both;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.bk-article h2:where(:not(.component-box *)) {
+  margin: 72px 0 14px;
+  font-size: 30px;
+  line-height: 1.3;
+}
+
+.bk-article h3:where(:not(.component-box *)) {
+  margin: 40px 0 10px;
+  font-size: 21px;
+  line-height: 1.4;
+}
+
+.bk-article :is(h4, h5, h6):where(:not(.component-box *)) {
+  margin: 28px 0 8px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.bk-chapter-number {
+  display: block;
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+
+.bk-heading-link {
+  position: absolute;
+  left: -1.1em;
+  bottom: 0;
+  width: 1em;
+  font-weight: 400;
+  text-align: center;
+  text-decoration: none;
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.12s;
+}
+
+:is(h2, h3, h4, h5, h6):hover > .bk-heading-link,
+.bk-heading-link:focus-visible {
+  opacity: 1;
+}
+
+.bk-heading-link:hover {
+  color: var(--accent);
+}
+
+@media (max-width: 999.98px) {
+  .bk-header {
+    padding-top: 40px;
+    margin-bottom: 32px;
+  }
+
+  .bk-article h2:where(:not(.component-box *)) {
+    margin-top: 56px;
+    font-size: 26px;
+  }
+
+  .bk-article h3:where(:not(.component-box *)) {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .bk-heading-link {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(:not(.component-box *, .bk-settings-panel, .bk-toast)),
+  :where(:not(.component-box *))::before,
+  :where(:not(.component-box *))::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

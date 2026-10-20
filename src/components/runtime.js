@@ -1,9 +1,15 @@
-import { loaders } from 'bake:component-loaders';
+import { files, loaders } from 'bake:component-loaders';
 
 const FRAME = 'figure.component[data-component]';
 const BOX = '.component-box';
-const NEAR_VIEWPORT = '800px 0px';
+const NEAR_DISTANCE = 800;
+const NEAR_SCREENS = 1.5;
 const definitions = new Map();
+const SLOW_CONNECTIONS = ['slow-2g', '2g'];
+const prefetchQueue = [];
+let prefetching = null;
+let starting = 0;
+const prefetched = new Set();
 
 function define(name) {
   if (!definitions.has(name)) {
@@ -40,6 +46,8 @@ async function start(frame) {
   if (frame.dataset.state !== undefined) return;
   frame.dataset.state = 'loading';
   const name = frame.dataset.component;
+  starting += 1;
+  pausePrefetch(name);
   try {
     await define(name);
     const box = frame.querySelector(BOX);
@@ -57,25 +65,88 @@ async function start(frame) {
   } catch (error) {
     frame.dataset.state = 'failed';
     console.error(`${name} cannot start`, error);
+  } finally {
+    starting -= 1;
+    prefetchNext();
   }
 }
 
-const observer = new IntersectionObserver(
-  (entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      observer.unobserve(entry.target);
-      start(entry.target);
-    }
-  },
-  { rootMargin: NEAR_VIEWPORT },
-);
+function nearMargin() {
+  return `${Math.max(NEAR_DISTANCE, innerHeight * NEAR_SCREENS)}px 0px`;
+}
+function createObserver(margin) {
+  const created = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        created.unobserve(entry.target);
+        start(entry.target);
+      }
+    },
+    { rootMargin: margin },
+  );
+  return created;
+}
+let margin = nearMargin();
+let observer = createObserver(margin);
 function observeFrames() {
-  for (const frame of document.querySelectorAll(FRAME)) {
-    if (frame.dataset.state === undefined) observer.observe(frame);
+  const frames = [...document.querySelectorAll(FRAME)].filter((frame) => frame.dataset.state === undefined);
+  for (const frame of frames) observer.observe(frame);
+  return frames;
+}
+function distanceFromViewport(frame) {
+  const { top, bottom } = frame.getBoundingClientRect();
+  return Math.max(0, top - innerHeight, -bottom);
+}
+function queuePrefetch(frames) {
+  const connection = navigator.connection;
+  if (connection?.saveData || SLOW_CONNECTIONS.includes(connection?.effectiveType)) return;
+  const waiting = frames.filter((frame) => frame.dataset.state === undefined);
+  const distances = new Map(waiting.map((frame) => [frame, distanceFromViewport(frame)]));
+  waiting.sort((a, b) => distances.get(a) - distances.get(b));
+  for (const name of new Set(waiting.map((frame) => frame.dataset.component))) {
+    if (Object.hasOwn(files, name) && !prefetchQueue.includes(name) && prefetching?.name !== name) prefetchQueue.push(name);
   }
+  prefetchNext();
+}
+function prefetchNext() {
+  if (prefetching !== null || starting > 0) return;
+  const name = prefetchQueue.shift();
+  if (name === undefined) return;
+  if (definitions.has(name)) return prefetchNext();
+  const controller = new AbortController();
+  prefetching = { name, controller };
+  const addresses = files[name].map((file) => new URL(file, import.meta.url).href).filter((address) => !prefetched.has(address) && !requestedByPage(address));
+  const download = (address) =>
+    fetch(address, { signal: controller.signal, priority: 'low' })
+      .then((response) => response.arrayBuffer())
+      .then(() => prefetched.add(address));
+  Promise.allSettled(addresses.map(download)).then(() => {
+    if (prefetching?.controller !== controller) return;
+    prefetching = null;
+    prefetchNext();
+  });
 }
 
-observeFrames();
-document.addEventListener('bake:content', observeFrames);
+function requestedByPage(address) {
+  return performance.getEntriesByName(address).some((entry) => entry.initiatorType !== 'fetch');
+}
+function pausePrefetch(name) {
+  if (prefetching === null || prefetching.name === name) return;
+  prefetching.controller.abort();
+  prefetchQueue.unshift(prefetching.name);
+  prefetching = null;
+}
+
+const frames = observeFrames();
+if (document.readyState === 'complete') queuePrefetch(frames);
+else addEventListener('load', () => queuePrefetch(frames), { once: true });
+document.addEventListener('bake:content', () => queuePrefetch(observeFrames()));
+addEventListener('resize', () => {
+  if (nearMargin() === margin) return;
+  margin = nearMargin();
+  observer.disconnect();
+  observer = createObserver(margin);
+  observeFrames();
+});
 addEventListener('beforeprint', () => document.querySelectorAll(FRAME).forEach(start));

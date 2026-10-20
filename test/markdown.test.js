@@ -5,9 +5,11 @@ import { before, describe, test } from 'node:test';
 import { readComponents } from '../src/components/read.js';
 import { readPreamble } from '../src/config/preamble.js';
 import { indexPages } from '../src/build/links.js';
-import { BUILT_IN_BLOCK_NAMES, parseArticle, readArticle } from '../src/markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES, readArticle } from '../src/markdown/article.js';
+import { parseAttributes, writeAttributes } from '../src/markdown/attributes.js';
+import { serializeMarkdown } from '../src/markdown/serialize.js';
 import { formatError, sortErrors } from '../src/report.js';
-import { folder, frontMatter, html, outline, parse, parsed } from './article.js';
+import { folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
 
 const fixturesDir = new URL('./fixtures/syntax-errors/', import.meta.url);
 const markdownFixtures = [
@@ -203,6 +205,124 @@ describe('headings and anchors', () => {
   }
 });
 
+describe('attributes', () => {
+  test('writes attributes in a form that the reader reads back to the same values', () => {
+    const written = [
+      ['{toggle}', { toggle: true }],
+      ['{title="text with spaces"}', { title: 'text with spaces' }],
+      ['{#own .wide}', { id: 'own', class: 'wide' }],
+      ['{range=6 step=0.25 min=-1 width=560px}', { range: '6', step: '0.25', min: '-1', width: '560px' }],
+      [`{label='say "hi"' fn="a}b" toc="短标题" empty=""}`, { label: 'say "hi"', fn: 'a}b', toc: '短标题', empty: '' }],
+      ['{id="two words" class="a=b"}', { id: 'two words', class: 'a=b' }],
+    ];
+    for (const [text, attributes] of written) {
+      assert.equal(writeAttributes(attributes), text);
+      assert.deepEqual(parseAttributes(text).attributes, attributes);
+    }
+    for (const text of ['{#own}', "{title='single quoted'}", '{range="6"}', '{id=own}', '{.wide toggle}']) {
+      const { attributes } = parseAttributes(text);
+      assert.deepEqual(parseAttributes(writeAttributes(attributes)).attributes, attributes);
+    }
+    assert.equal(writeAttributes({ range: 6 }), '{range=6}');
+    assert.equal(writeAttributes({}), '');
+  });
+});
+
+describe('writing Markdown', () => {
+  const text = (value) => ({ type: 'text', value });
+  const paragraph = (...children) => ({ type: 'paragraph', children });
+  const list = (...items) => ({ type: 'list', ordered: false, spread: false, children: items.map((children) => ({ type: 'listItem', spread: false, children })) });
+
+  test('writes Bake syntax that the parser reads back, and escapes text that it would read as syntax', async () => {
+    const tree = {
+      type: 'root',
+      children: [
+        { type: 'heading', depth: 2, children: [text('Gates')], attributes: { id: 'gates', toc: '门控' } },
+        paragraph({ type: 'highlight', children: [text('重点')] }, text('：见 '), { type: 'eqref', label: 'eq:ffn' }, text(' 和 '), { type: 'citation', key: 'shazeer2020' }, text('，旁注'), { type: 'footnoteReference', identifier: 'gemm', label: 'gemm' }, text('。')),
+        paragraph(text('a ==b== \\eqref{x} [@key] a * b *c*')),
+        paragraph(text(':::fold')),
+        {
+          type: 'bakeBlock',
+          name: 'fold',
+          attributes: { title: '推导' },
+          children: [{ type: 'bakeBlock', name: 'aside', attributes: {}, children: [paragraph({ type: 'image', url: 'relu.svg', alt: 'A', title: 'cap', attributes: { width: '64px' } })] }],
+        },
+        { type: 'bakeBlock', name: 'list-table', attributes: {}, children: [list([list([paragraph(text('a'))], [paragraph(text('b'))])], [list([paragraph({ type: 'inlineMath', value: '|x|' })], [list([paragraph(text('c'))])])])] },
+        { type: 'verbatim', value: '[^gemm]: epilogue' },
+        { type: 'bakeBlock', name: 'references', attributes: {}, children: [list([paragraph({ type: 'citation', key: 'shazeer2020' }, text(' Shazeer.'))])] },
+        { type: 'math', value: 'y = x \\label{eq:ffn}' },
+      ],
+    };
+    const markdown = serializeMarkdown(tree);
+    assert.equal(
+      markdown,
+      [
+        '## Gates {#gates toc="门控"}',
+        '',
+        '==重点==：见 \\eqref{eq:ffn} 和 [@shazeer2020]，旁注[^gemm]。',
+        '',
+        'a \\=\\=b\\=\\= \\\\eqref{x} \\[@key] a * b \\*c\\*',
+        '',
+        '\\:::fold',
+        '',
+        '::::fold{title="推导"}',
+        ':::aside',
+        '![A](relu.svg "cap"){width=64px}',
+        ':::',
+        '::::',
+        '',
+        ':::list-table',
+        '* - a',
+        '  - b',
+        '* - $|x|$',
+        '  - - c',
+        ':::',
+        '',
+        '[^gemm]: epilogue',
+        '',
+        ':::references',
+        '- [@shazeer2020] Shazeer.',
+        ':::',
+        '',
+        '$$',
+        'y = x \\label{eq:ffn}',
+        '$$',
+        '',
+      ].join('\n'),
+    );
+    const { article, errors } = await parse(markdown, { folder: folder(`${exampleBlog}content/posts/syntax`) });
+    assert.deepEqual(errors, []);
+    assert.deepEqual(article.sections[0].blocks.map((block) => block.type), ['paragraph', 'paragraph', 'paragraph', 'fold', 'list-table', 'references', 'math']);
+    assert.equal(outline(article.sections[0].blocks[1].html), '<p>a ==b== \\eqref{x} [@key] a * b *c*</p>');
+    assert.equal(outline(article.sections[0].blocks[2].html), '<p>:::fold</p>');
+  });
+
+  test('escapes every asterisk of a run next to text, also in strong text, next to an escaped character and in a table cell, so the text renders unchanged', async () => {
+    const cell = (value) => ({ type: 'tableCell', children: [text(value)] });
+    const tree = {
+      type: 'root',
+      children: [
+        paragraph(text('x**a**')),
+        paragraph(text('中**文**')),
+        paragraph(text('2**10')),
+        paragraph(text('x **a** y')),
+        paragraph(text(' **a** ')),
+        paragraph({ type: 'strong', children: [text('2**3 = 8')] }),
+        paragraph(text('a *`b`* and *[c]* d')),
+        { type: 'table', align: [null], children: [{ type: 'tableRow', children: [cell('h')] }, { type: 'tableRow', children: [cell('**a**')] }] },
+      ],
+    };
+    const { article, errors } = await parse(serializeMarkdown(tree));
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      article.intro.map((block) => outline(block.html).replace(/<[^>]+>|\s/g, '')),
+      ['x**a**', '中**文**', '2**10', 'x**a**y', '**a**', '2**3=8', 'a*`b`*and*[c]*d', 'h**a**'],
+    );
+    assert.equal(article.intro.some((block) => /<em>/.test(block.html)), false);
+    assert.equal(article.intro.filter((block) => /<strong>/.test(block.html)).length, 1);
+  });
+});
+
 describe('inline syntax', () => {
   test('renders highlight, emphasis, strikethrough, code, links and math', async () => {
     assert.equal(
@@ -270,6 +390,21 @@ describe('aside and fold', () => {
     const article = await parsed(':::aside\n```markdown\n:::\n```\n~~~~\n:::\n~~~\n:::\n~~~~\n:::\n\n## After\n');
     assert.equal(outline(article.intro[0].html), '<aside class="aside">\n```markdown\n:::\n```\n```\n:::\n~~~\n:::\n```\n</aside>');
     assert.deepEqual(article.sections.map((section) => section.id), ['after']);
+  });
+
+  test('reads a code fence inside a block only with up to three spaces of indentation, so indented code does not hide the closing line', async () => {
+    const indented = await parsed(':::fold{title="x"}\nIntro.\n\n    ```\n    not a fence\n\n:::\n\nTabbed.\n\n:::aside\nIntro.\n\n\t```\n\tnot a fence\n\n:::\n\nAfter.\n');
+    assert.deepEqual(
+      indented.intro.map((block) => [block.type, block.line, block.endLine]),
+      [
+        ['fold', 7, 13],
+        ['paragraph', 15, 15],
+        ['aside', 17, 23],
+        ['paragraph', 25, 25],
+      ],
+    );
+    const fenced = await parsed(':::aside\n   ```\n:::\n   ```\n:::\n\nAfter.\n');
+    assert.equal(outline(fenced.intro[0].html), '<aside class="aside">\n```\n:::\n```\n</aside>');
   });
 
   test('treats a line that starts with ::: followed by prose as text', async () => {

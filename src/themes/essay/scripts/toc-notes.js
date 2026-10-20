@@ -1,5 +1,4 @@
-import { closeOnEscape } from './escape.js';
-import { reducedMotion } from './motion.js';
+import { closeOnEscape, reducedMotion } from 'bake/theme/client';
 import { createElement } from './toc-card.js';
 import { ticksColumn } from './toc-ticks.js';
 
@@ -11,9 +10,12 @@ const CLOSE_DELAY = 220;
 export function notesColumn(nav, context) {
   const column = nav.querySelector('.bk-toc-column');
   const list = notesList(nav.querySelector('.bk-toc-list'), context);
+  let columnTop = null;
   return {
     update(state) {
-      column.style.setProperty('--column-top', `${Math.max(0, Math.round(column.getBoundingClientRect().top))}px`);
+      const top = `${Math.max(0, Math.round(column.getBoundingClientRect().top))}px`;
+      if (top !== columnTop) column.style.setProperty('--column-top', top);
+      columnTop = top;
       list.update(state);
     },
     relayout: list.relayout,
@@ -72,7 +74,11 @@ export function notesRailView(context) {
     });
   }
   context.host.append(ticks.element, panel);
-  closeOnEscape(panel, () => close(0));
+  closeOnEscape(panel, () => {
+    const wasOpen = isOpen();
+    close(0);
+    return wasOpen;
+  });
   return {
     columns: [ticks.element],
     update(state) {
@@ -109,6 +115,7 @@ function notesList(list, context) {
   const rows = chapters.flatMap((chapter) => [chapter.title, ...chapter.sections]);
   let current = -1;
   let shown = null;
+  let drawn = null;
   let followTimer = 0;
   let hovered = false;
 
@@ -156,6 +163,9 @@ function notesList(list, context) {
     centre,
     relayout: placeMarker,
     update(state) {
+      const key = `${state.entry} ${state.chapter} ${state.section} ${state.read.join()}`;
+      if (key === drawn) return;
+      drawn = key;
       current = state.entry;
       chapters.forEach((chapter, chapterIndex) => {
         const relation = chapterIndex < state.chapter ? 'read' : chapterIndex === state.chapter ? 'current' : 'ahead';

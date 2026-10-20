@@ -2,10 +2,11 @@ import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import { createGzip } from 'node:zlib';
-import { contentType } from '../src/build/content-types.js';
+import { contentType } from '../src/content-types.js';
 
 export async function serveStatic(dir, { gzip = false } = {}) {
   const root = resolve(dir);
+  const assets = join(root, 'assets');
   const server = createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
     let path = resolve(join(root, pathname));
@@ -23,12 +24,13 @@ export async function serveStatic(dir, { gzip = false } = {}) {
   });
   const send = (request, response, status, path) => {
     const type = contentType(path);
+    const cache = path.startsWith(`${assets}${sep}`) ? { 'cache-control': 'max-age=600' } : {};
     if (gzip && compressible(type) && /\bgzip\b/.test(request.headers['accept-encoding'] ?? '')) {
-      response.writeHead(status, { 'content-type': type, 'content-encoding': 'gzip', vary: 'accept-encoding' });
+      response.writeHead(status, { 'content-type': type, 'content-encoding': 'gzip', vary: 'accept-encoding', ...cache });
       createReadStream(path).pipe(createGzip()).pipe(response);
       return;
     }
-    response.writeHead(status, { 'content-type': type });
+    response.writeHead(status, { 'content-type': type, ...cache });
     createReadStream(path).pipe(response);
   };
   await new Promise((done) => server.listen(0, '127.0.0.1', done));

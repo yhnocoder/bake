@@ -1,3 +1,4 @@
+import { escapeMarkup } from '../escape.js';
 import { articleSource } from '../copy/copy.js';
 
 export const CATALOG_PATH = '_bake/articles.json';
@@ -7,7 +8,7 @@ export const READ_ARTICLE = 'read_article';
 const MAX_TOOL_TEXT = 120000;
 const UI = '[data-ui]';
 
-export const blogTools = [
+export const chatTools = [
   {
     type: 'function',
     function: {
@@ -58,22 +59,58 @@ export function loadCatalog(root, { fetch = globalThis.fetch } = {}) {
   return catalogRequest;
 }
 
-export function articlePrompt(page) {
+export function scopeOptions(catalog, labels) {
+  const articles = catalog.articles.map((entry) => ({ kind: 'article', id: `article:${entry.url}`, label: entry.title, meta: entry.date.slice(0, 7), search: `${entry.title} ${entry.url}`, urls: [entry.url] }));
+  const months = groups(catalog.articles, (entry) => [entry.date.slice(0, 7)]).map(([month, entries]) => ({ kind: 'month', id: `month:${month}`, label: month, meta: labels.articleCount(entries.length), search: month, urls: entries.map((entry) => entry.url) }));
+  const categories = groups(catalog.articles, (entry) => (entry.category === undefined ? [] : [entry.category])).map(([name, entries]) => ({ kind: 'topic', id: `category:${name}`, label: name, meta: labels.categoryCount(entries.length), search: name, urls: entries.map((entry) => entry.url) }));
+  const tags = groups(catalog.articles, (entry) => entry.tags).map(([tag, entries]) => ({ kind: 'topic', id: `tag:${tag}`, label: `#${tag}`, meta: labels.tagCount(entries.length), search: tag, urls: entries.map((entry) => entry.url) }));
+  return [...articles, ...months, ...categories, ...tags];
+}
+
+export function matchingScopes(options, query, picked) {
+  const words = query.toLowerCase();
+  return options.filter((option) => !picked.some((scope) => scope.id === option.id) && `${option.label} ${option.search}`.toLowerCase().includes(words));
+}
+
+function groups(entries, keysOf) {
+  const map = new Map();
+  for (const entry of entries) {
+    for (const key of keysOf(entry)) map.set(key, [...(map.get(key) ?? []), entry]);
+  }
+  return [...map];
+}
+
+export function systemPrompt({ page, catalog, scopes = [], sources = [] }) {
+  const where = page.article === null ? `on the page ${page.address}` : `reading the article "${page.title}" at ${page.address}`;
+  const intro = [`You are the reading assistant of the blog "${catalog.title}"${catalog.description === undefined ? '' : ` (${catalog.description})`}. The reader is ${where}.`, ...commonRules];
+  const links = 'Link articles and sections with their addresses and section ids, such as [the article](/2026-10/rope/) or [the section](/2026-10/rope/#id).';
+  if (scopes.length > 0) {
+    const listed = new Set(scopes.filter((scope) => scope.kind !== 'article').flatMap((scope) => scope.urls));
+    return [
+      ...intro,
+      `The reader limited the question to ${scopes.map((scope) => scope.label).join(', ')}. Answer from these articles. Say so when they do not cover something, and mark what you add from elsewhere.`,
+      links,
+      ...sources.map((source) => [`<article address="${escapeMarkup(`/${source.url}`)}" title="${escapeMarkup(source.title)}">`, source.content, '</article>'].join('\n')),
+      ...(listed.size === 0 ? [] : [`Read these articles with ${READ_ARTICLE} before you answer; read every one that may be relevant. They are listed one JSON object per line:`, ...catalogLines(catalog.articles.filter((entry) => listed.has(entry.url)))]),
+    ].join('\n');
+  }
+  const blog = [`The blog's articles are listed below, one JSON object per line. Before you answer a question about the content of other articles, call ${READ_ARTICLE} with their addresses and read them; read several when the question spans articles. Do not describe content you have not read.`, links, ...catalogLines(catalog.articles)];
+  if (page.article === null) return [...intro, ...blog].join('\n');
   const outline = page.article.outline.map((heading) => `${heading.depth === 3 ? '  ' : ''}- #${heading.id} ${heading.title}`);
   return [
-    `You are the reading assistant of the blog "${page.site}". The reader is reading the article "${page.title}" at ${page.address}. Its Markdown source is between the <article> tags below.`,
-    'Answer questions about this article. Base your answers on the article. Say so when the article does not cover something, and mark what you add from outside the article.',
-    ...commonRules,
-    'When you refer to a part of the article, link it with its id, such as [the heading](#id). The headings and their ids are:',
+    ...intro,
+    `Questions are about this article unless the reader asks about others. Its Markdown source is between the <article> tags below. Base your answers on the article. Say so when it does not cover something, and mark what you add from outside the blog.`,
+    'When you refer to a part of this article, link it with its id, such as [the heading](#id). The headings and their ids are:',
     ...(outline.length === 0 ? ['(the article has no headings)'] : outline),
     '<article>',
     page.article.source,
     '</article>',
+    ...blog,
   ].join('\n');
 }
 
-export function blogPrompt(page, catalog) {
-  const lines = catalog.articles.map((entry) =>
+function catalogLines(entries) {
+  return entries.map((entry) =>
     JSON.stringify({
       address: `/${entry.url}`,
       title: entry.title,
@@ -84,14 +121,6 @@ export function blogPrompt(page, catalog) {
       sections: entry.sections.length === 0 ? undefined : entry.sections.map(sectionLine),
     }),
   );
-  const where = page.article === null ? `on the page ${page.address}` : `reading the article "${page.title}" at ${page.address}`;
-  return [
-    `You are the reading assistant of the blog "${catalog.title}"${catalog.description === undefined ? '' : ` (${catalog.description})`}. The reader is ${where}.`,
-    `The blog's articles are listed below, one JSON object per line. Before you answer a question about the content of articles, call ${READ_ARTICLE} with their addresses and read them; read several when the question spans articles. Do not describe content you have not read.`,
-    ...commonRules,
-    'Link articles and sections with their addresses and section ids, such as [the article](/2026-10/rope/) or [the section](/2026-10/rope/#id).',
-    ...lines,
-  ].join('\n');
 }
 
 const commonRules = [

@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { article, bake, writeFiles } from '../blog.js';
+import { openWithSelectionModule } from './selection-module.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
@@ -138,7 +139,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         if (width < 1000) continue;
         if (covered) problems.push(`${at}: a button covers a card or the intro`);
         if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
-        if (chatGap < 16 || chatGap > 32) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
+        if (Math.abs(chatGap - 24) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
         if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
       }
     }
@@ -296,7 +297,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   await t.test('copying a selection or the whole article gives its Markdown', async () => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await context.newPage();
-    await page.goto(`${origin}/2026-10/activations/`);
+    await openWithSelectionModule(page, `${origin}/2026-10/activations/`);
     await settle(page);
     const lines = activationsSource.split('\n');
     const between = (first, last) => {

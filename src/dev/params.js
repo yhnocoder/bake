@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { folderFile } from '../config/rules.js';
 import { convertAttribute, valueProblem } from '../components/declarations.js';
-import { BARE_VALUE, attributeTokens } from '../markdown/attributes.js';
+import { attributeTokens, writeAttribute } from '../markdown/attributes.js';
 import { describeValue } from '../report.js';
 
 const DIRECTIVE = /^((?:[ \t]*>)*[ \t]*)(:{3,})([A-Za-z][\w-]*)/;
@@ -51,22 +51,13 @@ function paramEdit(name, param, declaration, value, token, files) {
   const current = token === undefined ? declaration.default : convertAttribute(declaration, token.value).value;
   if (current === value) return {};
   if (value === declaration.default) return { text: null };
-  const text = attributeText(param, declaration, value);
+  const text = writeAttribute(param, value);
   return text === null ? { error: `parameter "${param}" of ${name} cannot be written as an attribute, because its text contains both " and '` } : { text };
 }
 
 function fileProblem(declaration, value, files) {
   if (declaration.type !== 'file' || value === '' || folderFile(value, files) !== null) return null;
   return `must be a file in the article folder, got ${describeValue(value)}`;
-}
-
-function attributeText(param, declaration, value) {
-  if (declaration.type === 'boolean') return value ? param : `${param}=false`;
-  if (declaration.type === 'number') return `${param}=${String(value)}`;
-  if (BARE_VALUE.test(value)) return `${param}=${value}`;
-  if (!value.includes('"')) return `${param}="${value}"`;
-  if (!value.includes("'")) return `${param}='${value}'`;
-  return null;
 }
 
 function joinAttributes(text, tokens, edits) {

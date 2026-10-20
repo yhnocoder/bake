@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { bake } from '../blog.js';
+import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 
@@ -16,11 +16,12 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.equal(result.status, 0);
+  const origin = await serve(t, join(dir, 'dist'));
 
   const browser = await chromium.launch();
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(pathToFileURL(join(dir, 'dist/2026-10/syntax/index.html')).href);
+  await page.goto(`${origin}/2026-10/syntax/`);
   await page.evaluate(() => document.fonts.ready);
   const report = await page.evaluate(() => {
     const containers = [...document.querySelectorAll('mjx-container')];
@@ -79,7 +80,7 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   assert.deepEqual(card.duplicateIds, []);
 
   const phone = await browser.newPage({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
-  await phone.goto(pathToFileURL(join(dir, 'dist/2026-10/syntax/index.html')).href);
+  await phone.goto(`${origin}/2026-10/syntax/`);
   const opened = [];
   for (const number of report.notesWithMath) {
     await phone.locator(`.sidenote-ref[data-sidenote="${number}"] a`).first().tap();

@@ -17,7 +17,7 @@ export default function Page(props) {
     <html lang={props.site.language}>
       <head>
         <For each={props.assets.styles}>{(href) => <link rel="stylesheet" href={href} />}</For>
-        <For each={props.assets.scripts}>{(src) => <script defer src={src} />}</For>
+        <For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>
       </head>
       <body>
         <main innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
@@ -27,7 +27,7 @@ export default function Page(props) {
 }
 `;
 
-const siteFiles = ['404.html', '_bake/articles.json', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
+const siteFiles = ['404.html', '_bake/articles.json', '_bake/pet/LICENSE.txt', '_bake/pet/frame.webp', '_bake/pet/pet.json', '_bake/pet/spritesheet.webp', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
 
 function articleFiles(tree) {
   return Object.keys(tree).filter((path) => !path.startsWith('assets/') && !path.startsWith('og/') && !siteFiles.includes(path));
@@ -251,7 +251,7 @@ describe('bake build', () => {
     cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    assert.equal(result.stdout, '5 pages\ndist/ written\n');
+    assert.equal(result.stdout, '7 pages\ndist/ written\n');
     const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
     assert.match(page, /<h1 class="bk-title">Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
@@ -421,8 +421,8 @@ describe('bake build', () => {
       '2026-10/host/index.html src ../../2026-10/files/a%231.webp',
       '2026-10/host/index.html href ../../2026-10/files/b%3F1.json',
       '2026-10/host/index.html data-params ../../2026-10/files/a%231.png',
-      '2026-10/plain/index.html href ../../assets/plain%231%20%25-',
-      '2026-10/plain/index.html src ../../assets/plain%231%20%25-',
+      '2026-10/plain/index.html href ../../assets/plain_1%20_-',
+      '2026-10/plain/index.html src ../../assets/plain_1%20_-',
       'index.html data-preview 2026-10/files/c%251.js',
       'index.html src 2026-10/host/d%20e.svg',
     ]) {

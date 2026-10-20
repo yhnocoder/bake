@@ -1,5 +1,5 @@
 import { fragmentOf } from 'bake/fragments';
-import { closeOnEscape } from './escape.js';
+import { closeOnEscape } from 'bake/theme/client';
 
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';
@@ -126,9 +126,9 @@ export function hoverIntent(delay) {
       clearTimeout(hideTimer);
       shown = false;
     },
-    dismiss(entry) {
+    dismiss(entry, elements) {
       this.stop();
-      dismissed = entry;
+      dismissed = elements.some((element) => element?.matches(':hover')) ? entry : null;
     },
   };
 }
@@ -169,6 +169,7 @@ export function cardKeyboard({ groups, card, shown, leave, close }) {
     // why: the entry takes the focus while the card is still shown, because its focus listener opens the card when it is closed
     if (index >= 0 && card.contains(document.activeElement)) groups[index].at(-1).focus({ preventScroll: true });
     close();
+    return index >= 0;
   });
 }
 

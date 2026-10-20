@@ -28,6 +28,7 @@ describe('bake.config.js', () => {
       bento: { columns: 4 },
       home: { columns: 3, groupBy: 'month' },
       categories: [],
+      chat: { pet: 'crt-monitor' },
     });
     assert.ok(Object.isFrozen(config));
     assert.ok(Object.isFrozen(config.home));

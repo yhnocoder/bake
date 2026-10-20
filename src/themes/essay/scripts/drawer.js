@@ -1,4 +1,4 @@
-import { closeOnEscape } from './escape.js';
+import { closeOnEscape } from 'bake/theme/client';
 import { chapterCard, createElement } from './toc-card.js';
 
 const CLOSE_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -73,9 +73,10 @@ export function drawerView(context) {
     handle.focus();
   });
   closeOnEscape(drawer, () => {
-    if (!isOpen()) return;
+    if (!isOpen()) return false;
     setOpen(false);
     handle.focus();
+    return true;
   });
 
   return {
