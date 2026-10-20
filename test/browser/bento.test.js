@@ -117,7 +117,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the settings button and the AI chat button sit on one line in equal gutters and cover no card and not the text before the first section from 1340 pixels up', async () => {
+  await t.test('the settings button and the AI chat button sit on one line in equal gutters and cover no card and not the text before the first section from 1000 pixels up', async () => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
@@ -145,7 +145,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         const at = `${url} at ${width}px`;
         if (Math.abs(bottoms[0] - bottoms[1]) > 0.5) problems.push(`${at}: the buttons end at ${bottoms.join(' and ')}`);
         if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
-        if (width < 1340) continue;
+        if (width < 1000) continue;
         if (covered) problems.push(`${at}: a button covers a card or the intro`);
         if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
         if (Math.abs(chatGap - 12) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
