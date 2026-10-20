@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import { article, bake, writeFiles } from '../blog.js';
 import { serve } from './server.js';
 
@@ -178,6 +179,81 @@ test('the essay theme lays out articles', async (t) => {
     await page.setViewportSize({ width: 375, height: 900 });
     await settle(page);
     assert.deepEqual(await columns(), { sideBySide: false, stacked: true });
+    await page.close();
+  });
+
+  await t.test('a table wider than its column keeps the right border of its frame while it scrolls', async () => {
+    for (const [path, width] of [
+      ['syntax', 1440],
+      ['syntax', 375],
+      ['stress', 1440],
+    ]) {
+      const page = await open(path, { viewport: { width, height: 900 } });
+      const count = await page.evaluate(() => document.querySelectorAll('.bk-article .table-scroll').length);
+      let scrolled = 0;
+      for (let index = 0; index < count; index += 1) {
+        const scroller = page.locator('.bk-article .table-scroll').nth(index);
+        if (!(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth + 1))) continue;
+        for (const position of [0, 0.5]) {
+          await scroller.scrollIntoViewIfNeeded();
+          const frame = await scroller.evaluate((element, fraction) => {
+            element.scrollLeft = (element.scrollWidth - element.clientWidth) * fraction;
+            const box = element.getBoundingClientRect();
+            return { x: Math.floor(box.right) - 1, y: Math.floor(box.top + box.height / 2), border: getComputedStyle(element).borderRightColor };
+          }, position);
+          await settle(page);
+          const pixel = await page.screenshot({ clip: { x: frame.x, y: frame.y, width: 1, height: 1 } });
+          const { data } = await sharp(pixel).raw().toBuffer({ resolveWithObject: true });
+          const expected = frame.border.match(/\d+/g).map(Number);
+          const close = expected.every((channel, index) => Math.abs(channel - data[index]) <= 3);
+          assert.ok(close, `${path} at ${width}px, table ${index} scrolled to ${position}: right border is rgb(${[...data.subarray(0, 3)]}), expected ${frame.border}`);
+        }
+        scrolled += 1;
+      }
+      assert.ok(scrolled > 0, `${path} at ${width}px has a table that scrolls`);
+      await page.close();
+    }
+  });
+
+  await t.test('list table cells with text are at least 9em wide on a phone, so the table scrolls instead of stacking characters', async () => {
+    const page = await open('syntax', { viewport: { width: 375, height: 900 } });
+    const narrow = await page.evaluate(() =>
+      [...document.querySelectorAll('.bk-article table.list-table td')]
+        .filter((cell) => !cell.querySelector(':scope > :is(img, mjx-container):only-child'))
+        .map((cell) => ({ text: cell.textContent.trim().slice(0, 12), width: cell.getBoundingClientRect().width, em: parseFloat(getComputedStyle(cell).fontSize) }))
+        .filter((cell) => cell.width < cell.em * 9 - 0.5),
+    );
+    assert.deepEqual(narrow, []);
+    await page.close();
+  });
+
+  await t.test('display math in an example result fits the result beside the source and scrolls inside the result on a phone', async () => {
+    const page = await open('syntax');
+    const formulas = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('.bk-article .example-result mjx-container[display]')].map((formula) => {
+          const result = formula.closest('.example-result').getBoundingClientRect();
+          const box = formula.getBoundingClientRect();
+          return {
+            tex: formula.dataset.tex.slice(0, 24),
+            fits: formula.scrollWidth <= formula.clientWidth + 1,
+            scrolls: getComputedStyle(formula).overflowX === 'auto',
+            inside: box.left >= result.left - 0.5 && box.right <= result.right + 0.5,
+          };
+        }),
+      );
+    const wide = await formulas();
+    assert.ok(wide.length > 0);
+    assert.deepEqual(
+      wide.filter((formula) => !formula.fits || !formula.inside),
+      [],
+    );
+    await page.setViewportSize({ width: 375, height: 900 });
+    await settle(page);
+    assert.deepEqual(
+      (await formulas()).filter((formula) => !formula.inside || (!formula.fits && !formula.scrolls)),
+      [],
+    );
     await page.close();
   });
 
