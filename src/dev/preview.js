@@ -17,8 +17,7 @@ export function createPreview(root) {
     if (paths !== null) changedPaths.push(...paths);
     const result = await updateSite(site, paths);
     problems = result.errors;
-    const articleFiles = new Set(result.articles.map((article) => article.file));
-    if (result.errors.some((error) => !articleFiles.has(error.file))) return { problems, applied: false };
+    if (!result.articleErrorsOnly) return { problems, applied: false };
     const failed = new Set(result.errors.map((error) => error.file));
     const published = new Map(result.pages.map((page) => [page.article.file, page]));
     const next = new Map();
