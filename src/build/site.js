@@ -211,21 +211,25 @@ async function readMathPreamble(root, errors) {
 function linkArticles(articles, lastGood, errors) {
   const failed = new Set(errors.map((error) => error.file));
   const changed = articles.filter((article) => lastGood.has(article.file) && lastGood.get(article.file).article !== article);
-  const failedReading = changed.filter((article) => failed.has(article.file));
-  let linkErrors = linkWithLastGood(articles, failedReading, lastGood);
-  const failedLinks = new Set(linkErrors.map((error) => error.file));
-  const failing = changed.filter((article) => failed.has(article.file) || failedLinks.has(article.file));
-  if (failing.length > failedReading.length) linkErrors = linkWithLastGood(articles, failing, lastGood);
+  const failing = new Set(changed.filter((article) => failed.has(article.file)));
+  let linkErrors;
+  let size;
+  do {
+    size = failing.size;
+    linkErrors = linkWithLastGood(articles, failing, lastGood);
+    const failedLinks = new Set(linkErrors.map((error) => error.file));
+    for (const article of changed) if (failedLinks.has(article.file)) failing.add(article);
+  } while (failing.size > size);
   for (const article of articles) article.content = article.document?.structure() ?? null;
   errors.push(...linkErrors);
 }
 
 function linkWithLastGood(articles, failing, lastGood) {
   const errors = [];
-  const shown = articles.map((article) => (failing.includes(article) ? lastGood.get(article.file).article : article));
+  const shown = articles.map((article) => (failing.has(article) ? lastGood.get(article.file).article : article));
   const index = indexPages(shown.map(linkTarget));
   for (const article of articles) {
-    const own = failing.includes(article) ? indexPages(articles.map((other, position) => linkTarget(other === article ? article : shown[position]))) : index;
+    const own = failing.has(article) ? indexPages(articles.map((other, position) => linkTarget(other === article ? article : shown[position]))) : index;
     article.document?.link(own, errors);
   }
   return errors;
