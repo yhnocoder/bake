@@ -1,11 +1,11 @@
-import { Block, HeadingLink, Sidenotes, arrange } from '../essay/article.jsx';
+import { Block, HeadingLink, Sidenotes, arrange, subsectionRecap } from '../essay/article.jsx';
 
 const SPAN_OF_WIDTH = { body: '1', wide: '2', page: 'page' };
 const NARROW_COLUMNS = 2;
 
 export function Article(props) {
   const { content, columns, labels } = props;
-  const { intro, sections, rest } = arrange(content);
+  const { intro, sections, rest } = arrange(content, { recaps: true });
   const introNotes = intro.flatMap((entry) => entry.notes);
   return (
     <article class="bk-article bt-article" data-region="article">
@@ -31,7 +31,7 @@ export function Article(props) {
               <Recap html={section.recap} />
               {entries.map(({ block, afterHeading }) => [
                 <Block block={block} afterHeading={afterHeading} labels={labels} />,
-                <Recap html={block.type === 'heading' ? recapOf(section, block.id) : undefined} />,
+                <Recap html={block.type === 'heading' ? subsectionRecap(section, block.id) : undefined} />,
               ])}
               <Notes notes={[...notes, ...entries.flatMap((entry) => entry.notes)]} labels={labels} />
             </section>
@@ -46,10 +46,6 @@ export function Article(props) {
 function Recap(props) {
   if (props.html === undefined) return null;
   return <div class="recap bt-recap" innerHTML={props.html} />;
-}
-
-function recapOf(section, id) {
-  return section.subsections.find((subsection) => subsection.id === id)?.recap;
 }
 
 function Notes(props) {
