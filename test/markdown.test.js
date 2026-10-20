@@ -135,6 +135,18 @@ describe('headings and anchors', () => {
     ]);
   });
 
+  test('gives a ## section the card columns and rows written on its heading', async () => {
+    const article = await parsed('## First {cols=2 rows=23}\n\nA.\n\n## Second {cols=3}\n\nB.\n\n## Third\n\nC.\n');
+    assert.deepEqual(
+      article.sections.map(({ cols, rows }) => ({ cols, rows })),
+      [
+        { cols: 2, rows: 23 },
+        { cols: 3, rows: undefined },
+        { cols: undefined, rows: undefined },
+      ],
+    );
+  });
+
   test('keeps the source text and the lines of each heading, counted from the first line of the file', async () => {
     const body = 'Intro.\n\n## First\n\nA.\n\nSecond\n------\n\n### Inner\n';
     const article = await parsed(body);
@@ -193,6 +205,12 @@ describe('headings and anchors', () => {
   const headingErrors = [
     ['## A {width=full}', 'index.md:7:6 width must be body, wide or page, got "full"'],
     ['### A {width=wide}', 'index.md:7:7 width only applies to ## headings'],
+    ['## A {cols=0}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
+    ['## A {cols=1.5}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
+    ['## A {rows}', 'index.md:7:6 rows must be a whole number of card rows from 1 to 200, for example rows=12'],
+    ['## A {cols=7}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
+    ['## A {rows=201}', 'index.md:7:6 rows must be a whole number of card rows from 1 to 200, for example rows=12'],
+    ['### A {cols=2 rows=3}', 'index.md:7:7 cols only applies to ## headings', 'index.md:7:7 rows only applies to ## headings'],
     ['## A {toc}', 'index.md:7:6 toc must be a short title in quotes, for example toc="Short title"'],
     ['## A {id}', 'index.md:7:6 id must be an anchor name, for example {#intro}'],
     ['## A {.red}', 'index.md:7:6 unknown attribute "class" on heading'],
@@ -200,9 +218,9 @@ describe('headings and anchors', () => {
     ['## A {toc="unclosed}', 'index.md:7:6 cannot read the attributes {toc="unclosed}; write them as {#id key=value key="text with spaces"}'],
     ['# Title', 'index.md:7:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##'],
   ];
-  for (const [line, message] of headingErrors) {
-    test(`reports ${message.slice(message.indexOf(' ') + 1)}`, async () => {
-      assert.deepEqual((await parse(`${line}\n`)).errors, [message]);
+  for (const [line, ...messages] of headingErrors) {
+    test(`reports ${messages[0].slice(messages[0].indexOf(' ') + 1)} for ${line}`, async () => {
+      assert.deepEqual((await parse(`${line}\n`)).errors, messages);
     });
   }
 });

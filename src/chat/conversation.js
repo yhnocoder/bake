@@ -25,11 +25,11 @@ export async function answer({ key, system, history, tools, runTool, thinking, s
     added.push(message);
     if (finish !== 'tool_calls' || message.tool_calls === undefined) return { added, turn };
     for (const call of message.tool_calls) {
-      const read = { name: call.function.name, label: null, failed: false, done: false };
+      const read = { name: call.function.name, label: null, url: null, failed: false, done: false };
       turn.reads.push(read);
       update();
       const result = await runTool(call.function.name, parseArguments(call.function.arguments));
-      Object.assign(read, { label: result.label, failed: result.failed === true, done: true });
+      Object.assign(read, { label: result.label, url: result.url ?? null, failed: result.failed === true, done: true });
       update();
       added.push({ role: 'tool', tool_call_id: call.id, content: result.content });
     }

@@ -78,7 +78,7 @@ export default function preview(element) {
 
 ## 标题与锚点 {#headings toc="标题"}
 
-二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写三种属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`width` 是这一节在 bento 主题里的卡片宽度，essay 主题忽略它。
+二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写这些属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`cols` 和 `rows` 是这一节在 bento 主题里的卡片占几列、几行，例如 `## ReLU {cols=2 rows=23}`，`cols` 可以写 1 到 6，`rows` 可以写 1 到 200，不写 `rows` 时卡片和内容一样高；`width` 也给出 bento 卡片的宽度，`body` 占三分之一的列，`wide` 占一半，`page` 占满一行，写了 `cols` 时以 `cols` 为准。`cols`、`rows` 和 `width` 只能写在 `##` 标题上，essay 主题忽略它们。
 
 :::example
 ### 三级标题 {#third-level toc="短标题"}
@@ -509,6 +509,7 @@ def silu(x):
 | toc 取值不对 | `toc: sidebar` | `toc must be notes, tabs, dots or ticks, got "sidebar"` |
 | 同一页的锚点重复 | 两个标题都写 `{#intro}` | `duplicate anchor "intro", first defined at 7:7` |
 | 标题有不认识的属性 | `## 引言 {color=red}` | `unknown attribute "color" on heading` |
+| 卡片列数不是正整数 | `## 卡片 {cols=0}` | `cols must be a whole number of card columns from 1 to 6, for example cols=2` |
 | 不认识的块 | `:::warning` | `unknown block ":::warning"` |
 | 宽度取值不对 | `:::{width=full}` | `width must be body, wide or page, got "full"` |
 | 脚注没有定义 | `[^gemm]` 没有对应的 `[^gemm]:` | `footnote "gemm" has no definition` |

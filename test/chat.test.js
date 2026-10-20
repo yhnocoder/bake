@@ -7,11 +7,13 @@ import { basename, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
-import { chatTools, matchingScopes, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
+import { CHAT_RULES, chatTools, matchingScopes, pageAddress, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
 import { chatLabels } from '../src/chat/labels.js';
 import { PetError, sheetFile } from '../src/chat/reader-pet.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
+import { HISTORY_CHARACTERS, HISTORY_LIMIT, NOTE_VERSION_LIMIT, addNoteVersion, deleteConversation, historyGroups, historyKey, readHistory, roundMessages, saveConversation, storedRound } from '../src/chat/history.js';
+import { checkNote, citedEntries, exportMarkdown, noteFileName, noteHtml, notePrompt, noteRules, noteTitle } from '../src/chat/note.js';
 import { linkTarget, replyHtml } from '../src/chat/reply.js';
 import { openKey, sealKey } from '../src/chat/vault.js';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
@@ -189,6 +191,8 @@ describe('AI chat replies', () => {
 
   test('resolves links against the site root, opens external links in a new tab and drops unsafe ones', () => {
     assert.deepEqual(linkTarget('#angles', root), { href: '#angles', external: false });
+    assert.deepEqual(linkTarget('#angles', root, '/2026-10/rope/'), { href: 'https://example.com/blog/2026-10/rope/#angles', external: false });
+    assert.equal(linkTarget('#x', root, 'javascript:alert(1)//'), null);
     assert.deepEqual(linkTarget('/2026-10/rope/#angles', root), { href: 'https://example.com/blog/2026-10/rope/#angles', external: false });
     assert.deepEqual(linkTarget('2026-10/rope/', root), { href: 'https://example.com/blog/2026-10/rope/', external: false });
     assert.deepEqual(linkTarget('https://arxiv.org/abs/2104.09864', root), { href: 'https://arxiv.org/abs/2104.09864', external: true });
@@ -269,7 +273,7 @@ describe('AI chat conversation', () => {
       fetch,
       runTool: async (name, args) => {
         calls.push([name, args]);
-        return { content: '# Rope', label: 'Rope' };
+        return { content: '# Rope', label: 'Rope', url: '2026-10/rope/' };
       },
       onUpdate: (state) => updates.push(state),
     });
@@ -281,7 +285,7 @@ describe('AI chat conversation', () => {
       { role: 'tool', tool_call_id: 'c1', content: '# Rope' },
     ]);
     assert.equal(added.length, 3);
-    assert.deepEqual(turn, { reasoning: 'Need it.', content: 'Reading.\n\nRope rotates [pairs](/2026-10/rope/#pairs).', reads: [{ name: READ_ARTICLE, label: 'Rope', failed: false, done: true }] });
+    assert.deepEqual(turn, { reasoning: 'Need it.', content: 'Reading.\n\nRope rotates [pairs](/2026-10/rope/#pairs).', reads: [{ name: READ_ARTICLE, label: 'Rope', url: '2026-10/rope/', failed: false, done: true }] });
     assert.ok(updates.some((state) => state.reads.length === 1 && !state.reads[0].done));
     assert.notEqual(updates.at(-1).reads[0], turn.reads[0]);
   });
@@ -315,7 +319,7 @@ describe('AI chat context', () => {
 
   test('lists every article with its address and sections in the prompt for the whole blog', () => {
     const prompt = systemPrompt({ page: { address: '/', title: 'Test Blog', article: null }, catalog });
-    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is on the page \/\./);
+    assert.ok(prompt.startsWith(`${CHAT_RULES}\nThe blog is "Test Blog" (Notes.). The reader is on the page /.\n`));
     assert.ok(prompt.includes('{"address":"/2026-10/rope/","title":"Rope","date":"2026-10-19","summary":"Rotary.","sections":["#angles 01 Angles | #pairs Pairs"]}'));
     assert.ok(prompt.includes('{"address":"/2026-09/demo/","title":"Demo","date":"2026-09-05","tags":["html"]}'));
     assert.ok(!prompt.includes('<article'));
@@ -323,7 +327,7 @@ describe('AI chat context', () => {
 
   test('puts the source and the headings of the article and then the other articles in the prompt on an article page', () => {
     const prompt = systemPrompt({ page, catalog });
-    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is reading the article "Rope" at \/2026-10\/rope\/\./);
+    assert.ok(prompt.startsWith(`${CHAT_RULES}\nThe blog is "Test Blog" (Notes.). The reader is reading the article "Rope" at /2026-10/rope/.\n`));
     assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>\n/);
     assert.ok(prompt.indexOf('</article>') < prompt.indexOf('{"address":"/2026-09/demo/"'));
   });
@@ -369,12 +373,232 @@ describe('AI chat context', () => {
   test('reads an article by its address in any common form and reports unknown addresses', async () => {
     for (const address of ['/2026-10/rope/', '2026-10/rope', 'https://example.com/blog/2026-10/rope/index.html']) {
       const { fetch, requests } = fakeFetch(new Response('# Rope source'));
-      assert.deepEqual(await readArticle(root, catalog, address, { fetch }), { content: '# Rope source', label: 'Rope' });
+      assert.deepEqual(await readArticle(root, catalog, address, { fetch }), { content: '# Rope source', label: 'Rope', url: '2026-10/rope/' });
       assert.equal(requests[0].url, 'https://example.com/blog/2026-10/rope/index.md');
     }
     const { fetch } = fakeFetch(new Response('missing', { status: 404 }));
-    assert.deepEqual(await readArticle(root, catalog, '/2026-10/rope/', { fetch }), { content: 'The article could not be read: the server answered 404', label: 'Rope', failed: true });
+    assert.deepEqual(await readArticle(root, catalog, '/2026-10/rope/', { fetch }), { content: 'The article could not be read: the server answered 404', label: 'Rope', url: '2026-10/rope/', failed: true });
     assert.deepEqual(await readArticle(root, catalog, '/nowhere/', { fetch }), { content: 'There is no article at "/nowhere/". Use an address from the list.', label: '/nowhere/', failed: true });
+  });
+});
+
+describe('AI chat notes', () => {
+  const catalog = {
+    title: 'Test Blog',
+    articles: [
+      { url: '2026-10/rope/', title: 'Rope', date: '2026-10-19', tags: [], sections: [{ id: 'angles', number: '01', title: 'Angles', subsections: [{ id: 'pairs', title: 'Pairs' }] }, { id: '定义', number: '02', title: '定义', subsections: [] }] },
+      { url: '2026-09/demo/', title: 'Demo', date: '2026-09-05', tags: [], sections: [] },
+      { url: '2026-08/gelu/', title: 'GELU', date: '2026-08-05', tags: [], sections: [] },
+    ],
+  };
+  const labels = chatLabels('zh');
+  const round = (content, extra = {}) => ({ ask: { content: 'Q', scopes: [], bubble: { text: 'Q', quote: null, scopes: [] } }, content, reasoning: '', reads: [], ...extra });
+
+  test('keeps the links to articles and sections of the blog, turns the others into text and counts the cited articles', () => {
+    const markdown = [
+      '# Rope',
+      '',
+      '- One [Rope §01](/2026-10/rope/#angles), [pairs](#pairs) and [定义](https://example.com/blog/2026-10/rope/#%E5%AE%9A%E4%B9%89).',
+      '- Two [Demo](2026-09/demo/) and [missing](/2026-10/missing/) and [no section](/2026-10/rope/#nowhere).',
+      '- Three [web](https://example.org/x) and [script](javascript:alert(1)) and [other site](//example.org/) and [outside](https://example.com/other/).',
+    ].join('\n');
+    const checked = checkNote(`${markdown}\n\n`, { root, catalog, base: '/2026-10/rope/' });
+    assert.equal(
+      checked.markdown,
+      [
+        '# Rope',
+        '',
+        '- One [Rope §01](/2026-10/rope/#angles), [pairs](/2026-10/rope/#pairs) and [定义](/2026-10/rope/#%E5%AE%9A%E4%B9%89).',
+        '- Two [Demo](/2026-09/demo/) and missing and no section.',
+        '- Three [web](https://example.org/x) and script and other site and [outside](https://example.com/other/).',
+      ].join('\n'),
+    );
+    assert.equal(checked.articles, 2);
+    assert.equal(checkNote('- [here](#pairs)', { root, catalog }).markdown, '- here');
+  });
+
+  test('exports Markdown with absolute links and the line that names the conversation under the title', () => {
+    const note = '# Rope\n\n- One [Rope §01](/2026-10/rope/#angles) and [web](https://example.org/x).';
+    assert.equal(
+      exportMarkdown(note, { root, intro: labels.noteFrom('2026-10-20', { title: 'Rope', href: 'https://example.com/blog/2026-10/rope/' }) }),
+      '# Rope\n\n整理自 2026-10-20 在[《Rope》](https://example.com/blog/2026-10/rope/)的对话。\n\n- One [Rope §01](https://example.com/blog/2026-10/rope/#angles) and [web](https://example.org/x).\n',
+    );
+    assert.equal(exportMarkdown('- point', { root, intro: labels.noteFrom('2026-10-20', null) }), '整理自 2026-10-20 关于整个博客的对话。\n\n- point\n');
+    assert.equal(noteTitle(note), 'Rope');
+    assert.equal(noteTitle('- point'), null);
+    assert.equal(noteFileName('a/b: "c"?'), 'a b c.md');
+    assert.equal(noteFileName(' / '), 'note.md');
+  });
+
+  test('renders the title, the sections, the intro lines and the source line of a quote', () => {
+    const html = noteHtml('# Rope\n\n## Angles\n\n- One.\n\n> Quoted.\n>\n> 出自[Rope §01](/2026-10/rope/#angles)', { root, citedFrom: '出自', intro: [labels.noteFrom('2026-10-20', { title: 'Rope', href: '/2026-10/rope/' }), labels.noteRequest('短一点')] });
+    assert.match(html, /^<h4>Rope<\/h4>\n<p class="bk-chat-note-intro">整理自 2026-10-20 在<a href="https:\/\/example\.com\/blog\/2026-10\/rope\/">《Rope》<\/a>的对话。<\/p>\n<p class="bk-chat-note-intro">按要求重新整理：短一点<\/p>\n<h5>Angles<\/h5>/);
+    assert.match(noteHtml('# T\n\n\\[a^2\\]', { root, citedFrom: '出自', intro: [] }), /^<h4>T<\/h4>\n<div class="bk-chat-math" data-tex="a\^2" data-display="true">/);
+    assert.match(html, /<blockquote>\n<p>Quoted\.<\/p>\n<cite>出自<a href="https:\/\/example\.com\/blog\/2026-10\/rope\/#angles">Rope §01<\/a><\/cite>\n<\/blockquote>/);
+  });
+
+  test('collects the articles that the conversation read, linked or chose, without the article of the page', () => {
+    const rounds = [
+      round('See [Rope](/2026-10/rope/) and [Demo](/2026-09/demo/#x).', { reads: [{ label: 'GELU', url: '2026-08/gelu/', failed: false }, { label: 'Lost', url: '2026-07/lost/', failed: true }] }),
+      round('Again [Demo](/2026-09/demo/).', { ask: { content: 'Q', scopes: [{ kind: 'article', urls: ['2026-10/rope/'] }], bubble: {} } }),
+    ];
+    assert.deepEqual(
+      citedEntries(root, catalog, rounds, '2026-10/rope/').map((entry) => entry.url),
+      ['2026-08/gelu/', '2026-09/demo/'],
+    );
+    assert.deepEqual(
+      citedEntries(root, catalog, rounds, null).map((entry) => entry.url),
+      ['2026-08/gelu/', '2026-10/rope/', '2026-09/demo/'],
+    );
+  });
+
+  test('asks for a note from the conversation and the articles, and for a rewrite of the previous note with the request of the reader', () => {
+    const own = { entry: catalog.articles[0], source: '# Rope source' };
+    const sources = [{ entry: catalog.articles[2], source: '# GELU source' }];
+    const [system, user] = notePrompt({ catalog, own, sources, rounds: [round('A.')], labels, instructions: 'Be brief.' });
+    assert.ok(system.content.startsWith(`${noteRules(labels)}\nThe blog is "Test Blog".\n`));
+    assert.ok(system.content.includes('{"address":"/2026-10/rope/","title":"Rope"'));
+    assert.ok(system.content.includes('<article address="/2026-10/rope/" title="Rope">\n# Rope source\n</article>\n<article address="/2026-08/gelu/" title="GELU">\n# GELU source\n</article>'));
+    assert.ok(system.content.includes('a line that starts with "出自"'));
+    assert.ok(system.content.includes('"## 还没弄清的"'));
+    assert.ok(system.content.endsWith('<reader-instructions>\nBe brief.\n</reader-instructions>'));
+    assert.equal(user.content, '<conversation>\n<reader>\nQ\n</reader>\n<assistant>\nA.\n</assistant>\n</conversation>');
+    const [, rewrite] = notePrompt({ catalog, own: null, sources: [], rounds: [round('A.')], labels, previous: '# Old', request: '写短一点' });
+    assert.ok(rewrite.content.endsWith('</conversation>\n<note>\n# Old\n</note>\nRewrite this note as the reader asks: 写短一点\nKeep what the request does not ask to change.'));
+  });
+
+  test('replaces the built-in rules of the chat and the note with the rules of the reader and keeps the context after them', () => {
+    const page = { address: '/2026-10/rope/', title: 'Rope', article: { source: '# Source', outline: [] } };
+    const prompt = systemPrompt({ page, catalog, rules: 'Answer in one sentence.' });
+    assert.ok(prompt.startsWith('Answer in one sentence.\nThe blog is "Test Blog". The reader is reading the article "Rope" at /2026-10/rope/.\n'));
+    assert.ok(!prompt.includes(CHAT_RULES));
+    assert.ok(prompt.includes('<article>\n# Source\n</article>'));
+    assert.ok(prompt.includes('{"address":"/2026-09/demo/"'));
+    const [system] = notePrompt({ catalog, own: { entry: catalog.articles[0], source: '# Rope source' }, sources: [], rounds: [round('A.')], labels, rules: 'Write three points.' });
+    assert.ok(system.content.startsWith('Write three points.\nThe blog is "Test Blog".\nThe articles, one JSON object per line:\n'));
+    assert.ok(system.content.includes('<article address="/2026-10/rope/" title="Rope">\n# Rope source\n</article>'));
+  });
+
+  test('adds the instructions of the reader to the chat prompt and links into the article of a conversation continued on another page', () => {
+    const page = { address: '/', title: 'Test Blog', article: { source: '# Rope source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }], address: '/2026-10/rope/' } };
+    const prompt = systemPrompt({ page: { ...page, title: 'Rope' }, catalog, instructions: 'Be brief.' });
+    assert.match(prompt, /The reader is on the page \/ and continues a conversation about the article "Rope" at \/2026-10\/rope\/\./);
+    assert.ok(prompt.includes('link it with its address and id, such as [the heading](/2026-10/rope/#id)'));
+    assert.ok(prompt.endsWith('<reader-instructions>\nBe brief.\n</reader-instructions>'));
+    assert.ok(!systemPrompt({ page: { address: '/', title: 'Test Blog', article: null }, catalog }).includes('reader-instructions'));
+  });
+});
+
+describe('AI chat history', () => {
+  class Storage {
+    constructor(limit = Infinity) {
+      this.items = new Map();
+      this.limit = limit;
+    }
+    getItem(key) {
+      return this.items.get(key) ?? null;
+    }
+    setItem(key, value) {
+      if (value.length > this.limit) throw new Error('QuotaExceededError');
+      this.items.set(key, value);
+    }
+  }
+  const conversation = (id, address = '/2026-10/rope/') => ({ id, article: address === null ? null : { address, title: address }, date: '2026-10-20', rounds: [{ ask: { content: id, scopes: [], bubble: { text: id, quote: null, scopes: [] } }, content: 'A', reasoning: '', reads: [] }], note: null });
+
+  test('keeps the newest conversations of each site, at most 50, and drops the oldest when the storage is full', () => {
+    const storage = new Storage();
+    assert.equal(historyKey(root), 'bk-chat-history:/blog/');
+    for (let index = 0; index < HISTORY_LIMIT + 2; index += 1) saveConversation(root, conversation(`c${index}`), { storage });
+    let list = readHistory(root, { storage });
+    assert.equal(list.length, 50);
+    assert.deepEqual([list[0].id, list.at(-1).id], ['c51', 'c2']);
+    saveConversation(root, { ...conversation('c10'), date: '2026-10-21' }, { storage });
+    list = readHistory(root, { storage });
+    assert.deepEqual([list[0].id, list[0].date, list.length], ['c10', '2026-10-21', 50]);
+    assert.deepEqual(readHistory('https://example.com/other/', { storage }), []);
+    deleteConversation(root, 'c10', { storage });
+    assert.equal(readHistory(root, { storage }).length, 49);
+    const small = new Storage(JSON.stringify([conversation('a'), conversation('b')]).length + 1);
+    for (const id of ['a', 'b', 'c']) assert.equal(saveConversation(root, conversation(id), { storage: small }), true);
+    assert.deepEqual(
+      readHistory(root, { storage: small }).map((item) => item.id),
+      ['c', 'b'],
+    );
+    small.items.set(historyKey(root), '{broken');
+    assert.deepEqual(readHistory(root, { storage: small }), []);
+  });
+
+  test('keeps at most one million characters and skips entries that do not have the shape of a conversation', () => {
+    const storage = new Storage();
+    const long = (id) => ({ ...conversation(id), rounds: [{ ...conversation(id).rounds[0], content: 'x'.repeat(300_000) }] });
+    for (const id of ['a', 'b', 'c', 'd']) saveConversation(root, long(id), { storage });
+    assert.deepEqual(
+      readHistory(root, { storage }).map((item) => item.id),
+      ['d', 'c', 'b'],
+    );
+    assert.ok(storage.getItem(historyKey(root)).length <= HISTORY_CHARACTERS);
+    const note = { versions: [{ markdown: '# N', articles: 0, rounds: 1, request: null, date: '2026-10-20' }], index: 0 };
+    const failedRead = { ...conversation('noted').rounds[0], reads: [{ label: '/2099-01/nothing/', url: null, failed: true, done: true }] };
+    const good = [conversation('good'), { ...conversation('noted'), note, rounds: [failedRead] }];
+    const bad = [
+      { ...conversation('round'), rounds: [{}] },
+      { ...conversation('ask'), rounds: [{ ...conversation('ask').rounds[0], ask: { content: 'Q' } }] },
+      { ...conversation('scope'), rounds: [{ ...conversation('scope').rounds[0], ask: { ...conversation('scope').rounds[0].ask, scopes: [{ kind: 'article' }] } }] },
+      { ...conversation('no-note'), note: undefined },
+      { ...conversation('versions'), note: { versions: [], index: 0 } },
+      { ...conversation('index'), note: { ...note, index: 1 } },
+      { ...conversation('address'), article: { address: 'javascript:alert(1)//', title: 'X' } },
+      { ...conversation('date'), date: undefined },
+      null,
+      'text',
+    ];
+    storage.setItem(historyKey(root), JSON.stringify([bad[0], good[0], ...bad.slice(1), good[1]]));
+    assert.deepEqual(
+      readHistory(root, { storage }).map((item) => item.id),
+      ['good', 'noted'],
+    );
+  });
+
+  test('keeps the ten newest versions of a note and shows the newest', () => {
+    let note = null;
+    for (let index = 0; index < NOTE_VERSION_LIMIT + 3; index += 1) note = addNoteVersion(note, { markdown: `# ${index}` });
+    assert.equal(note.versions.length, 10);
+    assert.deepEqual([note.versions[0].markdown, note.versions.at(-1).markdown, note.index], ['# 3', '# 12', 9]);
+  });
+
+  test('gives an article page the address of its folder, also when it is opened as index.html', () => {
+    assert.equal(pageAddress(root, '/blog/2026-10/rope/'), '/2026-10/rope/');
+    assert.equal(pageAddress(root, '/blog/2026-10/rope/index.html'), '/2026-10/rope/');
+    assert.equal(pageAddress(root, '/blog/'), '/');
+    assert.equal(pageAddress(root, '/blog/index.html'), '/');
+  });
+
+  test('lists the conversations of one article on its page and groups every conversation by article on the homepage', () => {
+    const list = [conversation('a'), conversation('b', null), conversation('c', '/2026-09/demo/'), conversation('d')];
+    assert.deepEqual(
+      historyGroups(list, { address: '/2026-10/rope/', home: false }).map((group) => group.items.map((item) => item.id)),
+      [['a', 'd']],
+    );
+    assert.deepEqual(historyGroups(list, { address: '/2026-08/none/', home: false }), []);
+    assert.deepEqual(
+      historyGroups(list, { address: '/', home: true }).map((group) => [group.article?.address ?? null, group.items.map((item) => item.id)]),
+      [
+        ['/2026-10/rope/', ['a', 'd']],
+        [null, ['b']],
+        ['/2026-09/demo/', ['c']],
+      ],
+    );
+  });
+
+  test('stores a finished reply as a round without the tool results and turns it back into a question and a reply', () => {
+    const ask = { content: 'Q', scopes: [], bubble: { text: 'Q', quote: null, scopes: [] } };
+    const message = { role: 'assistant', content: 'A', reasoning: 'R', reads: [{ name: 'read_article', label: 'Rope', url: '2026-10/rope/', failed: false, done: true }], ask, sent: [{ role: 'assistant', tool_calls: [] }, { role: 'tool', content: 'long source' }, { role: 'assistant', content: 'A' }] };
+    const stored = storedRound(message);
+    assert.deepEqual(stored, { ask, content: 'A', reads: [{ label: 'Rope', url: '2026-10/rope/', failed: false, done: true }] });
+    assert.deepEqual(roundMessages(stored), [
+      { role: 'user', text: 'Q', quote: null, scopes: [] },
+      { role: 'assistant', content: 'A', reasoning: '', reads: stored.reads, error: null, done: true, ask, sent: [{ role: 'assistant', content: 'A' }] },
+    ]);
   });
 });
 

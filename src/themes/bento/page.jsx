@@ -8,7 +8,7 @@ export default function Page(props) {
     <ArticleDocument site={site} article={article} assets={assets} labels={labels} settings={READING_SETTINGS} bodyClass="bk-page bt-page">
       <div class="bt-shell">
         <Header site={site} article={article} home={assets.root} labels={labels} />
-        <Article content={article.content} columns={options.columns} labels={labels} />
+        <Article content={article.content} options={options} labels={labels} />
       </div>
     </ArticleDocument>
   );
