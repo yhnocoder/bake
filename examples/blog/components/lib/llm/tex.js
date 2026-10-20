@@ -1,35 +1,29 @@
-import { mathjax } from '@mathjax/src/js/mathjax.js'
-import { TeX } from '@mathjax/src/js/input/tex.js'
-import { SVG } from '@mathjax/src/js/output/svg.js'
-import { liteAdaptor } from '@mathjax/src/js/adaptors/liteAdaptor.js'
-import { RegisterHTMLHandler } from '@mathjax/src/js/handlers/html.js'
-import '@mathjax/src/js/input/tex/base/BaseConfiguration.js'
-import '@mathjax/src/js/input/tex/ams/AmsConfiguration.js'
-import { MathJaxNewcmFont } from '@mathjax/mathjax-newcm-font/js/svg.js'
+import { createSignal } from 'solid-js'
 
-const adaptor = liteAdaptor()
-RegisterHTMLHandler(adaptor)
+const typeset = new Map()
+const [version, setVersion] = createSignal(0)
 
-const texDocument = mathjax.document('', {
-  InputJax: new TeX({ packages: ['base', 'ams'] }),
-  OutputJax: new SVG({ fontData: MathJaxNewcmFont, fontCache: 'none', linebreaks: { inline: false } }),
-})
-
-const rendered = new Map()
-
-function renderTex(tex) {
-  const template = document.createElement('template')
-  template.innerHTML = adaptor.innerHTML(texDocument.convert(tex, { display: false }))
-  return template.content.querySelector('svg')
+function request(tex) {
+  if (!typeset.has(tex)) {
+    typeset.set(tex, null)
+    import('bake/math')
+      .then(({ texToSvg }) => texToSvg(tex))
+      .then((svg) => {
+        typeset.set(tex, svg)
+        setVersion((value) => value + 1)
+      })
+  }
+  return typeset.get(tex)
 }
 
 export function texSvg(tex) {
-  if (!rendered.has(tex)) rendered.set(tex, renderTex(tex))
-  return rendered.get(tex).cloneNode(true)
+  version()
+  return request(tex)?.cloneNode(true) ?? null
 }
 
 export function texBox(tex, emSize) {
   const svg = texSvg(tex)
+  if (!svg) return null
   const [, minY, width, height] = svg.getAttribute('viewBox').split(/\s+/).map(Number)
   const scale = emSize / 1000
   return { svg, width: width * scale, height: height * scale, ascent: -minY * scale }
@@ -45,6 +39,7 @@ export function richNodes(source) {
   return segments(source).map((part) => {
     if (!part.math) return document.createTextNode(part.text)
     const svg = texSvg(part.text)
+    if (!svg) return document.createTextNode('')
     svg.classList.add('llm-tex')
     return svg
   })
