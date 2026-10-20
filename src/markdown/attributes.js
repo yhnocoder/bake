@@ -1,8 +1,9 @@
 const BARE = `[^\\s"'={}]+`;
 const ATTRIBUTE = new RegExp(`\\s*(?:#(${BARE})|\\.(${BARE})|([A-Za-z_][\\w-]*)(?:=(?:"([^"]*)"|'([^']*)'|(${BARE})))?)`, 'y');
 const LEADING_SPACE = /^\s*/;
-
-export const BARE_VALUE = new RegExp(`^${BARE}$`);
+const SHORTHAND_VALUE = new RegExp(`^${BARE}$`);
+const BARE_VALUE = /^[\w.%/-]+$/;
+const SHORTHANDS = { id: '#', class: '.' };
 
 export function attributeTokens(text) {
   const inner = text.slice(1, -1);
@@ -33,4 +34,20 @@ export function parseAttributes(text) {
     offsets[key] = start;
   }
   return error === undefined ? { attributes, offsets } : { error, attributes, offsets };
+}
+
+export function writeAttributes(attributes) {
+  const entries = Object.entries(attributes);
+  if (entries.length === 0) return '';
+  return `{${entries.map(([name, value]) => writeAttribute(name, value)).join(' ')}}`;
+}
+
+export function writeAttribute(name, value) {
+  if (value === true) return name;
+  const text = String(value);
+  if (Object.hasOwn(SHORTHANDS, name) && SHORTHAND_VALUE.test(text)) return `${SHORTHANDS[name]}${text}`;
+  if (BARE_VALUE.test(text)) return `${name}=${text}`;
+  if (!text.includes('"')) return `${name}="${text}"`;
+  if (!text.includes("'")) return `${name}='${text}'`;
+  return null;
 }

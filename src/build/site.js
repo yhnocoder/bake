@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { chatBundle } from '../chat/bundle.js';
+import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { bundleComponents } from '../components/bundle.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, loadBakeConfig } from '../config/bake-config.js';
@@ -15,10 +15,10 @@ import { findArticles } from './articles.js';
 import { articleEntry, newestFirst } from './entries.js';
 import { listFiles } from './files.js';
 import { indexPages } from './links.js';
-import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
+import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
+import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
 
@@ -134,7 +134,7 @@ function homeOutput(entries, { config, themes, chat }, errors) {
       site: siteProps(config),
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
-      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', theme.scripts), modules: assetLinks('', [chat.entry]) },
+      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', [theme.script, chat.entry]) },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -145,7 +145,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
     theme.renderNotFound({
       site: siteProps(config),
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
-      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, theme.scripts) },
+      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, [theme.script]) },
     }),
   );
   return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
@@ -318,8 +318,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
     assets: {
       root,
       styles: assetLinks(root, theme.styles),
-      scripts: assetLinks(root, theme.scripts),
-      modules: assetLinks(root, [...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
+      scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

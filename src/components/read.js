@@ -3,10 +3,11 @@ import { join, posix, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import solid from 'vite-plugin-solid';
-import { blogPath, compileProblem, isInBlog, viteConfig } from '../build/vite.js';
+import { publicModules } from '../bundle/modules.js';
+import { blogPath, compileProblem, isInBlog, viteConfig } from '../bundle/vite.js';
 import { errorAt, fileStart } from '../report.js';
 import { checkDeclarations } from './declarations.js';
-import { nodeModules } from './modules.js';
+import { NODE_MATH_FILE } from './modules.js';
 
 export const COMPONENTS_DIR = 'components';
 export const BROWSER_GLOBALS = Object.freeze([
@@ -37,7 +38,7 @@ export async function readComponents(root, { builtInBlocks }, errors) {
   // why: the Vite dev server sets NODE_ENV to development, and later builds in this process would then bundle Solid's development build
   const environment = process.env.NODE_ENV;
   const server = await createServer({
-    ...viteConfig([nodeModules(), solid({ ssr: true })]),
+    ...viteConfig({ plugins: [solid({ ssr: true })], alias: publicModules('components', { 'bake/math': NODE_MATH_FILE }) }),
     appType: 'custom',
     server: { middlewareMode: true, hmr: false, watch: null, ws: false },
   });

@@ -129,6 +129,31 @@ async function pointAt(page, locator) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 2 });
 }
 
+async function restingBox(locator) {
+  await locator.evaluate(async (entry) => {
+    const host = entry.closest('.bk-toc-ui');
+    const texts = [...host.querySelectorAll('*')].filter((element) => element.childElementCount === 0 && element.textContent.trim() !== '');
+    await Promise.all(
+      texts.map((element) => {
+        const style = getComputedStyle(element);
+        return document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`, element.textContent);
+      }),
+    );
+    let last = '';
+    let since = performance.now();
+    while (performance.now() - since < 500) {
+      await new Promise((done) => requestAnimationFrame(done));
+      const box = entry.getBoundingClientRect();
+      const key = `${box.x} ${box.y} ${box.width} ${box.height}`;
+      if (key !== last) {
+        last = key;
+        since = performance.now();
+      }
+    }
+  });
+  return locator.boundingBox();
+}
+
 async function scrollInSteps(page, delta) {
   for (let step = 0; step < 5; step += 1) {
     await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
@@ -437,10 +462,14 @@ test('the table of contents', async (t) => {
       const frame = style === 'tabs' ? '.bk-index' : '.bk-popover';
       const shown = () => page.evaluate((selector) => document.querySelector(selector).classList.contains('is-on'), frame);
       const focused = () => page.evaluate((selector) => (document.activeElement.closest(selector) === null ? `${document.activeElement.classList[0]} ${decodeURIComponent(document.activeElement.getAttribute('href') ?? '')}` : 'card'), frame);
-      const entry = await page.locator(trigger).nth(1).boundingBox();
+      const cardOpens = (problem) =>
+        page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame).catch((error) => {
+          throw new Error(`${style}: ${problem}`, { cause: error });
+        });
+      const entry = await restingBox(page.locator(trigger).nth(1));
       const rest = (offset) => page.mouse.move(entry.x + entry.width / 2 + offset, entry.y + entry.height / 2);
       await rest(0);
-      await page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame);
+      await cardOpens('the card does not open while the pointer rests on its entry');
       await page.waitForTimeout(300);
       await rest(1);
       await page.keyboard.press('Escape');
@@ -452,7 +481,7 @@ test('the table of contents', async (t) => {
       await page.mouse.move(900, 450);
       await page.waitForTimeout(300);
       await page.keyboard.press('Tab');
-      await page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame);
+      await cardOpens('the card does not open when the keyboard reaches its entry');
       for (let step = 0; step < (style === 'ticks' ? 3 : 1); step += 1) await page.keyboard.press('Tab');
       assert.equal(await focused(), 'card', `${style}: the keyboard does not reach the card`);
       await page.keyboard.press('Escape');
@@ -460,6 +489,16 @@ test('the table of contents', async (t) => {
       assert.equal(await focused(), { tabs: 'bk-tab #one', dots: 'bk-dot-item #one', ticks: 'bk-tick #one-b' }[style], `${style}: the focus does not return to the entry`);
       await page.waitForTimeout(300);
       assert.equal(await shown(), false, `${style}: the card opens again when the focus returns to its entry`);
+      const focusedEntry = await page.evaluate(() => {
+        const box = document.activeElement.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      });
+      await page.mouse.move(focusedEntry.x, focusedEntry.y);
+      const opened = await page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame, { timeout: 2000 }).then(
+        () => true,
+        () => false,
+      );
+      assert.equal(opened, true, `${style}: the card stays closed when the pointer reaches the entry that the keyboard closed it from`);
       await context.close();
     }
   });

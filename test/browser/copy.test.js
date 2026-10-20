@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { parse } from '../article.js';
 import { article, bake, createBlog, validConfig } from '../blog.js';
+import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
@@ -71,7 +72,7 @@ test('copying from an article gives the Markdown source of the selection', async
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/syntax/`);
+  await openWithSelectionModule(page, `${base}/2026-10/syntax/`);
   await page.waitForFunction(() => document.querySelector('.bk-notes-layer') !== null);
   const copyChapter = '#copy ~ .bk-block';
 
@@ -256,11 +257,11 @@ test('a converted citation, reference entry and internal link keep a key or an a
   t.after(() => browser.close());
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/rope/`);
+  await openWithSelectionModule(page, `${base}/2026-10/rope/`);
   const paragraph = '.bk-article p';
   await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' too', after: true });
   assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/rope/#a%25zz) too');
-  await page.goto(`${base}/2026-10/host/`);
+  await openWithSelectionModule(page, `${base}/2026-10/host/`);
   await select(page, { selector: '.embed li', contains: 'First', text: 'irst' }, { selector: '.embed li', contains: 'Second', text: 'Sec', after: true });
   assert.equal((await copied(page)).text, ':::references\n- [@a%zz] irst.\n- [@b%20c] Sec\n:::');
   await context.close();
@@ -276,7 +277,7 @@ test('a citation and a reference list without data-key, which only raw HTML can 
   t.after(() => browser.close());
   const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/rope/`);
+  await openWithSelectionModule(page, `${base}/2026-10/rope/`);
   await select(page, { selector: '.bk-article p', contains: 'Raw', text: 'cites' }, { selector: '.bk-article p', contains: 'Raw', text: ' before', after: true });
   assert.equal((await copied(page)).text, 'cites [\\[1\\]](#keys) before');
   await select(page, { selector: '.bk-article li', contains: 'First', text: 'irst' }, { selector: '.bk-article li', contains: 'Second', text: 'Sec', after: true });
@@ -293,6 +294,10 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
     ['1\\. Not a list item', '1. Not', 'list'],
     ['\\- Not a list either', '- Not', 'list'],
     ['\\> Not a quote at all', '> Not', 'quote'],
+    ['Stars: x\\*\\*a\\*\\*, 中\\*\\*文\\*\\* and a \\*\\`b\\`\\* here.', 'x**a**', 'here'],
+    ['**2\\*\\*3 = 8** is strong text', '2**3', 'strong'],
+    ['Python: 2\\*\\*10 is 1024 here.', '2**10', 'here'],
+    ['中文：中\\*\\*文\\*\\*字。', '中文：中', '字'],
     ['中文，标点：“引号”（括号）！还有 snake_case 和 a * b。', '标点', 'b'],
     ['Noncharacter: a\uFDD0b and \uFDD0\uFDD0 here.', 'a\uFDD0b', 'here'],
     ['\uFDD0# Not a heading after a noncharacter', '\uFDD0#', 'heading'],
@@ -310,7 +315,7 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  await page.goto(`${base}/2026-10/escapes/`);
+  await openWithSelectionModule(page, `${base}/2026-10/escapes/`);
   for (const [, from, to] of paragraphs) {
     const point = { selector: '.bk-article p', contains: from };
     await select(page, { ...point, text: from }, { ...point, text: to, after: true });
@@ -323,5 +328,115 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   }
   await select(page, { selector: '.bk-article p', text: '标点' }, { selector: '.bk-article p', text: 'b。', after: true });
   assert.equal((await copied(page)).text, '标点：“引号”（括号）！还有 snake_case 和 a * b。');
+  await context.close();
+});
+
+test('the module that writes a selection as Markdown loads when the reader selects, opens a context menu or holds a shortcut key, and a copy before it arrives is the browser copy', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body: 'Some **bold** text and ==marked== words.\n' }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const paragraph = '.bk-article p';
+  const selectWords = (page) => select(page, { selector: paragraph, text: 'bold' }, { selector: paragraph, text: 'marked', after: true });
+  const dragAcross = async (page) => {
+    const box = await page.locator(paragraph).boundingBox();
+    await page.mouse.move(box.x + 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await page.mouse.up();
+  };
+  const opened = async (url) => {
+    const page = await context.newPage();
+    const requested = [];
+    page.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
+    return { page, requested };
+  };
+
+  await t.test('a copy before the module arrives is the browser copy, and a copy after it arrives is Markdown with the toast', async () => {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(
+      (url) => isSelectionChunk(url.href),
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    await page.goto(`${base}/2026-10/rope/`);
+    await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
+    await selectWords(page);
+    const early = await copied(page);
+    assert.equal(early.text, 'bold text and marked');
+    assert.match(early.html, /<strong[^>]*>bold<\/strong>/);
+    assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
+    const loaded = page.waitForResponse((response) => isSelectionChunk(response.url()));
+    release();
+    await selectionModuleReady(page, (await loaded).url());
+    assert.equal((await copied(page)).text, '**bold** text and ==marked==');
+    await page.locator('.bk-toast.is-on').waitFor({ state: 'attached', timeout: 5000 });
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  await t.test('when the module cannot be loaded, every copy is the browser copy without a toast, the masthead button still copies the source and the page reports no error', async () => {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const requested = [];
+    await page.route(
+      (url) => isSelectionChunk(url.href),
+      (route) => {
+        requested.push(route.request().url());
+        return route.abort();
+      },
+    );
+    await page.goto(`${base}/2026-10/rope/`);
+    await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
+    await selectWords(page);
+    assert.equal((await copied(page)).text, 'bold text and marked');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await dragAcross(page);
+      await selectWords(page);
+      assert.equal((await copied(page)).text, 'bold text and marked');
+    }
+    assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
+    assert.equal(requested.length, 1);
+    await page.evaluate(() => getSelection().removeAllRanges());
+    await page.locator('.bk-copy-source').click();
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), readFileSync(join(dir, 'content/posts/rope/index.md'), 'utf8'));
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  await t.test('a page where nobody selects requests no module, and a selection, a context menu or a shortcut key loads it', async () => {
+    const triggers = {
+      selection: dragAcross,
+      'context menu': (page) => page.locator(paragraph).click({ button: 'right' }),
+      'shortcut key': (page) => page.keyboard.press('Control'),
+    };
+    for (const [name, trigger] of Object.entries(triggers)) {
+      const { page, requested } = await opened(`${base}/2026-10/rope/`);
+      await page.waitForTimeout(1500);
+      assert.deepEqual(requested, [], `the module loads before the ${name}`);
+      const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
+      await trigger(page);
+      await selectionModuleReady(page, (await loading).url());
+      await selectWords(page);
+      assert.equal((await copied(page)).text, '**bold** text and ==marked==', name);
+      await page.close();
+    }
+  });
+
   await context.close();
 });
