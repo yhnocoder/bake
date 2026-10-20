@@ -6,6 +6,9 @@ const NEAR_DISTANCE = 800;
 const NEAR_SCREENS = 1.5;
 const definitions = new Map();
 const SLOW_CONNECTIONS = ['slow-2g', '2g'];
+const prefetchQueue = [];
+let prefetching = null;
+let starting = 0;
 
 function define(name) {
   if (!definitions.has(name)) {
@@ -42,6 +45,8 @@ async function start(frame) {
   if (frame.dataset.state !== undefined) return;
   frame.dataset.state = 'loading';
   const name = frame.dataset.component;
+  starting += 1;
+  pausePrefetch(name);
   try {
     await define(name);
     const box = frame.querySelector(BOX);
@@ -59,6 +64,9 @@ async function start(frame) {
   } catch (error) {
     frame.dataset.state = 'failed';
     console.error(`${name} cannot start`, error);
+  } finally {
+    starting -= 1;
+    prefetchNext();
   }
 }
 
@@ -89,27 +97,42 @@ function distanceFromViewport(frame) {
   const { top, bottom } = frame.getBoundingClientRect();
   return Math.max(0, top - innerHeight, -bottom);
 }
-function prefetchAll(frames) {
+function queuePrefetch(frames) {
   const connection = navigator.connection;
   if (connection?.saveData || SLOW_CONNECTIONS.includes(connection?.effectiveType)) return;
   const waiting = frames.filter((frame) => frame.dataset.state === undefined);
   const distances = new Map(waiting.map((frame) => [frame, distanceFromViewport(frame)]));
   waiting.sort((a, b) => distances.get(a) - distances.get(b));
-  const addresses = new Set(waiting.flatMap((frame) => files[frame.dataset.component].map((file) => new URL(file, import.meta.url).href)));
-  for (const address of addresses) {
-    if (performance.getEntriesByName(address).length > 0) continue;
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.crossOrigin = '';
-    link.href = address;
-    document.head.append(link);
+  for (const name of new Set(waiting.map((frame) => frame.dataset.component))) {
+    if (Object.hasOwn(files, name) && !prefetchQueue.includes(name) && prefetching?.name !== name) prefetchQueue.push(name);
   }
+  prefetchNext();
+}
+function prefetchNext() {
+  if (prefetching !== null || starting > 0) return;
+  const name = prefetchQueue.shift();
+  if (name === undefined) return;
+  if (definitions.has(name)) return prefetchNext();
+  const controller = new AbortController();
+  prefetching = { name, controller };
+  const addresses = files[name].map((file) => new URL(file, import.meta.url).href).filter((address) => performance.getEntriesByName(address).length === 0);
+  Promise.allSettled(addresses.map((address) => fetch(address, { signal: controller.signal, priority: 'low' }).then((response) => response.arrayBuffer()))).then(() => {
+    if (prefetching?.controller !== controller) return;
+    prefetching = null;
+    prefetchNext();
+  });
+}
+function pausePrefetch(name) {
+  if (prefetching === null || prefetching.name === name) return;
+  prefetching.controller.abort();
+  prefetchQueue.unshift(prefetching.name);
+  prefetching = null;
 }
 
 const frames = observeFrames();
-if (document.readyState === 'complete') prefetchAll(frames);
-else addEventListener('load', () => prefetchAll(frames), { once: true });
-document.addEventListener('bake:content', () => prefetchAll(observeFrames()));
+if (document.readyState === 'complete') queuePrefetch(frames);
+else addEventListener('load', () => queuePrefetch(frames), { once: true });
+document.addEventListener('bake:content', () => queuePrefetch(observeFrames()));
 addEventListener('resize', () => {
   if (nearMargin() === margin) return;
   margin = nearMargin();

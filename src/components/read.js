@@ -52,7 +52,7 @@ export async function readComponents(root, { builtInBlocks }, errors) {
       }
       const { params, layout, problems } = checkDeclarations(module.exports);
       for (const problem of problems) errors.push(errorAt(file, fileStart, `${name}: ${problem}`));
-      components.set(name, { name, file, path, params, layout, valid: problems.length === 0 });
+      components.set(name, { name, file, path, params, layout, solid: !module.customElement, valid: problems.length === 0 });
     }
   } finally {
     await server.close();
@@ -92,7 +92,8 @@ async function loadModule(server, path) {
   for (const [name] of hidden) delete globalThis[name];
   if (stubbed) globalThis.HTMLElement = class HTMLElement {};
   try {
-    return { exports: await server.ssrLoadModule(path) };
+    const exports = await server.ssrLoadModule(path);
+    return { exports, customElement: exports.default?.prototype instanceof HTMLElement };
   } catch (error) {
     return { error };
   } finally {

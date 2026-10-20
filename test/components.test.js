@@ -315,6 +315,12 @@ describe('building components', () => {
     const runtimeSource = readFileSync(join(dir, 'dist/assets', runtime), 'utf8');
     assert.match(runtimeSource, /fn-plot-[\w-]+\.js/);
     assert.doesNotMatch(runtimeSource, /unused-view/);
+    const files = JSON.parse(JSON.parse(/JSON\.parse\(("(?:[^"\\]|\\.)*")\)/.exec(runtimeSource)[1]));
+    assert.deepEqual(Object.keys(files).sort(), ['fn-plot', 'grid-view']);
+    for (const file of Object.values(files).flat()) assert.ok(assets.includes(file), `${file} is published`);
+    const kinds = (name) => files[name].map((file) => file.replace(/-[\w-]{8}\.(js|css)$/, '.$1')).sort();
+    assert.ok(kinds('fn-plot').includes('fn-plot.js') && kinds('fn-plot').includes('fn-plot.css') && kinds('fn-plot').includes('solid-element.js'), kinds('fn-plot').join(', '));
+    assert.ok(kinds('grid-view').includes('grid-view.js') && !kinds('grid-view').includes('solid-element.js'), kinds('grid-view').join(', '));
     const scripts = assets.filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
     assert.ok(!scripts.some((source) => source.includes('computations created outside')), 'no script contains the development build of Solid');
     const sources = assets.filter((name) => /\.(js|css)$/.test(name)).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));

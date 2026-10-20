@@ -3,7 +3,7 @@ import { POSTS_DIR } from '../build/articles.js';
 import { createSite, updateSite } from '../build/site.js';
 
 export function createPreview(root) {
-  const site = createSite(root, { drafts: true, base: '/' });
+  const site = createSite(root, { drafts: true, base: '/', prefetch: false });
   let pages = new Map();
   let home = null;
   let siteFiles = new Map();

@@ -3,12 +3,12 @@ import solid from 'vite-plugin-solid';
 import { compileProblem, outputOf, viteConfig } from '../build/vite.js';
 import { errorAt, fileStart } from '../report.js';
 import { COMPONENTS_DIR } from './read.js';
-import { RUNTIME_FILE, browserModules, isMathJaxModule } from './modules.js';
+import { MATHJAX_CHUNK, RUNTIME_FILE, browserModules, isMathJaxModule } from './modules.js';
 
-export async function bundleComponents(root, components, preamble, errors) {
+export async function bundleComponents(root, components, preamble, errors, { prefetch }) {
   try {
     const result = await build({
-      ...viteConfig([browserModules({ preamble, components }), solid()]),
+      ...viteConfig([browserModules({ preamble, components, prefetch }), solid()]),
       base: './',
       build: {
         write: false,
@@ -22,7 +22,7 @@ export async function bundleComponents(root, components, preamble, errors) {
             entryFileNames: 'assets/[name]-[hash].js',
             chunkFileNames: 'assets/[name]-[hash].js',
             assetFileNames: 'assets/[name]-[hash][extname]',
-            codeSplitting: { groups: [{ name: 'mathjax', test: isMathJaxModule }] },
+            codeSplitting: { groups: [{ name: MATHJAX_CHUNK, test: isMathJaxModule }] },
           },
         },
       },

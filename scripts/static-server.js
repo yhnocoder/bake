@@ -5,6 +5,7 @@ import { contentType } from '../src/build/content-types.js';
 
 export async function serveStatic(dir) {
   const root = resolve(dir);
+  const assets = join(root, 'assets');
   const server = createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
     let path = resolve(join(root, pathname));
@@ -19,7 +20,8 @@ export async function serveStatic(dir) {
       createReadStream(notFound).pipe(response);
       return;
     }
-    response.writeHead(200, { 'content-type': contentType(path) });
+    const cache = path.startsWith(`${assets}${sep}`) ? { 'cache-control': 'max-age=600' } : {};
+    response.writeHead(200, { 'content-type': contentType(path), ...cache });
     createReadStream(path).pipe(response);
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));

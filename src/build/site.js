@@ -25,8 +25,8 @@ const PUBLIC_DIR = 'public';
 const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
-export function createSite(root, { drafts = false, base, shareImages = false } = {}) {
-  return { root, drafts, base, shareImages, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
+export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
+  return { root, drafts, base, shareImages, prefetch, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
 }
 
 export async function updateSite(site, changedPaths = null) {
@@ -185,7 +185,7 @@ async function compileComponents(site, published, errors) {
     const { root, settings } = site;
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors), errors: bundleErrors };
+    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors };
   }
   errors.push(...site.bundle.errors);
   return site.bundle.bundle;
