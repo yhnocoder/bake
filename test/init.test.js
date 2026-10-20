@@ -16,12 +16,22 @@ describe('bake init', () => {
       result.stdout,
       [`Created a blog in ${root}:`, '  bake.config.js', '  content/posts/hello/index.md', '  .gitignore', `The first post is at /${date.slice(0, 7)}/hello/. Next: cd my-blog && bake dev`, ''].join('\n'),
     );
-    assert.equal(readFileSync(join(root, 'bake.config.js'), 'utf8'), "export default {\n  title: 'my-blog',\n  url: 'https://example.github.io',\n  language: 'zh-CN',\n};\n");
+    assert.equal(readFileSync(join(root, 'bake.config.js'), 'utf8'), ['export default {', '  title: "my-blog",', "  url: 'https://example.github.io',", "  language: 'zh-CN',", '};', ''].join('\n'));
     assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), 'node_modules/\ndist/\n.dist-staging/\n.dist-previous/\n');
     const build = bake(root, 'build');
     assert.equal(build.stderr, '');
     assert.equal(build.stdout, '1 page\ndist/ written\n');
     assert.ok(existsSync(join(root, 'dist', date.slice(0, 7), 'hello/index.html')));
+  });
+
+  test('writes a folder name with quotes and a line break as the site title', (t) => {
+    const dir = createBlog(t, {});
+    const name = 'it\'s "a"\nblog';
+    const result = bake(dir, 'init', name);
+    assert.equal(result.status, 0, result.stderr);
+    const build = bake(join(dir, name), 'build');
+    assert.equal(build.stderr, '');
+    assert.match(readFileSync(join(dir, name, 'dist/feed.xml'), 'utf8'), /<title>it&#x27;s &quot;a&quot;\nblog<\/title>/);
   });
 
   test('creates a blog in the current folder when no folder is given', (t) => {

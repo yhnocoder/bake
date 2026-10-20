@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 export const DIST_DIR = 'dist';
 const STAGING_DIR = '.dist-staging';
 const PREVIOUS_DIR = '.dist-previous';
+export const BUILD_DIRS = Object.freeze([DIST_DIR, STAGING_DIR, PREVIOUS_DIR]);
 
 export async function writeDist(root, outputs) {
   const staging = join(root, STAGING_DIR);
