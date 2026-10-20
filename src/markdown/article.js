@@ -21,7 +21,7 @@ import { equationReferences } from './eqref-syntax.js';
 import { highlight } from './highlight-syntax.js';
 import { readRawHtml } from './raw-html.js';
 import { REMARK_PLUGINS } from './remark-plugins.js';
-import { protectPipesInMath, restorePipesInMath } from './table-math.js';
+import { parseWithPipesInMath } from './table-math.js';
 
 const processor = unified()
   .use(remarkParse)
@@ -124,9 +124,8 @@ class ArticleParser {
   }
 
   async parse() {
-    const pipes = protectPipesInMath(this.source);
-    if (pipes.unreadLine !== undefined) this.report({ line: pipes.unreadLine, column: 1 }, UNREAD_TABLE_MATH);
-    const tree = restorePipesInMath(processor.parse(pipes.text), pipes.sentinel);
+    const { tree, unreadLine } = parseWithPipesInMath(processor, this.source);
+    if (unreadLine !== undefined) this.report({ line: unreadLine, column: 1 }, UNREAD_TABLE_MATH);
     tree.children = tree.children.filter((node) => node.type !== 'yaml');
     walk(tree, (node) => {
       if (node.type === 'bakeBlock') this.readBlock(node);

@@ -3,6 +3,7 @@ import { defaultHandlers, toHast } from 'mdast-util-to-hast';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { REMARK_PLUGINS } from '../markdown/remark-plugins.js';
+import { parseWithPipesInMath } from '../markdown/table-math.js';
 import { texDelimiters } from './tex-delimiters.js';
 
 export const MATH_CLASS = 'bk-chat-math';
@@ -12,7 +13,7 @@ const SCHEME = /^([a-z][a-z\d+.-]*):/i;
 const OPEN_SCHEMES = new Set(['http', 'https', 'mailto']);
 
 export function markdownTree(markdown) {
-  return processor.runSync(processor.parse(markdown));
+  return processor.runSync(parseWithPipesInMath(processor, markdown).tree);
 }
 
 export function replyHtml(markdown, { root, base }) {
