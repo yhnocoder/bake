@@ -18,7 +18,8 @@ export function createPreview(root) {
     if (paths !== null) changedPaths.push(...paths);
     const result = await updateSite(site, paths);
     problems = result.errors;
-    if (!result.articleErrorsOnly) return { problems, applied: false };
+    // why: a build with errors keeps the previous output, except the first one, so that every page can show the problems
+    if (result.home === undefined || (problems.length > 0 && home !== null)) return { problems, applied: false };
     const next = new Map(result.pages.map((page) => [page.article.file, servedPage(page, site.settings.components)]));
     const nextHome = servedHome(result.home);
     const changes = compare(pages, next, changedPaths.some((path) => !isArticleSource(path)));

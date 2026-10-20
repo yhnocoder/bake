@@ -44,7 +44,7 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 - Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
 - The homepage at http://localhost:4321/ shows every article, drafts included, and reloads when the front matter of an article changes or an article is added or removed.
 
-Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While an article has errors, its page keeps showing the last version without errors, and the other articles keep updating. Errors outside the articles, such as in `bake.config.js`, `preamble.sty` or a theme, stop all updates until they are fixed.
+Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While the blog has errors, every page keeps showing the last version without errors, and the pages update again when the errors are fixed. When `bake dev` starts on a blog whose articles have errors, it shows the pages with those errors.
 
 Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
 
