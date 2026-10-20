@@ -87,8 +87,10 @@ export function startPreviewCard(article) {
   document.body.append(host);
   render(() => <PreviewCard entry={entry()} shown={shown()} placed={placed()} onEnter={keep} onLeave={hide} />, host);
   closeOnEscape(host, () => {
+    const wasShown = shown();
     clearTimeout(showTimer);
     close();
+    return wasShown;
   });
 }
 

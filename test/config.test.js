@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { loadBakeConfig } from '../src/config/bake-config.js';
 import { availableThemes } from '../src/config/rules.js';
-import { readThemeOptions } from '../src/config/theme-options.js';
+import { optionProblem, readThemeOptions } from '../src/build/theme-options.js';
 import { formatError, sortErrors } from '../src/report.js';
 import { createBlog } from './blog.js';
 
@@ -10,7 +10,7 @@ async function load(t, files) {
   const dir = createBlog(t, files);
   const errors = [];
   const themes = await readThemeOptions(dir, availableThemes(dir), errors);
-  const config = await loadBakeConfig(dir, themes, errors);
+  const config = await loadBakeConfig(dir, themes, optionProblem, errors);
   return { config, lines: sortErrors(errors).map(formatError) };
 }
 
@@ -30,6 +30,7 @@ describe('bake.config.js', () => {
       themes: { essay: {}, bento: { columns: 4 } },
       home: { columns: 3, groupBy: 'month' },
       categories: [],
+      chat: { pet: 'crt-monitor' },
     });
     assert.ok(Object.isFrozen(config));
     assert.ok(Object.isFrozen(config.home));
@@ -48,7 +49,7 @@ describe('bake.config.js', () => {
   test('reports a missing bake.config.js at 1:1', async (t) => {
     const { config, lines } = await load(t, {});
     assert.equal(config, null);
-    assert.deepEqual(lines, ['bake.config.js:1:1 bake.config.js not found, run bake from the blog root']);
+    assert.deepEqual(lines, ['bake.config.js:1:1 bake.config.js not found, run bake from the blog root or create a blog with bake init']);
   });
 
   test('reports a JavaScript syntax error at its position', async (t) => {

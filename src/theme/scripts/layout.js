@@ -1,10 +1,13 @@
 import { CONTENT_EVENT, oncePerFrame } from './motion.js';
 import { leftColumnScreen, notesColumnScreen, phoneScreen } from './screens.js';
+import { declaresNaturalWidth } from './widths.js';
 
 export const LAYOUT_EVENT = 'bk:layout';
 const REACHING_BLOCKS = '.bk-block[data-resolved="wide"], .bk-block[data-resolved="page"]';
 const HEADINGS = 'h2[id], h3[id]';
 const WIDTH_BLOCKS = '.bk-block[data-width="auto"]';
+const CODE = 'pre.shiki';
+const QUOTES = /^["']|["']$/g;
 
 let schedule = () => {};
 let last = null;
@@ -45,17 +48,26 @@ export function startLayout(article, arrangements) {
   addEventListener('resize', () => schedule(true));
   for (const screen of [leftColumnScreen, notesColumnScreen, phoneScreen]) screen.addEventListener('change', () => schedule(true, true));
   document.fonts.ready.then(() => schedule(true, true));
-  document.fonts.addEventListener('loadingdone', () => schedule(true, true));
+  document.fonts.addEventListener('loadingdone', (event) => {
+    const families = measuredFamilies(article);
+    const fresh = event.fontfaces.some((face) => families.has(face.family.replace(QUOTES, '')));
+    document.fonts.ready.then(() => schedule(true, fresh));
+  });
   document.addEventListener(CONTENT_EVENT, () => schedule(true, true));
   article.addEventListener(
     'toggle',
     (event) => {
-      const widthBlock = event.target.closest(WIDTH_BLOCKS) !== null;
-      schedule(widthBlock, widthBlock);
+      const block = event.target.closest(WIDTH_BLOCKS);
+      schedule(block !== null && !declaresNaturalWidth(block));
     },
     true,
   );
   pass();
+}
+
+function measuredFamilies(article) {
+  const elements = [article, article.querySelector(CODE)].filter((element) => element !== null);
+  return new Set(elements.flatMap((element) => getComputedStyle(element).fontFamily.split(',').map((family) => family.trim().replace(QUOTES, ''))));
 }
 
 function measure(article) {

@@ -73,9 +73,10 @@ export function drawerView(view) {
     handle.focus();
   });
   closeOnEscape(drawer, () => {
-    if (!isOpen()) return;
+    if (!isOpen()) return false;
     setOpen(false);
     handle.focus();
+    return true;
   });
 
   let progress = null;

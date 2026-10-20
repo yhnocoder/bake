@@ -30,3 +30,13 @@ test('every width media query in the styles uses a breakpoint of screens.js or t
   }
   assert.deepEqual(problems, []);
 });
+
+test('every stacking layer variable that the styles use is defined', () => {
+  const code = readdirSync(SRC, { recursive: true })
+    .filter((name) => /\.(css|jsx?)$/.test(name))
+    .map((name) => readFileSync(join(SRC, name), 'utf8'))
+    .join('\n');
+  const defined = new Set([...code.matchAll(/(--layer-[a-z-]+)\s*:/g)].map(([, name]) => name));
+  const used = new Set([...code.matchAll(/var\((--layer-[a-z-]+)\)/g)].map(([, name]) => name));
+  assert.deepEqual([...used].filter((name) => !defined.has(name)).sort(), []);
+});

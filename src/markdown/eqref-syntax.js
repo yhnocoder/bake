@@ -4,12 +4,18 @@ const BACKSLASH = 92;
 const LEFT_BRACE = 123;
 const RIGHT_BRACE = 125;
 const COMMAND = 'eqref';
+const CONSTRUCTS_WITHOUT_EQUATION_REFERENCES = ['autolink', 'destinationLiteral', 'destinationRaw', 'reference', 'titleQuote', 'titleApostrophe'];
 
 export function equationReferences() {
   const data = this.data();
   (data.micromarkExtensions ??= []).push({ text: { [BACKSLASH]: { name: 'eqref', tokenize: tokenizeEqref } } });
   (data.fromMarkdownExtensions ??= []).push(eqrefFromMarkdown);
 }
+
+export const equationReferencesToMarkdown = {
+  unsafe: [{ character: '\\', after: `${COMMAND}\\{`, inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_EQUATION_REFERENCES }],
+  handlers: { eqref: (node) => `\\${COMMAND}{${node.label}}` },
+};
 
 const eqrefFromMarkdown = {
   enter: {

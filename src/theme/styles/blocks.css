@@ -18,16 +18,8 @@
   margin: 14px 0 18px;
 }
 
-@property --scroll-cover {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: transparent;
-}
-
 .bk-article {
   --scroll-cover: var(--bg);
-  /* why: the covers lie on the body background, so they follow its background-color transition in page.css during a theme switch */
-  transition: --scroll-cover 0.2s;
 }
 
 .bk-article :is(.aside, .quote, blockquote):where(:not(.component-box *)) {

@@ -260,10 +260,12 @@ export function createCardHost({ variant, showDelay }) {
         });
       }
       closeOnEscape(frame, () => {
+        const wasShown = isShown();
         const index = shown();
         // why: the entry takes the focus while the card is still shown, because its focus listener opens the card when it is closed
         if (!panel && index >= 0 && frame.contains(document.activeElement)) groups[index].at(-1).focus({ preventScroll: true });
         close();
+        return wasShown;
       });
       context.host.append(element);
     },

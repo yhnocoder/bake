@@ -10,6 +10,7 @@ export default {
   categories: [
     { id: 'writing', name: '写法', color: '#985b57', desc: 'Bake 支持的 Markdown 写法和它们生成的页面。' },
     { id: 'math', name: '数学', color: '#2a78d6', desc: '链式法则、雅可比矩阵与反向传播。' },
+    { id: 'llm', name: '大模型', color: '#7a5aa6', desc: '大模型里的激活函数、前馈网络和注意力。' },
     { id: 'pages', name: 'HTML 页面', color: '#1baf7a', desc: '不经过 Markdown、原样发布的页面。' },
   ],
 };

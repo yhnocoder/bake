@@ -1,0 +1,6 @@
+{
+  "id": "crt-monitor",
+  "displayName": "CRT Monitor",
+  "description": "A tiny retro CRT monitor that keeps an eye on your code.",
+  "spritesheetPath": "spritesheet.webp"
+}

@@ -26,52 +26,34 @@ button:focus-visible {
   right: var(--chat-right, 16px);
   bottom: var(--chat-bottom, 16px);
   z-index: var(--layer-chat-button, 75);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 12px 0 9px;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 82px;
+  padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  color: var(--ink-2);
-  font-size: 12.5px;
-  line-height: 1;
-  box-shadow:
-    0 0 0 0.5px color-mix(in srgb, var(--ink) 16%, transparent),
-    0 2px 8px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  background: none;
   user-select: none;
   -webkit-user-select: none;
   opacity: calc(1 - var(--chat-hidden, 0));
   transform: translateX(calc(var(--chat-hidden, 0) * (100% + var(--chat-right, 16px) + 8px)));
   visibility: var(--chat-visibility, visible);
   transition:
-    color 0.15s,
     scale 0.12s,
     opacity 0.2s,
-    translate 0.15s var(--ease-out, ease-out),
     transform 0.25s var(--ease-out, ease-out),
     visibility 0.25s;
 }
 
-.bk-chat-launcher:hover {
-  color: var(--accent);
+.bk-chat-launcher .bk-chat-pet {
+  width: 72px;
+  height: 78px;
 }
 
 .bk-chat-launcher:active {
-  scale: 0.97;
+  scale: 0.96;
   transition-duration: 0s;
-}
-
-.bk-chat-launcher[data-hidden] {
-  opacity: 0;
-  translate: 0 6px;
-  visibility: hidden;
-  transition:
-    opacity 0.12s,
-    translate 0.12s,
-    visibility 0s 0.12s;
 }
 
 .bk-chat-ask {
@@ -89,7 +71,7 @@ button:focus-visible {
   color: var(--bg);
   font-size: 12.5px;
   line-height: 1;
-  box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--button-shadow);
   user-select: none;
   -webkit-user-select: none;
   animation: bk-chat-fade 0.14s var(--ease-out, ease-out);
@@ -103,75 +85,6 @@ button:focus-visible {
   scale: 0.97;
 }
 
-.bk-chat-figure {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  overflow: visible;
-}
-
-.bk-chat-figure-body {
-  fill: color-mix(in srgb, var(--accent) 16%, var(--surface));
-  stroke: var(--accent);
-  stroke-width: 1.4;
-}
-
-.bk-chat-figure-eye {
-  fill: var(--ink);
-}
-
-.bk-chat-figure-closed,
-.bk-chat-figure-mouth {
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 1.2;
-  stroke-linecap: round;
-}
-
-.bk-chat-figure-closed {
-  display: none;
-}
-
-.bk-chat-figure-mouth {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.bk-chat-figure[data-state='greet'] {
-  animation: bk-chat-hop 0.5s var(--ease-out, ease-out);
-}
-
-.bk-chat-figure[data-state='waiting'] .bk-chat-figure-eye {
-  animation: bk-chat-look 1.6s ease-in-out infinite;
-}
-
-.bk-chat-figure[data-state='failed'] .bk-chat-figure-eye {
-  display: none;
-}
-
-.bk-chat-figure[data-state='failed'] .bk-chat-figure-closed {
-  display: inline;
-}
-
-.bk-chat-figure[data-state='failed'] .bk-chat-figure-mouth {
-  transform: scaleY(-1);
-}
-
-@keyframes bk-chat-hop {
-  40% {
-    transform: translateY(-2px) rotate(-6deg);
-  }
-}
-
-@keyframes bk-chat-look {
-  25% {
-    transform: translateX(-1.2px);
-  }
-  75% {
-    transform: translateX(1.2px);
-  }
-}
-
 @keyframes bk-chat-fade {
   from {
     opacity: 0;
@@ -179,22 +92,22 @@ button:focus-visible {
   }
 }
 
+@keyframes bk-chat-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  * {
-    translate: none !important;
+  .bk-chat-ask {
+    animation-name: bk-chat-fade-in;
   }
 
   .bk-chat-launcher {
     transform: none;
     transition:
-      color 0.15s,
       opacity 0.2s,
       visibility 0.2s;
-  }
-
-  .bk-chat-figure,
-  .bk-chat-figure * {
-    animation: none !important;
   }
 }
 

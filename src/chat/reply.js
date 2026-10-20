@@ -1,38 +1,25 @@
 import { toHtml } from 'hast-util-to-html';
-import { toHast } from 'mdast-util-to-hast';
-import remarkCjkFriendly from 'remark-cjk-friendly';
-import remarkCjkFriendlyStrikethrough from 'remark-cjk-friendly-gfm-strikethrough';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
+import { defaultHandlers, toHast } from 'mdast-util-to-hast';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { REMARK_PLUGINS } from '../markdown/remark-plugins.js';
+import { texDelimiters } from './tex-delimiters.js';
 
 export const MATH_CLASS = 'bk-chat-math';
 
-const processor = unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkCjkFriendly).use(remarkCjkFriendlyStrikethrough, { singleTilde: false });
+const processor = unified().use(remarkParse).use(REMARK_PLUGINS).use(texDelimiters);
 const SCHEME = /^([a-z][a-z\d+.-]*):/i;
 const OPEN_SCHEMES = new Set(['http', 'https', 'mailto']);
-const CODE = /(```[\s\S]*?(?:```|$)|`[^`\n]*`)/;
 
 export function replyHtml(markdown, { root }) {
-  const tree = toHast(processor.runSync(processor.parse(normalizeMath(markdown))), {
+  const tree = toHast(processor.runSync(processor.parse(markdown)), {
     handlers: {
       math: (state, node) => mathElement('div', node.value, true),
-      inlineMath: (state, node) => mathElement('span', node.value, false),
+      inlineMath: (state, node) => mathElement('span', node.value, node.data?.display === true),
+      paragraph: (state, node) => (node.children.length === 1 && node.children[0].data?.display === true ? mathElement('div', node.children[0].value, true) : defaultHandlers.paragraph(state, node)),
     },
   });
   return toHtml(clean(tree, root));
-}
-
-export function normalizeMath(markdown) {
-  return markdown
-    .split(CODE)
-    .map((part, index) =>
-      index % 2 === 1
-        ? part
-        : part.replace(/\\\[([\s\S]+?)\\\]/g, (match, tex) => `\n$$\n${tex.trim()}\n$$\n`).replace(/\\\(([\s\S]+?)\\\)/g, (match, tex) => `$${tex.trim()}$`),
-    )
-    .join('');
 }
 
 export function linkTarget(href, root) {

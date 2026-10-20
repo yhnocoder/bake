@@ -1,6 +1,6 @@
 import { LineCounter, isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { TOC_STYLES } from '../theme/choices.js';
+import { TOC_STYLES } from '../choices.js';
 import { choiceProblem, folderFile, folderPath, slugProblem } from './rules.js';
 import { CONFIG_FILE } from './bake-config.js';
 

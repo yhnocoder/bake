@@ -53,6 +53,12 @@ describe('bake dev', () => {
     assert.deepEqual(lines.slice(1), [`Serving the blog at http://localhost:${server.port}/`]);
   });
 
+  test('prints a loopback address other than 127.0.0.1 as it is, because localhost does not reach it', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const { server, lines } = await start(t, dir, { host: '127.0.0.5' });
+    assert.ok(lines.includes(`Serving the blog at http://127.0.0.5:${server.port}/`), lines.join('\n'));
+  });
+
   test('listens on the loopback address by default and prints only the local address', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const { server, lines } = await start(t, dir);
@@ -491,6 +497,8 @@ describe('preview updates', () => {
     };
     assert.deepEqual((await preview.update()).problems, []);
     assert.match(chunk(), /first text/);
+    const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(indexHtml(preview, '/2026-10/rope/'))[1];
+    assert.match(preview.find(runtime).output.render(), /JSON\.parse\("\{\}"\)/, 'bake dev serves without cache headers, so its runtime downloads no component files in advance');
     writeFiles(dir, { 'components/demo-chart.js': chart('second text') });
     const changed = await preview.update(['components/demo-chart.js']);
     assert.deepEqual([changed.problems, changed.reload], [[], 'all']);

@@ -12,15 +12,12 @@ export function ArticleDocument(props) {
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
         <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
-        <script innerHTML={prepaintScript} />
+        <script innerHTML={prepaintScript()} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
-          <script defer src={src} />
-        ))}
-        {assets.modules.map((src) => (
           <script type="module" src={src} />
         ))}
       </head>

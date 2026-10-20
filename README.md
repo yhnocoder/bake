@@ -2,17 +2,20 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
+> Bake is being rebuilt from scratch to follow its new design. `bake init`, `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
 
 ## Commands
 
 ```bash
+bake init my-blog       # create a blog with bake.config.js and a first post in my-blog/
 bake new 2026-10/rope   # create content/posts/2026-10/rope/index.md as a draft
-bake dev                # serve the blog at http://localhost:4321/ and update pages on save
+bake dev                # serve the blog at http://localhost:4321/, open it and update pages on save
 bake build              # check the blog and generate the static site into dist/
 ```
 
-Run every command from the blog root, the folder that contains `bake.config.js`.
+Run every command except `bake init` from the blog root, the folder that contains `bake.config.js`.
+
+`bake init [folder]` creates a blog in `folder`, or in the current folder when none is given: `bake.config.js` with the folder name as the site title, a first post at `content/posts/hello/index.md` and a `.gitignore` that leaves out `node_modules/`, `dist/`, `.dist-staging/` and `.dist-previous/`. It writes nothing when the folder already holds one of these files.
 
 `bake new <path>` creates `content/posts/<path>/index.md` with front matter for a draft dated today. The last folder name of the path becomes the slug.
 
@@ -20,7 +23,7 @@ Run every command from the blog root, the folder that contains `bake.config.js`.
 
 ### bake dev
 
-You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, and serves it at http://localhost:4321/. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. `bake dev` listens only on this computer, at `127.0.0.1`, because Write to file in a parameter bar changes files in the blog folder. `--host 0.0.0.0` makes it listen on every network interface, so a phone on the same network can open the pages too, and the terminal then also shows the addresses of the computer on the local network. Open the pages at one of those IP addresses: `bake dev` refuses requests for any host name other than `localhost`, a name that ends with `.localhost` and the name given with `--host`, so that a site cannot reach it through a DNS name that points at the computer. Only use it on a network you trust: the pages and their parameter bars are then open to everyone on that network. `bake dev` writes into the blog folder only when you press Write to file in a parameter bar, and it stops when you press Ctrl+C.
+You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, serves it at http://localhost:4321/ and opens that address in the default browser when it runs in a terminal; `--no-open` leaves the browser closed. Open the pages at `localhost` and not at `127.0.0.1`: the AI chat stores its key with a passkey, and browsers do not create passkeys for an IP address. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. `bake dev` listens only on this computer, at `127.0.0.1`, because Write to file in a parameter bar changes files in the blog folder. `--host 0.0.0.0` makes it listen on every network interface, so a phone on the same network can open the pages too, and the terminal then also shows the addresses of the computer on the local network. Open the pages at one of those IP addresses: `bake dev` refuses requests for any host name other than `localhost`, a name that ends with `.localhost` and the name given with `--host`, so that a site cannot reach it through a DNS name that points at the computer. Only use it on a network you trust: the pages and their parameter bars are then open to everyone on that network. `bake dev` writes into the blog folder only when you press Write to file in a parameter bar, and it stops when you press Ctrl+C.
 
 Bake watches the blog folder and rebuilds what changed each time you save a file:
 
@@ -82,6 +85,7 @@ export default {
 | `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
 | `themes` | no | The options of each theme, keyed by the theme name. The `bento` theme has one option, `columns`: the number of card columns on wide screens, an integer from 1 to 6, 4 by default, written as `themes: { bento: { columns: 4 } }`. A theme of the blog declares its options in `options.js` in its folder. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
+| `chat` | no | `{ pet }`: the pet of the AI chat, described in "The pet" below. The default is `crt-monitor`. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
 
 Any other field is an error.
@@ -321,11 +325,40 @@ The cache step is optional: it keeps the Chromium download between runs, and `np
 
 ## AI chat
 
-Every article page and the homepage have a button in the bottom right corner that opens a chat with DeepSeek. On an article page the reader asks about that article, whose Markdown source goes with every question, or switches to the whole blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, formulas are typeset with the macros of `preamble.sty`, and a switch turns DeepSeek's thinking mode on and off.
+Every article page and the homepage show a small animated pet in the bottom right corner. Clicking the pet opens a chat with DeepSeek: an input field and the latest messages appear as bubbles to the left of the pet. The answers of the model are on the right and the questions of the reader on the left. Escape, a click outside the chat or a second click on the pet closes it. On an article page a question is about that article, whose Markdown source goes with every question, and the model can also read other articles of the blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. Typing `@` in the input field opens a list of articles, months, categories and tags; the reader picks one or more of them to limit the question to those articles. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, and formulas are typeset with the macros of `preamble.sty`. A settings button in the input field starts a new chat, turns DeepSeek's thinking mode on and off, changes or clears the key and chooses another pet.
 
-There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. The menu of the chat clears the key. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
+There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
 
-Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads only when the reader asks about the whole blog. A page without scripts shows nothing of the chat.
+Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads when the reader sends the first question or types `@`. A page without scripts shows nothing of the chat.
+
+### The pet
+
+The pet uses the format of Codex pets: a folder with a `pet.json`, of which Bake reads only `displayName` and `spritesheetPath`, and a PNG or WebP spritesheet of 8 columns and 9 rows of 192 by 208 pixel frames, 1536 by 1872 pixels. Sheets of 1536 by 2288 pixels, which have two more rows, are accepted and cropped to the first 9 rows. The pet waves when the pointer or the keyboard reaches it, runs while an answer is written, reads while the model reads articles, waits while the passkey is used, jumps when an answer is done and shows a failed pose after an error. Readers who prefer reduced motion see the first frame of each pose.
+
+`chat.pet` in `bake.config.js` chooses the pet of the site:
+
+```js
+export default {
+  // ...
+  chat: { pet: 'miso' },
+};
+```
+
+| Value | Pet |
+|---|---|
+| `crt-monitor` | The built-in CRT Monitor. This is the default. |
+| `miso` | The built-in Miso, an otter. |
+| A folder of the blog, such as `pets/bun` | The pet in that folder. |
+| An `http` or `https` address of a `pet.json` | The pet at that address, which `bake build` downloads, checks and publishes with the site. |
+
+`bake build` publishes the pet in `_bake/pet/`, together with its first frame as a small image that the page shows until the pointer or the keyboard reaches the pet; the page downloads the whole spritesheet only then. A spritesheet of another size or one that is not a PNG or WebP image is reported as an error, and so is a spritesheet larger than 5 MB, whether it comes from a folder or an address, or one that would be larger than 5 MB after Bake converts it to WebP. `pet.json` may have at most 64 KB, and `spritesheetPath` must name a file inside the pet folder.
+
+Readers can choose their own pet in the chat settings by pasting the address of a `pet.json`. The browser downloads it without cookies and without the address of the page, refuses a spritesheet larger than 5 MB, of another size or in a format other than PNG and WebP, shows the name of the pet only as text, and remembers the choice in this browser.
+
+The built-in pets have their own licenses, which the chat settings name in one line:
+
+- CRT Monitor, "CRT Monitor — Codex Pet" by wxy, from https://github.com/wxy/codex-pets/tree/57a8c87c2abe1a9f3140c84ed2bdfcea0bc6b1de/pets/crt-monitor, is licensed under CC BY 4.0. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license notice is `src/chat/pets/crt-monitor/LICENSE`.
+- Miso, by gaerae, from https://github.com/gaerae/playpets/tree/40d0c5aa87038e4e73d0ca61da35a2b4a900e65b/assets/pets/miso, is licensed under the MIT license. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license is `src/chat/pets/miso/LICENSE`.
 
 ## Themes
 
@@ -342,7 +375,7 @@ The `essay` theme has four table of contents styles, which `toc` selects:
 
 A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
-The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `bento.columns` columns from 1340 pixels up, at most 2 from 600 to 1339 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. Cards keep the order of the article, so a row ends with a gap when the next card does not fit into it, and each card is as tall as its content. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it.
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. The grid has `themes.bento.columns` columns from 1340 pixels up, at most 2 from 600 to 1339 pixels and 1 below 600 pixels. A section written as `## Title {width=wide}` spans two columns and `{width=page}` spans the whole row; `body` or no width gives one column. A section without a width spans two columns when it contains a block with `:::{width=wide}`, the whole row when it contains a block with `:::{width=page}`, and two columns when one of its blocks does not fit into one column, such as a long line of code or a component with a pixel width. Cards keep the order of the article, so a row ends with a gap when the next card does not fit into it, and each card is as tall as its content. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it.
 
 A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
