@@ -82,6 +82,8 @@ describe('bake.config.js', () => {
     ["description: @''", 'description must be a non-empty string, got ""'],
     ['description: @3', 'description must be a non-empty string, got 3'],
     ['title: @3', 'title must be a non-empty string, got 3'],
+    ["title: @'a\\x01b'", 'title contains the character U+0001, which the RSS feed and the sitemap cannot hold'],
+    ["description: @'a\\uFFFEb'", 'description contains the character U+FFFE, which the RSS feed and the sitemap cannot hold'],
     ["language: @' '", 'language must be a non-empty string, got " "'],
     ["url: @'example.com'", 'url must be an absolute http or https URL, got "example.com"'],
     ["url: @'ftp://example.com'", 'url must be an absolute http or https URL, got "ftp://example.com"'],

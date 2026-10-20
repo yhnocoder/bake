@@ -7,11 +7,18 @@ export const WIDTHS = Object.freeze(['body', 'wide', 'page']);
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 const SIZE_PATTERN = /^(\d+(?:\.\d+)?)(px|%)$/;
+const NOT_IN_XML = /[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]/u;
 
 export function slugProblem(label, value) {
   if (typeof value !== 'string') return `${label} must be a string, got ${describeValue(value)}`;
   if (!SLUG_PATTERN.test(value)) return `${label} ${JSON.stringify(value)} may only contain lowercase letters, digits and "-"`;
   return null;
+}
+
+export function characterProblem(label, value) {
+  const found = typeof value === 'string' ? NOT_IN_XML.exec(value) : null;
+  if (found === null) return null;
+  return `${label} contains the character U+${found[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}, which the RSS feed and the sitemap cannot hold`;
 }
 
 export function choiceProblem(label, choices, value) {
