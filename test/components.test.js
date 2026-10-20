@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
@@ -354,6 +354,20 @@ describe('building components', () => {
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);
     assert.match(readFileSync(join(dir, 'dist/assets', assets.find((name) => /^line-plot-[\w-]+\.css$/.test(name))), 'utf8'), /\.bk-kit-slider/);
     assert.ok(!assets.some((name) => name.startsWith('tick-list') && name.endsWith('.css')), assets.join(', '));
+  });
+
+  test('builds formulas after reading a component library that replaces the module loader of MathJax, also with an empty preamble.sty', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'preamble.sty': '',
+      'components/lib/tex.js': "import { mathjax } from '@mathjax/src/js/mathjax.js';\n\nmathjax.asyncLoad = (name) => import(name);\n\nexport const ready = 'ready';\n",
+      'components/tex-box.js': `import { ready } from './lib/tex.js';\n\n${height}export default class TexBox extends HTMLElement {\n  connectedCallback() {\n    this.textContent = ready;\n  }\n}\n`,
+      'content/posts/rope/index.md': article({ body: '$$\nx \\in \\mathbb{R}\n$$\n\n:::tex-box\n:::\n' }),
+    });
+    symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), join(dir, 'node_modules'), 'dir');
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\mathbb{R}">/);
   });
 
   test('marks the frames of the article itself with their line and the frames of embedded content without one', (t) => {
