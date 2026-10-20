@@ -49,6 +49,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   const required = filesIn([...own, ...BUILD_FILES].map((path) => resolve(path)));
   const cached = cache.read(required);
   if (cached !== null) return loadTheme(cached.data, cached.files, new Set(cached.inputs));
+  const started = Date.now();
   const sources = new Set();
   const alias = [...publicModules('themes'), themeFileAlias(folders, locate, locateShared, sources)];
   let data;
@@ -74,7 +75,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
     errors.push(missingExport(root, error, locateShared) ?? compileError(root, name, error));
     return null;
   }
-  cache.write(data, theme.files, [...required, ...theme.sources]);
+  cache.write(data, theme.files, [...required, ...theme.sources], started);
   return theme;
 }
 

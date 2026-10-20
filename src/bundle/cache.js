@@ -17,6 +17,7 @@ const TOOLCHAIN = [
 ];
 const QUERY = /\?.*$/;
 const RENAME_TARGET_EXISTS = ['EEXIST', 'ENOTEMPTY'];
+const MTIME_RESOLUTION = 2000;
 
 export function filesIn(paths) {
   return paths
@@ -52,7 +53,10 @@ export function buildCache(name, slot, base) {
     }
   }
 
-  function write(data, files, inputs) {
+  function write(data, files, inputs, started) {
+    const sources = [...new Set(inputs.map((id) => id.replace(QUERY, '')).filter((file) => isAbsolute(file)))].sort();
+    // A file saved during the build would be stored with its new hash next to the output built from its old content.
+    if (sources.some((file) => (statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? 0) >= started - MTIME_RESOLUTION)) return;
     mkdirSync(dir, { recursive: true });
     const folder = `${location}-${outputDigest(files).slice(0, 16)}`;
     const output = join(dir, folder);
@@ -69,7 +73,6 @@ export function buildCache(name, slot, base) {
         if (!RENAME_TARGET_EXISTS.includes(error.code)) throw error;
       }
     }
-    const sources = [...new Set(inputs.map((id) => id.replace(QUERY, '')).filter((file) => isAbsolute(file)))].sort();
     const index = { toolchain: toolchainVersions(), inputs: sources.map((file) => [stored(file), hashOf(file)]), data, dir: folder, files: files.map((file) => file.path) };
     const staging = `${indexFile}.${randomUUID()}`;
     writeFileSync(staging, JSON.stringify(index));

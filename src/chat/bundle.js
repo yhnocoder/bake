@@ -23,12 +23,13 @@ function cachedBundle() {
 }
 
 async function buildBundle() {
+  const started = Date.now();
   const { entry, files, modules } = await browserBuild({
     input: { chat: ENTRY },
     plugins: [mathModules(fetchedPreamble(`../${CHAT_PREAMBLE_PATH}`)), solid()],
     alias: publicModules('chat'),
   });
-  cache.write({ entry }, files, [...filesIn(BUILD_DIRS), ...modules]);
+  cache.write({ entry }, files, [...filesIn(BUILD_DIRS), ...modules], started);
   return { entry, files };
 }
 
