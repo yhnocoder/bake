@@ -1,11 +1,7 @@
 import { join } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
-import remarkCjkFriendly from 'remark-cjk-friendly';
-import remarkCjkFriendlyStrikethrough from 'remark-cjk-friendly-gfm-strikethrough';
 import remarkFrontmatter from 'remark-frontmatter';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { resolveComponent } from '../components/declarations.js';
@@ -24,15 +20,13 @@ import { citationsAndMissingFootnotes } from './bracket-syntax.js';
 import { equationReferences } from './eqref-syntax.js';
 import { highlight } from './highlight-syntax.js';
 import { readRawHtml } from './raw-html.js';
+import { REMARK_PLUGINS } from './remark-plugins.js';
 import { protectPipesInMath, restorePipesInMath } from './table-math.js';
 
 const processor = unified()
   .use(remarkParse)
   .use(remarkFrontmatter)
-  .use(remarkGfm, { singleTilde: false })
-  .use(remarkMath)
-  .use(remarkCjkFriendly)
-  .use(remarkCjkFriendlyStrikethrough, { singleTilde: false })
+  .use(REMARK_PLUGINS)
   .use(highlight)
   .use(citationsAndMissingFootnotes)
   .use(equationReferences)
