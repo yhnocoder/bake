@@ -110,6 +110,7 @@ ${spacer}
 `,
   }),
   'content/posts/gelu/index.md': article({ slug: 'gelu', body: ':::grid-view\n:::\n' }),
+  'content/posts/below/index.md': article({ slug: 'below', body: `:::grid-view\n:::\n\n${spacer}\n\n:::text-view\n:::\n` }),
   'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
   'content/posts/source/index.md': article({ slug: 'source', body: '## Grid {#grid}\n\n:::grid-view{mode=far}\n:::\n' }),
   'content/posts/embedder/index.md': article({ slug: 'embedder', body: 'An article without components of its own.\n\n:::embed\n/2026-10/source/#grid\n:::\n' }),
@@ -303,6 +304,17 @@ test('components run in the browser', async (t) => {
     assert.ok(scripts.includes('grid-view'), scripts.join(', '));
     assert.ok(!scripts.some((name) => ['count-view', 'tex-view', 'solid-element', 'mathjax'].includes(name)), scripts.join(', '));
     await other.close();
+  });
+
+  await t.test('once the page has loaded, the code of a component far below the screen is loaded before the component starts', async () => {
+    const page = await open('below');
+    await waitForReady(page, 1);
+    await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]text-view-[\w-]{8}\.js$/.test(entry.name) && entry.responseEnd > 0));
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null), null);
+    await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
+    assert.deepEqual(page.problems, []);
+    await page.close();
   });
 
   await t.test('the article styles of the essay theme do not reach the content of a component', async () => {

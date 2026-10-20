@@ -2,7 +2,7 @@ import { loaders } from 'bake:component-loaders';
 
 const FRAME = 'figure.component[data-component]';
 const BOX = '.component-box';
-const NEAR_VIEWPORT = '800px 0px';
+const NEAR_VIEWPORT = '150% 0px';
 const definitions = new Map();
 
 function define(name) {
@@ -71,11 +71,24 @@ const observer = new IntersectionObserver(
   { rootMargin: NEAR_VIEWPORT },
 );
 function observeFrames() {
-  for (const frame of document.querySelectorAll(FRAME)) {
-    if (frame.dataset.state === undefined) observer.observe(frame);
-  }
+  const frames = [...document.querySelectorAll(FRAME)].filter((frame) => frame.dataset.state === undefined);
+  for (const frame of frames) observer.observe(frame);
+  return frames;
+}
+function defineInTurn(names) {
+  const [name, ...rest] = names;
+  if (name === undefined) return;
+  define(name)
+    // why: a definition that fails is reported by start when its frame comes near the viewport
+    .catch(() => {})
+    .then(() => setTimeout(() => defineInTurn(rest)));
+}
+function defineAll(frames) {
+  defineInTurn([...new Set(frames.map((frame) => frame.dataset.component))]);
 }
 
-observeFrames();
-document.addEventListener('bake:content', observeFrames);
+const frames = observeFrames();
+if (document.readyState === 'complete') defineAll(frames);
+else addEventListener('load', () => defineAll(frames), { once: true });
+document.addEventListener('bake:content', () => defineAll(observeFrames()));
 addEventListener('beforeprint', () => document.querySelectorAll(FRAME).forEach(start));
