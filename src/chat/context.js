@@ -7,6 +7,13 @@ export const ARTICLE_REGION = '[data-region="article"]';
 export const READ_ARTICLE = 'read_article';
 
 const MAX_TOOL_TEXT = 120000;
+
+export const CHAT_RULES = [
+  'You are the reading assistant of a blog and answer the questions of a reader about its articles.',
+  'Answer in the language the reader writes in. Write Markdown. Write formulas in TeX, between $ and $ inline and between $$ and $$ on their own lines.',
+  'Base your answers on the articles. Say so when they do not cover something, and mark what you add from outside the blog.',
+  'Do not describe content you have not read.',
+].join('\n');
 const UI = '[data-ui]';
 
 export const chatTools = [
@@ -94,28 +101,28 @@ function groups(entries, keysOf) {
   return [...map];
 }
 
-export function systemPrompt({ page, catalog, scopes = [], sources = [], instructions = '' }) {
+export function systemPrompt({ page, catalog, scopes = [], sources = [], rules = CHAT_RULES, instructions = '' }) {
   const away = page.article?.address;
   const where = page.article === null ? `on the page ${page.address}` : away === undefined ? `reading the article "${page.title}" at ${page.address}` : `on the page ${page.address} and continues a conversation about the article "${page.title}" at ${away}`;
-  const intro = [`You are the reading assistant of the blog "${catalog.title}"${catalog.description === undefined ? '' : ` (${catalog.description})`}. The reader is ${where}.`, ...commonRules];
+  const intro = [rules, `The blog is "${catalog.title}"${catalog.description === undefined ? '' : ` (${catalog.description})`}. The reader is ${where}.`];
   const links = 'Link articles and sections with their addresses and section ids, such as [the article](/2026-10/rope/) or [the section](/2026-10/rope/#id).';
   if (scopes.length > 0) {
     const listed = new Set(scopes.filter((scope) => scope.kind !== 'article').flatMap((scope) => scope.urls));
     return [
       ...intro,
-      `The reader limited the question to ${scopes.map((scope) => scope.label).join(', ')}. Answer from these articles. Say so when they do not cover something, and mark what you add from elsewhere.`,
+      `The reader limited the question to ${scopes.map((scope) => scope.label).join(', ')}. Answer from these articles.`,
       links,
       ...sources.map((source) => [`<article address="${escapeMarkup(`/${source.url}`)}" title="${escapeMarkup(source.title)}">`, source.content, '</article>'].join('\n')),
       ...(listed.size === 0 ? [] : [`Read these articles with ${READ_ARTICLE} before you answer; read every one that may be relevant. They are listed one JSON object per line:`, ...catalogLines(catalog.articles.filter((entry) => listed.has(entry.url)))]),
       ...instructionLines(instructions),
     ].join('\n');
   }
-  const blog = [`The blog's articles are listed below, one JSON object per line. Before you answer a question about the content of other articles, call ${READ_ARTICLE} with their addresses and read them; read several when the question spans articles. Do not describe content you have not read.`, links, ...catalogLines(catalog.articles)];
+  const blog = [`The blog's articles are listed below, one JSON object per line. Before you answer a question about the content of other articles, call ${READ_ARTICLE} with their addresses and read them; read several when the question spans articles.`, links, ...catalogLines(catalog.articles)];
   if (page.article === null) return [...intro, ...blog, ...instructionLines(instructions)].join('\n');
   const outline = page.article.outline.map((heading) => `${heading.depth === 3 ? '  ' : ''}- #${heading.id} ${heading.title}`);
   return [
     ...intro,
-    `Questions are about this article unless the reader asks about others. Its Markdown source is between the <article> tags below. Base your answers on the article. Say so when it does not cover something, and mark what you add from outside the blog.`,
+    `Questions are about this article unless the reader asks about others. Its Markdown source is between the <article> tags below.`,
     away === undefined ? 'When you refer to a part of this article, link it with its id, such as [the heading](#id). The headings and their ids are:' : `When you refer to a part of this article, link it with its address and id, such as [the heading](${away}#id). The headings and their ids are:`,
     ...(outline.length === 0 ? ['(the article has no headings)'] : outline),
     '<article>',
@@ -140,9 +147,6 @@ export function catalogLines(entries) {
   );
 }
 
-const commonRules = [
-  'Answer in the language the reader writes in. Write Markdown. Write formulas in TeX, between $ and $ inline and between $$ and $$ on their own lines.',
-];
 
 function sectionLine(section) {
   const children = section.subsections.map((subsection) => `#${subsection.id} ${subsection.title}`);

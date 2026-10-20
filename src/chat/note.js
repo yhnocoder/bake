@@ -24,10 +24,9 @@ export function citedEntries(root, catalog, rounds, own) {
   return urls.map((url) => catalog.articles.find((entry) => entry.url === url)).filter((entry) => entry !== undefined);
 }
 
-export function notePrompt({ catalog, own, sources, rounds, labels, previous = null, request = null, instructions = '' }) {
-  const articles = [...(own === null ? [] : [own]), ...sources];
-  const system = [
-    `You write a study note from a conversation between a reader and the reading assistant of the blog "${catalog.title}".`,
+export function noteRules(labels) {
+  return [
+    'You write a study note from a conversation between a reader and the reading assistant of a blog.',
     'Write the note in Markdown, in the language of the conversation, and answer with the note only.',
     'Start with one line "# " followed by a short title that names the topic.',
     'Leave out the questions and answers. Organize what the conversation established by topic, under "## " headings, as list items.',
@@ -36,6 +35,14 @@ export function notePrompt({ catalog, own, sources, rounds, labels, previous = n
     `List the questions that the conversation left open under a last heading "## ${labels.openQuestions}", and leave this heading out when no question is left open.`,
     'Write formulas in TeX, between $ and $ inline and between $$ and $$ on their own lines.',
     'Write nothing that neither the conversation nor the articles say.',
+  ].join('\n');
+}
+
+export function notePrompt({ catalog, own, sources, rounds, labels, previous = null, request = null, rules = noteRules(labels), instructions = '' }) {
+  const articles = [...(own === null ? [] : [own]), ...sources];
+  const system = [
+    rules,
+    `The blog is "${catalog.title}".`,
     ...(articles.length === 0 ? [] : ['The articles, one JSON object per line:', ...catalogLines(articles.map(({ entry }) => entry))]),
     ...articles.map(({ entry, source }) => [`<article address="${escapeMarkup(`/${entry.url}`)}" title="${escapeMarkup(entry.title)}">`, source, '</article>'].join('\n')),
     ...instructionLines(instructions),

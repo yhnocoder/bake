@@ -7,13 +7,13 @@ import { basename, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
-import { chatTools, matchingScopes, pageAddress, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
+import { CHAT_RULES, chatTools, matchingScopes, pageAddress, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
 import { chatLabels } from '../src/chat/labels.js';
 import { PetError, sheetFile } from '../src/chat/reader-pet.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
 import { HISTORY_CHARACTERS, HISTORY_LIMIT, NOTE_VERSION_LIMIT, addNoteVersion, deleteConversation, historyGroups, historyKey, readHistory, roundMessages, saveConversation, storedRound } from '../src/chat/history.js';
-import { checkNote, citedEntries, exportMarkdown, noteFileName, noteHtml, notePrompt, noteTitle } from '../src/chat/note.js';
+import { checkNote, citedEntries, exportMarkdown, noteFileName, noteHtml, notePrompt, noteRules, noteTitle } from '../src/chat/note.js';
 import { linkTarget, replyHtml } from '../src/chat/reply.js';
 import { openKey, sealKey } from '../src/chat/vault.js';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
@@ -319,7 +319,7 @@ describe('AI chat context', () => {
 
   test('lists every article with its address and sections in the prompt for the whole blog', () => {
     const prompt = systemPrompt({ page: { address: '/', title: 'Test Blog', article: null }, catalog });
-    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is on the page \/\./);
+    assert.ok(prompt.startsWith(`${CHAT_RULES}\nThe blog is "Test Blog" (Notes.). The reader is on the page /.\n`));
     assert.ok(prompt.includes('{"address":"/2026-10/rope/","title":"Rope","date":"2026-10-19","summary":"Rotary.","sections":["#angles 01 Angles | #pairs Pairs"]}'));
     assert.ok(prompt.includes('{"address":"/2026-09/demo/","title":"Demo","date":"2026-09-05","tags":["html"]}'));
     assert.ok(!prompt.includes('<article'));
@@ -327,7 +327,7 @@ describe('AI chat context', () => {
 
   test('puts the source and the headings of the article and then the other articles in the prompt on an article page', () => {
     const prompt = systemPrompt({ page, catalog });
-    assert.match(prompt, /^You are the reading assistant of the blog "Test Blog" \(Notes\.\)\. The reader is reading the article "Rope" at \/2026-10\/rope\/\./);
+    assert.ok(prompt.startsWith(`${CHAT_RULES}\nThe blog is "Test Blog" (Notes.). The reader is reading the article "Rope" at /2026-10/rope/.\n`));
     assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>\n/);
     assert.ok(prompt.indexOf('</article>') < prompt.indexOf('{"address":"/2026-09/demo/"'));
   });
@@ -456,7 +456,7 @@ describe('AI chat notes', () => {
     const own = { entry: catalog.articles[0], source: '# Rope source' };
     const sources = [{ entry: catalog.articles[2], source: '# GELU source' }];
     const [system, user] = notePrompt({ catalog, own, sources, rounds: [round('A.')], labels, instructions: 'Be brief.' });
-    assert.match(system.content, /^You write a study note from a conversation between a reader and the reading assistant of the blog "Test Blog"\./);
+    assert.ok(system.content.startsWith(`${noteRules(labels)}\nThe blog is "Test Blog".\n`));
     assert.ok(system.content.includes('{"address":"/2026-10/rope/","title":"Rope"'));
     assert.ok(system.content.includes('<article address="/2026-10/rope/" title="Rope">\n# Rope source\n</article>\n<article address="/2026-08/gelu/" title="GELU">\n# GELU source\n</article>'));
     assert.ok(system.content.includes('a line that starts with "出自"'));
@@ -465,6 +465,18 @@ describe('AI chat notes', () => {
     assert.equal(user.content, '<conversation>\n<reader>\nQ\n</reader>\n<assistant>\nA.\n</assistant>\n</conversation>');
     const [, rewrite] = notePrompt({ catalog, own: null, sources: [], rounds: [round('A.')], labels, previous: '# Old', request: '写短一点' });
     assert.ok(rewrite.content.endsWith('</conversation>\n<note>\n# Old\n</note>\nRewrite this note as the reader asks: 写短一点\nKeep what the request does not ask to change.'));
+  });
+
+  test('replaces the built-in rules of the chat and the note with the rules of the reader and keeps the context after them', () => {
+    const page = { address: '/2026-10/rope/', title: 'Rope', article: { source: '# Source', outline: [] } };
+    const prompt = systemPrompt({ page, catalog, rules: 'Answer in one sentence.' });
+    assert.ok(prompt.startsWith('Answer in one sentence.\nThe blog is "Test Blog". The reader is reading the article "Rope" at /2026-10/rope/.\n'));
+    assert.ok(!prompt.includes(CHAT_RULES));
+    assert.ok(prompt.includes('<article>\n# Source\n</article>'));
+    assert.ok(prompt.includes('{"address":"/2026-09/demo/"'));
+    const [system] = notePrompt({ catalog, own: { entry: catalog.articles[0], source: '# Rope source' }, sources: [], rounds: [round('A.')], labels, rules: 'Write three points.' });
+    assert.ok(system.content.startsWith('Write three points.\nThe blog is "Test Blog".\nThe articles, one JSON object per line:\n'));
+    assert.ok(system.content.includes('<article address="/2026-10/rope/" title="Rope">\n# Rope source\n</article>'));
   });
 
   test('adds the instructions of the reader to the chat prompt and links into the article of a conversation continued on another page', () => {

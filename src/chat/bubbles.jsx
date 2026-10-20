@@ -3,14 +3,14 @@ import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { selectionMarkdown } from '../copy/copy.js';
 import styles from './bubbles.css?inline';
-import { READ_ARTICLE, articlePage, catalogEntry, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
+import { CHAT_RULES, READ_ARTICLE, articlePage, catalogEntry, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
 import { answer } from './conversation.js';
 import { ApiError, checkKey, complete } from './deepseek.js';
 import { addNoteVersion, deleteConversation, historyGroups, localDate, readHistory, roundMessages, saveConversation, storedRound } from './history.js';
 import { HistoryList } from './history-list.jsx';
-import { MAX_INSTRUCTIONS, readInstructions, saveInstructions } from './instructions.js';
+import { MAX_INSTRUCTIONS, MAX_RULES, customPrompts, readPrompts, savePrompts } from './instructions.js';
 import { NoteCard } from './note-card.jsx';
-import { MAX_NOTE_SOURCES, checkNote, citedEntries, notePrompt } from './note.js';
+import { MAX_NOTE_SOURCES, checkNote, citedEntries, notePrompt, noteRules } from './note.js';
 import { PetError, chooseReaderPet, forgetReaderPet, storedReaderPet } from './reader-pet.js';
 import { MATH_CLASS, replyHtml } from './reply.js';
 import { typesetMath } from './typeset.js';
@@ -58,7 +58,8 @@ function Chat(props) {
   const [noteHint, setNoteHint] = createSignal('');
   const [redo, setRedo] = createSignal(false);
   const [historyItems, setHistoryItems] = createSignal([]);
-  const [instructions, setInstructions] = createSignal(readInstructions());
+  const builtInPrompts = { chat: CHAT_RULES, note: noteRules(labels) };
+  const [prompts, setPrompts] = createSignal(readPrompts());
   let conversationId = crypto.randomUUID();
   let awayPage = null;
   let apiKey = null;
@@ -302,7 +303,7 @@ function Chat(props) {
       );
       const { added } = await answer({
         key: apiKey,
-        system: systemPrompt({ page: await contextPage(catalog), catalog, scopes: picked, sources, instructions: instructions() }),
+        system: systemPrompt({ page: await contextPage(catalog), catalog, scopes: picked, sources, rules: prompts().chat ?? builtInPrompts.chat, instructions: prompts().instructions }),
         history,
         tools: chatTools,
         runTool: (name, args) => (name === READ_ARTICLE ? readArticle(root, catalog, args.address) : Promise.resolve({ content: `Unknown tool ${name}`, label: name, failed: true })),
@@ -387,7 +388,7 @@ function Chat(props) {
       const sources = await Promise.all(cited.map(async (entry) => ({ entry, source: (await readArticle(root, known, `/${entry.url}`)).content })));
       const { message } = await complete({
         key: apiKey,
-        messages: notePrompt({ catalog, own, sources, rounds, labels, previous: previous?.markdown ?? null, request, instructions: instructions() }),
+        messages: notePrompt({ catalog, own, sources, rounds, labels, previous: previous?.markdown ?? null, request, rules: prompts().note ?? builtInPrompts.note, instructions: prompts().instructions }),
         tools: [],
         thinking: thinking(),
         signal: controller.signal,
@@ -717,17 +718,18 @@ function Chat(props) {
           <Show when={popover() === 'prompt'}>
             <PromptForm
               labels={labels}
-              value={instructions()}
+              prompts={prompts()}
+              builtIn={builtInPrompts}
               onCancel={() => {
                 setPopover(null);
                 focusInput();
               }}
               onSave={(text) => {
-                const saved = saveInstructions(text);
+                const saved = savePrompts(text, builtInPrompts);
                 if (saved === null) return labels.promptStorage;
-                setInstructions(saved);
+                setPrompts(saved);
                 setPopover(null);
-                note(saved === '' ? labels.promptCleared : labels.promptSaved);
+                note(customPrompts(saved) ? labels.promptSaved : labels.promptCleared);
                 focusInput();
                 return null;
               }}
@@ -742,7 +744,7 @@ function Chat(props) {
               view={view()}
               thinking={thinking()}
               noteAction={finished().length > 0 && view() !== 'setup' ? { label: noteCurrent() ? labels.viewNote : labels.makeNote, run: noteCurrent() ? openNote : () => summarize(), disabled: busy() || noteBusy() || pending() !== null } : null}
-              instructions={instructions() !== ''}
+              customPrompts={customPrompts(prompts())}
               onPrompt={() => setPopover('prompt')}
               onNewChat={newChat}
               onThinking={toggleThinking}
@@ -824,7 +826,7 @@ function Settings(props) {
       </Show>
       <button type="button" class="bk-chat-menu-item" aria-haspopup="dialog" onClick={props.onPrompt}>
         {labels.prompt}
-        <Show when={props.instructions}>
+        <Show when={props.customPrompts}>
           <span class="bk-chat-menu-state">{labels.promptSet}</span>
         </Show>
       </button>
@@ -884,45 +886,86 @@ function Settings(props) {
   );
 }
 
+const PROMPT_TABS = ['instructions', 'chat', 'note'];
+
 function PromptForm(props) {
   const { labels } = props;
   const [problem, setProblem] = createSignal(null);
-  let field;
+  const [tab, setTab] = createSignal('instructions');
+  const fields = {};
+  const tabs = {};
   onMount(() => {
+    const field = fields.instructions;
     field.focus({ preventScroll: true });
     field.setSelectionRange(field.value.length, field.value.length);
   });
   const save = (event) => {
     event?.preventDefault();
-    setProblem(props.onSave(field.value));
+    setProblem(props.onSave({ instructions: fields.instructions.value, chat: fields.chat.value, note: fields.note.value }));
+  };
+  const choose = (name) => {
+    setTab(name);
+    tabs[name].focus();
   };
   return (
     <form class="bk-chat-pop bk-chat-prompt" role="dialog" aria-label={labels.promptTitle} onSubmit={save}>
-      <label for="bk-chat-prompt-text">{labels.promptTitle}</label>
-      <textarea
-        id="bk-chat-prompt-text"
-        rows="4"
-        maxlength={MAX_INSTRUCTIONS}
-        placeholder={labels.promptPlaceholder}
-        value={props.value}
-        ref={field}
-        on:keydown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.isComposing) save(event);
-        }}
-      />
+      <div class="bk-chat-prompt-tabs" role="tablist" aria-label={labels.promptTitle}>
+        <For each={PROMPT_TABS}>
+          {(name, index) => (
+            <button
+              type="button"
+              role="tab"
+              id={`bk-chat-prompt-tab-${name}`}
+              aria-controls={`bk-chat-prompt-panel-${name}`}
+              aria-selected={String(tab() === name)}
+              tabindex={tab() === name ? 0 : -1}
+              ref={(element) => (tabs[name] = element)}
+              onClick={() => setTab(name)}
+              on:keydown={(event) => {
+                const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+                if (step === undefined) return;
+                event.preventDefault();
+                choose(PROMPT_TABS[(index() + step + PROMPT_TABS.length) % PROMPT_TABS.length]);
+              }}
+            >
+              {labels.promptTabs[name]}
+            </button>
+          )}
+        </For>
+      </div>
+      <For each={PROMPT_TABS}>
+        {(name) => (
+          <div class="bk-chat-prompt-panel" role="tabpanel" id={`bk-chat-prompt-panel-${name}`} aria-labelledby={`bk-chat-prompt-tab-${name}`} hidden={tab() !== name}>
+            <textarea
+              id={name === 'instructions' ? 'bk-chat-prompt-text' : `bk-chat-prompt-${name}`}
+              rows="4"
+              data-built-in={name === 'instructions' ? undefined : ''}
+              maxlength={name === 'instructions' ? MAX_INSTRUCTIONS : MAX_RULES}
+              aria-labelledby={`bk-chat-prompt-tab-${name}`}
+              placeholder={name === 'instructions' ? labels.promptPlaceholder : undefined}
+              value={name === 'instructions' ? props.prompts.instructions : (props.prompts[name] ?? props.builtIn[name])}
+              ref={(element) => (fields[name] = element)}
+              on:keydown={(event) => {
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.isComposing) save(event);
+              }}
+            />
+          </div>
+        )}
+      </For>
       <p class="bk-chat-prompt-hint" role={problem() === null ? undefined : 'alert'} data-failed={problem() === null ? undefined : ''}>
-        {problem() ?? labels.promptHint}
+        {problem() ?? labels.promptHints[tab()]}
       </p>
       <div class="bk-chat-redo-actions">
         <button
           type="button"
           class="bk-chat-note-button"
           onClick={() => {
-            field.value = '';
+            const field = fields[tab()];
+            field.value = tab() === 'instructions' ? '' : props.builtIn[tab()];
             field.focus();
           }}
         >
-          {labels.promptClear}
+          {tab() === 'instructions' ? labels.promptClear : labels.promptReset}
         </button>
         <span class="bk-chat-prompt-gap" />
         <button type="button" class="bk-chat-note-button" onClick={props.onCancel}>
