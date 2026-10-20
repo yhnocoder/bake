@@ -184,6 +184,7 @@ button:focus-visible {
   }
 
   .bk-chat-launcher {
+    transform: none;
     transition:
       color 0.15s,
       opacity 0.2s,
