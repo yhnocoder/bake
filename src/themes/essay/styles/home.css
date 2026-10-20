@@ -37,7 +37,7 @@ html:has(.bk-home) {
 .bk-home .bk-home-bar {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--layer-home-bar);
   display: flex;
   align-items: center;
   gap: 8px 20px;
@@ -334,7 +334,7 @@ html:has(.bk-home) {
   position: absolute;
   top: 8px;
   left: 10px;
-  z-index: 1;
+  z-index: var(--layer-card-draft);
   padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--series-4) 50%, var(--surface));
   border-radius: 999px;
