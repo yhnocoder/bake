@@ -272,6 +272,21 @@ describe('aside and fold', () => {
     assert.deepEqual(article.sections.map((section) => section.id), ['after']);
   });
 
+  test('reads a code fence inside a block only with up to three spaces of indentation, so indented code does not hide the closing line', async () => {
+    const indented = await parsed(':::fold{title="x"}\nIntro.\n\n    ```\n    not a fence\n\n:::\n\nTabbed.\n\n:::aside\nIntro.\n\n\t```\n\tnot a fence\n\n:::\n\nAfter.\n');
+    assert.deepEqual(
+      indented.intro.map((block) => [block.type, block.line, block.endLine]),
+      [
+        ['fold', 7, 13],
+        ['paragraph', 15, 15],
+        ['aside', 17, 23],
+        ['paragraph', 25, 25],
+      ],
+    );
+    const fenced = await parsed(':::aside\n   ```\n:::\n   ```\n:::\n\nAfter.\n');
+    assert.equal(outline(fenced.intro[0].html), '<aside class="aside">\n```\n:::\n```\n</aside>');
+  });
+
   test('treats a line that starts with ::: followed by prose as text', async () => {
     assert.equal(await html(':::example 块的写法是：\n'), '<p>:::example 块的写法是：</p>');
   });

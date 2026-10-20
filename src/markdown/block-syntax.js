@@ -8,7 +8,7 @@ const LEFT_BRACE = 123;
 const RIGHT_BRACE = 125;
 const QUOTE = 34;
 const APOSTROPHE = 39;
-const CODE_FENCE_LINE = /^\s*(`{3,}|~{3,})(.*)$/;
+const CODE_FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
 const blockConstruct = { tokenize: tokenizeBlock, concrete: true };
 const nonLazyLine = { tokenize: tokenizeNonLazyLine, partial: true };
