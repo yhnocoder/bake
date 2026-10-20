@@ -1,5 +1,6 @@
 import { factorySpace } from 'micromark-factory-space';
 import { asciiAlpha, asciiAlphanumeric, markdownLineEnding } from 'micromark-util-character';
+import { writeAttributes } from './attributes.js';
 
 const COLON = 58;
 const DASH = 45;
@@ -9,6 +10,10 @@ const RIGHT_BRACE = 125;
 const QUOTE = 34;
 const APOSTROPHE = 39;
 const CODE_FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const BLOCK_FENCE_LINE = /^ {0,3}(:{3,})/gm;
+const SHORTEST_FENCE = 3;
+const LIST_TABLE = 'list-table';
+const LIST_TABLE_ROW_BULLET = '*';
 
 const blockConstruct = { tokenize: tokenizeBlock, concrete: true };
 const nonLazyLine = { tokenize: tokenizeNonLazyLine, partial: true };
@@ -17,6 +22,30 @@ export function bakeBlocks() {
   const data = this.data();
   (data.micromarkExtensions ??= []).push({ flow: { [COLON]: [blockConstruct] } });
   (data.fromMarkdownExtensions ??= []).push(blockFromMarkdown);
+}
+
+export const bakeBlocksToMarkdown = {
+  unsafe: [{ atBreak: true, character: ':', after: '::' }],
+  handlers: { bakeBlock: writeBlock },
+};
+
+function writeBlock(node, _, state, info) {
+  const exit = state.enter('bakeBlock');
+  const body = node.name === LIST_TABLE ? writeListTableRows(node.children[0], state, info) : state.containerFlow(node, info);
+  exit();
+  const inner = [...body.matchAll(BLOCK_FENCE_LINE)].map(([, colons]) => colons.length + 1);
+  const fence = ':'.repeat(Math.max(SHORTEST_FENCE, ...inner));
+  return `${fence}${node.name}${writeAttributes(node.attributes)}\n${body === '' ? '' : `${body}\n`}${fence}`;
+}
+
+function writeListTableRows(rows, state, info) {
+  const exit = state.enter('list');
+  const bullet = state.bulletCurrent;
+  state.bulletCurrent = LIST_TABLE_ROW_BULLET;
+  const value = state.containerFlow(rows, info);
+  state.bulletCurrent = bullet;
+  exit();
+  return value;
 }
 
 const blockFromMarkdown = {

@@ -1,5 +1,5 @@
 import { fragmentOf, idOfFragment } from '../fragments.js';
-import { writeAttributes } from '../markdown/attributes.js';
+import { serializeMarkdown } from '../markdown/serialize.js';
 
 export const UI = '[data-ui]';
 
@@ -10,14 +10,13 @@ const INLINE_LEAF = 'p, h1, h2, h3, h4, h5, h6, td, th, figcaption, summary, li,
 const BLOCK =
   'address, article, aside, blockquote, details, dialog, div, dl, dt, dd, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, summary, table, thead, tbody, tfoot, tr, td, th, ul, mjx-container[display="true"]';
 const HEADING = 'h1, h2, h3, h4, h5, h6';
-const LINE_MARK = '\uFDD0';
-const LINE_PREFIX = '(^|\\n)((?:[ \\t]*(?:>[ \\t]?|(?:[-+*]|\\d{1,9}[.)])[ \\t]+))*[ \\t]*)(\\d*)';
-const LINE_SYNTAX = /^(?:#{1,6}(?:[ \t]|$)|>|[-+](?:[ \t]|$)|[- \t]+$|:{3})/;
-const LINE_NUMBER = /^\d{1,9}(?=[.)](?:[ \t]|$))/;
-const ALWAYS_ESCAPED = new Set(['\\', '`', '[', ']', '$']);
-const ASCII_WORD = /[A-Za-z0-9]/;
-const HTML_START = /[A-Za-z/!?]/;
-const CHARACTER_REFERENCE = /^&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/i;
+const ALIGNMENTS = new Set(['left', 'center', 'right']);
+const ATTENTION = [
+  ['mark', 'highlight'],
+  ['strong, b', 'strong'],
+  ['em, i, cite', 'emphasis'],
+  ['del, s', 'delete'],
+];
 
 export function sidenoteElement(article, number) {
   return [...article.querySelectorAll(NOTE)].find((note) => note.dataset.sidenote === String(number) && note.closest(UI) === null) ?? null;
@@ -37,27 +36,25 @@ export class MarkdownWriter {
     this.lines = lines;
     this.notes = [];
     this.copied = [];
-    this.inCell = false;
-    this.mark = LINE_MARK.repeat(longestRun(`${article.innerHTML}\n${(lines ?? []).join('\n')}`, LINE_MARK) + 1);
   }
 
   write() {
     const common = this.range.commonAncestorContainer;
     const start = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
-    const markdown = resolveLineStarts(tidy(this.selection(start)), this.mark);
-    const footnotes = this.footnotes();
-    return footnotes.length === 0 ? markdown : `${markdown}\n\n${footnotes.join('\n\n')}`;
+    const selection = this.selection(start);
+    const footnotes = this.footnotes().map(verbatim);
+    return tidy(serializeMarkdown({ type: 'root', children: [...selection, ...footnotes] }));
   }
 
   selection(start) {
     const unit = start.closest(UNIT);
-    if (unit !== null && this.article.contains(unit) && this.isWhole(unit)) return this.unitSource(unit);
+    if (unit !== null && this.article.contains(unit) && this.isWhole(unit)) return [this.unitSource(unit)];
     const pre = start.closest('pre');
-    if (pre !== null) return this.selectedText(pre);
+    if (pre !== null) return [verbatim(this.selectedText(pre))];
     const math = start.closest('mjx-container[data-tex]');
-    if (math !== null) return this.math(math);
+    if (math !== null) return [this.math(math)];
     const leaf = start.closest(INLINE_LEAF);
-    if (leaf !== null && this.article.contains(leaf) && !this.hasSelectedBlock(leaf)) return this.inline(leaf).trim();
+    if (leaf !== null && this.article.contains(leaf) && !this.hasSelectedBlock(leaf)) return paragraph(this.inline(leaf));
     return this.block(start.closest('table') ?? start);
   }
 
@@ -73,7 +70,7 @@ export class MarkdownWriter {
     this.copied.push([line, endLine]);
     for (const reference of unit.querySelectorAll('sup.sidenote-ref[data-sidenote]')) this.addNote(reference.dataset.sidenote);
     const text = this.lines.slice(line - 1, endLine).join('\n');
-    return unit.matches(NOTE) ? noteBody(text, unit.dataset.label) : text;
+    return verbatim(unit.matches(NOTE) ? noteBody(text, unit.dataset.label) : text);
   }
 
   leaves(element) {
@@ -145,186 +142,159 @@ export class MarkdownWriter {
   }
 
   blocks(parent) {
-    return this.blockChunks(parent).join('\n\n');
-  }
-
-  blockChunks(parent) {
-    const chunks = [];
-    let run = '';
+    const nodes = [];
+    let run = [];
     const flush = () => {
-      if (run.trim() !== '') chunks.push(run.trim());
-      run = '';
+      nodes.push(...paragraph(run));
+      run = [];
     };
     for (const child of parent.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
-        run += escapeText(this.textPart(child), false, this.mark);
+        run.push(text(this.textPart(child)));
         continue;
       }
       if (child.nodeType !== Node.ELEMENT_NODE || child.matches(UI) || child.matches(NOTE) || !this.hasSelection(child)) continue;
       if (!child.matches(BLOCK)) {
-        run += this.inlineElement(child);
+        run.push(...this.inlineElement(child));
         continue;
       }
       flush();
-      const block = this.block(child);
-      if (block.trim() !== '') chunks.push(block);
+      nodes.push(...this.block(child));
     }
     flush();
-    return chunks;
+    return nodes;
   }
 
   block(element) {
-    if (element.matches(UNIT) && (this.isWhole(element) || element.matches(HEADING))) return this.unitSource(element);
-    if (element.matches('summary, .aside-title, .embed-source')) return '';
-    if (element.matches('p')) return this.inline(element).trim();
-    if (element.matches(HEADING)) return [`${'#'.repeat(Number(element.tagName[1]))} ${this.inline(element).trim()}`, writeAttributes(writtenAttributes(element))].filter(Boolean).join(' ');
-    if (element.matches('.example-source')) return this.selectedText(element).replace(/\n+$/, '');
-    if (element.matches('pre')) return this.code(element);
-    if (element.matches('mjx-container[data-tex]')) return this.math(element);
-    if (element.matches('ul, ol')) return element.matches('.references') ? this.references(element) : this.list(element);
-    if (element.matches('blockquote')) return quote(this.blocks(element));
-    if (element.matches('figure.quote')) return this.quoteWithSource(element);
+    if (element.matches(UNIT) && (this.isWhole(element) || element.matches(HEADING))) return [this.unitSource(element)];
+    if (element.matches('summary, .aside-title, .embed-source')) return [];
+    if (element.matches('p')) return paragraph(this.inline(element));
+    if (element.matches(HEADING)) return [{ type: 'heading', depth: Number(element.tagName[1]), children: trimPhrasing(this.inline(element)), attributes: writtenAttributes(element) }];
+    if (element.matches('.example-source')) return [verbatim(this.selectedText(element).replace(/\n+$/, ''))];
+    if (element.matches('pre')) return [this.code(element)];
+    if (element.matches('mjx-container[data-tex]')) return [this.math(element)];
+    if (element.matches('ul, ol')) return element.matches('.references') ? [this.references(element)] : this.list(element);
+    if (element.matches('blockquote')) return [{ type: 'blockquote', children: this.blocks(element) }];
+    if (element.matches('figure.quote')) return [this.quoteWithSource(element)];
     if (element.matches('figure.figure')) return this.figure(element);
-    if (element.matches('figure.component')) return this.component(element);
-    if (element.matches('table')) return element.matches('.list-table') ? this.listTable(element) : this.table(element);
-    if (element.matches('aside.aside')) return this.aside(element);
+    if (element.matches('figure.component')) return [this.component(element)];
+    if (element.matches('table')) return element.matches('.list-table') ? [this.listTable(element)] : this.table(element);
+    if (element.matches('aside.aside')) return [this.aside(element)];
     if (element.matches('details.fold')) return this.fold(element);
-    if (element.matches('.recap')) return fence('recap', {}, this.blocks(element));
-    if (element.matches('div[data-width]:not([data-line])')) return fence('', { width: element.dataset.width }, this.blocks(element));
-    if (element.matches('hr')) return '---';
+    if (element.matches('.recap')) return [bakeBlock('recap', {}, this.blocks(element))];
+    if (element.matches('div[data-width]:not([data-line])')) return [bakeBlock('', { width: element.dataset.width }, this.blocks(element))];
+    if (element.matches('hr')) return [{ type: 'thematicBreak' }];
     return this.blocks(element);
   }
 
   inline(element) {
-    let text = '';
+    const nodes = [];
     for (const child of element.childNodes) {
       if (!this.range.intersectsNode(child)) continue;
-      if (child.nodeType === Node.TEXT_NODE) text += escapeText(this.textPart(child), this.inCell, this.mark);
-      else if (child.nodeType === Node.ELEMENT_NODE) text += this.inlineElement(child);
+      if (child.nodeType === Node.TEXT_NODE) nodes.push(text(this.textPart(child)));
+      else if (child.nodeType === Node.ELEMENT_NODE) nodes.push(...this.inlineElement(child));
     }
-    return text;
+    return nodes;
   }
 
   inlineElement(element) {
-    if (element.matches(UI) || element.matches(NOTE) || element.matches('.component-box, svg, script, template')) return '';
-    if (element.matches('mjx-container[data-tex]')) return element.getAttribute('display') === 'true' ? `$$${element.dataset.tex.trim()}$$` : `$${element.dataset.tex.trim()}$`;
-    if (element.matches('sup.sidenote-ref[data-sidenote]')) return `[^${this.addNote(element.dataset.sidenote)}]`;
-    if (element.matches('a.citation')) return `[@${element.dataset.key}]`;
-    if (element.matches('a.eqref')) return `\\eqref{${idOfFragment(hashOf(element.getAttribute('href')))}}`;
-    if (element.matches('br')) return '\\\n';
-    if (element.matches('img')) return `![${element.getAttribute('alt') ?? ''}](${element.getAttribute('src')})${writeAttributes(element.style.width === '' ? {} : { width: element.style.width })}`;
-    if (element.matches('input[type="checkbox"]')) return element.checked ? '[x] ' : '[ ] ';
-    if (element.matches('code')) return inlineCode(this.selectedText(element));
+    if (element.matches(UI) || element.matches(NOTE) || element.matches('.component-box, svg, script, template, input')) return [];
+    if (element.matches('mjx-container[data-tex]')) return [{ type: 'inlineMath', value: element.dataset.tex.trim() }];
+    if (element.matches('sup.sidenote-ref[data-sidenote]')) {
+      const label = this.addNote(element.dataset.sidenote);
+      return [{ type: 'footnoteReference', identifier: label, label }];
+    }
+    if (element.matches('a.citation')) return [{ type: 'citation', key: element.dataset.key }];
+    if (element.matches('a.eqref')) return [{ type: 'eqref', label: idOfFragment(hashOf(element.getAttribute('href'))) }];
+    if (element.matches('br')) return [{ type: 'break' }];
+    if (element.matches('img')) return [image(element, element.style.width === '' ? {} : { width: element.style.width })];
+    if (element.matches('code')) return [{ type: 'inlineCode', value: this.selectedText(element) }];
     const inner = this.inline(element);
-    if (inner.trim() === '') return inner;
-    if (element.matches('mark')) return wrap('==', inner);
-    if (element.matches('strong, b')) return wrap('**', inner);
-    if (element.matches('em, i, cite')) return wrap('*', inner);
-    if (element.matches('del, s')) return wrap('~~', inner);
-    if (element.matches('a[href]')) return `[${inner}](${element.dataset.target === undefined ? element.getAttribute('href') : siteAddress(element.dataset.target)})`;
-    if (element.matches(BLOCK)) return `${this.blocks(element)}\n`;
+    if (inner.every(isBlank)) return inner;
+    const attention = ATTENTION.find(([selector]) => element.matches(selector));
+    if (attention !== undefined) return hoistWhitespace(inner, (children) => ({ type: attention[1], children }));
+    if (element.matches('a[href]')) return [{ type: 'link', url: element.dataset.target === undefined ? element.getAttribute('href') : siteAddress(element.dataset.target), children: inner }];
     return inner;
   }
 
   math(element) {
-    const tex = element.dataset.tex.trim();
-    return element.getAttribute('display') === 'true' ? `$$\n${tex}\n$$` : `$${tex}$`;
+    const value = element.dataset.tex.trim();
+    return element.getAttribute('display') === 'true' ? { type: 'math', value } : { type: 'paragraph', children: [{ type: 'inlineMath', value }] };
   }
 
   code(pre) {
-    const text = this.selectedText(pre).replace(/\n$/, '');
-    const ticks = '`'.repeat(Math.max(3, longestRun(text, '`') + 1));
-    return `${ticks}${pre.dataset.language ?? ''}\n${text}\n${ticks}`;
+    return { type: 'code', lang: pre.dataset.language ?? null, value: this.selectedText(pre).replace(/\n$/, '') };
   }
 
   list(element) {
     const ordered = element.matches('ol');
     const first = Number(element.getAttribute('start') ?? 1);
     const items = [...element.children].filter((child) => child.matches('li'));
-    const loose = items.some((item) => [...item.children].some((child) => child.matches('p')));
-    return items
-      .map((item, index) => {
-        if (!this.hasSelection(item)) return null;
-        const marker = ordered ? `${first + index}. ` : '- ';
-        return indent(this.blockChunks(item).join(loose ? '\n\n' : '\n'), marker);
-      })
-      .filter((item) => item !== null)
-      .join(loose ? '\n\n' : '\n');
+    const spread = items.some((item) => [...item.children].some((child) => child.matches('p')));
+    const selected = items.filter((item) => this.hasSelection(item));
+    if (selected.length === 0) return [];
+    const children = selected.map((item) => ({ type: 'listItem', spread, checked: checkedOf(item), children: this.blocks(item) }));
+    return [{ type: 'list', ordered, start: first + items.indexOf(selected[0]), spread, children }];
   }
 
   references(element) {
     const items = [...element.children]
       .filter((item) => item.matches('li') && this.hasSelection(item))
-      .map((item) => `- [@${item.dataset.key}] ${this.inline(item.querySelector('p') ?? item).trim()}`);
-    return fence('references', {}, items.join('\n'));
+      .map((item) => listItem([{ type: 'paragraph', children: [{ type: 'citation', key: item.dataset.key }, text(' '), ...trimPhrasing(this.inline(item.querySelector('p') ?? item))] }]));
+    return bakeBlock('references', {}, [tightList(items)]);
   }
 
   quoteWithSource(figure) {
-    const parts = [];
+    const children = [];
     const blockquote = figure.querySelector(':scope > blockquote');
     const caption = figure.querySelector(':scope > figcaption');
-    if (blockquote !== null && this.hasSelection(blockquote)) parts.push(this.blocks(blockquote));
-    if (caption !== null && this.hasSelection(caption)) parts.push(`— ${this.inline(caption).trim()}`);
-    return quote(parts.join('\n\n'));
+    if (blockquote !== null && this.hasSelection(blockquote)) children.push(...this.blocks(blockquote));
+    if (caption !== null && this.hasSelection(caption)) children.push(...paragraph([text('— '), ...trimPhrasing(this.inline(caption))]));
+    return { type: 'blockquote', children };
   }
 
   figure(figure) {
-    const image = figure.querySelector('img');
+    const element = figure.querySelector('img');
     const caption = figure.querySelector(':scope > figcaption');
-    if (image === null) return this.blocks(figure);
-    const title = caption === null ? '' : ` "${this.whole(caption, () => this.inline(caption)).trim().replaceAll('"', '\\"')}"`;
+    if (element === null) return this.blocks(figure);
     const attributes = {};
     if (figure.style.width !== '') attributes.width = figure.style.width;
     if (figure.dataset.float !== undefined) attributes.float = figure.dataset.float;
-    return `![${image.getAttribute('alt') ?? ''}](${image.getAttribute('src')}${title})${writeAttributes(attributes)}`;
+    const title = caption === null ? null : tidy(serializeMarkdown({ type: 'root', children: paragraph(this.whole(caption, () => this.inline(caption))) }));
+    return [{ type: 'paragraph', children: [{ ...image(element, attributes), title }] }];
   }
 
   fold(details) {
     const summary = details.querySelector(':scope > summary');
     const body = this.blocks(details);
-    if (body === '' && summary !== null && this.hasSelection(summary)) return this.inline(summary).trim();
-    return fence('fold', { title: summary?.textContent ?? '' }, body);
+    if (body.length === 0 && summary !== null && this.hasSelection(summary)) return paragraph(this.inline(summary));
+    return [bakeBlock('fold', { title: summary?.textContent ?? '' }, body)];
   }
 
   component(figure) {
-    const attributes = writtenAttributes(figure);
     const caption = figure.querySelector(':scope > figcaption');
-    const body = caption === null ? '' : this.whole(caption, () => this.inline(caption)).trim();
-    return fence(figure.dataset.component, attributes, body);
+    return bakeBlock(figure.dataset.component, writtenAttributes(figure), caption === null ? [] : this.whole(caption, () => this.blocks(caption)));
   }
 
   aside(element) {
     const title = element.querySelector(':scope > .aside-title');
-    return fence('aside', title === null ? {} : { title: title.textContent }, this.blocks(element));
+    return bakeBlock('aside', title === null ? {} : { title: title.textContent }, this.blocks(element));
   }
 
   table(table) {
     const rows = [...table.rows];
     const header = table.tHead?.rows[0] ?? rows[0];
-    if (header === undefined) return '';
-    const cells = (row) => {
-      this.inCell = true;
-      try {
-        return `| ${[...row.cells].map((cell) => this.whole(cell, () => this.inline(cell)).trim().replaceAll('\n', ' ')).join(' | ')} |`;
-      } finally {
-        this.inCell = false;
-      }
-    };
-    const separator = `|${[...header.cells].map((cell) => alignment(cell.getAttribute('align') ?? cell.style.textAlign)).join('|')}|`;
-    const body = rows.filter((row) => row !== header && this.hasSelection(row)).map(cells);
-    return [cells(header), separator, ...body].join('\n');
+    if (header === undefined) return [];
+    const tableRow = (row) => ({ type: 'tableRow', children: [...row.cells].map((cell) => ({ type: 'tableCell', children: singleLine(trimPhrasing(this.whole(cell, () => this.inline(cell)))) })) });
+    const align = [...header.cells].map((cell) => alignmentOf(cell.getAttribute('align') ?? cell.style.textAlign));
+    return [{ type: 'table', align, children: [tableRow(header), ...rows.filter((row) => row !== header && this.hasSelection(row)).map(tableRow)] }];
   }
 
   listTable(table) {
     const header = table.tHead?.rows[0];
     const rows = [header, ...[...(table.tBodies[0]?.rows ?? [])].filter((row) => this.hasSelection(row))].filter((row) => row !== undefined);
-    const text = rows
-      .map((row) => {
-        const cells = [...row.cells].map((cell) => indent(this.whole(cell, () => this.blocks(cell)), '- '));
-        return indent(cells.join('\n'), '* ');
-      })
-      .join('\n');
-    return fence('list-table', {}, text);
+    const cells = (row) => tightList([...row.cells].map((cell) => listItem(this.whole(cell, () => this.blocks(cell)))));
+    return bakeBlock('list-table', {}, [tightList(rows.map((row) => listItem([cells(row)])))]);
   }
 
   addNote(number) {
@@ -360,92 +330,92 @@ function siteAddress(target) {
   return hash === -1 ? target : `${target.slice(0, hash)}${fragmentOf(target.slice(hash + 1))}`;
 }
 
-function escapeText(text, inCell, mark) {
-  let offset = 0;
-  return text
-    .split('\n')
-    .map((line) => {
-      let escaped = '';
-      for (let index = 0; index < line.length; index += 1) escaped += isSyntax(text, offset + index, inCell) ? `\\${line[index]}` : line[index];
-      offset += line.length + 1;
-      return markLineStart(escaped, mark);
-    })
-    .join('\n');
+function text(value) {
+  return { type: 'text', value };
 }
 
-function markLineStart(line, mark) {
-  const content = line.trimStart();
-  const space = line.slice(0, line.length - content.length);
-  const number = LINE_NUMBER.exec(content);
-  if (number !== null) return `${space}${number[0]}${mark}${content.slice(number[0].length)}`;
-  return LINE_SYNTAX.test(content) ? `${space}${mark}${content}` : line;
+function verbatim(value) {
+  return { type: 'verbatim', value };
 }
 
-function isSyntax(text, index, inCell) {
-  const character = text[index];
-  const previous = text[index - 1] ?? '';
-  const next = text[index + 1] ?? '';
-  if (ALWAYS_ESCAPED.has(character)) return true;
-  if (character === '*') return !(/\s/.test(previous) && /\s/.test(next));
-  if (character === '_') return !(ASCII_WORD.test(previous) && ASCII_WORD.test(next));
-  if (character === '=' || character === '~') return previous === character || next === character;
-  if (character === '<') return HTML_START.test(next);
-  if (character === '&') return CHARACTER_REFERENCE.test(text.slice(index));
-  if (character === '|') return inCell;
-  return false;
+function bakeBlock(name, attributes, children) {
+  return { type: 'bakeBlock', name, attributes, children };
 }
 
-function wrap(marker, text) {
-  const [, before, core, after] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
-  return `${before}${marker}${core}${marker}${after}`;
+function listItem(children) {
+  return { type: 'listItem', spread: false, children };
 }
 
-function inlineCode(text) {
-  const ticks = '`'.repeat(longestRun(text, '`') + 1);
-  const padding = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
-  return `${ticks}${padding}${text}${padding}${ticks}`;
+function tightList(children) {
+  return { type: 'list', ordered: false, spread: false, children };
 }
 
-function longestRun(text, character) {
-  let longest = 0;
-  let current = 0;
-  for (const next of text) {
-    current = next === character ? current + 1 : 0;
-    longest = Math.max(longest, current);
+function image(element, attributes) {
+  return { type: 'image', url: element.getAttribute('src'), alt: element.getAttribute('alt') ?? '', attributes };
+}
+
+function paragraph(nodes) {
+  const children = trimPhrasing(nodes);
+  return children.length === 0 ? [] : [{ type: 'paragraph', children }];
+}
+
+function isBlank(node) {
+  return node.type === 'text' && node.value.trim() === '';
+}
+
+function trimPhrasing(nodes) {
+  const children = nodes.filter((node) => node.type !== 'text' || node.value !== '');
+  while (children[0]?.type === 'text') {
+    const value = children[0].value.trimStart();
+    if (value !== '') {
+      children[0] = text(value);
+      break;
+    }
+    children.shift();
   }
-  return longest;
+  while (children.at(-1)?.type === 'text') {
+    const value = children.at(-1).value.trimEnd();
+    if (value !== '') {
+      children[children.length - 1] = text(value);
+      break;
+    }
+    children.pop();
+  }
+  return children;
 }
 
-function indent(text, marker) {
-  const space = ' '.repeat(marker.length);
-  return text
-    .split('\n')
-    .map((line, index) => (index === 0 ? `${marker}${line}` : line === '' ? '' : `${space}${line}`))
-    .join('\n');
+function hoistWhitespace(nodes, wrap) {
+  const children = [...nodes];
+  const before = [];
+  const after = [];
+  const [leading] = children[0]?.type === 'text' ? /^\s*/.exec(children[0].value) : [''];
+  if (leading !== '') {
+    before.push(text(leading));
+    children[0] = text(children[0].value.slice(leading.length));
+  }
+  const [trailing] = children.at(-1)?.type === 'text' ? /\s*$/.exec(children.at(-1).value) : [''];
+  if (trailing !== '') {
+    after.push(text(trailing));
+    children[children.length - 1] = text(children.at(-1).value.slice(0, -trailing.length));
+  }
+  return [...before, wrap(children.filter((node) => node.type !== 'text' || node.value !== '')), ...after];
 }
 
-function quote(text) {
-  return text
-    .split('\n')
-    .map((line) => (line === '' ? '>' : `> ${line}`))
-    .join('\n');
+function singleLine(nodes) {
+  return nodes.map((node) => (node.type === 'text' ? text(node.value.replaceAll('\n', ' ')) : node));
 }
 
-function fence(name, attributes, body) {
-  const inner = body.match(/^:{3,}/gm) ?? [];
-  const colons = ':'.repeat(Math.max(3, ...inner.map((line) => line.length + 1)));
-  return `${colons}${name}${writeAttributes(attributes)}\n${body === '' ? '' : `${body}\n`}${colons}`;
+function checkedOf(item) {
+  const box = item.querySelector(':scope > input[type="checkbox"], :scope > p:first-child > input[type="checkbox"]');
+  return box === null ? null : box.checked;
+}
+
+function alignmentOf(align) {
+  return ALIGNMENTS.has(align) ? align : null;
 }
 
 function writtenAttributes(element) {
   return JSON.parse(element.dataset.attributes ?? '{}');
-}
-
-function alignment(align) {
-  if (align === 'center') return ':---:';
-  if (align === 'right') return '---:';
-  if (align === 'left') return ':---';
-  return '---';
 }
 
 function dedentDefinition(lines) {
@@ -464,11 +434,6 @@ function noteBody(definition, label) {
   const indents = rest.filter((line) => line.trim() !== '').map((line) => /^[ \t]*/.exec(line)[0].length);
   const common = indents.length === 0 ? 0 : Math.min(...indents);
   return [body, ...rest.map((line) => line.slice(common))].join('\n');
-}
-
-function resolveLineStarts(text, mark) {
-  const end = `${mark}(?!${LINE_MARK})`;
-  return text.replace(new RegExp(`${LINE_PREFIX}${end}`, 'g'), '$1$2$3\\').replace(new RegExp(end, 'g'), '');
 }
 
 function tidy(text) {

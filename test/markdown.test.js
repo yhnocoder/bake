@@ -7,6 +7,7 @@ import { readPreamble } from '../src/config/preamble.js';
 import { indexPages } from '../src/build/links.js';
 import { BUILT_IN_BLOCK_NAMES, parseArticle, readArticle } from '../src/markdown/article.js';
 import { parseAttributes, writeAttributes } from '../src/markdown/attributes.js';
+import { serializeMarkdown } from '../src/markdown/serialize.js';
 import { formatError, sortErrors } from '../src/report.js';
 import { folder, frontMatter, html, outline, parse, parsed } from './article.js';
 
@@ -224,6 +225,76 @@ describe('attributes', () => {
     }
     assert.equal(writeAttributes({ range: 6 }), '{range=6}');
     assert.equal(writeAttributes({}), '');
+  });
+});
+
+describe('writing Markdown', () => {
+  const text = (value) => ({ type: 'text', value });
+  const paragraph = (...children) => ({ type: 'paragraph', children });
+  const list = (...items) => ({ type: 'list', ordered: false, spread: false, children: items.map((children) => ({ type: 'listItem', spread: false, children })) });
+
+  test('writes Bake syntax that the parser reads back, and escapes text that it would read as syntax', async () => {
+    const tree = {
+      type: 'root',
+      children: [
+        { type: 'heading', depth: 2, children: [text('Gates')], attributes: { id: 'gates', toc: '门控' } },
+        paragraph({ type: 'highlight', children: [text('重点')] }, text('：见 '), { type: 'eqref', label: 'eq:ffn' }, text(' 和 '), { type: 'citation', key: 'shazeer2020' }, text('，旁注'), { type: 'footnoteReference', identifier: 'gemm', label: 'gemm' }, text('。')),
+        paragraph(text('a ==b== \\eqref{x} [@key] a * b *c*')),
+        paragraph(text(':::fold')),
+        {
+          type: 'bakeBlock',
+          name: 'fold',
+          attributes: { title: '推导' },
+          children: [{ type: 'bakeBlock', name: 'aside', attributes: {}, children: [paragraph({ type: 'image', url: 'relu.svg', alt: 'A', title: 'cap', attributes: { width: '64px' } })] }],
+        },
+        { type: 'bakeBlock', name: 'list-table', attributes: {}, children: [list([list([paragraph(text('a'))], [paragraph(text('b'))])], [list([paragraph({ type: 'inlineMath', value: '|x|' })], [list([paragraph(text('c'))])])])] },
+        { type: 'verbatim', value: '[^gemm]: epilogue' },
+        { type: 'bakeBlock', name: 'references', attributes: {}, children: [list([paragraph({ type: 'citation', key: 'shazeer2020' }, text(' Shazeer.'))])] },
+        { type: 'math', value: 'y = x \\label{eq:ffn}' },
+      ],
+    };
+    const markdown = serializeMarkdown(tree);
+    assert.equal(
+      markdown,
+      [
+        '## Gates {#gates toc="门控"}',
+        '',
+        '==重点==：见 \\eqref{eq:ffn} 和 [@shazeer2020]，旁注[^gemm]。',
+        '',
+        'a \\=\\=b\\=\\= \\\\eqref{x} \\[@key] a * b \\*c\\*',
+        '',
+        '\\:::fold',
+        '',
+        '::::fold{title="推导"}',
+        ':::aside',
+        '![A](relu.svg "cap"){width=64px}',
+        ':::',
+        '::::',
+        '',
+        ':::list-table',
+        '* - a',
+        '  - b',
+        '* - $|x|$',
+        '  - - c',
+        ':::',
+        '',
+        '[^gemm]: epilogue',
+        '',
+        ':::references',
+        '- [@shazeer2020] Shazeer.',
+        ':::',
+        '',
+        '$$',
+        'y = x \\label{eq:ffn}',
+        '$$',
+        '',
+      ].join('\n'),
+    );
+    const { article, errors } = await parse(markdown, { folder: folder(`${exampleBlog}content/posts/syntax`) });
+    assert.deepEqual(errors, []);
+    assert.deepEqual(article.sections[0].blocks.map((block) => block.type), ['paragraph', 'paragraph', 'paragraph', 'fold', 'list-table', 'references', 'math']);
+    assert.equal(outline(article.sections[0].blocks[1].html), '<p>a ==b== \\eqref{x} [@key] a * b *c*</p>');
+    assert.equal(outline(article.sections[0].blocks[2].html), '<p>:::fold</p>');
   });
 });
 
