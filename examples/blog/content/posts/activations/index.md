@@ -10,7 +10,7 @@ theme: bento
 
 神经网络的每一层在线性变换之后接一个逐元素的非线性函数，也就是激活函数。下面比较三个常用的激活函数：ReLU、GELU 和 SiLU。
 
-## ReLU {width=wide}
+## ReLU {cols=2 rows=23}
 
 ReLU 把负数变成 0，正数保持不变 [@relu]：
 
@@ -24,7 +24,7 @@ $$
 ReLU 和它的导数。拖动右上角的滑块改变横轴范围。
 :::
 
-## GELU
+## GELU {cols=2 rows=13}
 
 :::recap
 按输入在标准正态分布里的位置给它加权。
@@ -40,7 +40,7 @@ $$
 
 [^gelu-min]: 最小值约为 $-0.17$，在 $x \approx -0.75$ 处取到。
 
-## SiLU
+## SiLU {cols=2 rows=9}
 
 SiLU 把 $\Phi$ 换成 sigmoid 函数 $\sigma$ [@silu]：
 
@@ -50,36 +50,15 @@ $$
 
 它和 GELU 的形状很接近，计算更便宜。SwiGLU 用 SiLU 作为门控的激活函数。
 
-## 对比 {width=page}
+## 怎么选 {cols=2 rows=10}
 
-| 函数 | 公式 | 在 0 处的导数 | 负半轴 | 常见用法 |
-|---|---|---|---|---|
-| ReLU | $\max(0, x)$ | 不可导 | 恒为 0 | 原始 Transformer、早期的卷积网络 |
-| GELU | $x\,\Phi(x)$ | $0.5$ | 最小约 $-0.17$ | BERT、GPT-2 |
-| SiLU | $x\,\sigma(x)$ | $0.5$ | 最小约 $-0.28$ | SwiGLU 的门控、LLaMA |
+新模型多用 GELU 或 SiLU，它们在 0 附近的梯度更平滑。
 
-## 实现
+:::aside{title="实践建议"}
+沿用模型原来的激活函数。换成另一个函数后，学习率和初始化通常也要重新调。
+:::
 
-PyTorch 里三个函数都只有几行。GELU 的精确形式要算误差函数，常用的近似把它换成 $\tanh$：
-
-```python
-import math
-import torch
-
-def gelu(x):
-    cdf = 0.5 * (1 + torch.erf(x / math.sqrt(2)))
-    return x * cdf
-
-def gelu_tanh(x):
-    u = x + 0.044715 * x**3
-    u = u * math.sqrt(2 / math.pi)
-    return 0.5 * x * (1 + torch.tanh(u))
-
-def silu(x):
-    return x * torch.sigmoid(x)
-```
-
-## 导数
+## 导数 {cols=2 rows=21}
 
 ReLU 的导数在正半轴是 1，负半轴是 0。另外两个函数的导数都是平滑的。
 
@@ -107,23 +86,7 @@ $$
 $$
 :::
 
-## 怎么选
-
-新模型多用 GELU 或 SiLU，它们在 0 附近的梯度更平滑。
-
-:::aside{title="实践建议"}
-沿用模型原来的激活函数。换成另一个函数后，学习率和初始化通常也要重新调。
-:::
-
-## 写成 Markdown
-
-这篇文章的行内公式写在一对美元符号之间：
-
-:::example
-GELU 的定义是 $\mathrm{GELU}(x) = x\,\Phi(x)$，其中 $\Phi$ 是标准正态分布的累积分布函数。
-:::
-
-## 反向传播
+## 反向传播 {cols=2 rows=15}
 
 逐元素激活函数的雅可比矩阵是对角矩阵，所以换激活函数只改变每个元素乘上的导数。下面一节出自[雅可比矩阵](/2026-10/jacobian/)：
 
@@ -131,7 +94,44 @@ GELU 的定义是 $\mathrm{GELU}(x) = x\,\Phi(x)$，其中 $\Phi$ 是标准正�
 /2026-10/jacobian/#在反向传播中的作用
 :::
 
-## 参考文献
+## 写成 Markdown {cols=2 rows=11}
+
+这篇文章的行内公式写在一对美元符号之间：
+
+:::example
+GELU 的定义是 $\mathrm{GELU}(x) = x\,\Phi(x)$，其中 $\Phi$ 是标准正态分布的累积分布函数。
+:::
+
+## 实现 {cols=3 rows=18}
+
+PyTorch 里三个函数都只有几行。GELU 的精确形式要算误差函数，常用的近似把它换成 $\tanh$：
+
+```python
+import math
+import torch
+
+def gelu(x):
+    cdf = 0.5 * (1 + torch.erf(x / math.sqrt(2)))
+    return x * cdf
+
+def gelu_tanh(x):
+    u = x + 0.044715 * x**3
+    u = u * math.sqrt(2 / math.pi)
+    return 0.5 * x * (1 + torch.tanh(u))
+
+def silu(x):
+    return x * torch.sigmoid(x)
+```
+
+## 对比 {cols=3 rows=9}
+
+| 函数 | 公式 | 在 0 处的导数 | 负半轴 | 常见用法 |
+|---|---|---|---|---|
+| ReLU | $\max(0, x)$ | 不可导 | 恒为 0 | 原始 Transformer、早期的卷积网络 |
+| GELU | $x\,\Phi(x)$ | $0.5$ | 最小约 $-0.17$ | BERT、GPT-2 |
+| SiLU | $x\,\sigma(x)$ | $0.5$ | 最小约 $-0.28$ | SwiGLU 的门控、LLaMA |
+
+## 参考文献 {cols=3 rows=9}
 
 :::references
 - [@relu] Nair, Hinton. *Rectified Linear Units Improve Restricted Boltzmann Machines*. 2010.

@@ -49,6 +49,12 @@ Text.
 ## Body four
 
 Text.
+
+## Fixed {cols=3 rows=4}
+
+${'A long paragraph that does not fit into four rows. '.repeat(30)}
+
+Last line.
 `,
 });
 
@@ -85,12 +91,13 @@ test('the bento theme lays out sections as cards', async (t) => {
     await settle(page);
   };
 
-  await t.test('cards span the columns their sections ask for, the cards keep the order of the article and the column count drops on narrow screens', async () => {
+  await t.test('cards span the columns their sections ask for, the cards keep the order of the article and the grid has one column below 1000 pixels', async () => {
     const page = await open('bento-cards');
+    const desktop = { columns: 6, spans: { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 3, 'Body three': 2, 'Body four': 2, Fixed: 3 } };
     const expected = {
-      1440: { columns: 4, spans: { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 4, Component: 2, 'Body three': 1, 'Body four': 1 } },
-      1100: { columns: 2, spans: { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 2, Component: 2, 'Body three': 1, 'Body four': 1 } },
-      375: { columns: 1, spans: { 'Wide section': 1, 'Body one': 1, 'Body two': 1, 'Page section': 1, Component: 1, 'Body three': 1, 'Body four': 1 } },
+      1440: desktop,
+      1100: desktop,
+      375: { columns: 1, spans: { 'Wide section': 1, 'Body one': 1, 'Body two': 1, 'Page section': 1, Component: 1, 'Body three': 1, 'Body four': 1, Fixed: 1 } },
     };
     for (const width of widths) {
       await resize(page, width);
@@ -105,11 +112,12 @@ test('the bento theme lays out sections as cards', async (t) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);
-    assert.deepEqual(await page.evaluate(gridLayout), { columns: 2, spans: { One: 1, Two: 1, Three: 2 }, inOrder: true });
+    const grid = await page.evaluate(gridLayout);
+    assert.deepEqual({ columns: grid.columns, spans: grid.spans, inOrder: grid.inOrder }, { columns: 2, spans: { One: 1, Two: 1, Three: 2 }, inOrder: true });
     await page.close();
   });
 
-  await t.test('the settings button and the AI chat button sit on one line in equal gutters and cover no card and not the text before the first section from 1000 pixels up', async () => {
+  await t.test('the settings button and the AI chat button sit on one line in equal gutters and cover no card and not the text before the first section from 1340 pixels up', async () => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
@@ -136,11 +144,11 @@ test('the bento theme lays out sections as cards', async (t) => {
         const { settingsGap, chatGap, covered, gutters, bottoms } = await measure();
         const at = `${url} at ${width}px`;
         if (Math.abs(bottoms[0] - bottoms[1]) > 0.5) problems.push(`${at}: the buttons end at ${bottoms.join(' and ')}`);
-        if (width < 1000) continue;
+        if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
+        if (width < 1340) continue;
         if (covered) problems.push(`${at}: a button covers a card or the intro`);
         if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
-        if (Math.abs(chatGap - 24) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
-        if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
+        if (Math.abs(chatGap - 12) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
       }
     }
     await page.goto(`${englishOrigin.replace('127.0.0.1', 'localhost')}/`);
@@ -150,10 +158,24 @@ test('the bento theme lays out sections as cards', async (t) => {
     await context.close();
   });
 
-  await t.test('a card is as tall as its content and its sidenotes follow its last block', async () => {
+  await t.test('a card with rows is as tall as its rows from 1000 pixels up, every other card is as tall as its content, and sidenotes follow the last block', async () => {
     const page = await open('activations');
     for (const width of widths) {
       await resize(page, width);
+      if (width >= 1000) {
+        const heights = await page.evaluate(() => {
+          const grid = document.querySelector('.bt-grid');
+          const gap = parseFloat(getComputedStyle(grid).columnGap);
+          const row = parseFloat(getComputedStyle(grid).getPropertyValue('--bt-row-height'));
+          return [...grid.querySelectorAll('.bt-card[data-rows]')].map((card) => {
+            const rows = Number(card.dataset.rows);
+            return { rows, height: Math.round(card.getBoundingClientRect().height * 10) / 10, expected: Math.round((rows * row + (rows - 1) * gap) * 10) / 10 };
+          });
+        });
+        assert.equal(heights.length, 10, `${width}px`);
+        assert.deepEqual(heights.filter(({ height, expected }) => Math.abs(height - expected) > 0.5), [], `${width}px`);
+        continue;
+      }
       const cards = await page.evaluate(() =>
         [...document.querySelectorAll('.bt-card')].map((card) => {
           const style = getComputedStyle(card);
@@ -170,6 +192,69 @@ test('the bento theme lays out sections as cards', async (t) => {
         `${width}px`,
       );
     }
+    await page.close();
+  });
+
+  await t.test('each card goes to the columns that end highest, in the order of the article', async () => {
+    const page = await open('activations');
+    for (const width of [1440, 1100]) {
+      await resize(page, width);
+      const grid = await page.evaluate(gridLayout);
+      assert.deepEqual(grid.starts, { ReLU: 0, GELU: 2, SiLU: 4, 怎么选: 4, 导数: 2, 反向传播: 4, '写成 Markdown': 0, 实现: 0, 对比: 3, 参考文献: 3 }, `${width}px`);
+      assert.ok(grid.inOrder, `${width}px`);
+      const gaps = await page.evaluate(() => {
+        const boxes = [...document.querySelectorAll('.bt-card')].map((card) => card.getBoundingClientRect());
+        const gap = parseFloat(getComputedStyle(document.querySelector('.bt-grid')).columnGap);
+        return boxes.flatMap((box) => {
+          const below = boxes.filter((other) => other.top > box.bottom - 0.5 && other.left < box.right - 1 && other.right > box.left + 1);
+          if (below.length === 0) return [];
+          const distance = Math.min(...below.map((other) => other.top)) - box.bottom;
+          return Math.abs(distance - gap) > 0.5 ? [distance] : [];
+        });
+      });
+      assert.deepEqual(gaps, [], `${width}px`);
+    }
+    await page.close();
+  });
+
+  await t.test('content that does not fit into the rows of a card scrolls inside the card only after the card is chosen', async () => {
+    const page = await open('bento-cards', { reducedMotion: 'no-preference' });
+    const card = page.locator('.bt-card[data-rows]');
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForFunction(() => scrollY > 0);
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-overflow') && !element.hasAttribute('data-end') && getComputedStyle(element, '::after').content !== 'none'), true);
+    const box = await card.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const pageTop = await page.evaluate(() => scrollY);
+    await page.mouse.wheel(0, -200);
+    await page.waitForFunction((top) => scrollY < top, pageTop);
+    assert.equal(await card.evaluate((element) => element.scrollTop), 0);
+    const chosen = await card.boundingBox();
+    await page.mouse.click(chosen.x + chosen.width / 2, chosen.y + chosen.height / 2);
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active')), true);
+    const top = await page.evaluate(() => scrollY);
+    await page.mouse.wheel(0, 2000);
+    await page.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-end'));
+    assert.equal(await page.evaluate(() => scrollY), top);
+    await page.keyboard.press('Escape');
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active')), false);
+    await page.mouse.click(5, 5);
+    await card.focus();
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active') && element.tabIndex === 0), true);
+    await card.evaluate((element) => element.blur());
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active')), false);
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-hint')), false);
+    await page.evaluate(() => {
+      const marker = document.createElement('script');
+      marker.type = 'application/json';
+      marker.dataset.bakeDev = '';
+      document.head.append(marker);
+      document.dispatchEvent(new CustomEvent('bake:content'));
+    });
+    await page.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-hint'));
+    assert.match(await card.getAttribute('data-hint'), /^内容超出卡片 \d+ 像素，rows 至少写 \d+$/);
+    await resize(page, 375);
+    assert.equal(await card.evaluate((element) => element.hasAttribute('data-overflow') || element.scrollHeight > element.clientHeight + 1), false);
     await page.close();
   });
 
@@ -198,7 +283,8 @@ test('the bento theme lays out sections as cards', async (t) => {
           const box = card.getBoundingClientRect();
           const padding = parseFloat(getComputedStyle(card).paddingBottom) + parseFloat(getComputedStyle(card).borderBottomWidth);
           const above = [...card.children].filter((child) => child !== list).every((child) => child.getBoundingClientRect().bottom <= list.getBoundingClientRect().top + 0.5);
-          return [{ notes: list.querySelectorAll('.bk-sidenote').length, visible: list.checkVisibility(), atBottom: Math.abs(box.bottom - padding - list.getBoundingClientRect().bottom) < 1, above, last: card.lastElementChild === list }];
+          const atBottom = innerWidth >= 1000 || Math.abs(box.bottom - padding - list.getBoundingClientRect().bottom) < 1;
+          return [{ notes: list.querySelectorAll('.bk-sidenote').length, visible: list.checkVisibility(), atBottom, above, last: card.lastElementChild === list }];
         }),
       );
       assert.deepEqual(
@@ -265,20 +351,26 @@ test('the bento theme lays out sections as cards', async (t) => {
   await t.test('without scripts the cards keep their declared spans and every sidenote is shown', async () => {
     const page = await open('bento-cards', { javaScriptEnabled: false });
     const grid = await page.evaluate(gridLayout);
-    assert.deepEqual(grid.spans, { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 4, Component: 1, 'Body three': 1, 'Body four': 1 });
+    assert.deepEqual(grid.spans, { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 3 });
+    assert.equal(await page.locator('.bt-grid[data-packed], .bt-card[data-overflow]').count(), 0);
+    assert.ok(await page.evaluate(() => { const card = [...document.querySelectorAll('.bt-card')].at(-1); return card.scrollHeight <= card.clientHeight + 1; }));
     assert.equal(await page.locator('.bk-sidenote').evaluateAll((notes) => notes.every((note) => note.checkVisibility())), true);
     await page.close();
   });
 
   await t.test('the cards are placed again after bake dev replaces the article', async () => {
     const page = await open('bento-cards');
-    await page.evaluate(() => {
-      const article = document.querySelector('.bk-article');
-      article.innerHTML = article.innerHTML.replaceAll(/ style="grid-column:[^"]*"/g, '');
+    const before = await page.evaluate(gridLayout);
+    await page.evaluate(async () => {
+      const html = await (await fetch(location.href)).text();
+      const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.bk-article');
+      document.querySelector('.bk-article').replaceChildren(...fresh.childNodes);
       document.dispatchEvent(new CustomEvent('bake:content'));
     });
     await settle(page);
-    assert.deepEqual((await page.evaluate(gridLayout)).spans, { 'Wide section': 2, 'Body one': 1, 'Body two': 1, 'Page section': 4, Component: 2, 'Body three': 1, 'Body four': 1 });
+    const after = await page.evaluate(gridLayout);
+    assert.equal(await page.locator('.bt-grid[data-packed]').count(), 1);
+    assert.deepEqual(after, before);
     await page.close();
   });
 
@@ -363,16 +455,19 @@ test('the bento theme lays out sections as cards', async (t) => {
 function gridLayout() {
   const grid = document.querySelector('.bt-grid');
   const style = getComputedStyle(grid);
-  const tracks = style.gridTemplateColumns.split(' ').map(parseFloat);
+  const columns = Number(style.getPropertyValue('--bt-cols'));
   const gap = parseFloat(style.columnGap);
+  const origin = grid.getBoundingClientRect();
+  const track = (origin.width - gap * (columns - 1)) / columns;
   const cards = [...grid.querySelectorAll(':scope > .bt-card')].map((card) => ({ title: card.querySelector('h2 .bk-heading-text').textContent, box: card.getBoundingClientRect() }));
-  const spans = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.width + gap) / (tracks[0] + gap))]));
+  const spans = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.width + gap) / (track + gap))]));
+  const starts = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.left - origin.left) / (track + gap))]));
   const inOrder = cards.every(({ box }, index) => {
     if (index === 0) return true;
     const previous = cards[index - 1].box;
-    return Math.abs(box.top - previous.top) < 0.5 ? box.left > previous.right : box.top > previous.top;
+    return Math.abs(box.top - previous.top) < 0.5 ? box.left > previous.left : box.top > previous.top;
   });
-  return { columns: tracks.length, spans, inOrder };
+  return { columns, spans, starts, inOrder };
 }
 
 async function settle(page) {

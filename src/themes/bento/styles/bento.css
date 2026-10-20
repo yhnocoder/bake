@@ -1,8 +1,16 @@
 .bt-page {
-  --bt-gutter: 116px;
-  --bt-gap: 18px;
+  --bt-gutter: 104px;
+  --bt-gap: 6px;
   --bt-measure: 46em;
-  --bt-card-padding: 22px 24px 20px;
+  --bt-padding-top: 22px;
+  --bt-padding-x: 24px;
+  --bt-padding-bottom: 20px;
+  --bt-radius: 14px;
+  --bt-title-size: 21px;
+  --bt-title-leading: 1.4;
+  --bt-text-size: 15.5px;
+  --bt-leading: 1.8;
+  --bt-fade: 48px;
 }
 
 .bt-shell {
@@ -41,21 +49,79 @@
   align-items: start;
 }
 
+.bt-grid > .bt-card {
+  grid-column: span min(var(--bt-span), var(--bt-cols));
+}
+
+.bt-grid[data-packed] {
+  display: block;
+  position: relative;
+}
+
+.bt-grid[data-packed] > .bt-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.bt-grid[data-packed] > .bt-card[data-rows] {
+  height: calc(var(--bt-rows) * var(--bt-row-height) + (var(--bt-rows) - 1) * var(--bt-gap));
+  overflow: hidden;
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  transition: outline-color 0.15s var(--ease-out);
+}
+
+.bt-grid[data-packed] > .bt-card[data-rows][data-active] {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  outline-color: var(--line-2);
+}
+
+.bt-grid[data-packed] > .bt-card[data-overflow]::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  display: block;
+  height: var(--bt-fade);
+  margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.bt-grid[data-packed] > .bt-card[data-overflow][data-end]::after {
+  opacity: 0;
+}
+
+.bt-grid[data-packed] > .bt-card[data-hint]::before {
+  content: attr(data-hint);
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--accent);
+  pointer-events: none;
+}
+
 .bt-card {
   display: flow-root;
   min-width: 0;
-  padding: var(--bt-card-padding);
+  padding: var(--bt-padding-top) var(--bt-padding-x) var(--bt-padding-bottom);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--bt-radius);
   --scroll-cover: var(--surface);
   background: var(--surface);
   box-shadow: var(--shadow);
-  font-size: calc(var(--body-size) - 1px);
-  line-height: 1.8;
-}
-
-.bt-card[data-span='page'] {
-  grid-column: 1 / -1;
+  font-size: calc(var(--bt-text-size) * var(--reader-scale, 1));
+  line-height: calc(var(--bt-leading) + var(--leading-shift, 0));
 }
 
 .bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
@@ -65,8 +131,8 @@
 
 .bt-card > h2:where(:not(.component-box *)) {
   margin: 0 0 14px;
-  font-size: 21px;
-  line-height: 1.4;
+  font-size: calc(var(--bt-title-size) * var(--reader-scale, 1));
+  line-height: var(--bt-title-leading);
 }
 
 .bt-card > h2 > .bk-chapter-number {
@@ -81,8 +147,8 @@
 
 .bt-card > h3:where(:not(.component-box *)) {
   margin: 26px 0 8px;
-  font-size: 18px;
-  line-height: 1.5;
+  font-size: calc((var(--bt-title-size) - 3px) * var(--reader-scale, 1));
+  line-height: var(--bt-title-leading);
 }
 
 .bt-card > :is(h4, h5, h6):where(:not(.component-box *)) {
@@ -247,42 +313,31 @@
   margin-bottom: 0;
 }
 
-@media (min-width: 600px) {
-  .bt-grid:not([data-columns='1']) > .bt-card[data-span='2'] {
-    grid-column: span 2;
-  }
-}
-
 @media (max-width: 1339.98px) {
-  .bt-grid {
-    --bt-cols: var(--bt-columns-narrow);
+  .bt-page {
+    --bt-gutter: 48px;
+    --bt-padding-top: 18px;
+    --bt-padding-x: 18px;
+    --bt-padding-bottom: 16px;
+    --bt-text-size: 14px;
+    --bt-leading: 1.55;
   }
 }
 
 @media (max-width: 999.98px) {
   .bt-page {
-    --bt-gutter: 24px;
-    --bt-gap: 16px;
-  }
-
-  .bt-page .bk-header {
-    padding: 40px 0 28px;
-  }
-}
-
-@media (max-width: 599.98px) {
-  .bt-page {
-    --bt-gutter: 16px;
-    --bt-gap: 14px;
-    --bt-card-padding: 18px 18px 16px;
+    --bt-gutter: 12px;
+    --bt-title-size: 20px;
+    --bt-text-size: 15px;
+    --bt-leading: 1.8;
   }
 
   .bt-grid {
     --bt-cols: 1;
   }
 
-  .bt-card {
-    border-radius: 12px;
+  .bt-page .bk-header {
+    padding: 40px 0 28px;
   }
 
   .bt-intro {
@@ -296,14 +351,28 @@
     padding: 0;
   }
 
-  .bt-grid {
+  .bt-grid,
+  .bt-grid[data-packed] {
     display: block;
+    height: auto !important;
   }
 
-  .bt-card {
+  .bt-card,
+  .bt-grid[data-packed] > .bt-card,
+  .bt-grid[data-packed] > .bt-card[data-rows] {
+    position: static;
+    width: auto !important;
+    height: auto;
     margin-bottom: 16px;
+    overflow: visible;
     border: 0;
     box-shadow: none;
     padding: 0;
+    transform: none !important;
+  }
+
+  .bt-grid[data-packed] > .bt-card::after,
+  .bt-grid[data-packed] > .bt-card::before {
+    display: none;
   }
 }

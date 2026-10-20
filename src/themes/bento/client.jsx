@@ -9,6 +9,7 @@ import 'bake/theme/styles/print.css';
 import './styles/bento.css';
 import { resolveWidths, startFolds, startHeadingLinks, startHome, startLayout, startMarkdownCopy, startNotFound, startPreviewCard, startSettings, startToast } from 'bake/theme/client';
 import { startNotes } from './scripts/notes.js';
+import { startCardScroll } from './scripts/card-scroll.js';
 import { placeCards } from './scripts/spans.js';
 
 const article = document.querySelector('.bk-article');
@@ -22,6 +23,7 @@ if (article !== null) {
   startLayout(article, [resolveWidths, placeCards]);
   startFolds(article);
   startNotes(article);
+  startCardScroll(article);
   startHeadingLinks(article);
   startMarkdownCopy(article);
   startPreviewCard(article);

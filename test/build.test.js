@@ -282,7 +282,7 @@ describe('bake build', () => {
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));
     assert.ok(existsSync(join(dir, 'dist/2026-10/jacobian/index.html')));
     const bento = readFileSync(join(dir, 'dist/2026-10/activations/index.html'), 'utf8');
-    assert.match(bento, /<section class="bt-card" data-span="2" aria-labelledby="relu">/);
+    assert.match(bento, /<section class="bt-card" data-span="cols" data-rows="23" style="--bt-span:2;--bt-rows:23" aria-labelledby="relu">/);
   });
   test('publishes raster images as WebP and copies the original only when a link points to it', async (t) => {
     const photo = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#985b57' } }).png().toBuffer();

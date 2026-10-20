@@ -31,8 +31,7 @@ const knownFailures = [
   { name: 'dragging the slider of the function plot in the syntax article at 1440 pixels', reason: 'up to 13 percent of the frames are slower than the budget in two of five runs', task: 'kit-cleanup' },
   { name: 'dragging the slider of the function plot in the syntax article at 375 pixels', reason: '5.5 percent of the frames are slower than the budget in one of five runs', task: 'kit-cleanup' },
   { name: 'opening and closing a fold of the syntax article at 375 pixels', reason: 'one frame of 67 ms in one of five runs, and up to 3 percent dropped frames', task: 'viewport-measure' },
-  { name: 'dragging the slider of the function plot in the bento article at 375 pixels', reason: '29 to 34 percent of the frames are slower than the budget', task: 'bento-redesign' },
-  { name: 'resizing the bento article at 1440 pixels', reason: 'placing the cards again takes frames of 250 to 350 ms', task: 'bento-redesign' },
+  { name: 'resizing the bento article at 1440 pixels', reason: 'the browser restyles and lays out the whole page in frames of 150 to 170 ms after each resize, and each of the following layout passes takes about 100 ms', task: 'viewport-measure' },
 ];
 
 function scroll(distance) {
