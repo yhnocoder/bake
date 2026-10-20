@@ -1,7 +1,6 @@
-import { posix } from 'node:path';
 import { LineCounter, isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { TOC_STYLES, choiceProblem, slugProblem } from './rules.js';
+import { TOC_STYLES, choiceProblem, folderFile, folderPath, slugProblem } from './rules.js';
 import { CONFIG_FILE } from './bake-config.js';
 
 const REQUIRED = ['title', 'slug', 'date'];
@@ -49,7 +48,7 @@ export function readFrontMatter(file, source, rules, errors) {
       report(problem.node ?? node, problem.message);
       continue;
     }
-    fields[name] = name === 'preview' || name === 'cover' || name === 'page' ? posix.normalize(value) : value;
+    fields[name] = name === 'preview' || name === 'cover' || name === 'page' ? folderPath(value) : value;
     positions[name] = positionOf(node.range[0]);
   }
   for (const name of REQUIRED) {
@@ -105,11 +104,9 @@ function fieldMessage(name, value, rules) {
 }
 
 function articleFileProblem(name, value, kind, files, extension = '') {
-  const path = typeof value === 'string' ? posix.normalize(value) : '';
-  if (path === '' || path === '.' || path.startsWith('/') || path === '..' || path.startsWith('../') || !path.endsWith(extension)) {
-    return `${name} must be the relative path of ${kind} in the article folder, got ${describeValue(value)}`;
-  }
-  return files.includes(path) ? null : `${name} file ${JSON.stringify(value)} does not exist`;
+  const path = typeof value === 'string' ? folderPath(value) : null;
+  if (path === null || !path.endsWith(extension)) return `${name} must be the relative path of ${kind} in the article folder, got ${describeValue(value)}`;
+  return folderFile(path, files) === null ? `${name} file ${JSON.stringify(value)} does not exist` : null;
 }
 
 function isCalendarDate(value) {

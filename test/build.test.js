@@ -3,11 +3,29 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
+import { fromHtml } from 'hast-util-from-html';
 import sharp from 'sharp';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 
 const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
+
+const plainPage = `import { For } from 'solid-js';
+
+export default function Page(props) {
+  return (
+    <html lang={props.site.language}>
+      <head>
+        <For each={props.assets.styles}>{(href) => <link rel="stylesheet" href={href} />}</For>
+        <For each={props.assets.scripts}>{(src) => <script defer src={src} />}</For>
+      </head>
+      <body>
+        <main innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
+      </body>
+    </html>
+  );
+}
+`;
 
 const siteFiles = ['404.html', '_bake/articles.json', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
 
@@ -323,5 +341,92 @@ describe('bake build', () => {
       'linked.txt',
     ].sort());
     assert.equal(readFileSync(join(dir, 'dist/linked.txt'), 'utf8'), 'outside\n');
+  });
+
+  test('gives every address of a file whose name holds #, ?, % or a space a target that exists in dist/', async (t) => {
+    const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
+    const vector = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="#985b57"/></svg>\n';
+    const files = [
+      '## Files',
+      '',
+      '![Photo](a%231.png) and ![Vector](d%20e.svg)',
+      '',
+      '[Data](b%3F1.json) and [the preview](c%251.js).',
+      '',
+      ':::x-plot{points="a#1.png"}',
+      ':::',
+      '',
+      ':::x-plot{points="b?1.json"}',
+      ':::',
+      '',
+      '## Raw HTML',
+      '',
+      '<p><img src="d%20e.svg" srcset="d%20e.svg 1x, a%231.webp 2x" alt=""> <a href="b%3F1.json">data</a></p>',
+      '',
+    ].join('\n');
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/x-plot.js': "export const params = { points: { label: 'Points', type: 'file', default: '' } };\nexport const layout = { height: 100 };\nexport default class extends HTMLElement {}\n",
+      'content/posts/files/index.md': article({ title: 'Files', slug: 'files', extra: 'preview: c%1.js\n', body: files }),
+      'content/posts/files/a#1.png': photo,
+      'content/posts/files/b?1.json': '[1, 2]\n',
+      'content/posts/files/c%1.js': 'export default function draw(element) {\n  element.textContent = "preview";\n  return { start() {}, stop() {} };\n}\n',
+      'content/posts/files/d e.svg': vector,
+      'content/posts/host/index.md': article({ title: 'Host', slug: 'host', date: '2026-10-18', extra: 'cover: d e.svg\n', body: '![Cover](d%20e.svg)\n\n:::embed\n/2026-10/files/#files\n:::\n' }),
+      'content/posts/host/d e.svg': vector,
+      'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-10-17', extra: 'theme: "plain#1 %"\n' }),
+      'themes/plain#1 %/page.jsx': plainPage,
+      'themes/plain#1 %/client.jsx': "import './plain.css';\n",
+      'themes/plain#1 %/plain.css': 'main { color: #985b57; }\n',
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const site = 'https://example.com/';
+    const tree = readTree(join(dir, 'dist'));
+    const missing = [];
+    const addresses = [];
+    for (const path of Object.keys(tree).filter((file) => file.endsWith('.html'))) {
+      const check = (kind, address) => {
+        const url = new URL(address, new URL(path, site));
+        if (url.origin !== new URL(site).origin) return;
+        const file = decodeURIComponent(url.pathname.slice(1));
+        const target = file === '' || file.endsWith('/') ? `${file}index.html` : file;
+        addresses.push(`${path} ${kind} ${address}`);
+        if (!Object.hasOwn(tree, target)) missing.push(`${path} ${kind} ${address}`);
+      };
+      const visit = (node) => {
+        const properties = node.properties ?? {};
+        if (typeof properties.src === 'string') check('src', properties.src);
+        if (typeof properties.href === 'string') check('href', properties.href);
+        if (typeof properties.srcSet === 'string') for (const candidate of properties.srcSet.split(',')) check('srcset', candidate.trim().split(/\s+/)[0]);
+        if (typeof properties.dataPreview === 'string') check('data-preview', properties.dataPreview);
+        if (node.tagName === 'meta' && (properties.property === 'og:image' || properties.name === 'twitter:image')) check('og:image', properties.content);
+        if (properties.dataComponent === 'x-plot' && JSON.parse(properties.dataParams).points !== '') check('data-params', JSON.parse(properties.dataParams).points);
+        for (const child of [...(node.children ?? []), ...(node.content?.children ?? [])]) visit(child);
+      };
+      visit(fromHtml(tree[path].toString()));
+    }
+    assert.deepEqual(missing, []);
+    for (const expected of [
+      '2026-10/files/index.html src a%231.webp',
+      '2026-10/files/index.html src d%20e.svg',
+      '2026-10/files/index.html srcset a%231.webp',
+      '2026-10/files/index.html href b%3F1.json',
+      '2026-10/files/index.html href c%251.js',
+      '2026-10/files/index.html data-params a%231.png',
+      '2026-10/files/index.html data-params b%3F1.json',
+      '2026-10/files/index.html og:image https://example.com/og/2026-10/files-',
+      '2026-10/host/index.html og:image https://example.com/og/2026-10/host-',
+      '2026-10/host/index.html src d%20e.svg',
+      '2026-10/host/index.html src ../../2026-10/files/a%231.webp',
+      '2026-10/host/index.html href ../../2026-10/files/b%3F1.json',
+      '2026-10/host/index.html data-params ../../2026-10/files/a%231.png',
+      '2026-10/plain/index.html href ../../assets/plain%231%20%25-',
+      '2026-10/plain/index.html src ../../assets/plain%231%20%25-',
+      'index.html data-preview 2026-10/files/c%251.js',
+      'index.html src 2026-10/host/d%20e.svg',
+    ]) {
+      assert.ok(addresses.some((address) => address.startsWith(expected)), `${expected} is not among the addresses ${addresses.join(', ')}`);
+    }
   });
 });

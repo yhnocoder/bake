@@ -1,3 +1,5 @@
+import { fragmentOf } from 'bake/fragments';
+
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';
 const HIDE_DELAY = 200;
@@ -12,7 +14,7 @@ export function createElement(tag, className, text) {
 
 export function tocLink(id, className) {
   const link = createElement('a', className);
-  link.href = `#${encodeURIComponent(id)}`;
+  link.href = fragmentOf(id);
   return link;
 }
 

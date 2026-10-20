@@ -146,3 +146,48 @@ test('links, folds and citation previews', async (t) => {
     await page.close();
   });
 });
+
+test('a citation whose key holds a percent sign shows its entry in the preview card and jumps to it', async (t) => {
+  const keys = [
+    'Keys [@a%zz] with a malformed and [@b%41] with a valid percent-encoding.',
+    '',
+    filler('the citations'),
+    '',
+    ':::references',
+    '- [@a%zz] The malformed entry.',
+    '- [@b%41] The encoded entry.',
+    ':::',
+    '',
+    filler('the end'),
+    '',
+    filler('the appendix'),
+    '',
+  ].join('\n');
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/keys/index.md': article({ title: 'Keys', slug: 'keys', body: keys }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${base}/2026-10/keys/`);
+  const card = page.locator('.bk-preview');
+  for (const [index, text] of [
+    [0, 'The malformed entry.'],
+    [1, 'The encoded entry.'],
+  ]) {
+    await page.locator('a.citation').nth(index).hover();
+    await page.waitForFunction(() => document.querySelector('.bk-preview').classList.contains('is-on'), null, { timeout: 3000 });
+    assert.equal(await card.locator('.bk-preview-text').textContent(), text);
+    await page.mouse.move(5, 450);
+    await page.waitForFunction(() => !document.querySelector('.bk-preview').classList.contains('is-on'));
+  }
+  await page.locator('a.citation').first().click();
+  await page.waitForFunction(() => Math.abs(document.getElementById('reference-a%zz').getBoundingClientRect().top - 24) < 2, null, { timeout: 3000 });
+  assert.deepEqual(errors, []);
+});

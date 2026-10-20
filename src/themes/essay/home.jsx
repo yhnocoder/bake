@@ -1,3 +1,4 @@
+import { fragmentOf } from 'bake/fragments';
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
 import { HOME_COLUMNS, homePrepaintScript, prepaintScript, settingAttributes } from './settings.js';
@@ -62,7 +63,7 @@ function Listing(props) {
         {byCategory.length === 0 ? null : (
           <nav class="bk-chips" data-for="category" aria-label={labels.categories}>
             {byCategory.map((group) => (
-              <a class="bk-chip" href={`#${group.id}`} data-target={group.id} style={`--c:${group.category.color}`}>
+              <a class="bk-chip" href={fragmentOf(group.id)} data-target={group.id} style={`--c:${group.category.color}`}>
                 <span class="bk-chip-dot" />
                 {group.category.name}
                 <span class="bk-chip-count">{group.articles.length}</span>

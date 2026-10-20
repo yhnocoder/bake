@@ -1,3 +1,4 @@
+import { fragmentOf } from 'bake/fragments';
 import { cardKeyboard, chapterCard, clamp, createElement, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 110;
@@ -133,7 +134,7 @@ function indexCard(context) {
   function render() {
     const state = context.state();
     const chapter = context.outline.chapters[shown];
-    tab.href = `#${encodeURIComponent(chapter.id)}`;
+    tab.href = fragmentOf(chapter.id);
     tab.textContent = chapter.number;
     tab.classList.toggle('is-current', shown === Math.max(0, state.chapter));
     const scrollTop = body.scrollTop;

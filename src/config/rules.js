@@ -1,5 +1,5 @@
 import { readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { describeValue, listChoices } from '../report.js';
 
 export const BUILT_IN_THEMES = Object.freeze(['essay', 'bento']);
@@ -29,6 +29,16 @@ export function sizeProblem(label, value, subject) {
   if (parseSize(value) !== null) return null;
   const hint = WIDTHS.includes(value) ? `; use :::{width=${value}} around the ${subject}` : ', for example 560px or 70%';
   return `${label} must be a positive number of pixels or a percentage, got ${describeValue(value)}${hint}`;
+}
+
+export function folderPath(path) {
+  const normal = posix.normalize(path);
+  return normal === '.' || normal === '..' || normal.startsWith('../') || normal.startsWith('/') ? null : normal;
+}
+
+export function folderFile(path, files) {
+  const normal = folderPath(path);
+  return normal !== null && files.includes(normal) ? normal : null;
 }
 
 export function availableThemes(root) {

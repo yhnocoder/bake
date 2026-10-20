@@ -1,3 +1,4 @@
+import { fragmentOf, percentDecode } from '../fragments.js';
 import { errorAt } from '../report.js';
 
 const ARTICLE_ADDRESS = /^(\/\d{4}-\d{2}\/[^/?#]+)(\/|\/index\.html)?(\?[^#]*)?(?:#(.*))?$/;
@@ -22,20 +23,12 @@ export function parseAddress(url) {
   return { path, anchor, query, canonical: ending === '/', text: `${path}${fragment}`, written: `${base}${ending}${query}${fragment}` };
 }
 
-export function percentDecode(text) {
-  try {
-    return decodeURIComponent(text);
-  } catch {
-    return null;
-  }
-}
-
 export function encodePath(path) {
   return path.split('/').map(encodeURIComponent).join('/');
 }
 
 export function addressHref(root, path, anchor, query = '') {
-  return `${root}${path.slice(1)}${query}${anchor === undefined ? '' : `#${encodeURIComponent(anchor)}`}`;
+  return `${root}${path.slice(1)}${query}${anchor === undefined ? '' : fragmentOf(anchor)}`;
 }
 
 export function checkDuplicateUrls(articles, errors) {
