@@ -849,6 +849,12 @@ test('the AI chat on published pages', async (t) => {
     const bubbles = page.locator('.bk-chat-bubbles');
     assert.ok((await bubbles.boundingBox()).height <= 230);
     assert.equal(await bubbles.evaluate((element) => getComputedStyle(element).scrollbarWidth), 'none');
+    const room = await bubbles.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const rects = [...element.querySelectorAll('.bk-chat-bubble')].map((bubble) => bubble.getBoundingClientRect());
+      return { left: Math.min(...rects.map((rect) => rect.left - box.left)), right: Math.min(...rects.map((rect) => box.right - rect.right)), bottom: box.bottom - rects.at(-1).bottom };
+    });
+    assert.ok(room.left >= 6 && room.right >= 6 && room.bottom >= 6, `the scroll box cuts off the edges and shadows of the bubbles: ${JSON.stringify(room)}`);
     await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
     await bubbles.evaluate((element) => (element.scrollTop = -element.scrollHeight));
     await page.locator('.bk-chat-bubbles:not([data-faded])').waitFor();
