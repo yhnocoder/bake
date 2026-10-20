@@ -70,6 +70,35 @@ describe('themes', () => {
     assert.match(readFileSync(join(dir, 'dist/assets', script), 'utf8'), /text\/plain/);
   });
 
+  test('an @import url() without ./ in a theme folder finds the file in the blog folder first and in the built-in folder second', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'themes/essay/theme.css': '@import url(styles/tokens.css);\n@import url(styles/c.css);\n',
+      'themes/essay/styles/c.css': '.bk-custom {\n  color: red;\n}\n',
+    });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const styles = readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8');
+    assert.doesNotMatch(styles, /@import/i);
+    assert.match(styles, /--bg:#f5f6f4/);
+    assert.match(styles, /\.bk-custom\{color:red\}/);
+  });
+
+  test('a stylesheet pulled in by an @import line looks up its own @import lines in the blog folder first and in the built-in folder second', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'themes/essay/theme.css': "@import './styles/group.css';\n",
+      'themes/essay/styles/group.css': "@import './tokens.css';\n@import './c.css';\n",
+      'themes/essay/styles/c.css': '.bk-custom {\n  color: red;\n}\n',
+    });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const styles = readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8');
+    assert.doesNotMatch(styles, /@import/i);
+    assert.match(styles, /--bg:#f5f6f4/);
+    assert.match(styles, /\.bk-custom\{color:red\}/);
+  });
+
   test('reports a theme folder without page.jsx or client.jsx', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

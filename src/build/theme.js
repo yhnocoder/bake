@@ -19,7 +19,8 @@ const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const RENDER_ENTRY = 'bake:render';
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const RELATIVE_IMPORT = /^\.\.?[/]/;
-const CSS_IMPORT = /@import\s+(?:url\(\s*(['"]?)(\.\.?[/][^'"()\s]+)\1\s*\)|(['"])(\.\.?[/][^'"]+)\3)/gi;
+const STYLESHEET = /\.css(?:\?.*)?$/;
+const EVERY_IMPORT = /^/;
 
 export async function compileTheme(root, name, { siteTheme }, errors) {
   const folders = themeFolders(root, name);
@@ -29,18 +30,12 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
     if (locate(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
-  const resolution = { plugins: [themeFiles(folders, locate)], alias: publicModules('themes') };
+  const alias = [...publicModules('themes'), themeFileAlias(folders, locate)];
   try {
     const [server, client, styles] = await Promise.all([
-      build(serverConfig(resolution, locate, siteTheme)),
-      browserBuild({
-        input: locate(CLIENT_FILE),
-        plugins: [...resolution.plugins, solid()],
-        alias: resolution.alias,
-        format: 'iife',
-        names: { entry: assetFileName(name, '.js'), stylesheet: assetFileName(name, '.css') },
-      }),
-      siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), ...resolution, format: 'es', names: { stylesheet: THEME_STYLES_PATH } }) : null,
+      build(serverConfig(alias, locate, siteTheme)),
+      browserBuild({ input: locate(CLIENT_FILE), plugins: [solid()], alias, format: 'iife', names: { entry: assetFileName(name, '.js'), stylesheet: assetFileName(name, '.css') } }),
+      siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, format: 'es', names: { stylesheet: THEME_STYLES_PATH } }) : null,
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
     const { files } = client;
@@ -68,26 +63,16 @@ function fileLocator(folders) {
   return (path) => folders.map((folder) => join(folder, path)).find((file) => existsSync(file)) ?? null;
 }
 
-function themeFiles(folders, locate) {
-  const resolveThemeFile = (source, importer) => {
-    if (importer === undefined || !RELATIVE_IMPORT.test(source)) return null;
-    const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
-    if (folder === undefined) return null;
-    const path = relative(folder, resolve(dirname(importer), source));
-    return path.startsWith('..') ? null : locate(path);
-  };
+function themeFileAlias(folders, locate) {
   return {
-    name: 'bake-theme-files',
-    enforce: 'pre',
-    resolveId(source, importer) {
-      return resolveThemeFile(source, importer);
-    },
-    transform(code, id) {
-      if (!id.endsWith('.css')) return null;
-      return code.replace(CSS_IMPORT, (match, urlQuote, urlSource, quote, quotedSource) => {
-        const file = resolveThemeFile(urlSource ?? quotedSource, id);
-        return file === null ? match : `@import ${JSON.stringify(file)}`;
-      });
+    find: EVERY_IMPORT,
+    replacement: '',
+    customResolver(source, importer) {
+      if (importer === undefined || !(RELATIVE_IMPORT.test(source) || STYLESHEET.test(importer))) return null;
+      const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
+      if (folder === undefined) return null;
+      const path = relative(folder, resolve(dirname(importer), source));
+      return path.startsWith('..') ? null : locate(path);
     },
   };
 }
@@ -122,9 +107,9 @@ function renderEntry(locate, siteTheme) {
   };
 }
 
-function serverConfig(resolution, locate, siteTheme) {
+function serverConfig(alias, locate, siteTheme) {
   return {
-    ...viteConfig({ plugins: [...resolution.plugins, renderEntry(locate, siteTheme), solid({ ssr: true, solid: { hydratable: false } })], alias: resolution.alias }),
+    ...viteConfig({ plugins: [renderEntry(locate, siteTheme), solid({ ssr: true, solid: { hydratable: false } })], alias }),
     ssr: { noExternal: true },
     build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { codeSplitting: false } } },
   };

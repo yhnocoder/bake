@@ -217,7 +217,7 @@ describe('site files', () => {
 
   test('_bake/theme.css resolves every form of a relative @import in a theme folder against the built-in theme', (t) => {
     const themeCss = [
-      '@IMPORT url(./styles/fonts.css);',
+      '@import url(./styles/fonts.css);',
       "@import url( './styles/tokens.css' );",
       '@import url("./styles/home.css");',
       "@import './styles/not-found.css';",
