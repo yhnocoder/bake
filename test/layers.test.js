@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { isBuiltin } from 'node:module';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { describe, test } from 'node:test';
 import { parseSync } from 'vite';
@@ -97,11 +98,11 @@ describe('layers of src/', () => {
     assert.deepEqual(offending, []);
   });
 
-  test('the modules that run in the browser import no node: module', () => {
+  test('the modules that run in the browser import no Node built-in module', () => {
     const modules = browserModules();
     assert.ok(modules.includes(join(SRC, 'chat/panel.jsx')));
     assert.ok(modules.includes(join(SRC, 'kit/plot.jsx')));
-    const offending = modules.flatMap((file) => imports.get(file).filter(({ specifier }) => specifier.startsWith('node:')).map(({ specifier }) => `${name(file)} imports ${specifier}`));
+    const offending = modules.flatMap((file) => imports.get(file).filter(({ specifier }) => isBuiltin(specifier)).map(({ specifier }) => `${name(file)} imports ${specifier}`));
     assert.deepEqual(offending, []);
   });
 });
