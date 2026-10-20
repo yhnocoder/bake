@@ -201,8 +201,8 @@ describe('building components', () => {
     assert.doesNotMatch(readFileSync(join(dir, 'dist/assets', runtime), 'utf8'), /unused-view/);
     const scripts = assets.filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
     assert.ok(!scripts.some((source) => source.includes('computations created outside')), 'no script contains the development build of Solid');
-    const sources = assets.filter((name) => /\.(js|css)$/.test(name)).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
-    assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no asset contains code of bake/kit');
+    const sources = assets.filter((name) => /\.(js|css)$/.test(name) && !name.startsWith('essay-')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
+    assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no component asset contains code of bake/kit');
   });
 
   test('bundles the parts of bake/kit and their styles with the components that use them, and the plain helpers without the styles', (t) => {
@@ -215,7 +215,7 @@ describe('building components', () => {
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    const assets = readdirSync(join(dir, 'dist/assets')).filter((name) => /\.(js|css)$/.test(name));
+    const assets = readdirSync(join(dir, 'dist/assets')).filter((name) => /\.(js|css)$/.test(name) && !name.startsWith('essay-'));
     const withKit = assets.filter((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8').includes('bk-kit-')).map((name) => name.replace(/-[\w-]{8}\./, '.'));
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);
     assert.match(readFileSync(join(dir, 'dist/assets', assets.find((name) => /^line-plot-[\w-]+\.css$/.test(name))), 'utf8'), /\.bk-kit-slider/);

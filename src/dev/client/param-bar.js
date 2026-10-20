@@ -5,7 +5,7 @@ const MESSAGE_DURATION = 8000;
 const SAVED_KEY = 'bake-dev-param-values';
 
 export async function startParamBars({ file, token, version, setVersion, components, copyText, shown }) {
-  const styles = await Promise.all(['param-bar.css', 'switch.css'].map(loadSheet));
+  const styles = await Promise.all(['param-bar.css', 'controls.css'].map(loadSheet));
   const server = { file, token, version, setVersion, copyText, styles };
   const states = createStates();
   const bars = new Map();
@@ -337,8 +337,11 @@ function createControl(param, declaration, value, change) {
       select.value = next;
     };
   } else if (declaration.type === 'boolean') {
-    const toggle = input('checkbox', 'switch');
+    const toggle = input('checkbox');
     toggle.setAttribute('role', 'switch');
+    const track = element('span', 'bk-kit-switch');
+    toggle.replaceWith(track);
+    track.append(toggle);
     toggle.addEventListener('change', () => change(toggle.checked));
     control.set = (next) => {
       toggle.checked = next;

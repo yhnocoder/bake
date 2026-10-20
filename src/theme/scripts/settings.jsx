@@ -199,11 +199,12 @@ function OptionsRow(props) {
   return (
     <div class="bk-settings-row" data-setting={row.name}>
       <span class="bk-settings-label">{row.label(labels)}</span>
-      <div class="bk-settings-options" role="group" aria-label={row.label(labels)}>
+      <div class="bk-kit-segmented bk-settings-options" role="group" aria-label={row.label(labels)}>
         <For each={SETTINGS[row.name].values}>
           {(value) => (
             <button
               type="button"
+              class="bk-kit-segment"
               data-value={value}
               aria-label={row.glyph === undefined ? undefined : row.option(labels, value)}
               title={row.glyph === undefined ? undefined : row.option(labels, value)}
@@ -228,7 +229,7 @@ function ToggleRow(props) {
       <span class="bk-settings-label">{row.label(labels)}</span>
       <button type="button" class="bk-settings-switch" role="switch" aria-checked={String(checked())} onClick={() => chooseSetting(row.name, checked() ? off : on)}>
         <span>{text(labels)}</span>
-        <i aria-hidden="true" />
+        <i class="bk-kit-switch" aria-hidden="true" />
       </button>
     </div>
   );

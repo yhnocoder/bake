@@ -1,0 +1,55 @@
+.sidenote-ref {
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--reader-scale));
+  font-style: normal;
+  font-weight: 400;
+  line-height: 0;
+  vertical-align: super;
+  margin: 0 1px;
+}
+
+.sidenote-ref a {
+  position: relative;
+  isolation: isolate;
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.sidenote-ref a::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--mark);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+.sidenote-ref.is-active a::before {
+  opacity: 1;
+  transition-duration: 0.15s;
+}
+
+.bk-sidenote-number {
+  margin-right: 6px;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--reader-scale));
+  color: var(--accent);
+}
+
+.bk-sidenote-body,
+.bk-sidenote-body > :first-child {
+  display: inline;
+}
+
+.bk-sidenote-body p {
+  margin: 0 0 6px;
+}
+
+.bk-sidenote-body > :last-child {
+  margin-bottom: 0;
+}

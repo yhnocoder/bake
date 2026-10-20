@@ -1,3 +1,5 @@
+@import '../../kit/controls.css';
+
 :root {
   --ui-bottom: 16px;
   --chat-bottom: var(--ui-bottom);
@@ -143,52 +145,16 @@
   color: var(--ink-3);
 }
 
-.bk-settings-options {
+.bk-settings .bk-settings-options {
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--surface-2);
 }
 
 .bk-settings-options button {
-  position: relative;
-  isolation: isolate;
   flex: 1;
   padding: 4px 0;
   border: 0;
-  border-radius: 6px;
   background: none;
-  color: var(--ink-2);
   font-size: 12.5px;
-  white-space: nowrap;
-  transition: color 0.12s;
-}
-
-.bk-settings-options button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--surface);
-  box-shadow:
-    0 0 0 0.5px var(--hair),
-    var(--segment-shadow);
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-
-.bk-settings-options button:hover {
-  color: var(--ink);
-}
-
-.bk-settings-options button[aria-pressed='true'] {
-  color: var(--ink);
-}
-
-.bk-settings-options button[aria-pressed='true']::before {
-  opacity: 1;
 }
 
 .bk-settings-row[data-setting='size'] button {
@@ -222,37 +188,6 @@
   background: none;
   color: var(--ink);
   text-align: left;
-}
-
-.bk-settings-switch i {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 18px;
-  border-radius: 9px;
-  background: var(--line-2);
-  transition: background-color 0.2s;
-}
-
-.bk-settings-switch i::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 7px;
-  background: var(--surface);
-  box-shadow: var(--switch-thumb-shadow);
-  transition: transform 0.2s var(--ease-out);
-}
-
-.bk-settings-switch[aria-checked='true'] i {
-  background: var(--accent);
-}
-
-.bk-settings-switch[aria-checked='true'] i::after {
-  transform: translateX(12px);
 }
 
 @media (min-width: 1000px) {

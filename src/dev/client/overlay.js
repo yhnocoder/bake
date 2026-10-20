@@ -22,14 +22,14 @@ export function createOverlay() {
   host.dataset.bakeDev = '';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = [
-    '<link rel="stylesheet" href="/__bake/overlay.css"><link rel="stylesheet" href="/__bake/switch.css">',
+    '<link rel="stylesheet" href="/__bake/overlay.css"><link rel="stylesheet" href="/__bake/controls.css">',
     '<div class="marks"></div>',
     '<div class="bar">',
     '<button type="button" class="notice" hidden></button>',
     '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',
     '<section class="problems" data-state="clear" hidden aria-label="Problems">',
     '<header><span class="status" aria-hidden="true"></span><span class="title">No problems</span>',
-    '<label class="bars" hidden><input type="checkbox" role="switch" class="switch">Parameter bars</label>',
+    '<label class="bars" hidden><span class="bk-kit-switch"><input type="checkbox" role="switch"></span>Parameter bars</label>',
     '<button type="button" class="copy-all" hidden>Copy all</button>',
     '<button type="button" class="close" aria-label="Close the problems list" title="Close">',
     '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',

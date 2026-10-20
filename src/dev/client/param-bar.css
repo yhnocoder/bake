@@ -17,6 +17,7 @@
   --switch-off: var(--pb-line-2);
   --switch-on: var(--pb-ink-2);
   --switch-focus: var(--pb-accent);
+  --switch-thumb: #ffffff;
   font: 12px/1.5 var(--font-ui, system-ui, -apple-system, 'Segoe UI', sans-serif);
   color: var(--pb-ink);
   transition-property: opacity, display;

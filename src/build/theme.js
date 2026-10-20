@@ -21,13 +21,13 @@ const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const SHARED_DIR = join(import.meta.dirname, '../theme');
 const SHARED_MODULE = 'bake/theme';
 const SHARED_INDEX = join(SHARED_DIR, 'index.jsx');
-const BUILD_FILES = [SHARED_DIR, join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
+const BUILD_FILES = [SHARED_DIR, join(import.meta.dirname, '../kit/controls.css'), join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
 const RE_EXPORT = /export \{([^}]*)\} from '([^']+)'/g;
 const MISSING_BINDING = /"([^"]+)" is not exported/;
 const SHARED_EXPORTS = new Map([
   ['', 'index.jsx'],
   ['/client', 'client.js'],
-  ...['fonts', 'tokens', 'base', 'page', 'blocks', 'settings', 'home', 'not-found', 'print'].map((name) => [`/styles/${name}.css`, `styles/${name}.css`]),
+  ...['fonts', 'tokens', 'base', 'page', 'blocks', 'sidenotes', 'settings', 'home', 'not-found', 'print'].map((name) => [`/styles/${name}.css`, `styles/${name}.css`]),
 ]);
 const RENDER_ENTRY = 'bake:render';
 const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;

@@ -351,12 +351,12 @@ test('the kit draws the example function plot', async (t) => {
     assert.deepEqual(new Set(cursors), new Set(['pointer']));
     await frame.locator('.bk-kit-segment input').first().focus();
     await page.keyboard.press('ArrowRight');
-    const outline = await page.evaluate(() => getComputedStyle(document.activeElement.nextElementSibling).outlineStyle);
+    const outline = await page.evaluate(() => getComputedStyle(document.activeElement.closest('.bk-kit-segment')).outlineStyle);
     assert.equal(outline, 'solid');
     for (const control of ['.bk-kit-slider input', '.bk-kit-toggle input']) {
       await frame.locator(control).first().focus();
       await page.keyboard.press('Shift');
-      const style = await frame.locator(control).first().evaluate((input) => getComputedStyle(input.type === 'checkbox' ? input.nextElementSibling : input).outlineStyle);
+      const style = await frame.locator(control).first().evaluate((input) => getComputedStyle(input.type === 'checkbox' ? input.parentElement : input).outlineStyle);
       assert.equal(style, 'solid', control);
     }
     assert.deepEqual(problems, []);
@@ -490,7 +490,8 @@ test('the kit works for any component that imports it', async (t) => {
     const text = await page.evaluate(() => document.querySelector('figure.component .component-box').textContent);
     await page.close();
     const assets = requested.filter((path) => path.startsWith('/assets/') && /\.(js|css)$/.test(path));
-    return { text, assets, kit: assets.filter((path) => readFileSync(join(dir, 'dist', path), 'utf8').includes('bk-kit-')) };
+    const componentAssets = assets.filter((path) => !path.startsWith('/assets/essay-'));
+    return { text, assets, kit: componentAssets.filter((path) => readFileSync(join(dir, 'dist', path), 'utf8').includes('bk-kit-')) };
   };
 
   await t.test('a component that only uses the plain helpers loads none of the kit parts, their styles or MathJax', async () => {

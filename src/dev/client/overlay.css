@@ -26,6 +26,7 @@
   --switch-off: var(--dev-line);
   --switch-on: var(--dev-accent);
   --switch-focus: var(--dev-accent);
+  --switch-thumb: #ffffff;
   font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--dev-text);
 }

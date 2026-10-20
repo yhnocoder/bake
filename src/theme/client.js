@@ -1,3 +1,4 @@
+export { startArticle } from './scripts/article.js';
 export { labelsFor } from './labels.js';
 export { startMarkdownCopy } from './scripts/copy.js';
 export { markCurrent } from './scripts/current.js';

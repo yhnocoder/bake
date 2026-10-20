@@ -13,10 +13,8 @@ export function startNotes(article) {
   const labels = labelsFor(document.documentElement.lang);
   let layer = null;
   let placed = [];
-  let active = null;
   const read = () => {
     layer?.remove();
-    active = null;
     const originals = [...article.querySelectorAll('.bk-sidenote')];
     layer = null;
     placed = [];
@@ -40,20 +38,6 @@ export function startNotes(article) {
   });
   document.addEventListener(CONTENT_EVENT, read);
 
-  const activate = (number) => {
-    if (number === active) return;
-    if (active !== null) highlight(article, layer, active, false);
-    active = number;
-    if (active !== null) highlight(article, layer, active, true);
-  };
-  article.addEventListener('pointerover', (event) => {
-    const target = event.target.closest('.sidenote-ref, .bk-notes-layer .bk-sidenote');
-    if (target !== null) activate(target.dataset.sidenote);
-  });
-  article.addEventListener('pointerout', (event) => {
-    const target = event.target.closest('.sidenote-ref, .bk-notes-layer .bk-sidenote');
-    if (target !== null && !target.contains(event.relatedTarget)) activate(null);
-  });
   article.addEventListener('click', (event) => {
     const link = event.target.closest('.sidenote-ref a');
     if (link === null || event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -127,9 +111,7 @@ function lineOf(ref) {
   return { top: box.top, height: box.height };
 }
 
-function highlight(article, layer, number, on) {
-  for (const element of article.querySelectorAll(`.sidenote-ref[data-sidenote="${number}"]`)) element.classList.toggle('is-active', on);
-  layer?.querySelector(`.bk-sidenote[data-sidenote="${number}"]`)?.classList.toggle('is-active', on);
+export function tintParagraph(article, number, on) {
   const container = visibleReference(article, number)?.parentElement.closest(TINTED_CONTAINER);
   if (container === null || container === undefined) return;
   if (!container.classList.contains('bk-tintable')) {

@@ -21,7 +21,7 @@ const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
 const MAX_REQUEST_BYTES = 1024 * 1024;
 const CLIENT_DIR = join(import.meta.dirname, 'client');
-const CLIENT_FILES = new Set(readdirSync(CLIENT_DIR));
+const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, join(CLIENT_DIR, file)]), ['controls.css', join(import.meta.dirname, '../kit/controls.css')]]);
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
@@ -69,7 +69,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
     if (clientFile !== null && CLIENT_FILES.has(clientFile)) {
       response.writeHead(200, { 'content-type': contentType(clientFile), 'cache-control': 'no-store' });
-      return response.end(readFileSync(join(CLIENT_DIR, clientFile)));
+      return response.end(readFileSync(CLIENT_FILES.get(clientFile)));
     }
     let path;
     try {
