@@ -1,5 +1,5 @@
 import { fragmentOf } from 'bake/fragments';
-import { closeOnEscape } from './escape.js';
+import { closeOnEscape } from 'bake/theme/client';
 
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';

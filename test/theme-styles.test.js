@@ -14,7 +14,7 @@ function cssFiles(folder) {
 }
 
 test('every width media query in the styles uses a breakpoint of screens.js or the phone screen width', () => {
-  const screens = readFileSync(join(SRC, 'themes/essay/scripts/screens.js'), 'utf8');
+  const screens = readFileSync(join(SRC, 'theme/scripts/screens.js'), 'utf8');
   const screenWidths = [...screens.matchAll(/min-width: (\d+)px/g)].map((match) => Number(match[1]));
   assert.deepEqual(screenWidths, [1340, 1000]);
   const breakpoints = new Set([...screenWidths, PHONE_SCREEN_WIDTH]);

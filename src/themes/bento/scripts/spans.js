@@ -1,27 +1,10 @@
-import { CONTENT_EVENT, layoutChanged, oncePerFrame } from '../../essay/scripts/motion.js';
-import { declaresNaturalWidth, naturalWidthProbe, naturalWidths, overflows } from '../../essay/scripts/widths.js';
+import { declaresNaturalWidth, naturalWidthProbe, naturalWidths, overflows } from 'bake/theme/client';
 
 const WIDE_SPAN = 2;
 
-export function startSpans(article) {
-  let width = 0;
-  const layout = oncePerFrame(() => {
-    const grid = article.querySelector('.bt-grid');
-    if (grid === null) return;
-    placeCards(grid);
-    layoutChanged();
-  });
-  layout();
-  new ResizeObserver(() => {
-    if (article.clientWidth === width) return;
-    width = article.clientWidth;
-    layout();
-  }).observe(article);
-  document.fonts.ready.then(layout);
-  document.addEventListener(CONTENT_EVENT, layout);
-}
-
-function placeCards(grid) {
+export function placeCards(article) {
+  const grid = article.querySelector('.bt-grid');
+  if (grid === null) return;
   const cards = [...grid.querySelectorAll(':scope > .bt-card')];
   for (const card of cards) card.style.removeProperty('grid-column');
   const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;

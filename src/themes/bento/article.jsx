@@ -1,4 +1,4 @@
-import { Block, HeadingLink, Sidenotes, arrange, subsectionOf } from '../essay/article.jsx';
+import { Block, SectionHeading, Sidenotes, arrange, subsectionOf } from 'bake/theme';
 
 const SPAN_OF_WIDTH = { body: '1', wide: '2', page: 'page' };
 const NARROW_COLUMNS = 2;
@@ -21,13 +21,7 @@ export function Article(props) {
         <div class="bt-grid" data-columns={columns} style={columnStyle(columns)}>
           {sections.map(({ section, notes, entries }) => (
             <section class="bt-card" data-span={spanOf(section)} aria-labelledby={section.id}>
-              <h2 id={section.id} data-line={section.line} data-end-line={section.endLine}>
-                <span class="bk-chapter-number" data-ui>
-                  {section.number}
-                </span>
-                <HeadingLink id={section.id} labels={labels} />
-                <span class="bk-heading-text" innerHTML={section.title} />
-              </h2>
+              <SectionHeading section={section} labels={labels} />
               <Recap html={section.recap} />
               {entries.map(({ block, afterHeading }) => [
                 <Block block={block} afterHeading={afterHeading} labels={labels} />,
