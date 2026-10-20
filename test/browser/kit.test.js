@@ -66,6 +66,20 @@ export default function BrokenTex() {
   return <p class="broken-tex">Label <Tex tex="\\frac{" /></p>;
 }
 `,
+  'components/step-sliders.jsx': `import { Controls, Slider } from 'bake/kit';
+
+export const layout = { height: 80 };
+
+export default function StepSliders() {
+  return (
+    <Controls>
+      <Slider label="Quarter" min={0} max={1} step={0.25} value={0.25} onInput={() => {}} />
+      <Slider label="Two and a half" min={0} max={10} step={2.5} value={7.5} onInput={() => {}} />
+    </Controls>
+  );
+}
+`,
+  'content/posts/step-sliders/index.md': article({ slug: 'step-sliders', body: ':::step-sliders\n:::\n' }),
   'content/posts/plain/index.md': article({ slug: 'plain', body: ':::plain-view\n:::\n' }),
   'content/posts/broken-tex/index.md': article({ slug: 'broken-tex', body: ':::broken-tex\n:::\n' }),
   'content/posts/demo/index.md': article({ slug: 'demo', body: ':::kit-demo\n:::\n' }),
@@ -410,6 +424,20 @@ test('the kit works for any component that imports it', async (t) => {
     assert.equal(after.slope, '2');
     assert.notEqual(after.path, before.path);
     assert.deepEqual(problems, []);
+    await page.close();
+  });
+
+  await t.test('a slider shows its value with the decimals of its step', async () => {
+    const page = await browser.newPage();
+    await page.goto(`${origin}/2026-10/step-sliders/`);
+    await waitForComponents(page);
+    const sliders = await page.evaluate(() =>
+      [...document.querySelectorAll('.bk-kit-slider')].map((slider) => [slider.querySelector('.bk-kit-value').textContent, slider.querySelector('input').getAttribute('aria-valuetext')]),
+    );
+    assert.deepEqual(sliders, [
+      ['0.25', '0.25'],
+      ['7.5', '7.5'],
+    ]);
     await page.close();
   });
 

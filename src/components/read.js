@@ -26,6 +26,7 @@ export const BROWSER_GLOBALS = Object.freeze([
 
 const COMPONENT_EXTENSIONS = ['.js', '.jsx'];
 const COMPONENT_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/;
+const RESERVED_NAMES = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
 const UNDEFINED_NAME = /^(\S+) is not defined$/;
 const STACK_LOCATION = /\(?((?:file:\/\/)?[^\s()]+):(\d+):(\d+)\)?$/;
 
@@ -72,6 +73,8 @@ function componentFiles(root, builtInBlocks, errors) {
     const name = entry.slice(0, -extension.length);
     if (!COMPONENT_NAME.test(name)) {
       errors.push(errorAt(file, fileStart, `the file name of a component is its custom element name and its block name; use lowercase letters and digits with at least one "-", such as act-fn-plot, got "${name}"`));
+    } else if (RESERVED_NAMES.includes(name)) {
+      errors.push(errorAt(file, fileStart, `${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`));
     } else if (builtInBlocks.includes(name)) {
       errors.push(errorAt(file, fileStart, `${name}: :::${name} is a built-in block; give the component another name`));
     } else if (files.has(name)) {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
@@ -180,6 +180,23 @@ describe('homepage', () => {
     assert.match(cards[2], /^ href="2026-10\/demo\/" style="--c:var\(--accent\)" data-tags="\[\]" data-preview="2026-10\/demo\/preview.js">/);
     assert.match(cards[2], /<span class="bk-card-cover" aria-hidden="true">Demo<\/span>/);
     assert.doesNotMatch(html, /bk-card-draft/);
+  });
+
+  test('a card gives the preview and the image of an article URL-encoded addresses when their file names hold #, ? or %', async (t) => {
+    const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
+    const { dir, html } = buildHome(t, {
+      'bake.config.js': validConfig,
+      'content/posts/photo/index.md': article({ title: 'Photo', slug: 'photo', date: '2026-10-03', body: '![](<photo%231%3F100%25.png>)\n' }),
+      'content/posts/photo/photo#1?100%.png': photo,
+      'content/posts/demo/index.md': article({ title: 'Demo', slug: 'demo', date: '2026-10-02', extra: 'preview: preview#1?100%.js\n' }),
+      'content/posts/demo/preview#1?100%.js': 'export default () => ({ start() {}, stop() {} });\n',
+    });
+    const cards = html.split('<a class="bk-card"').slice(1, 3);
+    assert.match(cards[0], /<img src="2026-10\/photo\/photo%231%3F100%25.webp" alt loading="lazy" decoding="async">/);
+    assert.match(cards[1], /data-preview="2026-10\/demo\/preview%231%3F100%25.js"/);
+    const page = readFileSync(join(dir, 'dist/2026-10/photo/index.html'), 'utf8');
+    assert.match(page, /<img src="photo%231%3F100%25.webp"/);
+    assert.ok(existsSync(join(dir, 'dist/2026-10/photo/photo#1?100%.webp')));
   });
 
   test('a card never shows a component frame: it uses an image of the caption or the colour block, and the homepage loads no component code', async (t) => {

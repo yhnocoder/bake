@@ -193,7 +193,10 @@ function Panel(props) {
     setBusy(false);
   }
 
+  const retryable = (index) => !busy() && index === messages.length - 1;
+
   const retry = (index) => {
+    if (!retryable(index)) return;
     const asked = messages[index - 1];
     setMessages(produce((list) => list.splice(index, 1)));
     run(asked.quote === null ? asked.text : `${asked.quote.replace(/^/gm, '> ')}\n\n${asked.text}`);
@@ -347,7 +350,7 @@ function Panel(props) {
             <Show when={messages.length === 0}>
               <p class="bk-chat-empty">{labels.empty[mode()]}</p>
             </Show>
-            <For each={messages}>{(message, index) => (message.role === 'user' ? <UserMessage message={message} labels={labels} /> : <Reply message={message} root={root} labels={labels} onRetry={() => retry(index())} />)}</For>
+            <For each={messages}>{(message, index) => (message.role === 'user' ? <UserMessage message={message} labels={labels} /> : <Reply message={message} root={root} labels={labels} canRetry={retryable(index())} onRetry={() => retry(index())} />)}</For>
           </div>
           <form class="bk-chat-composer" onSubmit={send}>
             <Show when={quote() !== null}>
@@ -441,10 +444,13 @@ function Reply(props) {
       <div class="bk-chat-answer" ref={body} />
       <Show when={props.message.error !== null}>
         <p class="bk-chat-problem" role="alert">
-          {props.message.error}{' '}
-          <button type="button" class="bk-chat-link" onClick={props.onRetry}>
-            {labels.retry}
-          </button>
+          {props.message.error}
+          <Show when={props.canRetry}>
+            {' '}
+            <button type="button" class="bk-chat-link" onClick={props.onRetry}>
+              {labels.retry}
+            </button>
+          </Show>
         </p>
       </Show>
       <Show when={props.message.done && props.message.content !== ''}>

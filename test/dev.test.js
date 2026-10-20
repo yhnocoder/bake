@@ -149,7 +149,7 @@ describe('bake dev', () => {
     assert.match(events, /event: problems\ndata: \[\{"position":"content\/posts\/rope\/index.md:7:5","text":"content\/posts\/rope\/index.md:7:5 footnote \\"missing\\" has no definition"\}\]\n\n/);
     writeFileSync(join(dir, 'content/posts/rope/index.md'), article({ body: 'Text.\n' }));
     await eventually(() => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
-    await eventually(() => lines.includes('Updated /2026-10/rope/'), `bake dev printed ${JSON.stringify(lines)}`);
+    await eventually(() => lines.includes('Updated /, /2026-10/rope/'), `bake dev printed ${JSON.stringify(lines)}`);
   });
 
   test('writes nothing into the blog folder', async (t) => {
@@ -260,6 +260,38 @@ describe('preview updates', () => {
     assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
     assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
     assert.match(indexHtml(preview, '/2026-10/gelu/'), /GELU changed\./);
+  });
+
+  test('a slug or date change together with a body error keeps the homepage and the site files pointing at the served page', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
+    });
+    const preview = createPreview(dir);
+    await preview.update();
+    const served = (path) => preview.find(path).output.render();
+    const before = Object.fromEntries(['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json'].map((path) => [path, served(path)]));
+    for (const changed of [{ slug: 'rotary' }, { date: '2026-09-01' }]) {
+      writeFiles(dir, { 'content/posts/rope/index.md': article({ ...changed, body: 'Rope[^missing].\n' }) });
+      const result = await preview.update(['content/posts/rope/index.md']);
+      assert.deepEqual([result.applied, result.reload, result.refresh], [true, [], []]);
+      assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
+      assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
+      for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
+    }
+    writeFiles(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: 'GELU[^missing].\n' }) });
+    await preview.update(['content/posts/gelu/index.md']);
+    assert.equal(preview.find('2026-10/gelu/index.html'), null);
+    for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
+    writeFiles(dir, {
+      'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }),
+      'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: 'GELU.\n' }),
+    });
+    const fixed = await preview.update(['content/posts/gelu/index.md', 'content/posts/rope/index.md']);
+    assert.deepEqual([fixed.problems, fixed.reload], [[], ['/', '/2026-10/gelu/', '/2026-10/rope/', '/2026-10/rotary/']]);
+    assert.match(served('index.html'), /href="2026-10\/rotary\/"/);
+    assert.match(served('index.html'), /href="2026-10\/gelu\/"/);
+    assert.doesNotMatch(served('index.html'), /href="2026-10\/rope\/"/);
   });
 
   test('a change in one article checks the links of every article again and updates the sections embedded elsewhere', async (t) => {

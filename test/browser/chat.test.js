@@ -263,6 +263,40 @@ test('the AI chat on published pages', async (t) => {
     );
   });
 
+  await t.test('only the last failed reply offers a retry, and never while another answer streams', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    api.answers.push({ status: 402, body: '{"error":{"message":"Insufficient Balance"}}' });
+    await ask(page, '第一问');
+    const first = page.locator('.bk-chat-reply').nth(0);
+    await first.locator('.bk-chat-problem').filter({ hasText: '余额不足' }).waitFor();
+    assert.equal(await first.locator('.bk-chat-problem button').count(), 1);
+    await page.evaluate(() => (window.bakeTest.hold = true));
+    await ask(page, '第二问');
+    const second = page.locator('.bk-chat-reply').nth(1);
+    await second.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
+    assert.equal(await first.locator('.bk-chat-problem button').count(), 0);
+    await page.locator('.bk-chat-send[data-action="stop"]').click();
+    await page.locator('.bk-chat-reply[data-done]').nth(1).waitFor();
+    assert.equal(await first.locator('.bk-chat-problem').count(), 1);
+    assert.equal(await first.locator('.bk-chat-problem button').count(), 0);
+    assert.equal(await second.locator('.bk-chat-answer').textContent(), '前半句');
+    await page.evaluate(() => (window.bakeTest.hold = false));
+    api.answers.push({ body: text('第三答。') });
+    await ask(page, '第三问');
+    await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '第三答。' }).waitFor();
+    assert.equal(await page.locator('.bk-chat-reply').count(), 3);
+    assert.deepEqual(
+      api.requests.at(-1).body.messages.slice(1).map(({ role, content }) => [role, content]),
+      [
+        ['user', '第二问'],
+        ['assistant', '前半句'],
+        ['user', '第三问'],
+      ],
+    );
+  });
+
   await t.test('changing the key replaces the stored key and asks the browser to forget the old passkey', async (t) => {
     const { page } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
