@@ -79,8 +79,9 @@ test('internal links, preview cards and embeds', async (t) => {
   const browser = await chromium.launch();
   t.after(() => browser.close());
 
-  const desktop = async () => {
+  const desktop = async ({ clock = false } = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    if (clock) await page.clock.install();
     await page.goto(url);
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => scrollTo(0, document.getElementById('links').getBoundingClientRect().top + scrollY - 100));
@@ -119,7 +120,7 @@ test('internal links, preview cards and embeds', async (t) => {
     await page.close();
   });
 
-  await t.test('the card switches to another link at once, stays while the pointer is in it and hides 200 ms after the pointer leaves', async () => {
+  await t.test('the card switches to another link at once and hides 200 ms after the pointer leaves', async () => {
     const page = await desktop();
     await page.hover('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
     await page.waitForFunction(isOn);
@@ -133,8 +134,6 @@ test('internal links, preview cards and embeds', async (t) => {
     assert.ok(switched < 300, `the card switched ${switched} ms after the pointer reached the second link`);
     const box = await page.locator('.bk-preview').boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
-    await page.waitForTimeout(400);
-    assert.equal(await page.evaluate(isOn), true, 'the card hides while the pointer is in it');
     await page.mouse.move(5, 450);
     await page.waitForFunction(() => !document.querySelector('.bk-preview').classList.contains('is-on'));
     const hidden = await page.evaluate(() => {
@@ -142,9 +141,23 @@ test('internal links, preview cards and embeds', async (t) => {
       return cardLog.findLast((entry) => !entry.on).time - left.time;
     });
     assert.ok(hidden >= 190, `the card hid ${hidden} ms after the pointer left it`);
+    await page.close();
+  });
+
+  await t.test('the card stays while the pointer is in it, and an external link shows no card', async () => {
+    const page = await desktop({ clock: true });
+    await page.hover('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
+    await page.clock.runFor(400);
+    await page.waitForFunction(isOn);
+    const box = await page.locator('.bk-preview').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await page.clock.runFor(1000);
+    assert.equal(await page.evaluate(isOn), true, 'the card hides while the pointer is in it');
+    await page.mouse.move(5, 450);
+    await page.clock.runFor(1000);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-preview')).visibility === 'hidden');
     await page.hover('a[href="https://example.com/"]');
-    await page.waitForTimeout(800);
+    await page.clock.runFor(1000);
     assert.equal(await page.evaluate(isOn), false, 'an external link shows a card');
     await page.close();
   });
@@ -153,8 +166,10 @@ test('internal links, preview cards and embeds', async (t) => {
     const page = await desktop();
     const entries = [];
     for (const selector of ['.bk-block[data-type="paragraph"] a.citation', '.embed a.citation']) {
-      await page.locator(selector).evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await page.waitForTimeout(100);
+      await page.locator(selector).evaluate(async (element) => {
+        element.scrollIntoView({ block: 'center' });
+        for (let frame = 0; frame < 2; frame += 1) await new Promise((done) => requestAnimationFrame(done));
+      });
       await page.hover(selector);
       await page.waitForFunction(isOn);
       entries.push(await page.locator('.bk-preview').textContent());
@@ -190,13 +205,14 @@ test('internal links, preview cards and embeds', async (t) => {
 
   await t.test('on a phone there is no card and a tap opens the target under the site sub-path', async () => {
     const page = await browser.newPage({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
+    await page.clock.install();
     await page.goto(url);
     await page.locator('a.internal-link[data-target="/2026-10/target/#local-grad"]').tap();
     await page.waitForURL(`${base}/dist/2026-10/target/#local-grad`);
     assert.equal(await page.evaluate(() => document.querySelector('#local-grad').textContent), 'Each layer multiplies the gradient by its local derivative.');
     await page.goBack();
     await page.locator('a.internal-link[data-target="/2026-10/target/#chain-rule"]').hover();
-    await page.waitForTimeout(600);
+    await page.clock.runFor(1000);
     assert.equal(await page.evaluate(isOn), false);
     await page.close();
   });
