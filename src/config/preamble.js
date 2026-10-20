@@ -4,7 +4,7 @@ import { errorAt } from '../report.js';
 
 export const PREAMBLE_FILE = 'preamble.sty';
 
-export const MATH_PACKAGES = Object.freeze(['amsmath', 'amssymb', 'amsfonts', 'mathtools', 'braket', 'cancel', 'cases', 'color', 'xcolor', 'gensymb', 'upgreek']);
+const MATH_PACKAGES = Object.freeze(['amsmath', 'amssymb', 'amsfonts', 'mathtools', 'braket', 'cancel', 'cases', 'color', 'xcolor', 'gensymb', 'upgreek']);
 
 const GRAMMARS = {
   newcommand: ['star', 'name', 'optional', 'optional', 'group'],

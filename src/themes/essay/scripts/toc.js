@@ -2,6 +2,7 @@ import { labelsFor } from '../labels.js';
 import { drawerView } from './drawer.js';
 import { followLink } from './heading-links.jsx';
 import { CONTENT_EVENT, LAYOUT_EVENT, oncePerFrame } from './motion.js';
+import { leftColumnScreen, notesColumnScreen } from './screens.js';
 import { SETTING_EVENT } from './settings.jsx';
 import { readOutline } from './toc-card.js';
 import { dotsView } from './toc-dots.js';
@@ -9,8 +10,6 @@ import { notesColumn, notesRailView } from './toc-notes.js';
 import { tabsView } from './toc-tabs.js';
 import { ticksView } from './toc-ticks.js';
 
-const wideScreen = matchMedia('(min-width: 1340px)');
-const mediumScreen = matchMedia('(min-width: 1000px)');
 const READING_LINE = 0.25;
 const READING_LINE_MAX = 200;
 const DONE_SHARE = 0.85;
@@ -26,20 +25,21 @@ export function startToc(article) {
   let jumping = false;
   let state = null;
   let kind = null;
+  let mountedStyle = null;
   let view = null;
   let crossing = [];
 
-  const ctx = {
+  const context = {
     outline: readOutline(nav),
     labels: labelsFor(root.lang),
     host,
     article,
     jumping: () => jumping,
     state: () => state,
-    go(id) {
+    go(hash) {
       jumping = true;
       view.jumped?.();
-      followLink(`#${encodeURIComponent(id)}`).then(() =>
+      followLink(hash).then(() =>
         requestAnimationFrame(() => {
           jumping = false;
           update();
@@ -47,7 +47,7 @@ export function startToc(article) {
       );
     },
   };
-  let column = notesColumn(nav, ctx);
+  let column = notesColumn(nav, context);
   const notesView = () => ({
     columns: [nav.querySelector('.bk-toc-column')],
     update: (next) => column.update(next),
@@ -56,10 +56,13 @@ export function startToc(article) {
   });
 
   const update = oncePerFrame(() => {
-    state = readingState(ctx.outline, article);
+    state = readingState(context.outline, article);
     view.update(state);
     const yielding = crossing.some(isOnScreen);
-    for (const element of view.columns ?? []) element.classList.toggle('is-yielding', yielding);
+    for (const element of view.columns ?? []) {
+      element.classList.toggle('is-yielding', yielding);
+      element.inert = yielding;
+    }
   });
   const layout = oncePerFrame(() => {
     view.relayout?.();
@@ -68,13 +71,17 @@ export function startToc(article) {
   });
   const mount = (again = false) => {
     const style = root.dataset.toc;
-    const next = !mediumScreen.matches ? 'drawer' : style === 'notes' ? (wideScreen.matches ? 'notes' : 'rail') : style;
-    if (next === kind && !again) return;
+    const next = !notesColumnScreen.matches ? 'drawer' : style === 'notes' ? (leftColumnScreen.matches ? 'notes' : 'rail') : style;
+    if (next === kind && style === mountedStyle && !again) return;
     view?.destroy();
-    for (const element of document.querySelectorAll('.is-yielding')) element.classList.remove('is-yielding');
+    for (const element of document.querySelectorAll('.is-yielding')) {
+      element.classList.remove('is-yielding');
+      element.inert = false;
+    }
     kind = next;
-    view = kind === 'notes' ? notesView() : VIEWS[kind](ctx);
-    state = readingState(ctx.outline, article);
+    mountedStyle = style;
+    view = kind === 'notes' ? notesView() : VIEWS[kind](context);
+    state = readingState(context.outline, article);
     view.update(state);
     if (kind === 'notes') column.show();
     layout();
@@ -85,7 +92,7 @@ export function startToc(article) {
     const link = event.target.closest('a[href^="#"]');
     if (link === null) return;
     event.preventDefault();
-    ctx.go(decodeURIComponent(link.getAttribute('href').slice(1)));
+    context.go(link.getAttribute('href'));
   };
   nav.addEventListener('click', onClick);
   host.addEventListener('click', onClick);
@@ -94,8 +101,8 @@ export function startToc(article) {
     nav.classList.remove('is-ready');
     const saved = view.saved?.() ?? null;
     column.destroy();
-    ctx.outline = readOutline(nav);
-    column = notesColumn(nav, ctx);
+    context.outline = readOutline(nav);
+    column = notesColumn(nav, context);
     mount(true);
     if (saved !== null) view.restore(saved);
     settle();
@@ -108,8 +115,8 @@ export function startToc(article) {
   document.fonts.addEventListener('loadingdone', layout);
   document.addEventListener(CONTENT_EVENT, reread);
   new ResizeObserver(layout).observe(article);
-  wideScreen.addEventListener('change', () => mount());
-  mediumScreen.addEventListener('change', () => mount());
+  leftColumnScreen.addEventListener('change', () => mount());
+  notesColumnScreen.addEventListener('change', () => mount());
   document.addEventListener(SETTING_EVENT, (event) => {
     if (event.detail.name === 'toc') mount();
   });

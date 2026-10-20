@@ -18,24 +18,14 @@ export function createPreview(root) {
     if (paths !== null) changedPaths.push(...paths);
     const result = await updateSite(site, paths);
     problems = result.errors;
-    const articleFiles = new Set(result.articles.map((article) => article.file));
-    if (result.errors.some((error) => !articleFiles.has(error.file))) return { problems, applied: false };
-    const failed = new Set(result.errors.map((error) => error.file));
-    const published = new Map(result.pages.map((page) => [page.article.file, page]));
-    const next = new Map();
-    for (const article of result.articles) {
-      if (failed.has(article.file)) {
-        if (pages.has(article.file)) next.set(article.file, pages.get(article.file));
-      } else if (published.has(article.file)) {
-        next.set(article.file, servedPage(published.get(article.file), site.settings.components));
-      }
-    }
+    if (!result.articleErrorsOnly) return { problems, applied: false };
+    const next = new Map(result.pages.map((page) => [page.article.file, servedPage(page, site.settings.components)]));
     const nextHome = servedHome(result.home);
     const changes = compare(pages, next, changedPaths.some((path) => !isArticleSource(path)));
     if (home?.html !== nextHome.html) changes.reload = changes.reload === 'all' ? 'all' : ['/', ...changes.reload];
     pages = next;
     home = nextHome;
-    articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.fields?.draft === true }));
+    articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.draft }));
     siteFiles = new Map(result.siteFiles.map((output) => [output.path, output]));
     publicFiles = new Map(result.publicFiles.map((output) => [output.path, output]));
     for (const output of result.assetFiles) assetFiles.set(output.path, output);
@@ -69,11 +59,11 @@ function isArticleSource(path) {
   return path.startsWith(`${POSTS_DIR}/`) && posix.basename(path) === 'index.md';
 }
 
-function servedPage({ article, outputs }, components) {
-  const index = outputs.find((output) => output.path === `${article.url.slice(1)}index.html`);
+function servedPage({ article, entry, outputs }, components) {
+  const index = outputs.find((output) => output.path === `${entry.path}index.html`);
   return {
     file: article.file,
-    url: article.url,
+    url: entry.url,
     fields: JSON.stringify(article.fields),
     html: index?.render?.() ?? null,
     outline: outlineOf(article.content),
@@ -108,7 +98,6 @@ function compare(before, after, reloadAll) {
   const refresh = [];
   for (const url of new Set([...old.keys(), ...next.keys()])) {
     const [a, b] = [old.get(url), next.get(url)];
-    if (a === b) continue;
     if (a === undefined || b === undefined || a.fields !== b.fields) reload.push(url);
     else if (a.html !== b.html || a.version !== b.version) refresh.push(url);
   }

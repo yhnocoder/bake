@@ -1,5 +1,8 @@
+import { elementOfFragment } from 'bake/fragments';
 import { createEffect, createSignal } from 'solid-js';
 import { render } from 'solid-js/web';
+import { CONTENT_EVENT } from './motion.js';
+import { hoverWithFinePointer, notesColumnScreen } from './screens.js';
 
 const SHOW_DELAY = 300;
 const HIDE_DELAY = 200;
@@ -9,8 +12,8 @@ const OFFSET = 8;
 
 export function startPreviewCard(article) {
   const kinds = [
-    { kind: 'reference', selector: 'a.citation', screen: matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1000px)'), read: readReference },
-    { kind: 'link', selector: 'a.internal-link[data-target]', screen: matchMedia('(hover: hover) and (pointer: fine)'), read: readTemplate },
+    { kind: 'reference', selector: 'a.citation', enabled: () => hoverWithFinePointer.matches && notesColumnScreen.matches, read: readReference },
+    { kind: 'link', selector: 'a.internal-link[data-target]', enabled: () => hoverWithFinePointer.matches, read: readTemplate },
   ];
   const [entry, setEntry] = createSignal(null);
   const [shown, setShown] = createSignal(false);
@@ -39,7 +42,7 @@ export function startPreviewCard(article) {
   const triggerOf = (target) => {
     for (const kind of kinds) {
       const link = target instanceof Element ? target.closest(kind.selector) : null;
-      if (link !== null && kind.screen.matches) return { link, kind };
+      if (link !== null && kind.enabled()) return { link, kind };
     }
     return null;
   };
@@ -66,7 +69,7 @@ export function startPreviewCard(article) {
   article.addEventListener('focusout', (event) => {
     if (triggerOf(event.target) !== null) hide();
   });
-  document.addEventListener('bake:content', () => {
+  document.addEventListener(CONTENT_EVENT, () => {
     clearTimeout(showTimer);
     close();
   });
@@ -91,7 +94,7 @@ export function startPreviewCard(article) {
 
 function readReference(link) {
   if (new URL(link.href).pathname !== location.pathname) return readTemplate(link);
-  const item = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+  const item = elementOfFragment(document, link.hash);
   if (item === null) return null;
   const number = document.createElement('span');
   number.className = 'bk-preview-number';

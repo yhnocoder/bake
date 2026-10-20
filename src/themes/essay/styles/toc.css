@@ -14,8 +14,7 @@
   font-family: var(--font-ui);
 }
 
-.bk-toc a,
-.bk-toc-ui a {
+:where(.bk-toc, .bk-toc-ui) a {
   color: inherit;
   text-decoration: none;
 }
@@ -126,11 +125,6 @@ html[data-script] .bk-toc-label-notes {
 .bk-toc-recap-text p:last-child,
 .bk-toc-card-recap p:last-child {
   margin: 0;
-}
-
-:is(.bk-toc-recap-text, .bk-toc-card-recap) .bk-block {
-  width: auto;
-  margin: 4px 0;
 }
 
 :is(.bk-toc-recap-text, .bk-toc-card-recap) mjx-container {
@@ -440,11 +434,10 @@ html[data-script] .bk-toc-chapters {
   transition:
     width 0.2s var(--ease-out),
     background-color 0.2s,
-    color 0.2s,
-    box-shadow 0.2s;
+    color 0.2s;
 }
 
-.bk-toc-ui .bk-tab.is-read {
+.bk-tab.is-read {
   color: var(--ink-2);
 }
 
@@ -454,18 +447,35 @@ html[data-script] .bk-toc-chapters {
   background: var(--tab-hover);
 }
 
-.bk-toc-ui .bk-tab.is-current {
+.bk-tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    var(--tab-shadow),
+    0 6px 14px -6px color-mix(in srgb, var(--tab-current) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.bk-tab.is-current {
   width: 40px;
   background: var(--tab-current);
   color: var(--tab-current-ink);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.12),
-    0 6px 14px -6px color-mix(in srgb, var(--tab-current) 70%, transparent);
+}
+
+.bk-tab.is-current::before {
+  opacity: 1;
 }
 
 .bk-tab.is-current:is(:hover, .is-hover) {
   width: 45px;
-  box-shadow: none;
+}
+
+.bk-tab.is-current:is(:hover, .is-hover)::before {
+  opacity: 0;
 }
 
 .bk-tab-title {
@@ -541,14 +551,11 @@ html[data-script] .bk-toc-chapters {
   line-height: 1;
   letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
   pointer-events: auto;
 }
 
-.bk-toc-ui .bk-index-tab {
-  color: var(--ink);
-}
-
-.bk-toc-ui .bk-index-tab.is-current {
+.bk-index-tab.is-current {
   color: var(--accent);
 }
 
@@ -888,23 +895,20 @@ html[data-script] .bk-toc-chapters {
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--card-shadow);
   transition:
     transform 0.25s var(--ease-out),
     opacity 0.2s,
     visibility 0.25s;
 }
 
-.bk-toc-ui .bk-toc-handle {
-  background: var(--surface);
-  color: var(--accent);
-  box-shadow: var(--card-shadow);
-}
-
-.bk-toc-ui .bk-toc-handle.is-tab {
+.bk-toc-handle.is-tab {
   background: var(--tab-current);
   color: var(--tab-current-ink);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.12),
+    var(--tab-shadow),
     0 8px 18px -8px color-mix(in srgb, var(--tab-current) 80%, transparent);
 }
 
@@ -993,7 +997,7 @@ html[data-script] .bk-toc-chapters {
   color: var(--ink-3);
 }
 
-.bk-toc-ui .bk-drawer-close {
+.bk-drawer-close {
   display: grid;
   place-items: center;
   width: 30px;
@@ -1027,7 +1031,7 @@ html[data-script] .bk-toc-chapters {
   padding: 4px 10px 40px 6px;
 }
 
-.bk-toc-ui .bk-drawer-tab {
+.bk-drawer-tab {
   position: relative;
   display: flex;
   align-items: center;
@@ -1043,7 +1047,7 @@ html[data-script] .bk-toc-chapters {
     color 0.15s;
 }
 
-.bk-toc-ui .bk-drawer-tab.is-read {
+.bk-drawer-tab.is-read {
   color: var(--ink-2);
 }
 
@@ -1058,12 +1062,12 @@ html[data-script] .bk-toc-chapters {
   background: var(--tab-current);
 }
 
-.bk-toc-ui .bk-drawer-tab.is-selected {
+.bk-drawer-tab.is-selected {
   background: var(--surface);
   color: var(--ink);
 }
 
-.bk-toc-ui .bk-drawer-dot {
+.bk-drawer-dot {
   display: flex;
   justify-content: center;
   width: 100%;
@@ -1071,11 +1075,23 @@ html[data-script] .bk-toc-chapters {
 }
 
 .bk-drawer-dot i {
+  position: relative;
   width: 8px;
   height: 8px;
   border-radius: 4px;
   background: var(--line-2);
-  transition: box-shadow 0.15s;
+}
+
+.bk-drawer-dot i::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 2.5px var(--surface),
+    0 0 0 4px var(--ink);
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
 .bk-drawer-dot.is-read i {
@@ -1089,10 +1105,8 @@ html[data-script] .bk-toc-chapters {
   background: var(--capsule-fill);
 }
 
-.bk-drawer-dot.is-selected i {
-  box-shadow:
-    0 0 0 2.5px var(--surface),
-    0 0 0 4px var(--ink);
+.bk-drawer-dot.is-selected i::before {
+  opacity: 1;
 }
 
 @media (max-width: 999.98px) {

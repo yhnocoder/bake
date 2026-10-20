@@ -21,6 +21,10 @@ describe('code', () => {
     assert.equal(await html('```py\nx = 1\n```\n\n```\n<b>&\n```\n'), '```py\nx = 1\n```\n```\n&#x3C;b>&#x26;\n```');
   });
 
+  test('accepts the plain text languages text, txt, plain and plaintext and keeps the language name', async () => {
+    assert.equal(await html('```text\na\n```\n\n```txt\nb\n```\n\n```plain\nc\n```\n\n```plaintext\nd\n```\n'), '```text\na\n```\n```txt\nb\n```\n```plain\nc\n```\n```plaintext\nd\n```');
+  });
+
   test('reports an unknown language', async () => {
     assert.deepEqual((await parse('```pyhton\nx\n```\n')).errors, ['index.md:7:1 unknown code language "pyhton"']);
   });

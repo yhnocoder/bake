@@ -363,7 +363,7 @@ async function writeSheet(sheet, path, panels) {
   await sheet.screenshot({ path, fullPage: true, clip: box });
 }
 
-export function countLine(results) {
+function countLine(results) {
   const pages = new Set(results.map((result) => result.page)).size;
   const counts = ['changed', 'new', 'removed', 'unchanged']
     .map((status) => [status, results.filter((result) => result.status === status).length])

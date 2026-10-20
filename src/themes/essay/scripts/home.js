@@ -1,12 +1,11 @@
 import { labelsFor } from '../labels.js';
 import { storageKey } from '../settings.js';
-import { oncePerFrame, reducedMotion } from './motion.js';
+import { EASING, oncePerFrame, reducedMotion } from './motion.js';
+import { withoutHover } from './screens.js';
 
 const LOAD_MARGIN = '300px 0px';
 const MIDDLE_BAND = '-45% 0px -45% 0px';
 const CURRENT_LINE = 0.15;
-const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
-const noHover = matchMedia('(hover: none)');
 
 export function startHome(home) {
   const root = document.documentElement;
@@ -30,7 +29,7 @@ export function startHome(home) {
 
   const band = new IntersectionObserver(
     (entries) => {
-      if (!noHover.matches) return;
+      if (!withoutHover.matches) return;
       for (const entry of entries) {
         if (entry.isIntersecting) previews.get(entry.target).play();
         else previews.get(entry.target).pause();
@@ -46,10 +45,10 @@ export function startHome(home) {
     band.observe(card);
     screen.observe(card);
     card.addEventListener('pointerenter', () => {
-      if (!noHover.matches) preview.play();
+      if (!withoutHover.matches) preview.play();
     });
     card.addEventListener('pointerleave', () => {
-      if (!noHover.matches) preview.pause();
+      if (!withoutHover.matches) preview.pause();
     });
     card.addEventListener('focus', () => preview.play());
     card.addEventListener('blur', () => preview.pause());
@@ -57,6 +56,7 @@ export function startHome(home) {
   reducedMotion.addEventListener('change', () => previews.forEach((preview) => preview.sync()));
 
   if (home.querySelector('.bk-chips[data-for="category"]') !== null) startCurrentChip(home);
+  startStuckBar(home);
 
   const switches = [...home.querySelectorAll('.bk-switch')];
   const showPressed = () => {
@@ -82,6 +82,13 @@ export function startHome(home) {
       moveCards(visibleCards(), () => filterMonths(home, chip.dataset.tag, labels, previews));
     });
   }
+}
+
+function startStuckBar(home) {
+  const bar = home.querySelector('.bk-home-bar');
+  if (bar === null) return;
+  const watch = new IntersectionObserver(([entry]) => bar.toggleAttribute('data-stuck', !entry.isIntersecting));
+  watch.observe(home.querySelector('.bk-home-header'));
 }
 
 function startCurrentChip(home) {
@@ -123,7 +130,9 @@ function startCurrentChip(home) {
 }
 
 function choose(name, value) {
+  const values = [...document.querySelectorAll(`.bk-switch[data-control="${name}"] button`)].map((button) => button.dataset.value);
   document.documentElement.dataset[name] = value;
+  document.documentElement.style.setProperty(`--${name}-index`, values.indexOf(value));
   try {
     localStorage.setItem(storageKey(name), value);
   } catch {}

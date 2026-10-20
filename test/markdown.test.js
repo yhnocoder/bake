@@ -190,6 +190,7 @@ describe('headings and anchors', () => {
     ['## A {width=full}', 'index.md:7:6 width must be body, wide or page, got "full"'],
     ['### A {width=wide}', 'index.md:7:7 width only applies to ## headings'],
     ['## A {toc}', 'index.md:7:6 toc must be a short title in quotes, for example toc="Short title"'],
+    ['## A {id}', 'index.md:7:6 id must be an anchor name, for example {#intro}'],
     ['## A {.red}', 'index.md:7:6 unknown attribute "class" on heading'],
     ['## A {toc="a" toc="b"}', 'index.md:7:6 attribute "toc" is written twice'],
     ['## A {toc="unclosed}', 'index.md:7:6 cannot read the attributes {toc="unclosed}; write them as {#id key=value key="text with spaces"}'],
@@ -279,6 +280,8 @@ describe('aside and fold', () => {
     [':::fold\nText.\n:::', 'index.md:9:1 :::fold is missing "title"'],
     [':::aside{color=red}\nText.\n:::', 'index.md:9:1 unknown attribute "color" on :::aside'],
     [':::recap{x=1}\nText.\n:::', 'index.md:9:1 unknown attribute "x" on :::recap'],
+    [':::aside{title}\nText.\n:::', 'index.md:9:1 title must be text in quotes, for example title="Notes"'],
+    [':::fold{title}\nText.\n:::', 'index.md:9:1 title must be text in quotes, for example title="Notes"'],
   ];
   for (const [source, message] of blockErrors) {
     test(`reports ${message.slice(message.indexOf(' ') + 1)}`, async () => {
@@ -345,14 +348,14 @@ describe('citations', () => {
     const article = await parsed(`See [@b], then [@a] and [@b].[^n]\n\n[^n]: Also [@c].\n\n${references}`);
     assert.equal(
       article.intro[0].html,
-      '<p>See <a class="citation" href="#reference-b">[1]</a>, then <a class="citation" href="#reference-a">[2]</a> and <a class="citation" href="#reference-b">[1]</a>.<sup class="sidenote-ref" data-sidenote="1"><a href="#sidenote-1">1</a></sup></p>',
+      '<p>See <a class="citation" href="#reference-b" data-key="b">[1]</a>, then <a class="citation" href="#reference-a" data-key="a">[2]</a> and <a class="citation" href="#reference-b" data-key="b">[1]</a>.<sup class="sidenote-ref" data-sidenote="1"><a href="#sidenote-1">1</a></sup></p>',
     );
     assert.deepEqual(article.references.map(({ number, key, id, html }) => [number, key, id, html]), [
       [1, 'b', 'reference-b', 'Author B. 2021.'],
       [2, 'a', 'reference-a', 'Author A. <em>Title A</em>. 2020.'],
       [3, 'c', 'reference-c', 'Author C. 2022.'],
     ]);
-    assert.equal(article.intro[1].html, '<ol class="references"><li id="reference-b" value="1">Author B. 2021.</li><li id="reference-a" value="2">Author A. <em>Title A</em>. 2020.</li><li id="reference-c" value="3">Author C. 2022.</li></ol>');
+    assert.equal(article.intro[1].html, '<ol class="references"><li id="reference-b" value="1" data-key="b">Author B. 2021.</li><li id="reference-a" value="2" data-key="a">Author A. <em>Title A</em>. 2020.</li><li id="reference-c" value="3" data-key="c">Author C. 2022.</li></ol>');
   });
 
   test('lists uncited entries after the cited ones without a number', async () => {
@@ -364,8 +367,14 @@ describe('citations', () => {
     ]);
     assert.equal(
       article.intro[1].html,
-      '<ol class="references"><li id="reference-b" value="1">Author B. 2021.</li></ol><ul class="references uncited"><li id="reference-a">Author A. <em>Title A</em>. 2020.</li><li id="reference-c">Author C. 2022.</li></ul>',
+      '<ol class="references"><li id="reference-b" value="1" data-key="b">Author B. 2021.</li></ol><ul class="references uncited"><li id="reference-a" data-key="a">Author A. <em>Title A</em>. 2020.</li><li id="reference-c" data-key="c">Author C. 2022.</li></ul>',
     );
+  });
+
+  test('percent-encodes the key in the address of a citation and writes it as written in data-key', async () => {
+    const article = await parsed('See [@a%zz] and [@b%41].\n\n:::references\n- [@a%zz] A.\n- [@b%41] B.\n:::\n');
+    assert.equal(article.intro[0].html, '<p>See <a class="citation" href="#reference-a%25zz" data-key="a%zz">[1]</a> and <a class="citation" href="#reference-b%2541" data-key="b%41">[2]</a>.</p>');
+    assert.equal(article.intro[1].html, '<ol class="references"><li id="reference-a%zz" value="1" data-key="a%zz">A.</li><li id="reference-b%41" value="2" data-key="b%41">B.</li></ol>');
   });
 
   test('reports citations missing from :::references and malformed reference lists', async () => {
@@ -432,5 +441,10 @@ describe('word count', () => {
   test('counts every Chinese character and every other word of the text and inline code, but not code blocks or math', async () => {
     const article = await parsed('激活函数 GELU 的近似[^n]，用 `tanh` 计算 $x^2$。\n\n```python\nprint(1)\n```\n\n## 二 Two words\n\n[^n]: 旁注不计入。\n');
     assert.equal(article.words, 15);
+  });
+
+  test('counts every character of the Han script as one word', async () => {
+    const article = await parsed('𠀀𠀁〇 word\n');
+    assert.equal(article.words, 4);
   });
 });

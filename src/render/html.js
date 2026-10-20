@@ -1,11 +1,11 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
 import { addressHref, encodePath } from '../build/urls.js';
+import { fragmentOf, idOfFragment, referenceId, sidenoteId } from '../fragments.js';
 import { highlightCode } from './code.js';
-import { equationHref, relocateMath } from './math.js';
+import { relocateMath } from './math.js';
 
 const ATTRIBUTION_PREFIX = '— ';
-const ID_ATTRIBUTE = /\sid\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const RELATIVE_URL = /^(?![A-Za-z][A-Za-z0-9+.-]*:|\/|\?)/;
 
 export function resultWidths(example) {
@@ -52,10 +52,11 @@ function handlers(context) {
       if (excerpt === undefined) return defaultHandlers.paragraph(state, node);
       return element('p', {}, state.all(node));
     },
-    html: (state, node) => raw(excerpt === undefined ? node.value : node.value.replace(ID_ATTRIBUTE, '')),
+    html: (state, node) => raw(excerpt === undefined ? node.value : node.rawHtml.withoutIds),
     link(state, node) {
       const result = defaultHandlers.link(state, node);
-      const target = node.target ?? (excerpt !== undefined && node.url.startsWith('#') ? excerpt.target(decodeAnchor(node.url.slice(1))) : undefined);
+      const anchor = excerpt !== undefined && node.url.startsWith('#') ? idOfFragment(node.url) : null;
+      const target = node.target ?? (anchor === null ? undefined : excerpt.target(anchor));
       if (target !== undefined) {
         const { address, page } = target;
         result.properties = { className: ['internal-link'], ...result.properties, href: addressHref(context.root, address.path, address.anchor, address.query) };
@@ -71,21 +72,22 @@ function handlers(context) {
     footnoteReference(state, node) {
       if (excerpt !== undefined) return undefined;
       const number = context.sidenoteNumber(node.identifier);
-      const link = element('a', { href: `#sidenote-${number}` }, [text(String(number))]);
+      const link = element('a', { href: fragmentOf(sidenoteId(number)) }, [text(String(number))]);
       return element('sup', { className: ['sidenote-ref'], dataSidenote: number }, [link]);
     },
     missingFootnote: (state, node) => text(`[^${node.label}]`),
     citation(state, node) {
       const number = context.citationNumber(node.key);
       if (number === undefined) return text(`[@${node.key}]`);
-      const target = excerpt?.target(`reference-${node.key}`);
+      const id = referenceId(node.key);
+      const target = excerpt?.target(id);
       const properties = target === undefined ? {} : { dataTarget: target.address.text };
-      return element('a', { className: ['citation'], href: relocate(`#reference-${node.key}`), ...properties }, [text(`[${number}]`)]);
+      return element('a', { className: ['citation'], href: relocate(fragmentOf(id)), dataKey: node.key, ...properties }, [text(`[${number}]`)]);
     },
     eqref(state, node) {
       const equation = context.equation(node.label);
       if (equation === undefined) return text(node.value);
-      return element('a', { className: ['eqref'], href: relocate(equationHref(equation.id)) }, [text(`(${equation.tag})`)]);
+      return element('a', { className: ['eqref'], href: relocate(fragmentOf(equation.id)) }, [text(`(${equation.tag})`)]);
     },
     inlineMath: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
     math: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
@@ -129,8 +131,8 @@ function blockElement(state, node, context) {
     case 'recap':
       return element('div', { className: ['recap'] }, children());
     case 'references': {
-      const id = (entry) => (context.excerpt === undefined ? { id: `reference-${entry.key}` } : {});
-      const item = (entry) => element('li', { ...id(entry), value: entry.number }, state.all({ type: 'paragraph', children: entry.children }));
+      const id = (entry) => (context.excerpt === undefined ? { id: referenceId(entry.key) } : {});
+      const item = (entry) => element('li', { ...id(entry), value: entry.number, dataKey: entry.key }, state.all({ type: 'paragraph', children: entry.children }));
       const cited = context.references().filter((entry) => entry.number !== undefined);
       const uncited = context.references().filter((entry) => entry.number === undefined);
       return [
@@ -234,12 +236,4 @@ function text(value) {
 
 function raw(value) {
   return { type: 'raw', value };
-}
-
-function decodeAnchor(anchor) {
-  try {
-    return decodeURIComponent(anchor);
-  } catch {
-    return anchor;
-  }
 }

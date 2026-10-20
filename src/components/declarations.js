@@ -1,5 +1,4 @@
-import { posix } from 'node:path';
-import { WIDTHS, parseSize } from '../config/rules.js';
+import { WIDTHS, folderFile, parseSize } from '../config/rules.js';
 import { describeValue, listChoices } from '../report.js';
 
 export const PARAM_TYPES = Object.freeze(['number', 'text', 'boolean', 'enum', 'file']);
@@ -97,7 +96,7 @@ export function resolveComponent(name, component, attributes, files) {
     else params[attribute] = value;
   }
   for (const [param, declaration] of Object.entries(component.params)) {
-    if (declaration.type !== 'file' || params[param] === '' || isFolderFile(params[param], files)) continue;
+    if (declaration.type !== 'file' || params[param] === '' || folderFile(params[param], files) !== null) continue;
     if (Object.hasOwn(attributes, param)) report(param, `parameter "${param}" of ${name} must be a file in the article folder, got ${describeValue(params[param])}`);
     else report(undefined, `parameter "${param}" of ${name} defaults to ${describeValue(params[param])}, which is not a file in the article folder`);
   }
@@ -190,11 +189,6 @@ export function valueProblem(declaration, value) {
     default:
       return typeof value === 'string' ? null : `must be text, got ${describeValue(value)}`;
   }
-}
-
-export function isFolderFile(value, files) {
-  if (value.startsWith('/') || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value)) return false;
-  return files.includes(posix.normalize(value));
 }
 
 function listAll(items) {

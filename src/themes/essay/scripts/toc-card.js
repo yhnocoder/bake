@@ -1,9 +1,11 @@
+import { fragmentOf } from 'bake/fragments';
+
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';
 const HIDE_DELAY = 200;
 const WARM_TIME = 400;
 
-export function el(tag, className, text) {
+export function createElement(tag, className, text) {
   const element = document.createElement(tag);
   if (className) element.className = className;
   if (text !== undefined) element.textContent = text;
@@ -11,8 +13,8 @@ export function el(tag, className, text) {
 }
 
 export function tocLink(id, className) {
-  const link = el('a', className);
-  link.href = `#${encodeURIComponent(id)}`;
+  const link = createElement('a', className);
+  link.href = fragmentOf(id);
   return link;
 }
 
@@ -47,14 +49,14 @@ export function readOutline(nav) {
   return { chapters, entries };
 }
 
-export function chapterCard(ctx, chapterIndex, state) {
-  const chapter = ctx.outline.chapters[chapterIndex];
+export function chapterCard(context, chapterIndex, state) {
+  const chapter = context.outline.chapters[chapterIndex];
   const current = chapterIndex === state.chapter;
-  const card = el('div', 'bk-toc-card');
+  const card = createElement('div', 'bk-toc-card');
   const head = tocLink(chapter.id, 'bk-toc-card-head');
   head.dataset.index = chapter.index;
-  const number = el('span', current ? 'bk-toc-card-number is-current' : 'bk-toc-card-number', current ? `${chapter.number} · ${ctx.labels.reading}` : chapter.number);
-  const title = el('span', 'bk-toc-card-title');
+  const number = createElement('span', current ? 'bk-toc-card-number is-current' : 'bk-toc-card-number', current ? `${chapter.number} · ${context.labels.reading}` : chapter.number);
+  const title = createElement('span', 'bk-toc-card-title');
   title.append(fullTitle(chapter));
   head.append(number, title);
   card.append(head);
@@ -64,13 +66,13 @@ export function chapterCard(ctx, chapterIndex, state) {
     if (lead !== null) card.append(summary('p', 'bk-toc-card-lead bk-toc-card-chapter-lead', lead));
   }
   if (chapter.sections.length > 0) {
-    const list = el('div', 'bk-toc-card-sections');
+    const list = createElement('div', 'bk-toc-card-sections');
     for (const section of chapter.sections) {
       const row = tocLink(section.id, 'bk-toc-card-section');
       row.dataset.index = section.index;
       row.classList.toggle('is-read', state.read[section.index]);
       row.classList.toggle('is-current', state.entry === section.index);
-      row.append(el('span', 'bk-toc-card-section-title', section.title));
+      row.append(createElement('span', 'bk-toc-card-section-title', section.title));
       if (section.recap !== undefined) row.append(summary('span', 'bk-toc-card-recap', section.recap));
       else {
         const lead = leadOf(section.heading);
@@ -179,7 +181,7 @@ export function clamp(value, low, high) {
 }
 
 function summary(tag, className, html) {
-  const element = el(tag, className);
+  const element = createElement(tag, className);
   element.append(cleaned(html));
   return element;
 }

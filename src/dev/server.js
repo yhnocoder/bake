@@ -6,8 +6,9 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { contentType } from '../build/content-types.js';
+import { escapeMarkup } from '../build/escape.js';
 import { describeValue, errorCount, formatError } from '../report.js';
-import { escapeHtml, missingPage } from './missing.js';
+import { missingPage } from './missing.js';
 import { rewriteSource, sourceVersion } from './params.js';
 import { createPreview } from './preview.js';
 import { watchBlog } from './watch.js';
@@ -291,7 +292,7 @@ function isPlainObject(value) {
 
 function injectClient(html, data) {
   const attributes = Object.entries(data)
-    .map(([name, value]) => (value === true ? ` data-${name}` : ` data-${name}="${escapeHtml(value)}"`))
+    .map(([name, value]) => (value === true ? ` data-${name}` : ` data-${name}="${escapeMarkup(value)}"`))
     .join('');
   const script = `<script src="${DEV_PREFIX}client.js" data-bake-dev${attributes}></script>`;
   const end = html.lastIndexOf('</body>');
@@ -309,7 +310,13 @@ function sendHtml(response, status, html) {
 }
 
 function problemsData(problems) {
-  return problems.map((problem) => ({ position: `${problem.file}:${problem.line}:${problem.column}`, text: formatError(problem) }));
+  return problems.map((problem) => ({
+    file: problem.file,
+    location: `${problem.line}:${problem.column}`,
+    message: problem.message,
+    position: `${problem.file}:${problem.line}:${problem.column}`,
+    text: formatError(problem),
+  }));
 }
 
 function send(response, event, data) {

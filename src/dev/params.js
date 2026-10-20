@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { convertAttribute, isFolderFile, valueProblem } from '../components/declarations.js';
+import { folderFile } from '../config/rules.js';
+import { convertAttribute, valueProblem } from '../components/declarations.js';
 import { BARE_VALUE, attributeTokens } from '../markdown/attributes.js';
 import { describeValue } from '../report.js';
 
@@ -55,7 +56,7 @@ function paramEdit(name, param, declaration, value, token, files) {
 }
 
 function fileProblem(declaration, value, files) {
-  if (declaration.type !== 'file' || value === '' || isFolderFile(value, files)) return null;
+  if (declaration.type !== 'file' || value === '' || folderFile(value, files) !== null) return null;
   return `must be a file in the article folder, got ${describeValue(value)}`;
 }
 

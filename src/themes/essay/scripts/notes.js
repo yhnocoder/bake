@@ -1,9 +1,15 @@
 import { labelsFor } from '../labels.js';
-import { CONTENT_EVENT, LAYOUT_EVENT, expand, flash, oncePerFrame, reducedMotion, stopAnimations } from './motion.js';
+import { CONTENT_EVENT, EASING, LAYOUT_EVENT, flash, oncePerFrame, reducedMotion } from './motion.js';
+import { notesColumnScreen } from './screens.js';
 
-const wideScreen = matchMedia('(min-width: 1000px)');
 const NOTE_GAP = 12;
-const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, summary, .bk-block';
+const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, .bk-block';
+const OPEN_DURATION = 200;
+const CLOSE_DURATION = 140;
+const SHOWN = { opacity: 1, transform: 'none' };
+const HIDDEN = { opacity: 0, transform: 'translateY(-4px)' };
+const running = new WeakMap();
+const closing = new WeakSet();
 
 export function startNotes(article) {
   const labels = labelsFor(document.documentElement.lang);
@@ -44,7 +50,7 @@ export function startNotes(article) {
   });
   document.fonts.ready.then(layout);
   document.fonts.addEventListener('loadingdone', layout);
-  wideScreen.addEventListener('change', layout);
+  notesColumnScreen.addEventListener('change', layout);
 
   const activate = (number) => {
     if (number === active) return;
@@ -65,7 +71,7 @@ export function startNotes(article) {
     if (link === null || event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
     const number = link.parentElement.dataset.sidenote;
-    if (wideScreen.matches) {
+    if (notesColumnScreen.matches) {
       const note = layer?.querySelector(`.bk-sidenote[data-sidenote="${number}"]`) ?? null;
       if (note !== null) flash(note);
       return;
@@ -76,7 +82,7 @@ export function startNotes(article) {
 }
 
 function placeNotes(article, layer, placed) {
-  if (!wideScreen.matches) return;
+  if (!notesColumnScreen.matches) return;
   const column = layer.getBoundingClientRect();
   const blocked = obstacles(article, layer, column);
   let floor = -Infinity;
@@ -152,21 +158,29 @@ function highlight(article, layer, number, on) {
 }
 
 function toggleInline(article, note) {
-  const opening = !note.classList.contains('is-open');
+  const opening = !note.classList.contains('is-open') || closing.has(note);
   for (const ref of article.querySelectorAll(`.sidenote-ref[data-sidenote="${note.dataset.sidenote}"] a`)) ref.setAttribute('aria-expanded', String(opening));
-  stopAnimations(note);
+  const from = note.classList.contains('is-open') ? { opacity: Number(getComputedStyle(note).opacity), transform: getComputedStyle(note).transform } : HIDDEN;
+  running.get(note)?.cancel();
+  closing.delete(note);
   if (opening) {
     note.classList.add('is-open');
-    if (!reducedMotion.matches) expand(note, true).then((done) => done && stopAnimations(note));
+    if (!reducedMotion.matches) running.set(note, note.animate([from, SHOWN], { duration: OPEN_DURATION, easing: EASING }));
     return;
   }
   if (reducedMotion.matches) {
     note.classList.remove('is-open');
     return;
   }
-  expand(note, false, { duration: 160 }).then((done) => {
-    if (!done) return;
-    note.classList.remove('is-open');
-    stopAnimations(note);
-  });
+  closing.add(note);
+  const animation = note.animate([from, HIDDEN], { duration: CLOSE_DURATION, easing: EASING, fill: 'forwards' });
+  running.set(note, animation);
+  animation.finished.then(
+    () => {
+      closing.delete(note);
+      note.classList.remove('is-open');
+      animation.cancel();
+    },
+    () => {},
+  );
 }

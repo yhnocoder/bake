@@ -223,10 +223,50 @@ test('copying from an article gives the Markdown source of the selection', async
     await page.emulateMedia({ colorScheme: 'light' });
   });
 
+  await t.test('starting the copy module on a page without the source script is an error', async () => {
+    const stripped = await context.newPage();
+    const errors = [];
+    stripped.on('pageerror', (error) => errors.push(error.message));
+    await stripped.route(`${base}/2026-10/syntax/`, async (route) => {
+      const response = await route.fetch();
+      const html = await response.text();
+      const withoutSource = html.replace(/<script type="application\/json" class="bk-source"[^>]*>[\s\S]*?<\/script>/, '');
+      assert.notEqual(withoutSource, html);
+      await route.fulfill({ response, body: withoutSource });
+    });
+    await stripped.goto(`${base}/2026-10/syntax/`, { waitUntil: 'load' });
+    assert.deepEqual(errors, ['bake/copy needs the source of the article in script.bk-source']);
+    await stripped.close();
+  });
+
   await context.close();
 });
 
-test('a partly selected paragraph escapes the text that Markdown would read as syntax, so the copy renders the same text', async (t) => {
+test('a converted citation, reference entry and internal link keep a key or an anchor with a percent sign as written', async (t) => {
+  const body = '## Keys {#a%zz}\n\nGates help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/rope/#a%25zz) too.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n';
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/rope/index.md': article({ body }),
+    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: ':::embed\n/2026-10/rope/#a%25zz\n:::\n' }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/rope/`);
+  const paragraph = '.bk-article p';
+  await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' too', after: true });
+  assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/rope/#a%25zz) too');
+  await page.goto(`${base}/2026-10/host/`);
+  await select(page, { selector: '.embed li', contains: 'First', text: 'irst' }, { selector: '.embed li', contains: 'Second', text: 'Sec', after: true });
+  assert.equal((await copied(page)).text, ':::references\n- [@a%zz] irst.\n- [@b%20c] Sec\n:::');
+  await context.close();
+});
+
+test('a partly selected paragraph escapes the text that Markdown would read as syntax and keeps every other character, including U+FDD0, so the copy renders the same text', async (t) => {
   const paragraphs = [
     ['Start: a \\*literal\\* star, snake_case\\_name, a \\_literal\\_ underscore, \\`ticks\\` and C:\\\\path.', 'a *literal*', 'path'],
     ['Money: \\$5 or \\$6, a \\==mark\\== and \\~~strike\\~~ here.', '$5', 'here'],
@@ -236,6 +276,10 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
     ['\\- Not a list either', '- Not', 'list'],
     ['\\> Not a quote at all', '> Not', 'quote'],
     ['中文，标点：“引号”（括号）！还有 snake_case 和 a * b。', '标点', 'b'],
+    ['Noncharacter: a\uFDD0b and \uFDD0\uFDD0 here.', 'a\uFDD0b', 'here'],
+    ['\uFDD0# Not a heading after a noncharacter', '\uFDD0#', 'heading'],
+    ['\\# Heading-like text with \uFDD0 inside', '# Heading-like', 'inside'],
+    ['12\\. List-like text with \uFDD0 inside', '12. List-like', 'inside'],
   ];
   const dir = createBlog(t, {
     'bake.config.js': validConfig,

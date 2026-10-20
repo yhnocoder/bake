@@ -98,8 +98,21 @@ describe('internal links', () => {
     ]);
   });
 
+  test('reports a link or an embed address whose anchor has an invalid percent-encoding at the link', async () => {
+    const { errors } = await site('[x](/2026-10/nothere/#%ZZ) and [y](#%ZZ)\n\n:::embed\n/2026-10/target/#%E9\n:::\n');
+    assert.deepEqual(errors, [
+      'host.md:7:1 link target /2026-10/nothere/#%ZZ has an invalid percent-encoding; write a literal % as %25',
+      'host.md:7:32 link target #%ZZ has an invalid percent-encoding; write a literal % as %25',
+      'host.md:10:1 :::embed address /2026-10/target/#%E9 has an invalid percent-encoding; write a literal % as %25',
+    ]);
+  });
+
   test('accepts same-page links to headings, paragraph anchors, sidenotes, references and equations', async () => {
     await host('## A {#a}\n\nText[^n] [@k]. ^para\n\n$$\nx \\label{eq:x}\n$$\n\n[1](#a) [2](#para) [3](#sidenote-1) [4](#reference-k) [5](#eq:x) [6](#)\n\n[^n]: Note.\n\n:::references\n- [@k] K.\n:::\n');
+  });
+
+  test('accepts same-page links to ids in raw HTML written without quotes, with spaces around = or in capitals', async () => {
+    await host('<div id=box>a</div>\n\n<p ID="upper">b</p>\n\n<p id = "spaced">c</p>\n\nText with [x](#box) [y](#upper) [z](#spaced).\n');
   });
 
   test('checks addresses without the trailing slash, with index.html or with a query and gives the article address', async () => {
@@ -166,7 +179,7 @@ describe('preview content', () => {
     const [section, paragraph, start, inside] = article.previews.map((preview) => outline(preview.html));
     assert.equal(
       section,
-      '<p>Let $y = f(u)$ and $u = g(x)$, then</p>\n$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$\n<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
+      '<p>Let $y = f(u)$ and $u = g(x)$, then</p>\n$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$\n<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-key="griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
     );
     assert.equal(paragraph, section.slice(section.lastIndexOf('<p>')));
     assert.equal(start, '<p>Intro paragraph.</p>');
@@ -210,7 +223,7 @@ describe(':::embed', () => {
         '<div class="embed"><div class="embed-part"><h2 data-attributes="{&#x22;id&#x22;:&#x22;chain-rule&#x22;}">Chain rule</h2>',
         '<p>Let $y = f(u)$ and $u = g(x)$, then</p>',
         '$$\\frac{\\partial y}{\\partial x} = \\frac{\\partial y}{\\partial u} \\frac{\\partial u}{\\partial x} \\label{eq:chain}$$',
-        '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
+        '<p>Equation <a class="eqref" href="../../2026-10/target/#eq%3Achain">(1)</a> uses the local gradient <a class="citation" href="../../2026-10/target/#reference-griewank" data-key="griewank" data-target="/2026-10/target/#reference-griewank">[1]</a>, see <a class="internal-link" href="../../2026-10/target/#order" data-target="/2026-10/target/#order">the order</a>.</p>',
         '<p>A fourth block.</p>',
         '<h3 data-attributes="{&#x22;id&#x22;:&#x22;inside&#x22;}">Inside</h3>',
         '<p>Text inside.</p><p class="embed-source"><a href="../../2026-10/target/#chain-rule"><cite>Target</cite><span class="embed-number">1</span></a></p></div><div class="embed-part"><p>Intro paragraph.</p><p class="embed-source"><a href="../../2026-10/target/#opening"><cite>Target</cite></a></p></div></div>',
@@ -278,11 +291,24 @@ describe(':::embed', () => {
     const all = ids(html);
     assert.deepEqual(all.filter((id, index) => all.indexOf(id) !== index), []);
     assert.deepEqual(all.sort(), ['marker', 'reference-k']);
-    assert.match(article.intro[1].html, /<a class="citation" href="\.\.\/\.\.\/2026-10\/cited\/#reference-k" data-target="\/2026-10\/cited\/#reference-k">\[1\]<\/a>/);
+    assert.match(article.intro[1].html, /<a class="citation" href="\.\.\/\.\.\/2026-10\/cited\/#reference-k" data-key="k" data-target="\/2026-10\/cited\/#reference-k">\[1\]<\/a>/);
     assert.deepEqual(
       article.previews.map(({ target, kind, number, html: text }) => ({ target, kind, number, text })),
       [{ target: '/2026-10/cited/#reference-k', kind: 'reference', number: '1', text: 'The source entry.' }],
     );
+  });
+
+  test('removes the id attributes of embedded raw HTML and keeps text that only looks like one', async () => {
+    const source = { url: '/2026-10/raw/', title: 'Raw', body: '## Part {#part}\n\n<p ID=box class="note">Set id=5 here</p>\n' };
+    const article = await host(':::embed\n/2026-10/raw/#part\n:::\n', [source]);
+    assert.match(article.intro[0].html, /<p class="note">Set id=5 here<\/p>/);
+  });
+
+  test('points a link with an invalid percent-encoding in embedded content into the source article and reports it only there', async () => {
+    const source = { url: '/2026-10/bad/', title: 'Bad', body: '## Part {#part}\n\nSee [this](#%ZZ).\n' };
+    const { articles, errors } = await site(':::embed\n/2026-10/bad/#part\n:::\n', [source]);
+    assert.deepEqual(errors.map((error) => error.split(':')[0]), ['bad.md']);
+    assert.match(articles['/2026-10/host/'].intro[0].html, /<a href="\.\.\/\.\.\/2026-10\/bad\/#%ZZ">this<\/a>/);
   });
 
   test('reports an embed of an equation, a sidenote or a reference', async () => {
