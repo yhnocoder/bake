@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { rewriteLine, rewriteSource, sourceVersion } from '../src/dev/params.js';
@@ -210,5 +211,20 @@ describe('the parameter endpoint of bake dev', () => {
     assert.deepEqual(await request(write, { 'content-type': 'text/plain' }), [415, { error: 'send the parameters as application/json' }]);
     assert.equal(read(), before);
     assert.deepEqual((await request({}, { origin: new URL(server.url).origin }))[0], 200);
+  });
+
+  test('compares the origin with the Host header without regard to letter case', async (t) => {
+    const { server, token, version } = await start(t);
+    const body = JSON.stringify({ file: FILE, version, line: 9, name: 'label-view', params: { text: 'first', size: 2 }, write: false });
+    const status = await new Promise((done, fail) => {
+      const headers = { host: `LocalHost:${server.port}`, origin: `http://localhost:${server.port}`, 'content-type': 'application/json', 'x-bake-token': token };
+      const sent = httpRequest({ host: '127.0.0.1', port: server.port, path: '/__bake/params', method: 'POST', headers, setHost: false }, (response) => {
+        response.resume();
+        response.on('end', () => done(response.statusCode));
+      });
+      sent.on('error', fail);
+      sent.end(body);
+    });
+    assert.equal(status, 200);
   });
 });

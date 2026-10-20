@@ -183,13 +183,13 @@ function isLoopback(host) {
   return host === 'localhost' || host === '::1' || (isIPv4(host) && host.startsWith('127.'));
 }
 
-function hostName(header) {
+export function hostName(header) {
   if (typeof header !== 'string' || header === '') return null;
   const match = /^\[([^\]]*)\](?::\d*)?$/.exec(header) ?? /^([^:]*)(?::\d*)?$/.exec(header);
   return (match === null ? header : match[1]).toLowerCase();
 }
 
-function allowedHost(name, host) {
+export function allowedHost(name, host) {
   if (name === null) return false;
   return name === 'localhost' || name.endsWith('.localhost') || isIP(name) !== 0 || name === host.toLowerCase();
 }
@@ -256,7 +256,7 @@ function sameOrigin(request) {
   const { origin, host } = request.headers;
   if (origin === undefined) return true;
   try {
-    return new URL(origin).host === host;
+    return typeof host === 'string' && new URL(origin).host === host.toLowerCase();
   } catch {
     return false;
   }
@@ -299,7 +299,12 @@ function injectClient(html, data) {
 }
 
 function sendHtml(response, status, html) {
-  response.writeHead(status, { 'content-type': contentType('index.html'), 'cache-control': 'no-store' });
+  response.writeHead(status, {
+    'content-type': contentType('index.html'),
+    'cache-control': 'no-store',
+    'x-frame-options': 'SAMEORIGIN',
+    'content-security-policy': "frame-ancestors 'self'",
+  });
   response.end(html);
 }
 

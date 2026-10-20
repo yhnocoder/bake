@@ -25,6 +25,7 @@ export async function startParamBars({ file, token, version, setVersion, compone
       controller.host.hidden = !visible;
       box.before(controller.host);
     }
+    states.prune(file, (name, index) => declared[name] !== undefined && index < (seen.get(name) ?? 0));
   }
 
   scan();
@@ -69,7 +70,35 @@ function createStates() {
         sessionStorage.setItem(SAVED_KEY, JSON.stringify(all));
       } catch {}
     },
+    prune(file, exists) {
+      const all = read();
+      const prefix = `${file} `;
+      const kept = Object.fromEntries(
+        Object.entries(all).filter(([key]) => {
+          if (!key.startsWith(prefix)) return true;
+          const [name, index] = key.slice(prefix.length).split(' ');
+          return exists(name, Number(index));
+        }),
+      );
+      if (Object.keys(kept).length === Object.keys(all).length) return;
+      try {
+        sessionStorage.setItem(SAVED_KEY, JSON.stringify(kept));
+      } catch {}
+    },
   };
+}
+
+function validValue(declaration, value) {
+  switch (declaration.type) {
+    case 'number':
+      return Number.isFinite(value) && !(value < declaration.min) && !(value > declaration.max);
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'enum':
+      return declaration.options.includes(value);
+    default:
+      return typeof value === 'string';
+  }
 }
 
 function createBar(frame, index, declarations, server, { states, bars }) {
@@ -88,7 +117,9 @@ function createBar(frame, index, declarations, server, { states, bars }) {
   const markdown = JSON.parse(frame.dataset.params);
   const saved = states.get(key).changes;
   const current = { ...markdown };
-  for (const param of Object.keys(declarations)) if (param in saved && typeof saved[param] === typeof markdown[param]) current[param] = saved[param];
+  const restored = Object.fromEntries(Object.entries(saved).filter(([param, value]) => param in declarations && validValue(declarations[param], value)));
+  Object.assign(current, restored);
+  if (Object.keys(restored).length !== Object.keys(saved).length) states.save(key, restored);
   let waiting = false;
   let messageTimer;
 

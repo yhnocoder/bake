@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { createSite, updateSite } from '../src/build/site.js';
 import { sourceVersion } from '../src/dev/params.js';
 import { createPreview } from '../src/dev/preview.js';
-import { startDevServer } from '../src/dev/server.js';
+import { allowedHost, hostName, startDevServer } from '../src/dev/server.js';
 import { isWatched } from '../src/dev/watch.js';
 import { formatError } from '../src/report.js';
 import { article, createBlog, readTree, validConfig, writeFiles } from './blog.js';
@@ -104,6 +104,23 @@ describe('bake dev', () => {
     assert.deepEqual(await send('/2026-10/rope/', 'localhost.evil.example'), [403, 'bake dev refuses requests for the host localhost.evil.example; open the page at localhost or at an IP address']);
     for (const host of [`localhost:${server.port}`, 'blog.localhost', `127.0.0.1:${server.port}`, `[::1]:${server.port}`, '192.168.1.20']) {
       assert.equal((await send('/2026-10/rope/', host))[0], 200, host);
+    }
+  });
+
+  test('accepts the host name given with --host in the Host header, in any letter case', () => {
+    assert.equal(allowedHost(hostName('Studio.Lan:4321'), 'studio.lan'), true);
+    assert.equal(allowedHost(hostName('studio.lan'), 'Studio.Lan'), true);
+    assert.equal(allowedHost(hostName('other.lan:4321'), 'studio.lan'), false);
+    assert.equal(allowedHost(hostName('studio.lan.evil.example'), 'studio.lan'), false);
+  });
+
+  test('sends HTML pages with headers that refuse framing by other sites', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article() });
+    const { get } = await start(t, dir);
+    for (const path of ['/', '/2026-10/rope/', '/missing/']) {
+      const response = await get(path);
+      assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN', path);
+      assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'self'", path);
     }
   });
 

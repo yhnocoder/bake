@@ -482,6 +482,46 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal(await page.evaluate(() => sessionStorage.getItem('bake-dev-param-values')), '{}');
   });
 
+  await t.test('restored values that the declarations no longer accept and keys of components that are gone are dropped', async () => {
+    const stale = { fn: 'tanh', range: 99, removed: 1 };
+    const otherFile = { range: 3 };
+    await page.evaluate(
+      ([file, stale, otherFile]) => {
+        const count = document.querySelectorAll('[data-region] figure.component[data-component="act-fn-plot"][data-line]').length;
+        const saved = { [`other/index.md act-fn-plot 0`]: otherFile, [`${file} act-fn-plot ${count}`]: stale, [`${file} gone-plot 0`]: stale };
+        for (let index = 0; index < count; index += 1) saved[`${file} act-fn-plot ${index}`] = stale;
+        sessionStorage.setItem('bake-dev-param-values', JSON.stringify(saved));
+      },
+      [SYNTAX, stale, otherFile],
+    );
+    await open();
+    assert.equal(await page.locator('bake-param-bar').evaluateAll((bars) => bars.filter((item) => item.shadowRoot.querySelector('.control[data-changed]') !== null).length), 0);
+    assert.equal((await liveParams()).fn, 'silu');
+    assert.deepEqual(await page.evaluate(() => JSON.parse(sessionStorage.getItem('bake-dev-param-values'))), { 'other/index.md act-fn-plot 0': otherFile });
+    await page.evaluate(() => sessionStorage.removeItem('bake-dev-param-values'));
+  });
+
+  await t.test('the bar takes its colours from the theme and follows its dark mode', async () => {
+    const colours = () => bar.evaluate((host) => {
+      const style = getComputedStyle(host.shadowRoot.querySelector('.bar'));
+      return [style.backgroundColor, style.color];
+    });
+    const theme = await page.evaluate(() => document.documentElement.dataset.theme);
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'light';
+    });
+    const light = await colours();
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'dark';
+    });
+    const dark = await colours();
+    await page.evaluate((value) => {
+      document.documentElement.dataset.theme = value;
+    }, theme);
+    assert.notEqual(dark[0], light[0]);
+    assert.notEqual(dark[1], light[1]);
+  });
+
   await t.test('a parameter changed in the editor restarts the component and highlights its block once', async () => {
     await watchFrames();
     edit(`fn=silu range=6 beta=${beta}`, `fn=silu range=5 beta=${beta}`);
