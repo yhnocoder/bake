@@ -1,0 +1,43 @@
+name: demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: demo
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Set the address of the Pages site
+        working-directory: examples/blog
+        run: sed -i "s|url: 'https://example.github.io'|url: '${{ steps.pages.outputs.base_url }}'|" bake.config.js && grep -F "url: '${{ steps.pages.outputs.base_url }}'" bake.config.js
+      - name: Build the example blog
+        working-directory: examples/blog
+        run: node ../../src/cli.js build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: examples/blog/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

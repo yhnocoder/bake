@@ -4,6 +4,11 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- The `demo` workflow, which publishes the example blog to the GitHub Pages site of the repository when it is started by hand.
+- Installation steps in the README.
+
 ## [0.1.0]
 
 The first release of Bake as it was rebuilt to follow its new design.
