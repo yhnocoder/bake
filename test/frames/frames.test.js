@@ -24,11 +24,15 @@ function scroll(distance) {
   return async (page) => {
     const height = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
     const length = Math.min(distance ?? height, height);
-    await page.mouse.move(200, 400);
+    const { width, height: viewHeight } = page.viewportSize();
+    await page.mouse.move(width / 2, viewHeight / 2);
     return async () => {
       const steps = Math.ceil(length / WHEEL_STEP);
+      const start = await page.evaluate(() => scrollY);
       await paced(steps, steps * WHEEL_INTERVAL, () => page.mouse.wheel(0, WHEEL_STEP));
       await settle(page, 300);
+      const scrolled = (await page.evaluate(() => scrollY)) - start;
+      assert.ok(scrolled >= length * 0.9, `the page scrolled ${scrolled} of ${length} pixels`);
     };
   };
 }
