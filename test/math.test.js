@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { html, outline, parse, parsed } from './article.js';
+import { components, html, outline, parse, parsed } from './article.js';
 
 const preamble = [{ tex: '\\newcommand{\\R}{\\mathbb{R}}', position: { line: 4, column: 1 } }];
 
@@ -130,9 +130,9 @@ describe('math', () => {
   });
 
   test('keeps | inside $…$ in the attributes of a block', async () => {
-    const article = await parsed(':::fold{title="$|x|$ fold"}\nbody\n:::\n\n:::act-fn-plot{fn="$|x|$"}\n:::\n', { components: new Map([['act-fn-plot', { valid: false }]]) });
+    const article = await parsed(':::fold{title="$|x|$ fold"}\nbody\n:::\n\n:::act-fn-plot{fn="$|x|$"}\n:::\n', { components: components({ 'act-fn-plot': { params: { fn: { label: 'Function', type: 'text', default: '' } } } }) });
     assert.match(article.intro[0].html, /<summary>\$\|x\|\$ fold<\/summary>/);
-    assert.deepEqual(article.intro[1].attributes, { fn: '$|x|$' });
+    assert.equal(article.intro[1].params.fn, '$|x|$');
   });
 
   test('reports | inside $…$ on a table line of an article that uses every private-use character', async () => {

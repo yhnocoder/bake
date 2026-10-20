@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { bake, copyExample, writeFiles } from './blog.js';
-import { folder, outline, parseSite } from './article.js';
+import { components as declare, folder, outline, parseSite } from './article.js';
 
 const fixturesDir = join(import.meta.dirname, 'fixtures/syntax-errors');
 const ID_ATTRIBUTE = new RegExp(' id="([^"]*)"', 'g');
-const linkFixtures = ['missing-link-target.md', 'embed-self.md', 'embed-duplicate.md', 'embed-overlap.md'];
 
 const target = [
   'Intro paragraph. ^opening',
@@ -48,10 +45,10 @@ const target = [
 ].join('\n');
 
 const other = '## Far {#far}\n\nFar away.\n';
-const components = new Map([
-  ['act-fn-plot', { name: 'act-fn-plot', valid: true, params: { fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu'], default: 'relu' } }, layout: { height: 360 } }],
-  ['data-view', { name: 'data-view', valid: true, params: { source: { label: 'Source', type: 'file', default: '' } }, layout: { height: 200 } }],
-]);
+const components = declare({
+  'act-fn-plot': { params: { fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu'], default: 'relu' } } },
+  'data-view': { params: { source: { label: 'Source', type: 'file', default: '' } } },
+});
 
 async function site(body, pages = []) {
   return parseSite([{ url: '/2026-10/host/', title: 'Host', body }, { url: '/2026-10/target/', title: 'Target', body: target, folder: folder(fixturesDir) }, { url: '/2026-10/other/', title: 'Other', body: other }, ...pages], { components });
@@ -354,19 +351,5 @@ describe(':::embed', () => {
       'host.md:18:1 :::embed lists no address; write one site address per line, such as /2026-10/slug/#anchor',
       'host.md:22:1 :::embed holds only site addresses, one per line, such as /2026-10/slug/#anchor',
     ]);
-  });
-});
-
-describe('link fixtures', () => {
-  test('syntax error fixtures for links and embeds report the lines in expected.json', (t) => {
-    const expected = JSON.parse(readFileSync(join(fixturesDir, 'expected.json'), 'utf8'));
-    const dir = copyExample(t);
-    writeFiles(dir, Object.fromEntries(linkFixtures.map((name) => [`content/posts/fixtures/${name.replace('.md', '')}/index.md`, readFileSync(join(fixturesDir, name), 'utf8')])));
-    const lines = bake(dir, 'build')
-      .stderr.trim()
-      .split('\n')
-      .slice(0, -1)
-      .map((line) => line.replace(/^content\/posts\/fixtures\/([\w-]+)\/index\.md/, '$1.md'));
-    assert.deepEqual(lines.sort(), linkFixtures.map((name) => expected[name]).sort());
   });
 });

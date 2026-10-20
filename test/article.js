@@ -50,6 +50,10 @@ export function outline(html) {
     .replace(/<pre class="shiki bake"[^>]*?(?: data-language="([^"]*)")?><code>([\s\S]*?)<\/code><\/pre>/g, (match, language = '', code) => `\`\`\`${language}\n${code.replace(/<[^>]*>/g, '')}\n\`\`\``);
 }
 
+export function components(declarations) {
+  return new Map(Object.entries(declarations).map(([name, { params = {}, layout = { height: 100 }, valid = true }]) => [name, { name, valid, params, layout }]));
+}
+
 export function folder(path) {
   return { path, files: readdirSync(path) };
 }

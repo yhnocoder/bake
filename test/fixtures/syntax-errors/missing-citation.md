@@ -2,6 +2,7 @@
 title: Error fixture
 slug: missing-citation
 date: 2026-10-19
+category: writing
 ---
 
 见 [@vaswani2017]。

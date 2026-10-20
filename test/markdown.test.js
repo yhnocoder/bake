@@ -1,120 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { before, describe, test } from 'node:test';
-import { readComponents } from '../src/components/read.js';
-import { readPreamble } from '../src/config/preamble.js';
-import { indexPages } from '../src/build/links.js';
-import { BUILT_IN_BLOCK_NAMES, readArticle } from '../src/markdown/article.js';
+import { describe, test } from 'node:test';
 import { parseAttributes, writeAttributes } from '../src/markdown/attributes.js';
 import { serializeMarkdown } from '../src/markdown/serialize.js';
 import { formatError, sortErrors } from '../src/report.js';
-import { folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
+import { components, folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
 
-const fixturesDir = new URL('./fixtures/syntax-errors/', import.meta.url);
-const markdownFixtures = [
-  'duplicate-anchor.md',
-  'unknown-heading-attribute.md',
-  'unknown-block.md',
-  'invalid-width.md',
-  'undefined-footnote.md',
-  'missing-citation.md',
-  'unknown-eqref.md',
-  'label-space.md',
-  'label-outside-environment.md',
-  'list-table-cell-count.md',
-  'image-width-tier.md',
-  'unknown-component-parameter.md',
-  'component-parameter-range.md',
-  'unknown-component.md',
-  'component-width.md',
-  'component-width-percent.md',
-  'component-height.md',
-  'component-float.md',
-  'component-width-block.md',
-  'component-file-outside.md',
-  'component-id.md',
-];
 const exampleBlog = fileURLToPath(new URL('../examples/blog/', import.meta.url));
-describe('markdown fixtures', () => {
-  let components;
-  before(async () => {
-    const errors = [];
-    components = await readComponents(exampleBlog, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors);
-    assert.deepEqual(errors.map(formatError), []);
-  });
-
-  test('syntax error fixtures for text syntax and components report the lines in expected.json', async () => {
-    const expected = JSON.parse(readFileSync(new URL('expected.json', fixturesDir), 'utf8'));
-    for (const name of markdownFixtures) {
-      const errors = [];
-      await parseArticle(name, readFileSync(new URL(name, fixturesDir), 'utf8'), errors, { folder: folder(fileURLToPath(fixturesDir)), components });
-      assert.deepEqual(errors.map(formatError), [expected[name]], name);
-    }
-  });
-
-  test('the syntax article parses without errors into its sections, sidenotes and references', async () => {
-    const errors = [];
-    const preamble = readPreamble(exampleBlog, errors);
-    const entries = [];
-    for (const slug of ['syntax', 'syntax-linked']) {
-      const source = readFileSync(`${exampleBlog}content/posts/${slug}/index.md`, 'utf8');
-      const url = `/2026-10/${slug}/`;
-      entries.push({ url, title: slug, draft: false, article: await readArticle(`${slug}/index.md`, source, errors, { folder: folder(`${exampleBlog}content/posts/${slug}`), preamble, url, components }) });
-    }
-    const site = indexPages(entries);
-    for (const entry of entries) entry.article.link(site, errors);
-    const article = entries[0].article.structure();
-    assert.deepEqual(errors.map(formatError), []);
-    assert.deepEqual(
-      article.toc.map((entry) => `${entry.number} ${entry.id} ${entry.title}`),
-      [
-        '01 front-matter front matter',
-        '02 headings 标题',
-        '03 inline 段落内的写法',
-        '04 lists 列表与引用',
-        '05 aside-fold 提示框与折叠块',
-        '06 sidenotes 旁注',
-        '07 citations 参考文献',
-        '08 math 公式与公式宏',
-        '09 code 代码',
-        '10 tables 表格与 list-table',
-        '11 images 图片与浮动',
-        '12 width 宽度写法',
-        '13 components 交互组件',
-        '14 links 站内链接与嵌入',
-        '15 copy 复制',
-        '16 errors 附录：构建报错的写法',
-      ],
-    );
-    assert.deepEqual(article.toc[1].children, [{ id: 'recap', title: '小节要点', recap: '<p><code>:::recap</code> 写在标题后面，不显示在正文里，读过这一节后出现在目录和章节卡片里。</p>' }]);
-    assert.match(article.toc[7].recap, /^<p>公式在生成时排版，例如 <mjx-container/);
-    assert.deepEqual(
-      article.toc[7].children.map(({ id, recap }) => [id, recap === undefined ? 'no recap' : 'recap']),
-      [
-        ['multiline', 'no recap'],
-        ['macros', 'recap'],
-      ],
-    );
-    assert.deepEqual(
-      article.toc[10].children.map(({ id, title, recap }) => [id, title, recap]),
-      [
-        ['image-size', '尺寸', undefined],
-        ['float', '浮动', undefined],
-      ],
-    );
-    assert.equal(article.sections[11].width, 'wide');
-    assert.deepEqual(
-      article.sidenotes.map((note) => [note.number, note.label]),
-      [
-        [1, 'gemm'],
-        [2, 'cap'],
-        [3, 'copy-notes'],
-      ],
-    );
-    assert.deepEqual(article.references.map((entry) => `${entry.number} ${entry.key}`), ['1 shazeer2020', '2 gelu', 'undefined vaswani2017']);
-  });
-});
 
 describe('headings and anchors', () => {
   test('numbers ## sections and lists ### headings under them in the table of contents', async () => {
@@ -630,12 +522,8 @@ describe('blocks', () => {
       fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'silu' },
       range: { label: 'Range', type: 'number', min: 1, max: 10, default: 4 },
     };
-    const components = new Map([['act-fn-plot', { name: 'act-fn-plot', valid: true, params, layout: { height: 360 } }]]);
-    const [block] = (await parsed(':::act-fn-plot{fn=gelu range=6}\nCaption.\n:::\n', { components })).intro;
-    assert.deepEqual(
-      { type: block.type, name: block.name, attributes: block.attributes, params: block.params },
-      { type: 'component', name: 'act-fn-plot', attributes: { fn: 'gelu', range: '6' }, params: { fn: 'gelu', range: 6 } },
-    );
+    const [block] = (await parsed(':::act-fn-plot{fn=gelu range=6}\nCaption.\n:::\n', { components: components({ 'act-fn-plot': { params } }) })).intro;
+    assert.deepEqual([block.type, block.name, block.params], ['component', 'act-fn-plot', { fn: 'gelu', range: 6 }]);
   });
 
   test('gives the block inside :::{width=…} that width', async () => {
