@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { join, posix, sep } from 'node:path';
 import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { readPet } from '../chat/pet-files.js';
@@ -29,7 +29,8 @@ const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
 export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
-  return { root, drafts, base, shareImages, prefetch, settings: null, articles: new Map(), themes: new Map(), bundle: null };
+  // why: Vite reports module paths with symbolic links resolved, and they are compared with paths under the root
+  return { root: realpathSync(root), drafts, base, shareImages, prefetch, settings: null, articles: new Map(), themes: new Map(), bundle: null };
 }
 
 export async function updateSite(site, changedPaths = null) {

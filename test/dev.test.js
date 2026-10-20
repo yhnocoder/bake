@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { join } from 'node:path';
@@ -309,7 +309,7 @@ describe('preview updates', () => {
     assert.notEqual(second.get('content/posts/llm/rope/index.md'), first.get('content/posts/llm/rope/index.md'));
   });
 
-  test('compiles a theme again when a file that it imports from another folder under themes/ changes', async (t) => {
+  test('compiles a theme again when a file that it imports from another folder under themes/ changes, also when the blog folder is reached through a symbolic link', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
@@ -318,7 +318,9 @@ describe('preview updates', () => {
       'themes/common/word.js': "export const word = 'first';\n",
       'themes/common/look.css': '.word { color: red; }\n',
     });
-    const site = createSite(dir);
+    const link = join(createBlog(t, {}), 'blog');
+    symlinkSync(dir, link);
+    const site = createSite(link);
     const render = (result) => result.pages.find((page) => page.entry.url === '/2026-10/rope/').outputs[0].render();
     const stylesheet = (result) => result.assetFiles.filter((file) => file.path.endsWith('.css')).map((file) => String(file.render())).join('\n');
     const first = await updateSite(site);
