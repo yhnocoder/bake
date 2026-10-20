@@ -43,7 +43,7 @@ try {
       colorScheme: variant.colorScheme,
       reducedMotion: 'reduce',
     });
-    const page = await context.newPage();
+    let page = await context.newPage();
     let chatShown = false;
     for (const { path, name } of pages) {
       await page.goto(origin + path, { waitUntil: 'networkidle' });
@@ -62,6 +62,8 @@ try {
         await page.evaluate(() => document.fonts.ready);
         await page.screenshot({ path: join(out, `${name}-chat.${variant.name}.png`), animations: 'disabled', caret: 'hide' });
         count += 1;
+        await page.close();
+        page = await context.newPage();
       }
     }
     await context.close();
