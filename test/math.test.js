@@ -94,4 +94,24 @@ describe('math', () => {
       '<div class="table-scroll"><table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>$|x|_1$</td>\n<td><code>c</code></td>\n</tr>\n<tr>\n<td>$|y|$</td>\n<td>$</td>\n</tr>\n</tbody>\n</table></div>',
     );
   });
+
+  test('publishes a private-use character of the article unchanged next to | inside $…$ on a table line', async () => {
+    assert.equal(
+      await html('Icon  here.\n\n| a | b |\n|---|---|\n|  | $|x|$ |\n'),
+      '<p>Icon  here.</p>\n<div class="table-scroll"><table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td></td>\n<td>$|x|$</td>\n</tr>\n</tbody>\n</table></div>',
+    );
+  });
+
+  test('keeps | inside $…$ in the attributes of a block', async () => {
+    const article = await parsed(':::fold{title="$|x|$ fold"}\nbody\n:::\n\n:::act-fn-plot{fn="$|x|$"}\n:::\n', { components: new Map([['act-fn-plot', { valid: false }]]) });
+    assert.match(article.intro[0].html, /<summary>\$\|x\|\$ fold<\/summary>/);
+    assert.deepEqual(article.intro[1].attributes, { fn: '$|x|$' });
+  });
+
+  test('reports | inside $…$ on a table line of an article that uses every private-use character', async () => {
+    const every = Array.from({ length: 0xf8ff - 0xe000 + 1 }, (_, index) => String.fromCharCode(0xe000 + index)).join('');
+    assert.deepEqual((await parse(`${every}\n\n| a |\n|---|\n| $|x|$ |\n`)).errors, [
+      'index.md:11:1 | inside $…$ cannot be read on this line, because the article uses every private-use character from U+E000 to U+F8FF and Bake needs one that it does not use',
+    ]);
+  });
 });
