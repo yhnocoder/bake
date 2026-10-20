@@ -46,8 +46,10 @@ const CHINESE = {
     address: '链接必须以 http:// 或 https:// 开头。',
     network: '读不到这个链接，对方网站可能不允许跨域请求。',
     json: '这个链接不是有效的 pet.json，需要 displayName 和 spritesheetPath。',
+    timeout: '这个链接在 30 秒内没有回应。',
     large: '形象图片超过 5 MB。',
-    image: '形象图片无法读取。',
+    image: '形象图片不是 PNG 或 WebP 图片。',
+    storage: '浏览器的存储空间已满，无法记住这个形象。',
     size: (size) => `形象图片是 ${size} 像素，需要 1536x1872 或 1536x2288。`,
   },
   errors: {
@@ -115,8 +117,10 @@ const ENGLISH = {
     address: 'The link must start with http:// or https://.',
     network: 'The link cannot be read. The site may not allow cross-origin requests.',
     json: 'The link is not a valid pet.json with displayName and spritesheetPath.',
+    timeout: 'The link did not answer within 30 seconds.',
     large: 'The spritesheet is larger than 5 MB.',
-    image: 'The spritesheet cannot be read as an image.',
+    image: 'The spritesheet is not a PNG or WebP image.',
+    storage: 'The storage of this browser is full, so the pet cannot be remembered.',
     size: (size) => `The spritesheet is ${size} pixels; it must be 1536x1872 or 1536x2288.`,
   },
   errors: {

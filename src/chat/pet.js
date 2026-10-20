@@ -79,6 +79,7 @@ export function createPet(initial) {
     loading = null;
     element.toggleAttribute('data-ready', false);
     frame.src = source.frame;
+    if (sheet.src.startsWith('blob:')) URL.revokeObjectURL(sheet.src);
     sheet.removeAttribute('src');
     if (wasLoading) load();
   };

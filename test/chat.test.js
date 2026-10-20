@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
+import sharp from 'sharp';
 import { chatTools, matchingScopes, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
 import { chatLabels } from '../src/chat/labels.js';
+import { PetError, sheetFile } from '../src/chat/reader-pet.js';
 import { answer, MAX_TOOL_ROUNDS } from '../src/chat/conversation.js';
 import { ApiError, complete, readEvents } from '../src/chat/deepseek.js';
 import { linkTarget, normalizeMath, replyHtml } from '../src/chat/reply.js';
@@ -316,5 +318,34 @@ describe('AI chat key storage', () => {
     assert.equal(await openKey(secret, sealed), 'sk-test-0123456789');
     assert.notEqual((await sealKey(secret, 'sk-test-0123456789')).data, sealed.data);
     await assert.rejects(openKey(crypto.getRandomValues(new Uint8Array(32)), sealed));
+  });
+});
+
+describe('reader pet sheets', () => {
+  const image = (width, height, format, options = {}) =>
+    sharp({ create: { width, height, channels: options.alpha === false ? 3 : 4, background: { r: 10, g: 20, b: 30, alpha: 0.5 } } })
+      [format](options.settings ?? {})
+      .toBuffer();
+
+  test('reads the size of a PNG, a lossy, a lossless and an extended WebP sheet from its header and types the blob', async () => {
+    for (const [bytes, type, rows] of [
+      [await image(1536, 1872, 'png'), 'image/png', 9],
+      [await image(1536, 2288, 'webp', { alpha: false }), 'image/webp', 11],
+      [await image(1536, 1872, 'webp', { settings: { lossless: true } }), 'image/webp', 9],
+      [await image(1536, 2288, 'webp'), 'image/webp', 11],
+    ]) {
+      const sheet = sheetFile(new Uint8Array(bytes));
+      assert.deepEqual([sheet.blob.type, sheet.blob.size, sheet.rows], [type, bytes.length, rows]);
+    }
+  });
+
+  test('rejects a sheet that is not a PNG or WebP image and reports the size of a sheet of another size', async () => {
+    for (const bytes of [await image(1536, 1872, 'jpeg', { alpha: false }), Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), Buffer.alloc(0)]) {
+      assert.throws(() => sheetFile(new Uint8Array(bytes)), (error) => error instanceof PetError && error.code === 'image');
+    }
+    for (const [format, settings] of [['png', {}], ['webp', {}], ['webp', { lossless: true }]]) {
+      const bytes = await image(192, 208, format, { settings });
+      assert.throws(() => sheetFile(new Uint8Array(bytes)), (error) => error instanceof PetError && error.code === 'size' && error.detail === '192x208');
+    }
   });
 });

@@ -784,6 +784,8 @@ test('the AI chat on published pages', async (t) => {
     api.pets['/big/sheet.png'] = Buffer.alloc(5 * 1024 * 1024 + 1);
     api.pets['/wrong/pet.json'] = JSON.stringify({ displayName: 'Wrong', spritesheetPath: 'sheet.png' });
     api.pets['/wrong/sheet.png'] = await petSheet(192, 208, 'png');
+    api.pets['/text/pet.json'] = JSON.stringify({ displayName: 'Text', spritesheetPath: 'sheet.png' });
+    api.pets['/text/sheet.png'] = '<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1872"/>';
     await page.goto(`${base}/2026-10/syntax/`);
     const frame = () => shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-frame').src;");
     const siteFrame = await frame();
@@ -801,6 +803,7 @@ test('the AI chat on published pages', async (t) => {
     for (const [path, message] of [
       ['/big/pet.json', '形象图片超过 5 MB。'],
       ['/wrong/pet.json', '形象图片是 192x208 像素，需要 1536x1872 或 1536x2288。'],
+      ['/text/pet.json', '形象图片不是 PNG 或 WebP 图片。'],
       ['/missing/pet.json', '读不到这个链接，对方网站可能不允许跨域请求。'],
     ]) {
       await choose(path);
@@ -817,15 +820,19 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(JSON.parse((await storage(page)).local['bk-chat-pet']).url, `${PETS}/bun/pet.json`);
     assert.equal(await credit.count(), 0);
     assert.ok(api.petRequests.length > 0 && api.petRequests.every((request) => request.headers.referer === undefined && request.headers.cookie === undefined), JSON.stringify(api.petRequests));
+    await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
+    assert.equal(api.petRequests.filter((request) => request.path === '/bun/art/sheet.webp').length, 1);
 
     await page.reload();
     assert.match(await frame(), /^data:image\/webp;base64,/);
     await page.locator('.bk-chat-launcher').hover();
     await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
-    assert.match(await shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-sheet').src;"), /^blob:/);
+    const blob = await shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-sheet').src;");
+    assert.match(blob, /^blob:/);
     await openSettings(page);
     await page.locator('.bk-chat-menu .bk-chat-link', { hasText: '换回默认' }).click();
     assert.equal(await frame(), siteFrame);
+    assert.equal(await page.evaluate((url) => fetch(url).then(() => 'read', () => 'revoked'), blob), 'revoked');
     assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
     await credit.waitFor();
   });

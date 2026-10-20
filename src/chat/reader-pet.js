@@ -3,6 +3,10 @@ import { PET_FRAME, PET_JSON_MAX_BYTES, PET_MAX_BYTES, PET_SHEET_HEIGHTS, PET_SH
 export const READER_PET_KEY = 'bk-chat-pet';
 
 const REQUEST = { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' };
+const TIMEOUT = 30_000;
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+let chosen = null;
 
 export class PetError extends Error {
   constructor(code, detail = '') {
@@ -22,28 +26,39 @@ export function storedReaderPet() {
 }
 
 export async function chooseReaderPet(address) {
-  const { url, name, blob } = await fetchPet(address);
-  const bitmap = await sheetBitmap(blob);
+  const fetched = await fetchPet(address);
+  const { url, name, sheet } = fetched;
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(sheet.blob);
+  } catch {
+    throw new PetError('image');
+  }
   const canvas = document.createElement('canvas');
   canvas.width = PET_FRAME.width;
   canvas.height = PET_FRAME.height;
   canvas.getContext('2d').drawImage(bitmap, 0, 0, PET_FRAME.width, PET_FRAME.height, 0, 0, PET_FRAME.width, PET_FRAME.height);
   bitmap.close();
   const pet = { url, name, frame: canvas.toDataURL('image/webp', 0.9) };
-  localStorage.setItem(READER_PET_KEY, JSON.stringify(pet));
+  try {
+    localStorage.setItem(READER_PET_KEY, JSON.stringify(pet));
+  } catch {
+    throw new PetError('storage');
+  }
+  chosen = fetched;
   return pet;
 }
 
 export function forgetReaderPet() {
-  localStorage.removeItem(READER_PET_KEY);
+  chosen = null;
+  try {
+    localStorage.removeItem(READER_PET_KEY);
+  } catch {}
 }
 
 export async function readerPetSheet(address) {
-  const { blob } = await fetchPet(address);
-  const bitmap = await sheetBitmap(blob);
-  const rows = bitmap.height / PET_FRAME.height;
-  bitmap.close();
-  return { sheet: URL.createObjectURL(blob), rows };
+  const { sheet } = chosen?.url === address ? chosen : await fetchPet(address);
+  return { sheet: URL.createObjectURL(sheet.blob), rows: sheet.rows };
 }
 
 async function fetchPet(address) {
@@ -56,32 +71,43 @@ async function fetchPet(address) {
     throw new PetError('json');
   }
   if (typeof json?.displayName !== 'string' || json.displayName.trim() === '' || typeof json.spritesheetPath !== 'string') throw new PetError('json');
-  const sheet = webAddress(new URL(json.spritesheetPath, url).href);
-  const bytes = await download(sheet, PET_MAX_BYTES);
-  return { url, name: json.displayName.trim(), blob: new Blob([bytes]) };
+  const sheetUrl = webAddress(new URL(json.spritesheetPath, url).href);
+  return { url, name: json.displayName.trim(), sheet: sheetFile(await download(sheetUrl, PET_MAX_BYTES)) };
 }
 
-async function sheetBitmap(blob) {
-  let bitmap;
-  try {
-    bitmap = await createImageBitmap(blob);
-  } catch {
-    throw new PetError('image');
+export function sheetFile(bytes) {
+  const header = imageHeader(bytes);
+  if (header === null) throw new PetError('image');
+  const { type, width, height } = header;
+  if (width !== PET_SHEET_WIDTH || !PET_SHEET_HEIGHTS.includes(height)) throw new PetError('size', `${width}x${height}`);
+  return { blob: new Blob([bytes], { type }), rows: height / PET_FRAME.height };
+}
+
+function imageHeader(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const ascii = (offset, length) => (bytes.length < offset + length ? '' : String.fromCharCode(...bytes.subarray(offset, offset + length)));
+  if (bytes.length >= 24 && PNG_SIGNATURE.every((value, index) => bytes[index] === value) && ascii(12, 4) === 'IHDR') {
+    return { type: 'image/png', width: view.getUint32(16), height: view.getUint32(20) };
   }
-  if (bitmap.width !== PET_SHEET_WIDTH || !PET_SHEET_HEIGHTS.includes(bitmap.height)) {
-    const size = `${bitmap.width}x${bitmap.height}`;
-    bitmap.close();
-    throw new PetError('size', size);
+  if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WEBP' || bytes.length < 30) return null;
+  const chunk = ascii(12, 4);
+  if (chunk === 'VP8X') return { type: 'image/webp', width: 1 + (view.getUint32(24, true) & 0xffffff), height: 1 + (view.getUint32(26, true) >>> 8) };
+  if (chunk === 'VP8L' && bytes[20] === 0x2f) {
+    const bits = view.getUint32(21, true);
+    return { type: 'image/webp', width: 1 + (bits & 0x3fff), height: 1 + ((bits >>> 14) & 0x3fff) };
   }
-  return bitmap;
+  if (chunk === 'VP8 ' && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
+    return { type: 'image/webp', width: view.getUint16(26, true) & 0x3fff, height: view.getUint16(28, true) & 0x3fff };
+  }
+  return null;
 }
 
 async function download(url, limit) {
   let response;
   try {
-    response = await fetch(url, REQUEST);
+    response = await fetch(url, { ...REQUEST, signal: AbortSignal.timeout(TIMEOUT) });
   } catch (error) {
-    throw new PetError('network', error.message);
+    throw error.name === 'TimeoutError' ? new PetError('timeout') : new PetError('network', error.message);
   }
   if (!response.ok) throw new PetError('network', String(response.status));
   if (Number(response.headers.get('content-length')) > limit) {
@@ -92,7 +118,13 @@ async function download(url, limit) {
   const chunks = [];
   let size = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    let read;
+    try {
+      read = await reader.read();
+    } catch (error) {
+      throw error.name === 'TimeoutError' ? new PetError('timeout') : new PetError('network', error.message);
+    }
+    const { done, value } = read;
     if (done) break;
     size += value.length;
     if (size > limit) {
