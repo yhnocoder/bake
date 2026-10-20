@@ -1,34 +1,45 @@
 # Bake
 
-Bake is a static site generator for a technical blog with interactive components. The tool lives in this repository; blogs live in their own repositories.
+Bake is a static site generator for a technical blog with interactive components. This repository holds the tool; each blog lives in its own repository, and `examples/blog/` is the one blog kept here as example and test fixture.
 
-@CONTRIBUTING.md
 @TESTING.md
 
 ## Code
 
-- No comments and no docstrings. Names and structure carry the meaning. The one exception is code that looks removable or changeable but is not: write a single line `why: <reason>` there, and use it rarely. Tool directives (`# noqa`, `// eslint-disable`, `# shellcheck`) and a script's `#!` line are not comments. `scripts/check_comment.py` enforces this.
-- Everything in the repository is English: code, identifiers, test names, CLI output, error messages, commit messages and PR text.
+- Match the style of the surrounding code.
+- Names and structure carry the meaning. Write a comment only for knowledge the code cannot express, such as why code that looks removable must stay.
+- Write no abstraction for a need that does not exist yet. Prefer deleting code to adding it.
+- No shims, fallbacks, legacy aliases or dual code paths. Replace old behavior outright and delete code that is no longer used.
+- Fix the root cause, in the shared code that every caller goes through.
+- Every problem Bake finds in a blog is reported as `file:line:col message`, with the path relative to the blog root, and one run reports all problems (`src/report.js`).
+- Layers, enforced by `test/layers.test.js`: the directories of `src/` import each other without a cycle, only `src/cli.js` and `src/dev/` import `src/build/`, and modules that run in the browser import no Node built-in module.
+- Dependencies: use a mature library for a general problem (parsing, typesetting, highlighting, diffing, sanitizing), and write Bake's own core by hand (the article structure, the theme interface, the component interface, copying as Markdown). Accept a library's native behavior instead of wrapping it. Add a dependency in the change that uses it.
 
-## Commits
+## Language
 
-`<type>(<scope>): <summary>`, for example `feat(cli): list commands in --help`. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`.
+Code, identifiers, test names, CLI output, error messages, commits and documentation are in English. The content of the example blog and the localized labels of the interface may be in other languages.
 
-## Pull requests
+## Documentation
 
-- The title says in one sentence what changed.
-- The body has a "Before:" paragraph, an "After:" paragraph, then a short "How".
-- Name the Issue Board task the PR belongs to.
-- Add a `Tests: name, name` line to force specific tests in CI.
+- There is no developer documentation. Knowledge the code cannot express goes into a comment next to the code.
+- README.md is for people who write a blog with Bake. A change to the public interface (commands, configuration, Markdown syntax, components, themes) updates README.md in the same change.
+
+## Tests
+
+- Test behavior that a user of Bake or a reader of a blog can observe, not the implementation.
+- Add a test only for a behavior that no other test guards.
+- Size the verification to the change: a change to documentation only runs no tests, a change to one feature runs the tests of that feature, and a change to shared code (build, theme layer, test helpers) runs `npm test` and the browser suite.
+
+## Commits and pull requests
+
+- Commit messages: `<type>(<scope>): <summary>`, such as `feat(cli): list commands in --help`. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`.
+- A pull request title says in one sentence what changed. The body has a "Before:" paragraph, an "After:" paragraph and a short "How".
 
 ## Writing
 
-These rules apply to documentation, README, PR text and messages.
+These rules apply to documentation, messages, commits and pull requests.
 
-- Say what a mechanism is and what it does. Do not name or explain it with metaphors or personification.
-- Write the action itself in plain words. No filler, slang or playful tone.
-- Do not abbreviate heavily, invent abbreviations, drop subjects or compress sentences. Write the full sentence.
-- No "not X but Y" contrasts, dashes used as punctuation, parallel lists for rhythm, or slogans.
-- Describe the current state in full. When something changes, rewrite the affected text; do not mix old and new wording, and do not mention removed names.
-- Do not use bare labels such as R5 or S1. When a number is unavoidable, say what it refers to.
-- Use established terms. Check the usual name of a concept instead of coining one.
+- Write plain words and full sentences. No metaphors, personification, slang, filler or playful tone.
+- Use the established term for a concept instead of coining one, and do not invent abbreviations.
+- Do not use bare labels such as R5 or S1; say what a number refers to.
+- Describe the current state. When something changes, rewrite the affected text instead of adding to it.
