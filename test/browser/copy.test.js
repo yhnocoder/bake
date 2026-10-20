@@ -266,6 +266,24 @@ test('a converted citation, reference entry and internal link keep a key or an a
   await context.close();
 });
 
+test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list', async (t) => {
+  const body = '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n';
+  const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/rope/`);
+  await select(page, { selector: '.bk-article p', contains: 'Raw', text: 'cites' }, { selector: '.bk-article p', contains: 'Raw', text: ' before', after: true });
+  assert.equal((await copied(page)).text, 'cites [\\[1\\]](#keys) before');
+  await select(page, { selector: '.bk-article li', contains: 'First', text: 'irst' }, { selector: '.bk-article li', contains: 'Second', text: 'Sec', after: true });
+  assert.equal((await copied(page)).text, '1. irst plain entry.\n2. Sec');
+  await context.close();
+});
+
 test('a partly selected paragraph escapes the text that Markdown would read as syntax and keeps every other character, including U+FDD0, so the copy renders the same text', async (t) => {
   const paragraphs = [
     ['Start: a \\*literal\\* star, snake_case\\_name, a \\_literal\\_ underscore, \\`ticks\\` and C:\\\\path.', 'a *literal*', 'path'],

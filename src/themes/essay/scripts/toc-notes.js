@@ -1,3 +1,4 @@
+import { closeOnEscape } from './escape.js';
 import { reducedMotion } from './motion.js';
 import { createElement } from './toc-card.js';
 import { ticksColumn } from './toc-ticks.js';
@@ -22,8 +23,6 @@ export function notesColumn(nav, context) {
 }
 
 export function notesRailView(context) {
-  const abort = new AbortController();
-  const { signal } = abort;
   const panel = createElement('div', 'bk-toc-panel');
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', context.labels.notes);
@@ -72,14 +71,8 @@ export function notesRailView(context) {
       if (!(next instanceof Node) || (!ticks.element.contains(next) && !panel.contains(next))) close();
     });
   }
-  addEventListener(
-    'keydown',
-    (event) => {
-      if (event.key === 'Escape') close(0);
-    },
-    { signal },
-  );
   context.host.append(ticks.element, panel);
+  closeOnEscape(panel, () => close(0));
   return {
     columns: [ticks.element],
     update(state) {
@@ -91,7 +84,6 @@ export function notesRailView(context) {
       list.relayout();
     },
     destroy() {
-      abort.abort();
       clearTimeout(openTimer);
       clearTimeout(closeTimer);
       list.destroy();

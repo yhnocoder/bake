@@ -866,7 +866,17 @@ class ArticleParser {
     let recapTarget = null;
     for (const node of tree.children) {
       if (node.type === 'heading' && node.depth === 2) {
-        const section = { ...this.headingFields(node), number: String(sections.length + 1).padStart(2, '0'), width: node.attributes.width, line: node.position.start.line, endLine: node.position.end.line, blocks: [], subsections: [] };
+        const section = {
+          ...this.headingFields(node),
+          number: String(sections.length + 1).padStart(2, '0'),
+          width: node.attributes.width,
+          line: node.position.start.line,
+          endLine: node.position.end.line,
+          titleSidenotes: this.referencedSidenotes(node),
+          recapSidenotes: [],
+          blocks: [],
+          subsections: [],
+        };
         sections.push(section);
         recapTarget = section;
         continue;
@@ -879,7 +889,7 @@ class ArticleParser {
       const block = this.block(node);
       (current?.blocks ?? intro).push(block);
       if (node.type === 'heading' && node.depth === 3 && current) {
-        const subsection = { id: block.id, title: block.title, text: block.text, toc: block.toc, line: block.line, endLine: block.endLine };
+        const subsection = { id: block.id, title: block.title, text: block.text, toc: block.toc, line: block.line, endLine: block.endLine, titleSidenotes: block.sidenotes, recapSidenotes: [] };
         current.subsections.push(subsection);
         recapTarget = subsection;
       }
@@ -891,6 +901,7 @@ class ArticleParser {
       line: definition.position.start.line,
       endLine: definition.position.end.line,
       html: renderChildrenHtml(definition.children, this.context),
+      sidenotes: this.referencedSidenotes(definition),
     }));
     const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: referenceId(entry.key), html: renderInlineHtml(entry.children, this.context) }));
     const previews = [...this.linked.values()].filter((target) => target.page.article !== null).map((target) => target.page.article.preview(target, this));
@@ -949,14 +960,23 @@ class ArticleParser {
       return;
     }
     target.recap = renderChildrenHtml(node.children, this.context);
+    target.recapSidenotes = this.referencedSidenotes(node);
     this.recapLines.set(target, node.position.start);
+  }
+
+  referencedSidenotes(node) {
+    const numbers = new Set();
+    walk(node, (child) => {
+      if (child.type === 'footnoteReference') numbers.add(this.sidenotes.get(child.identifier).number);
+    });
+    return [...numbers];
   }
 
   block(node) {
     if (node.type === 'bakeBlock' && node.name === '' && node.children.length === 1) {
       return { ...this.block(node.children[0]), line: node.position.start.line, endLine: node.position.end.line, width: node.attributes.width };
     }
-    const block = { type: blockType(node), line: node.position.start.line, endLine: node.position.end.line, html: renderHtml(node, this.context) };
+    const block = { type: blockType(node), line: node.position.start.line, endLine: node.position.end.line, html: renderHtml(node, this.context), sidenotes: this.referencedSidenotes(node) };
     const width = naturalWidth(node);
     if (width !== undefined) block.naturalWidth = width;
     if (node.type === 'heading') Object.assign(block, { depth: node.depth }, this.headingFields(node));

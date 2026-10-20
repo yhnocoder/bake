@@ -79,6 +79,7 @@ export function ticksView(context) {
     card,
     shown: () => (card.classList.contains('is-on') ? shownChapter : -1),
     leave: () => leave(),
+    close: () => close(),
   });
 
   function render(chapterIndex) {
@@ -118,15 +119,20 @@ export function ticksView(context) {
       card.getBoundingClientRect();
       card.classList.remove('is-snap');
       card.classList.add('is-on');
-    }, now);
+    }, now, index);
+  }
+  function hide() {
+    card.classList.remove('is-on');
+    shownChapter = -1;
+    pointed = -1;
+    ticks.hover(-1);
   }
   function leave() {
-    intent.leave(() => {
-      card.classList.remove('is-on');
-      shownChapter = -1;
-      pointed = -1;
-      ticks.hover(-1);
-    });
+    intent.leave(hide);
+  }
+  function close() {
+    intent.dismiss(pointed);
+    hide();
   }
   return {
     columns: [ticks.element],

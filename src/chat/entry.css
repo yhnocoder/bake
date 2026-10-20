@@ -1,5 +1,6 @@
 :host {
   all: initial;
+  color-scheme: inherit;
   font-family: var(--font-ui, system-ui, sans-serif);
   color: var(--ink);
 }
@@ -24,7 +25,7 @@ button:focus-visible {
   position: fixed;
   right: var(--chat-right, 16px);
   bottom: var(--chat-bottom, 16px);
-  z-index: 75;
+  z-index: var(--layer-chat-button, 75);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -77,7 +78,7 @@ button:focus-visible {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 76;
+  z-index: var(--layer-chat-ask, 76);
   display: inline-flex;
   align-items: center;
   height: 28px;

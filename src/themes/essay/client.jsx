@@ -8,6 +8,7 @@ import './styles/settings.css';
 import './styles/home.css';
 import './styles/not-found.css';
 import './styles/print.css';
+import { startButtons } from './scripts/buttons.js';
 import { startMarkdownCopy } from './scripts/copy.js';
 import { startFolds } from './scripts/folds.js';
 import { startHeadingLinks } from './scripts/heading-links.jsx';
@@ -35,4 +36,5 @@ if (article !== null) {
   startMarkdownCopy(article);
   startPreviewCard(article);
   startToc(article);
+  startButtons();
 }

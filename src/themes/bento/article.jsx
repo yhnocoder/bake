@@ -1,4 +1,4 @@
-import { Block, HeadingLink, Sidenotes, arrange, subsectionRecap } from '../essay/article.jsx';
+import { Block, HeadingLink, Sidenotes, arrange, subsectionOf } from '../essay/article.jsx';
 
 const SPAN_OF_WIDTH = { body: '1', wide: '2', page: 'page' };
 const NARROW_COLUMNS = 2;
@@ -31,7 +31,7 @@ export function Article(props) {
               <Recap html={section.recap} />
               {entries.map(({ block, afterHeading }) => [
                 <Block block={block} afterHeading={afterHeading} labels={labels} />,
-                <Recap html={block.type === 'heading' ? subsectionRecap(section, block.id) : undefined} />,
+                <Recap html={subsectionOf(section, block)?.recap} />,
               ])}
               <Notes notes={[...notes, ...entries.flatMap((entry) => entry.notes)]} labels={labels} />
             </section>
