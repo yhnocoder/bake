@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
 import { bake, createBlog } from '../blog.js';
+import { isSelectionChunk } from './selection-module.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
@@ -202,6 +203,25 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-reply[data-done]').waitFor();
     assert.equal(api.requests.at(-1).body.messages.at(-1).content, `> ${quote}\n\n这段是什么意思？`);
     assert.equal(await page.locator('.bk-chat-user blockquote').textContent(), quote);
+  });
+
+  await t.test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the panel without a quote', async (t) => {
+    const { page, problems } = await openBrowser(t, base);
+    await page.route((url) => isSelectionChunk(url.href), (route) => route.abort());
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await page.locator('.bk-chat-panel button[aria-label="关闭"]').click();
+    await page.locator('.bk-chat-panel:not(.is-open)').waitFor({ state: 'attached' });
+    await page.evaluate(() => {
+      const range = document.createRange();
+      range.selectNodeContents(document.querySelector('.bk-article > .bk-block[data-type="paragraph"] p'));
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+    await page.locator('.bk-chat-ask').click();
+    await page.locator('.bk-chat-panel.is-open').waitFor({ state: 'attached', timeout: 5000 });
+    assert.equal(await page.locator('.bk-chat-quote-text').count(), 0);
+    assert.deepEqual(problems, []);
   });
 
   await t.test('DeepSeek errors are explained with a retry, and a cleared key leaves nothing in storage', async (t) => {

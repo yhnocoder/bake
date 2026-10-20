@@ -32,8 +32,8 @@ export function startCopy(article, { copied }) {
 }
 
 export async function selectionMarkdown(range, article) {
-  const { copiedSelection } = await loadSelection();
-  return copiedSelection(range, article, articleSource());
+  const module = await loadSelection();
+  return module === null ? null : module.copiedSelection(range, article, articleSource());
 }
 
 function loadWhenIdle() {
@@ -42,6 +42,9 @@ function loadWhenIdle() {
 }
 
 function loadSelection() {
-  selectionImport ??= import('./selection.js').then((module) => (selectionModule = module));
+  selectionImport ??= import('./selection.js').then(
+    (module) => (selectionModule = module),
+    () => null,
+  );
   return selectionImport;
 }

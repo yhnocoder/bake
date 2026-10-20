@@ -337,6 +337,13 @@ test('the module that writes a selection as Markdown loads after the page, and a
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const paragraph = '.bk-article p';
   const selectWords = (page) => select(page, { selector: paragraph, text: 'bold' }, { selector: paragraph, text: 'marked', after: true });
+  const dragAcross = async (page) => {
+    const box = await page.locator(paragraph).boundingBox();
+    await page.mouse.move(box.x + 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await page.mouse.up();
+  };
   const withoutIdleCallbacks = () => {
     window.idleCallbacks = [];
     window.requestIdleCallback = (callback) => window.idleCallbacks.push(callback);
@@ -367,6 +374,35 @@ test('the module that writes a selection as Markdown loads after the page, and a
     await page.close();
   });
 
+  await t.test('when the module cannot be loaded, a copy is the browser copy without a toast, the masthead button still copies the source and the page reports no error', async () => {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const requested = [];
+    await page.route(
+      (url) => isSelectionChunk(url.href),
+      (route) => {
+        requested.push(route.request().url());
+        return route.abort();
+      },
+    );
+    await page.goto(`${base}/2026-10/rope/`);
+    await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
+    await page.waitForTimeout(1500);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await dragAcross(page);
+      await selectWords(page);
+      assert.equal((await copied(page)).text, 'bold text and marked');
+      assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
+    }
+    assert.equal(requested.length, 1);
+    await page.evaluate(() => getSelection().removeAllRanges());
+    await page.locator('.bk-copy-source').click();
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), readFileSync(join(dir, 'content/posts/rope/index.md'), 'utf8'));
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
   await t.test('the first selectstart in the article loads the module before the browser is idle', async () => {
     const page = await context.newPage();
     await page.addInitScript(withoutIdleCallbacks);
@@ -376,11 +412,7 @@ test('the module that writes a selection as Markdown loads after the page, and a
     await page.waitForFunction(() => window.idleCallbacks.length === 1);
     assert.deepEqual(requested, []);
     const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
-    const box = await page.locator(paragraph).boundingBox();
-    await page.mouse.move(box.x + 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
-    await page.mouse.up();
+    await dragAcross(page);
     await selectionModuleReady(page, (await loading).url());
     await selectWords(page);
     assert.equal((await copied(page)).text, '**bold** text and ==marked==');
