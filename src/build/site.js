@@ -52,7 +52,7 @@ export async function updateSite(site, changedPaths = null) {
   const articles = [];
   for (const found of findArticles(root)) {
     const cached = site.articles.get(found.file);
-    const unchanged = cached !== undefined && !touches(found.dir) && cached.files.join('\n') === found.files.join('\n');
+    const unchanged = cached !== undefined && !touchesArticle(found, changedPaths) && cached.files.join('\n') === found.files.join('\n');
     articles.push(unchanged ? cached : await loadArticle(root, found, settings));
   }
   site.articles = new Map(articles.map((article) => [article.file, article]));
@@ -89,6 +89,12 @@ export async function updateSite(site, changedPaths = null) {
   const failed = new Set(errors.map((error) => error.file));
   const drawable = [...shareImages.values()].filter((image) => !failed.has(image.owner));
   return { errors: sortErrors(errors), articleErrorsOnly, articles, pages: [...shown.values()], home, siteFiles, assetFiles, assetSources, shareImages: drawable, publicFiles };
+}
+
+function touchesArticle(found, changedPaths) {
+  if (changedPaths === null) return true;
+  const own = [found.file, ...found.files.map((file) => posix.join(found.dir, file))];
+  return changedPaths.some((changed) => found.dir === changed || found.dir.startsWith(`${changed}/`) || own.some((path) => path === changed || path.startsWith(`${changed}/`)));
 }
 
 function shownPages(articles, pages, lastGood, config, errors) {

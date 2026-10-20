@@ -294,6 +294,21 @@ describe('preview updates', () => {
     assert.deepEqual(fourth.errors, []);
   });
 
+  test('a change in an article folder nested inside another article folder parses only the nested article again', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/llm/index.md': article({ slug: 'llm' }),
+      'content/posts/llm/rope/index.md': article(),
+    });
+    const site = createSite(dir);
+    const byFile = (result) => new Map(result.articles.map((entry) => [entry.file, entry]));
+    const first = byFile(await updateSite(site));
+    writeFileSync(join(dir, 'content/posts/llm/rope/index.md'), article({ body: 'Changed.\n' }));
+    const second = byFile(await updateSite(site, ['content/posts/llm/rope/index.md']));
+    assert.equal(second.get('content/posts/llm/index.md'), first.get('content/posts/llm/index.md'));
+    assert.notEqual(second.get('content/posts/llm/rope/index.md'), first.get('content/posts/llm/rope/index.md'));
+  });
+
   test('compiles a theme again when a file that it imports from another folder under themes/ changes', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
