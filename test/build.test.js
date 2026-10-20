@@ -10,6 +10,23 @@ import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
+const plainPage = `import { For } from 'solid-js';
+
+export default function Page(props) {
+  return (
+    <html lang={props.site.language}>
+      <head>
+        <For each={props.assets.styles}>{(href) => <link rel="stylesheet" href={href} />}</For>
+        <For each={props.assets.scripts}>{(src) => <script defer src={src} />}</For>
+      </head>
+      <body>
+        <main innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
+      </body>
+    </html>
+  );
+}
+`;
+
 const siteFiles = ['404.html', '_bake/articles.json', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
 
 function articleFiles(tree) {
@@ -357,6 +374,10 @@ describe('bake build', () => {
       'content/posts/files/d e.svg': vector,
       'content/posts/host/index.md': article({ title: 'Host', slug: 'host', date: '2026-10-18', extra: 'cover: d e.svg\n', body: '![Cover](d%20e.svg)\n\n:::embed\n/2026-10/files/#files\n:::\n' }),
       'content/posts/host/d e.svg': vector,
+      'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-10-17', extra: 'theme: "plain#1 %"\n' }),
+      'themes/plain#1 %/page.jsx': plainPage,
+      'themes/plain#1 %/client.jsx': "import './plain.css';\n",
+      'themes/plain#1 %/plain.css': 'main { color: #985b57; }\n',
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
@@ -397,10 +418,12 @@ describe('bake build', () => {
       '2026-10/host/index.html src ../../2026-10/files/a%231.webp',
       '2026-10/host/index.html href ../../2026-10/files/b%3F1.json',
       '2026-10/host/index.html data-params ../../2026-10/files/a%231.png',
+      '2026-10/plain/index.html href ../../assets/plain%231%20%25-',
+      '2026-10/plain/index.html src ../../assets/plain%231%20%25-',
       'index.html data-preview 2026-10/files/c%251.js',
       'index.html src 2026-10/host/d%20e.svg',
     ]) {
-      assert.ok(addresses.includes(expected), `${expected} is not among the addresses ${addresses.join(', ')}`);
+      assert.ok(addresses.some((address) => address.startsWith(expected)), `${expected} is not among the addresses ${addresses.join(', ')}`);
     }
   });
 });
