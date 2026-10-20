@@ -32,8 +32,7 @@ export function startHome(home) {
     (entries) => {
       if (!withoutHover.matches) return;
       for (const entry of entries) {
-        if (entry.isIntersecting) previews.get(entry.target).play();
-        else previews.get(entry.target).pause();
+        previews.get(entry.target).want('middle', entry.isIntersecting);
       }
     },
     { rootMargin: MIDDLE_BAND },
@@ -46,13 +45,13 @@ export function startHome(home) {
     band.observe(card);
     screen.observe(card);
     card.addEventListener('pointerenter', () => {
-      if (!withoutHover.matches) preview.play();
+      if (!withoutHover.matches) preview.want('pointer', true);
     });
     card.addEventListener('pointerleave', () => {
-      if (!withoutHover.matches) preview.pause();
+      if (!withoutHover.matches) preview.want('pointer', false);
     });
-    card.addEventListener('focus', () => preview.play());
-    card.addEventListener('blur', () => preview.pause());
+    card.addEventListener('focus', () => preview.want('focus', true));
+    card.addEventListener('blur', () => preview.want('focus', false));
   }
   reducedMotion.addEventListener('change', () => previews.forEach((preview) => preview.sync()));
   addEventListener('scroll', scrollHold(previews), { passive: true });
@@ -202,12 +201,12 @@ function moveCards(before, change) {
 function cardPreview(card) {
   let state = 'idle';
   let controller = null;
-  let wanted = false;
+  const reasons = new Set();
   let running = false;
   let onScreen = false;
   let held = false;
   const sync = () => {
-    const play = wanted && onScreen && !held && controller !== null && !reducedMotion.matches;
+    const play = reasons.size > 0 && onScreen && !held && controller !== null && !reducedMotion.matches;
     if (play === running) return;
     running = play;
     try {
@@ -248,13 +247,14 @@ function cardPreview(card) {
         console.error(`the preview ${card.dataset.preview} cannot be shown`, error);
       }
     },
-    play() {
-      wanted = true;
-      card.dataset.active = '';
+    want(reason, wanted) {
+      if (wanted) reasons.add(reason);
+      else reasons.delete(reason);
+      card.toggleAttribute('data-active', reasons.size > 0);
       sync();
     },
     pause() {
-      wanted = false;
+      reasons.clear();
       delete card.dataset.active;
       sync();
     },

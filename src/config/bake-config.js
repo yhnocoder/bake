@@ -6,7 +6,7 @@ import { parse } from 'acorn';
 import { DEFAULT_PET, petSourceProblem } from './pet.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
 import { HOME_COLUMNS, TOC_STYLES } from '../choices.js';
-import { choiceProblem, slugProblem } from './rules.js';
+import { characterProblem, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
 
@@ -184,7 +184,8 @@ function validateCategories(categories, report) {
     }
     check('name', textProblem(`${label}.name`, name));
     check('color', typeof color === 'string' && HEX_COLOR.test(color) ? null : `${label}.color must be a hex color in the form #rrggbb, got ${describeValue(color)}`);
-    if (typeof desc !== 'string') report([...path, 'desc'], 'value', `${label}.desc must be a string, got ${describeValue(desc)}`);
+    const descProblem = typeof desc === 'string' ? characterProblem(`${label}.desc`, desc) : `${label}.desc must be a string, got ${describeValue(desc)}`;
+    if (descProblem !== null) report([...path, 'desc'], 'value', descProblem);
     return { id, name, color, desc };
   });
 }
@@ -200,7 +201,7 @@ function labelPath(path) {
 }
 
 function textProblem(label, value) {
-  return typeof value === 'string' && value.trim() !== '' ? null : `${label} must be a non-empty string, got ${describeValue(value)}`;
+  return typeof value === 'string' && value.trim() !== '' ? characterProblem(label, value) : `${label} must be a non-empty string, got ${describeValue(value)}`;
 }
 
 function urlProblem(value) {

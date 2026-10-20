@@ -74,7 +74,7 @@ export function tabsView({ outline, labels, host, reserve, jumping }) {
       else measure();
     },
     relayout() {
-      if (current !== null) measure();
+      if (current !== null) withoutTransition(items.flatMap((item) => [item.tab, item.title]), measure);
     },
     destroy() {
       root.remove();

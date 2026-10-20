@@ -119,7 +119,7 @@ function monthGroups(articles) {
     if (!months.has(month)) months.set(month, []);
     months.get(month).push(article);
   }
-  return [...months].sort(([a], [b]) => (a < b ? 1 : -1)).map(([month, entries]) => ({ id: `month-${month}`, month, articles: entries }));
+  return [...months].map(([month, entries]) => ({ id: `month-${month}`, month, articles: entries }));
 }
 
 function Switch(props) {

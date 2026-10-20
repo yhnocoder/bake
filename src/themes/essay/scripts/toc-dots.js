@@ -68,10 +68,8 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
       if (jumping() && current !== null) return;
       const next = Math.max(0, state.chapter);
       items.forEach((entry, index) => {
-        if (next !== current) {
-          entry.item.classList.toggle('is-read', index < next);
-          entry.item.classList.toggle('is-current', index === next);
-        }
+        entry.item.classList.toggle('is-read', index < next);
+        entry.item.classList.toggle('is-current', index === next);
         const progress = index === next && state.chapter >= 0 ? state.progress.toFixed(4) : '0';
         if (progress === entry.progress) return;
         entry.progress = progress;
@@ -84,7 +82,7 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
       else measure();
     },
     relayout() {
-      if (current !== null) measure();
+      if (current !== null) withoutTransition(items.flatMap((entry) => [entry.item, entry.dot]), measure);
     },
     destroy() {
       root.remove();

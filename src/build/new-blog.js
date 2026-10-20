@@ -2,6 +2,7 @@ import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { CONFIG_FILE } from '../config/bake-config.js';
 import { POSTS_DIR } from './articles.js';
+import { BUILD_DIRS } from './dist.js';
 import { articleUrl } from '../urls.js';
 
 const EXAMPLE_SLUG = 'hello';
@@ -46,7 +47,7 @@ function nearestExisting(path) {
 
 function blogFiles(name, date) {
   return {
-    [CONFIG_FILE]: ['export default {', `  title: '${name.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}',`, "  url: 'https://example.github.io',", "  language: 'zh-CN',", '};', ''].join('\n'),
+    [CONFIG_FILE]: ['export default {', `  title: ${JSON.stringify(name)},`, "  url: 'https://example.github.io',", "  language: 'zh-CN',", '};', ''].join('\n'),
     [`${POSTS_DIR}/${EXAMPLE_SLUG}/index.md`]: [
       '---',
       'title: Hello',
@@ -68,6 +69,6 @@ function blogFiles(name, date) {
       '$$',
       '',
     ].join('\n'),
-    '.gitignore': ['node_modules/', 'dist/', '.dist-staging/', '.dist-previous/', ''].join('\n'),
+    '.gitignore': [...['node_modules', ...BUILD_DIRS].map((dir) => `${dir}/`), ''].join('\n'),
   };
 }

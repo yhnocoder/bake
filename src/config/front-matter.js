@@ -1,7 +1,7 @@
 import { LineCounter, isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { describeValue, errorAt, fileStart } from '../report.js';
 import { TOC_STYLES } from '../choices.js';
-import { choiceProblem, folderFile, folderPath, slugProblem } from './rules.js';
+import { characterProblem, choiceProblem, folderFile, folderPath, slugProblem } from './rules.js';
 import { CONFIG_FILE } from './bake-config.js';
 
 const REQUIRED = ['title', 'slug', 'date'];
@@ -70,9 +70,13 @@ export function readFrontMatter(file, source, rules, errors) {
 function fieldProblem(name, value, node, rules) {
   const message = fieldMessage(name, value, rules);
   if (message) return { message };
-  const item = name === 'tags' ? value.findIndex((tag) => typeof tag !== 'string') : -1;
-  if (item !== -1) return { node: isSeq(node) ? node.items[item] : node, message: 'tags must be a list of strings' };
-  return null;
+  if (name !== 'tags') {
+    const problem = name === 'title' || name === 'summary' ? characterProblem(name, value) : null;
+    return problem === null ? null : { message: problem };
+  }
+  const item = value.findIndex((tag) => typeof tag !== 'string' || characterProblem('tag', tag) !== null);
+  if (item === -1) return null;
+  return { node: isSeq(node) ? node.items[item] : node, message: typeof value[item] === 'string' ? characterProblem('tags', value[item]) : 'tags must be a list of strings' };
 }
 
 function fieldMessage(name, value, rules) {

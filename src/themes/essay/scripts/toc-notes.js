@@ -1,5 +1,5 @@
 import { reducedMotion } from 'bake/theme/client';
-import { createElement } from './toc-card.js';
+import { createElement, withoutTransition } from './toc-card.js';
 import { ticksColumn } from './toc-ticks.js';
 
 export const RAIL_CARD = { variant: 'panel', showDelay: 160 };
@@ -96,6 +96,10 @@ function notesList(list, outline) {
     if (Math.abs(list.scrollTop - top) > 1) list.scrollTo({ top, behavior: smooth && !reducedMotion.matches ? 'smooth' : 'instant' });
   }
 
+  function placeInstantly() {
+    withoutTransition([marker], placeMarker);
+  }
+
   function placeMarker() {
     const target = current >= 0 ? rows[current] : undefined;
     if (target === undefined || list.clientHeight === 0) {
@@ -109,12 +113,13 @@ function notesList(list, outline) {
     const top = offset + (chapter ? padding - 2 : 3);
     const height = title.offsetHeight - (chapter ? padding + 1 : 6);
     marker.style.transform = `translateY(${top}px) scaleY(${height / MARKER_HEIGHT})`;
+    // why: classList.add writes the class attribute even when the class is already there, and toggle with true does not
     marker.classList.toggle('is-on', true);
   }
 
   return {
     centre,
-    relayout: placeMarker,
+    relayout: placeInstantly,
     update(state) {
       const key = `${state.entry} ${state.chapter} ${state.section} ${state.read.join()}`;
       if (key === drawn) return;

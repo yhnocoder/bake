@@ -23,7 +23,6 @@ export function ticksColumn({ outline, labels, article, reserve }, rail = false)
     return row;
   });
   let left = RAIL_LEFT;
-  let drawn = null;
   const relayout = () => {
     const room = innerHeight - 2 * (reserve + ENTRY_GAP);
     const fitting = (room - (outline.chapters.length - 1) * CHAPTER_GAP) / rows.length;
@@ -41,9 +40,6 @@ export function ticksColumn({ outline, labels, article, reserve }, rail = false)
     relayout,
     anchor: (chapter) => ({ left: left + COLUMN_WIDTH + CARD_GAP, top: rows[outline.chapters[chapter].index].getBoundingClientRect().top - CARD_RISE }),
     update(state) {
-      const key = `${state.entry} ${state.read.join()}`;
-      if (key === drawn) return;
-      drawn = key;
       rows.forEach((row, index) => {
         row.classList.toggle('is-current', index === state.entry);
         row.classList.toggle('is-read', state.read[index] || index < state.entry);

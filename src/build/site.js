@@ -16,12 +16,12 @@ import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
 import { articleEntry, newestFirst } from './entries.js';
 import { listFiles } from './files.js';
-import { indexPages } from './links.js';
-import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
+import { checkDuplicateUrls, indexPages } from './links.js';
+import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, chatCatalogJson, feedXml, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
 import { THEME_OPTIONS_FILE, optionProblem, readThemeOptions } from './theme-options.js';
-import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from '../urls.js';
+import { absoluteLink, articleUrl, encodePath, pageRoot, siteLink, sitePath } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
 
@@ -48,11 +48,11 @@ export async function updateSite(site, changedPaths = null) {
     site.bundle = null;
   }
   const { settings } = site;
-  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articleErrorsOnly: false, articles: [], pages: [], siteFiles: [], assetFiles: [], shareImages: [], publicFiles: [] };
+  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articleErrorsOnly: false, articles: [], pages: [], siteFiles: [], assetFiles: [], assetSources: new Map(), shareImages: [], publicFiles: [] };
   const articles = [];
   for (const found of findArticles(root)) {
     const cached = site.articles.get(found.file);
-    const unchanged = cached !== undefined && !touches(found.dir) && cached.files.join('\n') === found.files.join('\n');
+    const unchanged = cached !== undefined && !touchesArticle(found, changedPaths) && cached.files.join('\n') === found.files.join('\n');
     articles.push(unchanged ? cached : await loadArticle(root, found, settings));
   }
   site.articles = new Map(articles.map((article) => [article.file, article]));
@@ -63,8 +63,9 @@ export async function updateSite(site, changedPaths = null) {
   const published = articles.filter((article) => article.url !== null && (site.drafts || !article.draft));
   const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), chatBundle()]);
   const assetFiles = assetOutputs(themes, bundle, chat);
+  const assetSources = new Map(site.shareImages ? assetFiles.map((file) => [file.path, file.render()]) : []);
   const current = published.map((article) => ({ article, entry: articleEntry(article, config) }));
-  const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, current, config, assetFiles, errors) : new Map();
+  const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, current, config, assetSources, errors) : new Map();
   const pageSettings = { config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
   const pages = current.map(({ article, entry }) => ({ article, entry, outputs: articleOutputs(root, article, entry, pageSettings, errors) }));
   const shown = shownPages(articles, pages, site.lastGood, config, errors);
@@ -85,7 +86,15 @@ export async function updateSite(site, changedPaths = null) {
   const articleFiles = new Set(articles.map((article) => article.file));
   const articleErrorsOnly = errors.every((error) => articleFiles.has(error.file));
   if (articleErrorsOnly) site.lastGood = shown;
-  return { errors: sortErrors(errors), articleErrorsOnly, articles, pages: [...shown.values()], home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
+  const failed = new Set(errors.map((error) => error.file));
+  const drawable = [...shareImages.values()].filter((image) => !failed.has(image.owner));
+  return { errors: sortErrors(errors), articleErrorsOnly, articles, pages: [...shown.values()], home, siteFiles, assetFiles, assetSources, shareImages: drawable, publicFiles };
+}
+
+function touchesArticle(found, changedPaths) {
+  if (changedPaths === null) return true;
+  const own = [found.file, ...found.files.map((file) => posix.join(found.dir, file))];
+  return changedPaths.some((changed) => found.dir === changed || found.dir.startsWith(`${changed}/`) || own.some((path) => path === changed || path.startsWith(`${changed}/`)));
 }
 
 function shownPages(articles, pages, lastGood, config, errors) {
@@ -138,8 +147,7 @@ async function compileThemes(site, published, config, errors) {
   return themes;
 }
 
-function shareImagesOf(root, pages, config, assetFiles, errors) {
-  const sources = new Map(assetFiles.map((file) => [file.path, file.render()]));
+function shareImagesOf(root, pages, config, sources, errors) {
   const failed = new Set(errors.map((error) => error.file));
   const listed = pages.filter(({ article, entry }) => !entry.draft && article.fields.page === undefined && !failed.has(article.file));
   return new Map(listed.map((page) => [page.article.file, shareImageOf(root, page, config, sources)]));
@@ -181,11 +189,14 @@ function assetLinks(root, paths) {
 function renderSitePage(config, themes, label, errors, render) {
   const theme = themes.get(config.theme);
   if (theme === null) return '';
+  return renderDocument(() => render(theme), posix.join(THEMES_DIR, config.theme), `the ${config.theme} theme cannot render ${label}`, errors);
+}
+
+function renderDocument(render, file, failure, errors) {
   try {
-    return `<!doctype html>\n${render(theme)}\n`;
+    return `<!doctype html>\n${render()}\n`;
   } catch (error) {
-    const folder = posix.join(THEMES_DIR, config.theme);
-    errors.push(errorAt(folder, fileStart, `the ${config.theme} theme cannot render ${label}: ${error instanceof Error ? error.message : String(error)}`));
+    errors.push(errorAt(file, fileStart, `${failure}: ${error instanceof Error ? error.message : String(error)}`));
     return '';
   }
 }
@@ -348,12 +359,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };
-  try {
-    return `<!doctype html>\n${theme.render(props)}\n`;
-  } catch (error) {
-    errors.push(errorAt(article.file, fileStart, `the ${name} theme cannot render this article: ${error instanceof Error ? error.message : String(error)}`));
-    return '';
-  }
+  return renderDocument(() => theme.render(props), article.file, `the ${name} theme cannot render this article`, errors);
 }
 
 function shareImageProps(config, image) {
