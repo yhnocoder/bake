@@ -113,6 +113,7 @@ function notesList(list, outline) {
     const top = offset + (chapter ? padding - 2 : 3);
     const height = title.offsetHeight - (chapter ? padding + 1 : 6);
     marker.style.transform = `translateY(${top}px) scaleY(${height / MARKER_HEIGHT})`;
+    // why: classList.add writes the class attribute even when the class is already there, and toggle with true does not
     marker.classList.toggle('is-on', true);
   }
 
