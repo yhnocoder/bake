@@ -24,7 +24,8 @@ const MODULE_SCRIPT_SCHEMES = ['http:', 'https:'];
 export function prepaintScript(pageSteps = '') {
   const choices = JSON.stringify(Object.fromEntries(Object.entries(SETTINGS).map(([name, setting]) => [name, setting.values])));
   const settingSteps = `try{var s=${choices},d=document.documentElement.dataset;for(var k in s){var v=localStorage.getItem('${storageKey('')}'+k);if(d[k]!==undefined&&s[k].indexOf(v)>=0)d[k]=v}}catch(e){}`;
-  return `if(${JSON.stringify(MODULE_SCRIPT_SCHEMES)}.indexOf(location.protocol)>=0){document.documentElement.dataset.script='on';${settingSteps}${pageSteps}}`;
+  const schemeSteps = `var t=document.documentElement.dataset.theme;if(t!==undefined)document.documentElement.dataset.scheme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;`;
+  return `if(${JSON.stringify(MODULE_SCRIPT_SCHEMES)}.indexOf(location.protocol)>=0){document.documentElement.dataset.script='on';${settingSteps}${schemeSteps}${pageSteps}}`;
 }
 
 export function homePrepaintSteps(groups) {

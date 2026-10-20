@@ -478,12 +478,13 @@ test('components run in the browser', async (t) => {
     assert.equal(await themes(), 0);
     await page.click('.bk-settings-toggle');
     await page.click('[data-setting="theme"] [data-value="dark"]');
-    assert.equal(await themes(), 1);
+    await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '1');
     await page.click('[data-setting="theme"] [data-value="system"]');
-    assert.equal(await themes(), 2);
+    await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '2');
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '3');
     await page.click('[data-setting="theme"] [data-value="light"]');
+    await page.waitForFunction(() => document.querySelector('.count-view-text').dataset.themes === '4');
     await page.emulateMedia({ colorScheme: 'light' });
     assert.equal(await themes(), 4);
     await page.close();

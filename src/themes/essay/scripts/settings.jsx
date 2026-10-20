@@ -3,7 +3,7 @@ import { render } from 'solid-js/web';
 import { labelsFor } from '../labels.js';
 import { SETTINGS, storageKey } from '../settings.js';
 import { closeOnEscape } from './escape.js';
-import { layoutChanged } from './motion.js';
+import { layoutChanged, reducedMotion } from './motion.js';
 
 export const SETTING_EVENT = 'bk:setting';
 const THEME_EVENT = 'bake:theme';
@@ -22,14 +22,70 @@ function settingValue(name) {
 }
 
 export function chooseSetting(name, value) {
-  document.documentElement.dataset[name] = value;
   try {
     localStorage.setItem(storageKey(name), value);
   } catch {}
   values[name][1](value);
+  if (name === 'theme') {
+    switchTheme(value);
+    return;
+  }
+  document.documentElement.dataset[name] = value;
   document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
-  if (name === 'theme') document.dispatchEvent(new CustomEvent(THEME_EVENT));
   if (settingRows.find((row) => row.name === name)?.changesLayout) layoutChanged();
+}
+
+const darkScheme = matchMedia('(prefers-color-scheme: dark)');
+
+function switchTheme(value) {
+  fadeColours(() => {
+    document.documentElement.dataset.theme = value;
+    document.documentElement.dataset.scheme = value === 'system' ? systemScheme() : value;
+    document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name: 'theme', value } }));
+    document.dispatchEvent(new CustomEvent(THEME_EVENT));
+  });
+}
+
+function coloursFade() {
+  return document.startViewTransition !== undefined && !reducedMotion.matches && document.visibilityState === 'visible';
+}
+
+let fade = null;
+
+function fadeColours(apply) {
+  if (!coloursFade()) {
+    apply();
+    return;
+  }
+  const transition = document.startViewTransition(apply);
+  fade = transition;
+  transition.finished.finally(() => {
+    if (fade === transition) fade = null;
+  });
+}
+
+function systemScheme() {
+  return darkScheme.matches ? 'dark' : 'light';
+}
+
+function endFadeOnPress() {
+  addEventListener(
+    'pointerdown',
+    (event) => {
+      if (fade === null || event.target !== document.documentElement) return;
+      event.stopImmediatePropagation();
+      fade.skipTransition();
+    },
+    true,
+  );
+}
+
+function followSystemScheme() {
+  if (settingValue('theme') !== 'system') return;
+  fadeColours(() => {
+    document.documentElement.dataset.scheme = systemScheme();
+    document.dispatchEvent(new CustomEvent(THEME_EVENT));
+  });
 }
 
 export function startSettings() {
@@ -37,9 +93,8 @@ export function startSettings() {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <Settings labels={labels} />, host);
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (settingValue('theme') === 'system') document.dispatchEvent(new CustomEvent(THEME_EVENT));
-  });
+  darkScheme.addEventListener('change', followSystemScheme);
+  endFadeOnPress();
 }
 
 function Settings(props) {

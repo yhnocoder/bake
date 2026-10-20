@@ -279,12 +279,10 @@ test('the essay theme lays out articles', async (t) => {
     await lightSystem.close();
   });
 
-  await t.test('display math shows a scroll shadow only on an overflowing side, during and after a theme switch', async () => {
+  await t.test('display math shows a scroll shadow only on an overflowing side in both schemes, also in the first frame after a theme switch', async () => {
     const problems = [];
     for (const width of [1440, 375]) {
       const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Animation.enable');
       const edges = async () => {
         const boxes = await page.evaluate(() =>
           [...document.querySelectorAll('.bk-article mjx-container[display]')].map((formula) => {
@@ -308,13 +306,11 @@ test('the essay theme lays out articles', async (t) => {
       await page.locator('mjx-container[display]').nth(1).scrollIntoViewIfNeeded();
       await settle(page);
       await check('in the light scheme');
-      await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
-      await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
-      await page.waitForTimeout(600);
-      const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      assert.ok(!['rgb(245, 246, 244)', 'rgb(17, 20, 19)'].includes(background), `the switch is still running, ${background}`);
-      await check('while switching to the dark scheme');
-      await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 });
+      await page.evaluate(async () => {
+        document.documentElement.dataset.theme = 'dark';
+        await new Promise((done) => requestAnimationFrame(done));
+      });
+      await check('in the first frame of the dark scheme');
       await page.waitForTimeout(400);
       await check('in the dark scheme');
       if (width === 375) assert.ok((await edges()).some((edge) => edge.overflows), 'a formula overflows on a phone');
