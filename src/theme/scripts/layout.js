@@ -12,8 +12,8 @@ const QUOTES = /^["']|["']$/g;
 let schedule = () => {};
 let last = null;
 
-export function requestLayout({ arrange = false, fresh = arrange } = {}) {
-  schedule(arrange, fresh);
+export function requestLayout({ arrange = false, fresh = arrange, now = false } = {}) {
+  schedule(arrange, fresh, now);
 }
 
 export function currentLayout(article) {
@@ -25,7 +25,7 @@ export function startLayout(article, arrangements) {
   let arrangePending = true;
   let freshPending = true;
   let width = null;
-  const pass = oncePerFrame(() => {
+  const run = () => {
     if (arrangePending) {
       const fresh = freshPending;
       arrangePending = false;
@@ -34,11 +34,13 @@ export function startLayout(article, arrangements) {
     }
     last = measure(article);
     document.dispatchEvent(new CustomEvent(LAYOUT_EVENT, { detail: last }));
-  });
-  schedule = (arrange, fresh = false) => {
+  };
+  const pass = oncePerFrame(run);
+  schedule = (arrange, fresh = false, now = false) => {
     if (arrange) arrangePending = true;
     if (fresh) freshPending = true;
-    pass();
+    if (now) run();
+    else pass();
   };
   new ResizeObserver(([entry]) => {
     const changed = entry.contentRect.width !== width;

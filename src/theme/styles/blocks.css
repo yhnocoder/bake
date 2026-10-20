@@ -87,7 +87,7 @@
   padding: 14px 18px;
   border-radius: 8px;
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--reader-scale));
   line-height: 1.65;
   font-variant-ligatures: none;
   tab-size: 4;
@@ -103,11 +103,11 @@
 }
 
 .bk-article :is(li, td, th, aside, details, blockquote, .example-result) > pre.shiki:where(:not(.component-box *)) {
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
 }
 
 .bk-article .table-scroll:where(:not(.component-box *)) {
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
@@ -120,7 +120,7 @@
 .bk-article table:where(:not(.component-box *)) {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--reader-scale));
   line-height: 1.6;
   overflow-wrap: normal;
 }
@@ -204,7 +204,7 @@
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-  font-size: 14px;
+  font-size: calc(14px * var(--reader-scale));
   line-height: 1.7;
   color: var(--ink-2);
 }
@@ -277,7 +277,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article .figure[data-float] > figcaption:where(:not(.component-box *)) {
   margin-top: 6px;
   padding-top: 4px;
-  font-size: 13px;
+  font-size: calc(13px * var(--reader-scale));
 }
 
 .bk-article .aside:where(:not(.component-box *)) {
@@ -286,14 +286,14 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   padding: 18px 24px;
   border-radius: 12px;
   background: var(--surface-2);
-  font-size: 15.5px;
-  line-height: 1.8;
+  font-size: calc(15.5px * var(--reader-scale));
+  line-height: calc(1.8 + var(--leading-shift));
 }
 
 .bk-article .aside-title:where(:not(.component-box *)) {
   margin: 0 0 4px;
   font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--reader-scale));
   font-weight: 600;
   line-height: 1.6;
   letter-spacing: 0.04em;
@@ -310,8 +310,8 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   padding: 18px 26px;
   border-radius: 12px;
   background: var(--surface-2);
-  font-size: 17.5px;
-  line-height: 1.75;
+  font-size: calc(17.5px * var(--reader-scale));
+  line-height: calc(1.75 + var(--leading-shift));
 }
 
 .bk-article .quote > blockquote:where(:not(.component-box *)) {
@@ -325,7 +325,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article .quote > figcaption:where(:not(.component-box *)) {
   margin-top: 12px;
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--reader-scale));
   line-height: 1.6;
   color: var(--ink-3);
 }
@@ -350,7 +350,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   list-style: none;
   border-radius: 6px;
   font-weight: 700;
-  font-size: 16px;
+  font-size: calc(16px * var(--reader-scale));
   color: var(--ink-2);
   user-select: none;
   -webkit-user-select: none;
@@ -410,7 +410,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article details.fold:where(:not(.component-box *))::details-content {
   padding-left: 18px;
   border-left: 2px solid var(--line);
-  font-size: 16px;
+  font-size: calc(16px * var(--reader-scale));
 }
 
 .bk-article details.fold[open]:where(:not(.component-box *))::details-content {
@@ -431,7 +431,7 @@ html:not([data-script]) .bk-article .component > .component-box::before {
   margin: 48px 0 26px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--reader-scale));
   line-height: 1.7;
 }
 
@@ -443,15 +443,15 @@ h4 + .bk-references {
 
 .bk-references-label {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--reader-scale));
   color: var(--ink-3);
 }
 
 .bk-article .references:where(:not(.component-box *)) {
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
   padding: 0;
   list-style: none;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--reader-scale));
   line-height: 1.7;
 }
 
@@ -472,7 +472,7 @@ h4 + .bk-references {
   margin-left: calc(-2.4em - 8px);
   margin-right: 8px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--reader-scale));
   color: var(--ink-3);
   user-select: none;
   -webkit-user-select: none;
@@ -492,11 +492,11 @@ h4 + .bk-references {
 
 .bk-article [data-block]:where(:not(.component-box *)) {
   clear: both;
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
   padding: 14px 18px;
   border: 1px dashed var(--line-2);
   border-radius: 10px;
-  font-size: 14px;
+  font-size: calc(14px * var(--reader-scale));
   line-height: 1.7;
   color: var(--ink-2);
 }
@@ -510,13 +510,13 @@ h4 + .bk-references {
   display: block;
   margin-bottom: 4px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--reader-scale));
   color: var(--ink-3);
 }
 
 .bk-article .embed:where(:not(.component-box *)) {
   clear: both;
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
   padding-left: 18px;
   border-left: 2px solid var(--line);
 }
@@ -531,12 +531,12 @@ h4 + .bk-references {
 
 .bk-article .embed :is(h2, h3, h4, h5, h6):where(:not(.component-box *)) {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: calc(18px * var(--reader-scale));
   line-height: 1.5;
 }
 
 .bk-article .embed h2:where(:not(.component-box *)) {
-  font-size: 21px;
+  font-size: calc(21px * var(--reader-scale));
   line-height: 1.4;
 }
 
@@ -547,7 +547,7 @@ h4 + .bk-references {
 .bk-article .embed-source:where(:not(.component-box *)) {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: calc(12px * var(--reader-scale));
   line-height: 1.6;
   color: var(--ink-3);
 }
@@ -587,16 +587,16 @@ h4 + .bk-references {
 .bk-article .embed-number:where(:not(.component-box *)) {
   margin-left: 0.4em;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--reader-scale));
   font-variant-numeric: tabular-nums;
 }
 
 .bk-article .recap:where(:not(.component-box *)) {
-  margin: 0 0 16px;
+  margin: 0 0 var(--paragraph-gap);
   padding-left: 12px;
   border-left: 2px solid var(--line-2);
-  font-size: 14.5px;
-  line-height: 1.75;
+  font-size: calc(14.5px * var(--reader-scale));
+  line-height: calc(1.75 + var(--leading-shift));
   color: var(--ink-2);
 }
 
@@ -711,7 +711,7 @@ h4 + .bk-references {
 
   .bk-article :is(.quote, blockquote:not(.quote > blockquote)):where(:not(.component-box *)) {
     padding: 14px 18px;
-    font-size: 16.5px;
+    font-size: calc(16.5px * var(--reader-scale));
   }
 
   .bk-article .aside:where(:not(.component-box *)) {

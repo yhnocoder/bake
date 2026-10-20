@@ -50,8 +50,8 @@
   --scroll-cover: var(--surface);
   background: var(--surface);
   box-shadow: var(--shadow);
-  font-size: calc(var(--body-size) - 1px);
-  line-height: 1.8;
+  font-size: calc(var(--reading-size) - 1px);
+  line-height: calc(1.8 + var(--leading-shift));
 }
 
 .bt-card[data-span='page'] {
@@ -65,29 +65,29 @@
 
 .bt-card > h2:where(:not(.component-box *)) {
   margin: 0 0 14px;
-  font-size: 21px;
+  font-size: calc(21px * var(--reader-scale));
   line-height: 1.4;
 }
 
 .bt-card > h2 > .bk-chapter-number {
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--reader-scale));
 }
 
 .bt-card > h2 > .bk-heading-link {
   left: -1em;
-  font-size: 18px;
+  font-size: calc(18px * var(--reader-scale));
 }
 
 .bt-card > h3:where(:not(.component-box *)) {
   margin: 26px 0 8px;
-  font-size: 18px;
+  font-size: calc(18px * var(--reader-scale));
   line-height: 1.5;
 }
 
 .bt-card > :is(h4, h5, h6):where(:not(.component-box *)) {
   margin: 22px 0 6px;
-  font-size: 15.5px;
+  font-size: calc(15.5px * var(--reader-scale));
 }
 
 .bt-card > .bt-recap:where(:not(.component-box *)) {
@@ -98,7 +98,7 @@
   margin: -6px 0 18px;
   padding-left: 0;
   border-left: 0;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--reader-scale));
   line-height: 1.7;
   color: var(--recap);
   text-wrap: pretty;
@@ -109,7 +109,7 @@
 }
 
 .bt-card .embed h2:where(:not(.component-box *)) {
-  font-size: 18px;
+  font-size: calc(18px * var(--reader-scale));
   line-height: 1.5;
 }
 
@@ -162,7 +162,7 @@
 
 .bt-article .sidenote-ref {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--reader-scale));
   font-style: normal;
   font-weight: 400;
   line-height: 0;
@@ -205,8 +205,8 @@
   margin: -2px -8px;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: calc(13px * var(--reader-scale));
+  line-height: calc(1.7 + var(--leading-shift));
   color: var(--ink-2);
 }
 
@@ -230,7 +230,7 @@
   border-radius: 3px;
   padding: 0 2px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--reader-scale));
   color: var(--accent);
 }
 

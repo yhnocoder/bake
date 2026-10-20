@@ -4,10 +4,15 @@ export const SETTINGS = {
   toc: { values: TOC_STYLES, initial: (article) => article.toc },
   theme: { values: ['system', 'light', 'dark'], initial: () => 'system' },
   font: { values: ['sans', 'wenkai'], initial: () => 'sans' },
+  size: { values: ['small', 'medium', 'large', 'larger'], initial: () => 'medium' },
+  weight: { values: ['light', 'regular', 'bold'], initial: () => 'regular' },
+  spacing: { values: ['tight', 'normal', 'loose'], initial: () => 'normal' },
   buttons: { values: ['autohide', 'always'], initial: () => 'autohide' },
 };
 
 export const SITE_SETTINGS = ['theme', 'font'];
+
+export const READING_SETTINGS = [...SITE_SETTINGS, 'size', 'weight', 'spacing'];
 
 export function storageKey(name) {
   return `bk-${name}`;
