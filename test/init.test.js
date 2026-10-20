@@ -41,6 +41,27 @@ describe('bake init', () => {
     assert.equal(readFileSync(join(dir, 'bake.config.js'), 'utf8'), validConfig);
   });
 
+  test('reports a folder argument that names a file, or a file where it needs a folder, and writes nothing', (t) => {
+    const dir = createBlog(t, { afile: 'x\n', 'blocked/content/posts/hello': 'x\n' });
+    for (const [folder, path] of [
+      ['afile', 'afile'],
+      ['afile/sub', 'afile'],
+      ['blocked', 'blocked/content/posts/hello'],
+    ]) {
+      const result = bake(dir, 'init', folder);
+      assert.equal(result.status, 1, folder);
+      assert.equal(result.stderr, `bake init: ${path} already exists; run bake init in a new or empty folder\n`, folder);
+    }
+    assert.deepEqual(readdirSync(join(dir, 'blocked')), ['content']);
+  });
+
+  test('quotes a folder with spaces in the next command', (t) => {
+    const dir = createBlog(t, {});
+    const result = bake(dir, 'init', "my blog's");
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.endsWith("Next: cd 'my blog'\\''s' && bake dev\n"), result.stdout);
+  });
+
   test('rejects options and a second folder with the usage line', (t) => {
     const dir = createBlog(t, {});
     for (const args of [['a', 'b'], ['--force']]) {

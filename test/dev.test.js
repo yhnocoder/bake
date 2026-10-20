@@ -53,6 +53,12 @@ describe('bake dev', () => {
     assert.deepEqual(lines.slice(1), [`Serving the blog at http://localhost:${server.port}/`]);
   });
 
+  test('prints a loopback address other than 127.0.0.1 as it is, because localhost does not reach it', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const { server, lines } = await start(t, dir, { host: '127.0.0.5' });
+    assert.ok(lines.includes(`Serving the blog at http://127.0.0.5:${server.port}/`), lines.join('\n'));
+  });
+
   test('listens on the loopback address by default and prints only the local address', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const { server, lines } = await start(t, dir);

@@ -45,8 +45,12 @@ function runInit(args) {
   const folder = args[0] ?? '.';
   const result = newBlog(folder, localDate(new Date()));
   if (result.error) return fail(result.error);
-  const next = folder === '.' ? 'bake dev' : `cd ${folder} && bake dev`;
+  const next = folder === '.' ? 'bake dev' : `cd ${shellWord(folder)} && bake dev`;
   console.log([`Created a blog in ${result.root}:`, ...result.files.map((file) => `  ${file}`), `The first post is at ${result.url}. Next: ${next}`].join('\n'));
+}
+
+function shellWord(text) {
+  return /^[\w./-]+$/.test(text) ? text : `'${text.replaceAll("'", "'\\''")}'`;
 }
 
 function runNew(args) {
