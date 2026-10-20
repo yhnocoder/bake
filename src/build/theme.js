@@ -13,6 +13,7 @@ const CLIENT_FILE = 'client.jsx';
 const HOME_FILE = 'home.jsx';
 const NOT_FOUND_FILE = 'not-found.jsx';
 const THEME_STYLES_FILE = 'theme.css';
+const FONTS_FILE = 'fonts.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
@@ -42,22 +43,27 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
     if (fileLocator(own)(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
-  const alias = [...publicModules('themes'), themeFileAlias(folders, locate, locateShared)];
+  const sources = new Set();
+  const alias = [...publicModules('themes'), themeFileAlias(folders, locate, locateShared, sources)];
   try {
-    const [server, client, styles] = await Promise.all([
+    const fontsFile = locate(FONTS_FILE);
+    const [server, client, styles, fonts] = await Promise.all([
       build(serverConfig(alias, locate, siteTheme)),
       browserBuild({ input: { [name]: locate(CLIENT_FILE) }, plugins: [solid()], alias }),
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
+      fontsFile === null ? null : browserBuild({ input: { fonts: fontsFile }, alias }),
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
     return {
       render: module.render,
       renderHome: module.renderHome,
       renderNotFound: module.renderNotFound,
-      files: styles === null ? client.files : [...client.files, ...styles.files],
+      files: [client, styles, fonts].flatMap((output) => output?.files ?? []),
       styles: client.stylesheets,
       lazyStyles: client.lazyStylesheets,
+      fonts: fonts?.files.filter((file) => STYLESHEET.test(file.path)).map((file) => file.path) ?? [],
       script: client.entry,
+      sources: new Set([...sources, ...[client, styles, fonts].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]),
     };
   } catch (error) {
     errors.push(missingExport(root, error, locateShared) ?? compileError(root, name, error));
@@ -75,7 +81,7 @@ function fileLocator(folders) {
   return (path) => folders.map((folder) => join(folder, path)).find((file) => existsSync(file)) ?? null;
 }
 
-function themeFileAlias(folders, locate, locateShared) {
+function themeFileAlias(folders, locate, locateShared, sources) {
   return {
     find: EVERY_IMPORT,
     replacement: '',
@@ -86,6 +92,7 @@ function themeFileAlias(folders, locate, locateShared) {
         return path === undefined ? null : locateShared(path);
       }
       if (!(RELATIVE_IMPORT.test(source) || STYLESHEET.test(importer))) return null;
+      sources.add(resolve(dirname(importer), source.replace(/[?#].*/, '')));
       const folder = folders.find((candidate) => importer.startsWith(`${candidate}${sep}`));
       if (folder === undefined) return null;
       const path = relative(folder, resolve(dirname(importer), source));

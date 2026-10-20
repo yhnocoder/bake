@@ -161,6 +161,52 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
+  await t.test('on a phone a preview in the middle of the screen waits until the scrolling stops', async () => {
+    const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+    const jacobian = cardIn('category', '2026-09/jacobian/');
+    await page.locator(jacobian).evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
+    const states = await page.locator(jacobian).evaluate(async (card) => {
+      const seen = [];
+      for (let step = 0; step < 16; step += 1) {
+        scrollBy({ top: step % 2 === 0 ? 3 : -3, behavior: 'instant' });
+        await new Promise((done) => setTimeout(done, 50));
+        seen.push(card.querySelector('.bk-card-preview').dataset.state);
+      }
+      return seen;
+    });
+    assert.deepEqual(new Set(states.slice(1)), new Set(['stopped']));
+    assert.equal(await page.locator(jacobian).getAttribute('data-active'), '');
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', jacobian);
+    await context.close();
+  });
+
+  await t.test('a column switch measures every card before it starts the card animations, which only move and scale the cards', async () => {
+    const { context, page } = await open();
+    const { calls, properties } = await page.evaluate(() => {
+      const calls = [];
+      const measure = Element.prototype.getBoundingClientRect;
+      const animate = Element.prototype.animate;
+      Element.prototype.getBoundingClientRect = function () {
+        calls.push('measure');
+        return measure.call(this);
+      };
+      Element.prototype.animate = function (...options) {
+        calls.push('animate');
+        return animate.apply(this, options);
+      };
+      document.querySelector('[data-control="columns"] button[data-value="5"]').click();
+      Element.prototype.getBoundingClientRect = measure;
+      Element.prototype.animate = animate;
+      const properties = [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
+      return { calls, properties };
+    });
+    assert.ok(calls.includes('animate'), 'the column switch animated no card');
+    assert.equal(calls.lastIndexOf('measure') < calls.indexOf('animate'), true, `a card was measured after the first animation started: ${calls.join(' ')}`);
+    assert.deepEqual(properties.filter((name) => !['composite', 'computedOffset', 'easing', 'offset'].includes(name)), ['scale', 'translate']);
+    await context.close();
+  });
+
   await t.test('with reduced motion a preview shows its first frame and never starts', async () => {
     const { context, page } = await open({ reducedMotion: 'reduce' });
     const gate = cardIn('category', '2026-10/gate/');

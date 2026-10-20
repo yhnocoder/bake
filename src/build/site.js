@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { join, posix, sep } from 'node:path';
 import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { readPet } from '../chat/pet-files.js';
 import { petFolder } from '../config/pet.js';
@@ -20,7 +20,7 @@ import { indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { optionProblem, readThemeOptions } from './theme-options.js';
+import { THEME_OPTIONS_FILE, optionProblem, readThemeOptions } from './theme-options.js';
 import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
@@ -35,9 +35,14 @@ export function createSite(root, { drafts = false, base, shareImages = false, pr
 export async function updateSite(site, changedPaths = null) {
   const { root } = site;
   const touches = (path) => changedPaths === null || changedPaths.some((changed) => changed === path || changed.startsWith(`${path}/`));
-  if (touches(THEMES_DIR)) site.themes.clear();
+  const themePaths = (changedPaths ?? [THEMES_DIR]).filter((path) => path === THEMES_DIR || path.startsWith(`${THEMES_DIR}/`));
+  for (const [name, compiled] of site.themes) {
+    if (themePaths.some((path) => readsThemePath(root, name, compiled.theme, path))) site.themes.delete(name);
+  }
+  const themeNamesChanged = themePaths.length > 0 && site.settings?.rules?.themes.join('\n') !== availableThemes(root).join('\n');
+  const themeOptionsChanged = themePaths.some((path) => path.split('/').length <= 2 || path.split('/')[2] === THEME_OPTIONS_FILE);
   const pet = site.settings?.config ? petFolder(site.settings.config.chat.pet) : null;
-  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || touches(THEMES_DIR) || touches(COMPONENTS_DIR) || (pet !== null && touches(pet))) {
+  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || themeNamesChanged || themeOptionsChanged || touches(COMPONENTS_DIR) || (pet !== null && touches(pet))) {
     site.settings = await readSettings(root);
     site.articles.clear();
     site.bundle = null;
@@ -108,6 +113,13 @@ async function readSettings(root) {
   return { errors, config, preamble, pet, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
 }
 
+function readsThemePath(root, name, theme, path) {
+  const [, folder] = path.split('/');
+  if (folder === undefined || folder === name || theme === null) return true;
+  const file = join(root, path);
+  return [...theme.sources].some((source) => source === file || source.startsWith(`${file}${sep}`));
+}
+
 async function compileThemes(site, published, config, errors) {
   const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
   const sorted = [...names].sort();
@@ -144,7 +156,7 @@ function homeOutput(entries, { config, themes, chat }, errors) {
       options: config.themes[config.theme],
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
-      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', [theme.script, chat.entry]) },
+      assets: { root: './', styles: assetLinks('', theme.styles), fonts: assetLinks('', theme.fonts), scripts: assetLinks('', [theme.script, chat.entry]) },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -156,7 +168,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
       site: siteProps(config),
       options: config.themes[config.theme],
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
-      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, [theme.script]) },
+      assets: { root: base, styles: assetLinks(base, theme.styles), fonts: assetLinks(base, theme.fonts), scripts: assetLinks(base, [theme.script]) },
     }),
   );
   return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
@@ -331,6 +343,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
       root,
       styles: assetLinks(root, theme.styles),
       lazyStyles: Object.fromEntries(Object.entries(theme.lazyStyles).map(([name, path]) => [name, assetLinks(root, [path])[0]])),
+      fonts: assetLinks(root, theme.fonts),
       scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },

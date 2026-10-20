@@ -33,7 +33,7 @@ export function prepaintScript(pageSteps = '') {
 
 export function lightWenkaiSteps(href) {
   if (href === undefined) return '';
-  return `var w=document.documentElement.dataset;if(w.font==='wenkai'&&w.weight==='light'){var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(href)};l.setAttribute('blocking','render');document.head.appendChild(l)}`;
+  return `var w=document.documentElement.dataset;if(w.font==='wenkai'&&w.weight==='light'){var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(href)};document.head.appendChild(l)}`;
 }
 
 export function homePrepaintSteps(groups) {

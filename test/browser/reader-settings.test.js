@@ -51,7 +51,7 @@ function wenkaiFaces() {
       const high = parseInt((start.includes('?') ? start.replaceAll('?', 'F') : end).replace(/^U\+/i, ''), 16);
       return code >= low && code <= high;
     });
-  const shown = new Set();
+  const shown = new Set([' '.codePointAt(0)]);
   for (const element of document.body.querySelectorAll('*')) {
     if (!getComputedStyle(element).fontFamily.split(',').some((name) => family(name) === 'LXGW WenKai')) continue;
     for (const node of element.childNodes) {

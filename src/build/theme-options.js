@@ -6,14 +6,14 @@ import { paramProblems, valueProblem } from '../components/declarations.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
 
-const OPTIONS_FILE = 'options.js';
+export const THEME_OPTIONS_FILE = 'options.js';
 const OPTION = { noun: 'option', reserved: [], written: 'as a key of bake.config.js', setter: 'bake.config.js' };
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 
 export async function readThemeOptions(root, names, errors) {
   const themes = new Map();
   for (const name of names) {
-    const path = [join(root, 'themes', name, OPTIONS_FILE), ...(BUILT_IN_THEMES.includes(name) ? [join(BUILT_IN_DIR, name, OPTIONS_FILE)] : [])].find((candidate) => existsSync(candidate));
+    const path = [join(root, 'themes', name, THEME_OPTIONS_FILE), ...(BUILT_IN_THEMES.includes(name) ? [join(BUILT_IN_DIR, name, THEME_OPTIONS_FILE)] : [])].find((candidate) => existsSync(candidate));
     themes.set(name, path === undefined ? {} : await readOptions(root, name, path, errors));
   }
   return themes;
@@ -30,17 +30,17 @@ export function optionProblem(declaration, value) {
 }
 
 async function readOptions(root, name, path, errors) {
-  const file = path.startsWith(root) ? relative(root, path) : `${name} theme ${OPTIONS_FILE}`;
+  const file = path.startsWith(root) ? relative(root, path) : `${name} theme ${THEME_OPTIONS_FILE}`;
   const source = readFileSync(path, 'utf8');
   let options;
   try {
     ({ options } = await import(`${pathToFileURL(path).href}?version=${createHash('sha256').update(source).digest('hex')}`));
   } catch (error) {
-    errors.push(errorAt(file, fileStart, `${name}: ${OPTIONS_FILE} cannot be read: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`));
+    errors.push(errorAt(file, fileStart, `${name}: ${THEME_OPTIONS_FILE} cannot be read: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`));
     return null;
   }
   if (typeof options !== 'object' || options === null || Array.isArray(options)) {
-    errors.push(errorAt(file, fileStart, `${name}: ${OPTIONS_FILE} must export options, an object that maps each option name to its declaration, got ${describeValue(options)}`));
+    errors.push(errorAt(file, fileStart, `${name}: ${THEME_OPTIONS_FILE} must export options, an object that maps each option name to its declaration, got ${describeValue(options)}`));
     return null;
   }
   const count = errors.length;

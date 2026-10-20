@@ -158,8 +158,11 @@ llm-glu-diagram {
   font-family: var(--font-ui);
   white-space: pre;
 }
-.llm-halo {
-  filter: drop-shadow(0 0 1.2px var(--surface)) drop-shadow(0 0 1.2px var(--surface));
+.llm-halo g {
+  stroke: var(--surface);
+  stroke-width: var(--llm-halo-width);
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 .llm-tex {
   display: inline-block;

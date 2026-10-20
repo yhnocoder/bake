@@ -1,1 +1,1 @@
-import 'lxgw-wenkai-webfont/lxgwwenkai-light.css';
+import './wenkai-light.css';

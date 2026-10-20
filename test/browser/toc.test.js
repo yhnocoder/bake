@@ -136,9 +136,10 @@ async function restingBox(locator) {
     await Promise.all(
       texts.map((element) => {
         const style = getComputedStyle(element);
-        return document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`, element.textContent);
+        return document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`, element.textContent).catch(() => {});
       }),
     );
+    await document.fonts.ready;
     let last = '';
     let since = performance.now();
     while (performance.now() - since < 500) {
@@ -715,22 +716,22 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
-  await t.test('on phones an article without a table of contents hides the settings button while scrolling down and shows it on scrolling up', async () => {
+  await t.test('on phones an article without a table of contents hides the settings button while scrolling down and shows it on scrolling up, and the variables that hide the chat button stay off the page', async () => {
     const { page, context } = await open({ path: 'plain', viewport: { width: 375, height: 760 }, hasTouch: true });
     const state = () =>
       page.evaluate(() => ({
         hidden: document.documentElement.classList.contains('bk-buttons-hidden'),
-        chat: getComputedStyle(document.documentElement).getPropertyValue('--chat-hidden').trim(),
+        page: [document.documentElement, document.body].map((element) => getComputedStyle(element).getPropertyValue('--chat-hidden').trim()).join(),
         settings: getComputedStyle(document.querySelector('.bk-settings')).opacity,
       }));
     assert.deepEqual([await page.locator('.bk-toc').count(), await page.locator('.bk-toc-handle').count()], [0, 0]);
-    assert.deepEqual(await state(), { hidden: false, chat: '', settings: '1' });
+    assert.deepEqual(await state(), { hidden: false, page: ',', settings: '1' });
     await scrollInSteps(page, 600);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden', null, { timeout: 2000 });
-    assert.deepEqual(await state(), { hidden: true, chat: '1', settings: '0' });
+    assert.deepEqual(await state(), { hidden: true, page: ',', settings: '0' });
     await scrollInSteps(page, -200);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).opacity === '1', null, { timeout: 2000 });
-    assert.deepEqual(await state(), { hidden: false, chat: '', settings: '1' });
+    assert.deepEqual(await state(), { hidden: false, page: ',', settings: '1' });
     await context.close();
   });
 
