@@ -1,5 +1,6 @@
 :host {
   all: initial;
+  color-scheme: inherit;
   font-family: var(--font-ui, system-ui, sans-serif);
   color: var(--ink);
 }
