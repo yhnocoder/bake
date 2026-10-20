@@ -61,12 +61,15 @@ Measure `npm test` before and after and record both times here.
 
 ### 3. Test redesign
 
+Done in two parts: 3a fixes the macOS failures and the hang, completes the test helpers and replaces fixed sleeps; 3b reviews every test file for implementation details, adds the long article frame cases and changes CI.
+
+
 - One test helper module: the example blog path, building a copy once per test file, serving it, launching the browser once per file, and `settle`. It replaces the inline copies (about 16 build blocks, 41 browser launches, 3 `settle` functions; `buildExample` in `test/browser/chat-page.js` is the starting point). The copy excludes `dist`, the staging folders and `node_modules`.
 - Replace fixed `waitForTimeout` sleeps with waits for an observable state. Give animated interface parts an observable settled state where none exists, or use `page.clock` for timers. A fixed wait that proves something does not happen may stay.
 - Review every test file for tests of implementation details and rewrite or delete them; merge tests that guard the same behavior. `test/browser/chat.test.js` and `test/browser/copy.test.js` build several blogs each; build one per file.
 - `test/frames/frames.test.js` opens only the syntax article, the bento article and the homepage. Add the two long real articles, `llm-act-fns` and `matrix-calculus`: scrolling the whole article and dragging a control of one of their components, in the nightly set.
 - `test/frames/frames.test.js`: the hover case passes with 15 of 20 events; find the cause instead of tolerating misses.
-- CI: run jobs in the Playwright container image matching the pinned version instead of installing system packages; drop `needs: performance` from the nightly `frames` job; rebalance the unit shards if they stay uneven.
+- CI: drop `needs: performance` from the nightly `frames` job. Running the jobs in the Playwright container image and rebalancing the shards are deferred, because nothing is pushed in this cleanup and CI cannot verify them.
 
 - Make the suites pass on macOS, the development machine. At the start of this step, on unchanged code, 8 unit tests fail on macOS (6 of them because the temporary folder is reported as `/var/...` and resolved as `/private/var/...`; 2 `bake dev` port tests for another reason), and 26 browser tests in `copy.test.js` and `bento.test.js` fail. Find each cause; fix the code when Bake itself handles the path wrongly, and the test otherwise.
 - `test/dev.test.js` "stops with a message when the blog folder can no longer be watched" sometimes hangs on macOS because it deletes the folder before the watcher has started reporting; wait for the watcher first.
