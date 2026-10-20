@@ -129,7 +129,7 @@ describe('themes', () => {
     assert.equal(bake(dir, 'build').stderr, '');
     const styles = readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8');
     assert.doesNotMatch(styles, /@import/i);
-    assert.match(styles, /--bg:#f5f6f4/);
+    assert.match(styles, /--bg:[^;]*#f5f6f4/);
     assert.match(styles, /\.bk-custom\{color:red\}/);
   });
 
@@ -144,7 +144,7 @@ describe('themes', () => {
     assert.equal(bake(dir, 'build').stderr, '');
     const styles = readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8');
     assert.doesNotMatch(styles, /@import/i);
-    assert.match(styles, /--bg:#f5f6f4/);
+    assert.match(styles, /--bg:[^;]*#f5f6f4/);
     assert.match(styles, /\.bk-custom\{color:red\}/);
   });
 

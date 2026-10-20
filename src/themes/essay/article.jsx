@@ -1,6 +1,5 @@
 import { fragmentOf } from 'bake/fragments';
 
-const SIDENOTE_REFERENCE = /data-sidenote="(\d+)"/g;
 const PLACED_BLOCKS = new Set(['math', 'code', 'table', 'list-table', 'example', 'figure', 'component', 'embed']);
 const FLOATED_FIGURE = /^<figure[^>]*\sdata-float=/;
 
@@ -31,31 +30,29 @@ export function Article(props) {
 export function arrange(content, { recaps = false } = {}) {
   const notes = new Map(content.sidenotes.map((note) => [note.number, note]));
   const placed = new Set();
-  const take = (html) => {
-    const found = [];
-    for (const [, digits] of html.matchAll(SIDENOTE_REFERENCE)) {
-      const number = Number(digits);
-      if (placed.has(number) || !notes.has(number)) continue;
+  const take = (numbers) =>
+    numbers.flatMap((number) => {
+      if (placed.has(number)) return [];
       placed.add(number);
-      found.push(notes.get(number), ...take(notes.get(number).html));
-    }
-    return found;
-  };
-  const shownRecap = (html) => (recaps && html !== undefined ? html : '');
+      const note = notes.get(number);
+      return [note, ...take(note.sidenotes)];
+    });
+  const recapNotes = (heading) => (recaps && heading !== undefined ? heading.recapSidenotes : []);
   const entries = (blocks, section) =>
     blocks.map((block, index) => ({
       block,
       afterHeading: index === 0 ? section !== undefined : blocks[index - 1].type === 'heading',
-      notes: take(block.html + shownRecap(block.type === 'heading' ? subsectionRecap(section, block.id) : undefined)),
+      notes: take([...block.sidenotes, ...recapNotes(subsectionOf(section, block))]),
     }));
   const intro = entries(content.intro);
-  const sections = content.sections.map((section) => ({ section, notes: take(section.title + shownRecap(section.recap)), entries: entries(section.blocks, section) }));
+  const sections = content.sections.map((section) => ({ section, notes: take([...section.titleSidenotes, ...recapNotes(section)]), entries: entries(section.blocks, section) }));
   const rest = content.sidenotes.filter((note) => !placed.has(note.number));
   return { intro, sections, rest };
 }
 
-export function subsectionRecap(section, id) {
-  return section?.subsections.find((subsection) => subsection.id === id)?.recap;
+export function subsectionOf(section, block) {
+  if (block.type !== 'heading') return undefined;
+  return section?.subsections.find((subsection) => subsection.id === block.id);
 }
 
 function Flow(props) {
