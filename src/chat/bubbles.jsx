@@ -391,7 +391,7 @@ function Chat(props) {
   const placeholder = () => (view() === 'setup' ? labels.placeholder.key : scopes().length > 0 ? labels.placeholder.scoped : labels.placeholder[page.article === null ? 'blog' : 'article']);
 
   return (
-    <section class="bk-chat" data-open={open() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} onKeyDown={containerKeydown}>
+    <section class="bk-chat" data-open={open() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>
       <p class="bk-chat-status" role="status">
         <Show when={announcement()} keyed>
           {({ text }) => <span>{text}</span>}
@@ -507,7 +507,7 @@ function Chat(props) {
           }}
           onClick={readQuery}
           onBlur={() => setQuery(null)}
-          onKeyDown={keydown}
+          on:keydown={keydown}
         />
         <div class="bk-chat-menu-area">
           <button type="button" class="bk-chat-icon" aria-label={labels.settings} aria-expanded={String(menu())} onClick={() => setMenu(!menu())}>

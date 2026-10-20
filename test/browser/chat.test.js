@@ -508,6 +508,49 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
   });
 
+  await t.test('one Escape closes only the chat while the keyboard focus is in it, and only an overlay of the theme while the focus is on the page', async (t) => {
+    const { page } = await openBrowser(t, base);
+    await page.addInitScript(() => localStorage.setItem('bk-toc', 'tabs'));
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    const chatOpen = () => page.locator('.bk-chat').evaluate((chat) => chat.hasAttribute('data-open'));
+    const focusQuestion = () => page.locator(QUESTION).focus();
+    const settle = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+    const link = page.locator('.bk-article a.internal-link').first();
+    await link.scrollIntoViewIfNeeded();
+    await focusQuestion();
+    await link.hover();
+    await page.locator('.bk-preview.is-on').waitFor();
+    await page.keyboard.press('Escape');
+    await settle();
+    assert.equal(await chatOpen(), false, 'Escape in the chat leaves the chat open');
+    assert.equal(await page.locator('.bk-preview.is-on').count(), 1, 'Escape in the chat closes the preview card');
+
+    await page.mouse.move(720, 450);
+    await page.locator('.bk-chat-launcher').click();
+    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
+    await page.locator('.bk-settings-toggle').focus();
+    await page.keyboard.press('Enter');
+    await page.locator('.bk-settings.is-open').waitFor();
+    await page.keyboard.press('Escape');
+    await settle();
+    assert.equal(await page.locator('.bk-settings.is-open').count(), 0, 'Escape on the settings leaves them open');
+    assert.equal(await chatOpen(), true, 'Escape on the settings of the theme closes the chat');
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+
+    await page.locator('.bk-chat-launcher').click();
+    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
+    await page.locator('.bk-tab').nth(1).hover();
+    await page.locator('.bk-index.is-on').waitFor({ state: 'attached' });
+    await focusQuestion();
+    await page.keyboard.press('Escape');
+    await settle();
+    assert.equal(await chatOpen(), false, 'Escape in the chat leaves the chat open');
+    assert.equal(await page.locator('.bk-index.is-on').count(), 1, 'Escape in the chat closes the chapter card');
+  });
+
   await t.test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides fades out before it leaves the keyboard order', async (t) => {
     const { context, page } = await openBrowser(t, base);
     const cdp = await context.newCDPSession(page);
