@@ -1,3 +1,4 @@
+import { parse, postprocess, preprocess } from 'micromark';
 import { factorySpace } from 'micromark-factory-space';
 import { asciiAlpha, asciiAlphanumeric, markdownLineEnding } from 'micromark-util-character';
 import { writeAttributes } from './attributes.js';
@@ -17,6 +18,11 @@ const LIST_TABLE_ROW_BULLET = '*';
 
 const blockConstruct = { tokenize: tokenizeBlock, concrete: true };
 const nonLazyLine = { tokenize: tokenizeNonLazyLine, partial: true };
+
+function isCodeLine(lines, lineNumber) {
+  const events = postprocess(parse().document().write(preprocess()(lines.join('\n'), undefined, true)));
+  return events.some(([kind, token]) => kind === 'enter' && token.type === 'codeFlowValue' && token.start.line === lineNumber);
+}
 
 export function bakeBlocks() {
   const data = this.data();
@@ -78,6 +84,7 @@ function tokenizeBlock(effects, ok, nok) {
   let previous;
   let quote;
   let line = '';
+  const lines = [];
   let codeFence = null;
   return start;
 
@@ -156,11 +163,18 @@ function tokenizeBlock(effects, ok, nok) {
 
   function lineStart(code) {
     const content = initialSize ? factorySpace(effects, chunkStart, 'linePrefix', initialSize + 1) : chunkStart;
-    if (codeFence !== null) return content(code);
-    return effects.attempt({ tokenize: tokenizeClosingFence, partial: true }, afterContent, content)(code);
+    const closingFence = { tokenize: tokenizeClosingFence, partial: true };
+    if (codeFence === null) return effects.attempt(closingFence, afterContent, content)(code);
+    return effects.check(closingFence, closingFenceOutsideCode, content)(code);
+
+    function closingFenceOutsideCode(code) {
+      if (isCodeLine([...lines, ':'.repeat(sizeOpen)], lines.length + 1)) return content(code);
+      return effects.attempt(closingFence, afterContent, content)(code);
+    }
   }
 
   function trackCodeFence() {
+    lines.push(line);
     const match = CODE_FENCE_LINE.exec(line);
     line = '';
     if (!match) return;

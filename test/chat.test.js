@@ -177,6 +177,13 @@ describe('AI chat replies', () => {
     );
   });
 
+  test('keeps a | inside a formula in its table cell', () => {
+    const html = replyHtml('| a | b |\n| - | - |\n| $|x|$ | $\\{x \\mid x > 0\\}$ |\n', { root });
+    assert.match(html, /<td><span class="bk-chat-math" data-tex="\|x\|">\|x\|<\/span><\/td>/);
+    assert.match(html, /data-tex="\\\{x \\mid x > 0\\\}"/);
+    assert.doesNotMatch(html, /\uE000/);
+  });
+
   test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', () => {
     const math = (tex, display = false) => `<${display ? 'div' : 'span'} class="bk-chat-math" data-tex="${tex}"${display ? ' data-display="true"' : ''}>${tex}</${display ? 'div' : 'span'}>`;
     assert.equal(replyHtml('Inline \\(x^2\\) and `\\(code\\)`.', { root }), `<p>Inline ${math('x^2')} and <code>\\(code\\)</code>.</p>`);

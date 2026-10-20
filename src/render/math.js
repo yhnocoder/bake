@@ -52,7 +52,7 @@ function peekArgument(parser, name) {
 }
 
 function recordLabel(parser, name) {
-  parser.tags.recorded.labels.push(peekArgument(parser, name));
+  parser.tags.recorded.labels.push({ name: peekArgument(parser, name), afterEnvironment: !parser.tags.currentTag.env && parser.tags.history.length > 0 });
   return BaseMethods.HandleLabel(parser, name);
 }
 

@@ -22,6 +22,14 @@ describe('math', () => {
     assert.match(article.intro[3].html, /id="eq:b"/);
   });
 
+  test('reports a label name with a space in \\label and in \\eqref, because a label is an HTML id', async () => {
+    const { errors } = await parse('$$\nx \\label{a b}\n$$\n\nSee \\eqref{a b}.\n');
+    assert.deepEqual(errors, [
+      'index.md:7:1 \\label{a b} has a space; a label name has no spaces, for example \\label{eq:ffn}',
+      'index.md:11:5 \\eqref{a b} has a space; a label name has no spaces, for example \\eqref{eq:ffn}',
+    ]);
+  });
+
   test('numbers formulas that use a numbered environment of their own', async () => {
     const article = await parsed('$$\n\\begin{align}\na \\label{eq:a} \\\\\nb \\label{eq:b}\n\\end{align}\n$$\n\n\\eqref{eq:b}\n');
     assert.equal(article.intro[1].html, '<p><a class="eqref" href="#eq%3Ab">(2)</a></p>');
