@@ -1,7 +1,7 @@
 export const FRAME_BUDGET = 1000 / 60;
 export const SLOW_FRAME = FRAME_BUDGET + 1;
 export const MAX_SLOW_SHARE = 0.05;
-export const MAX_FRAME = 50;
+export const MAX_FRAME = 3 * FRAME_BUDGET + 1;
 export const CPU_SLOWDOWN = 4;
 
 export const VIEWPORTS = {

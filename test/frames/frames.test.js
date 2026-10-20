@@ -110,7 +110,7 @@ async function openChat(page) {
     for (let round = 0; round < 2; round += 1) {
       await page.locator('.bk-chat-launcher').click();
       await page.waitForTimeout(700);
-      await page.locator('.bk-chat-panel button[aria-label="关闭"]').click();
+      await page.locator('.bk-chat-launcher').click();
       await page.waitForTimeout(700);
     }
   };

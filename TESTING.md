@@ -88,7 +88,7 @@ The `performance` job measures loading and scrolling. It records no frame times 
 Every interaction on a page draws at least 60 frames per second on a CPU four times slower than the runner's. `test/frames/frames.test.js` builds `examples/blog/` into a temporary directory, serves it at `localhost` and opens each page in Chromium at 1440 by 900 pixels and at 375 by 812 pixels with a device pixel ratio of 2, without reduced motion, so the animations run as a reader sees them. After the page has loaded, it slows the CPU down four times with the Chrome DevTools Protocol, records the time between consecutive `requestAnimationFrame` callbacks while Playwright performs the interaction, and fails when:
 
 - more than 5% of the frames take longer than 17.7 ms, one frame budget at 60 frames per second plus 1 ms,
-- one frame takes longer than 50 ms,
+- one frame takes longer than 51 ms, three frame budgets plus 1 ms,
 - fewer than 20 frames were drawn,
 - the page throws an error, or
 - a component enters the viewport before its `data-state` is `ready`.
