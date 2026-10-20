@@ -497,6 +497,8 @@ describe('preview updates', () => {
     };
     assert.deepEqual((await preview.update()).problems, []);
     assert.match(chunk(), /first text/);
+    const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(indexHtml(preview, '/2026-10/rope/'))[1];
+    assert.match(preview.find(runtime).output.render(), /JSON\.parse\("\{\}"\)/, 'bake dev serves without cache headers, so its runtime downloads no component files in advance');
     writeFiles(dir, { 'components/demo-chart.js': chart('second text') });
     const changed = await preview.update(['components/demo-chart.js']);
     assert.deepEqual([changed.problems, changed.reload], [[], 'all']);
