@@ -33,6 +33,8 @@ The layout grows task by task. Today `src/cli.js`, `src/report.js`, `src/fragmen
 | `examples/blog/` | The example blog: the syntax article, the posts it links to and further posts that fill the homepage |
 | `scripts/` | Repository checks, the screenshot scripts for pull requests and the static server that the browser tests and the screenshot script use |
 
+The directories of `src/` import each other without a cycle. `src/build/` reads the blog and calls the other directories, so only `src/cli.js` and `src/dev/` import it, and the modules at the top of `src/` hold what several directories share. The modules that run in the browser import no `node:` module: the files of the themes, the AI chat module `src/chat/entry.js`, the component runtime `src/components/runtime.js` and the public modules `bake/copy`, `bake/fragments`, `bake/math` and `bake/kit`, together with every module they import.
+
 ## Themes interpret, they never add syntax
 
 The set of things an article can write (heading levels, blocks, width levels `body`, `wide` and `page`, front matter fields) is defined by Bake alone. A theme receives the parsed article and decides how to lay it out; it cannot add attributes, blocks or front matter fields. An attribute no theme knows is a build error, and so is an attribute without the value its syntax requires, such as `:::aside{title}` or a heading with `{id}`. Adding syntax means changing Bake's syntax table and stating what it means in every theme.
@@ -380,6 +382,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 | Rule | Check |
 |---|---|
 | No comments except `why: <reason>` | `scripts/check_comment.py`, tested by `test/check-comment.test.js` |
+| The directories of `src/` import each other without a cycle, only `src/cli.js` and `src/dev/` import `src/build/`, and the modules that run in the browser import no `node:` module | `test/layers.test.js` |
 | CLI output is English and lists the commands, and `bake dev` reports a missing `bake.config.js`, prints its address, stops on an interrupt and exits with a message when it can no longer watch the blog | `test/cli.test.js` |
 | Errors are reported as `file:line:col message`, all in one run, sorted, with the count line, and a build with errors leaves `dist/` unchanged | `test/build.test.js` |
 | Every `bake.config.js` and front matter error states its exact position | `test/config.test.js`, `test/front-matter.test.js` |
