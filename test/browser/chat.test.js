@@ -551,6 +551,23 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-index.is-on').count(), 1, 'Escape in the chat closes the chapter card');
   });
 
+  await t.test('an Escape that ends the composition of an input method closes neither the chat nor an overlay of the theme', async (t) => {
+    const { page, context } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    const link = page.locator('.bk-article a.internal-link').first();
+    await link.scrollIntoViewIfNeeded();
+    await link.hover();
+    await page.locator('.bk-preview.is-on').waitFor();
+    await page.locator(QUESTION).focus();
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Input.imeSetComposition', { text: 'ni', selectionStart: 2, selectionEnd: 2 });
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('.bk-chat[data-open]').count(), 1, 'Escape during a composition closes the chat');
+    assert.equal(await page.locator('.bk-preview.is-on').count(), 1, 'Escape during a composition closes the preview card');
+  });
+
   await t.test('a click where the bubbles were reaches the page while a closed chat fades out, at 1440 and 375 pixels', async (t) => {
     for (const [width, height] of [
       [1440, 900],
@@ -852,9 +869,11 @@ test('the AI chat on published pages', async (t) => {
     const room = await bubbles.evaluate((element) => {
       const box = element.getBoundingClientRect();
       const rects = [...element.querySelectorAll('.bk-chat-bubble')].map((bubble) => bubble.getBoundingClientRect());
-      return { left: Math.min(...rects.map((rect) => rect.left - box.left)), right: Math.min(...rects.map((rect) => box.right - rect.right)), bottom: box.bottom - rects.at(-1).bottom };
+      const launcher = element.getRootNode().querySelector('.bk-chat-launcher').getBoundingClientRect();
+      return { left: Math.min(...rects.map((rect) => rect.left - box.left)), right: Math.min(...rects.map((rect) => box.right - rect.right)), bottom: box.bottom - rects.at(-1).bottom, launcher: launcher.left - box.right };
     });
-    assert.ok(room.left >= 6 && room.right >= 6 && room.bottom >= 6, `the scroll box cuts off the edges and shadows of the bubbles: ${JSON.stringify(room)}`);
+    assert.ok(room.left >= 6 && room.right >= 2 && room.bottom >= 6, `the scroll box cuts off the edges and shadows of the bubbles: ${JSON.stringify(room)}`);
+    assert.ok(room.launcher >= 0, `the scroll box covers the launcher: ${JSON.stringify(room)}`);
     await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
     await bubbles.evaluate((element) => (element.scrollTop = -element.scrollHeight));
     await page.locator('.bk-chat-bubbles:not([data-faded])').waitFor();
@@ -896,7 +915,7 @@ test('the AI chat on published pages', async (t) => {
     assert.doesNotMatch(seen.dark.pet, /rgba\(0, 0, 0, 0\)/, seen.dark.pet);
   });
 
-  await t.test('in the median of five cycles of opening and closing the chat at a quarter of the CPU speed, the longest main-thread task takes at most 40 milliseconds longer with 30 rounds of conversation than with one and at most 80 milliseconds, at 1440 and 375 pixels', async (t) => {
+  await t.test('in the median of seven cycles of opening and closing the chat at a quarter of the CPU speed, the longest main-thread task takes at most 40 milliseconds longer with 30 rounds of conversation than with one and at most 80 milliseconds, at 1440 and 375 pixels', async (t) => {
     const { context, page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
@@ -922,12 +941,12 @@ test('the AI chat on published pages', async (t) => {
         await cycle();
         await cdp.send('HeapProfiler.collectGarbage');
         const cycles = [];
-        for (let round = 0; round < 5; round += 1) {
+        for (let round = 0; round < 7; round += 1) {
           await context.browser().startTracing(page, { categories: ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline'] });
           await cycle();
           cycles.push(mainThreadTasks(JSON.parse(await context.browser().stopTracing()))[0]);
         }
-        longest[width] = cycles.sort((a, b) => a - b)[2];
+        longest[width] = cycles.sort((a, b) => a - b)[3];
       }
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       await page.setViewportSize({ width: 1440, height: 900 });

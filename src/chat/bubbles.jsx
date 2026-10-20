@@ -15,6 +15,7 @@ const SCOPE_QUERY = /@([^\s@]*)$/;
 const CONTEXT_LENGTH = /context length/i;
 const DEEPSEEK_KEYS = 'https://platform.deepseek.com/api_keys';
 const typeset = new Map();
+const composing = (event) => event.isComposing || event.keyCode === 229;
 
 export function createChat({ shadow, root, labels, pet, petSource, launcher }) {
   const style = document.createElement('style');
@@ -324,7 +325,7 @@ function Chat(props) {
         return;
       }
     }
-    if (event.key === 'Escape' && query() !== null) {
+    if (event.key === 'Escape' && query() !== null && !composing(event)) {
       event.preventDefault();
       event.stopPropagation();
       setQuery(null);
@@ -334,10 +335,10 @@ function Chat(props) {
       if (scopes().length > 0) setScopes(scopes().slice(0, -1));
       else if (quote() !== null) setQuote(null);
     }
-    if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229) submit(event);
+    if (event.key === 'Enter' && !composing(event)) submit(event);
   };
   const containerKeydown = (event) => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || composing(event)) return;
     event.preventDefault();
     if (menu()) {
       setMenu(false);
@@ -364,7 +365,7 @@ function Chat(props) {
     hide({ focus: false });
   };
   const escape = (event) => {
-    if (event.key === 'Escape' && open() && !event.defaultPrevented) hide();
+    if (event.key === 'Escape' && open() && !event.defaultPrevented && !composing(event)) hide();
   };
   const refresh = () => (page = currentPage(root));
   document.addEventListener('pointerdown', outside);
