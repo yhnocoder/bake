@@ -304,6 +304,9 @@ describe('writing Markdown', () => {
       children: [
         paragraph(text('x**a**')),
         paragraph(text('中**文**')),
+        paragraph(text('2**10')),
+        paragraph(text('x **a** y')),
+        paragraph(text(' **a** ')),
         paragraph({ type: 'strong', children: [text('2**3 = 8')] }),
         paragraph(text('a *`b`* and *[c]* d')),
         { type: 'table', align: [null], children: [{ type: 'tableRow', children: [cell('h')] }, { type: 'tableRow', children: [cell('**a**')] }] },
@@ -313,9 +316,10 @@ describe('writing Markdown', () => {
     assert.deepEqual(errors, []);
     assert.deepEqual(
       article.intro.map((block) => outline(block.html).replace(/<[^>]+>|\s/g, '')),
-      ['x**a**', '中**文**', '2**3=8', 'a*`b`*and*[c]*d', 'h**a**'],
+      ['x**a**', '中**文**', '2**10', 'x**a**y', '**a**', '2**3=8', 'a*`b`*and*[c]*d', 'h**a**'],
     );
-    assert.deepEqual(article.intro.map((block) => /<em>/.test(block.html)), [false, false, false, false, false]);
+    assert.equal(article.intro.some((block) => /<em>/.test(block.html)), false);
+    assert.equal(article.intro.filter((block) => /<strong>/.test(block.html)).length, 1);
   });
 });
 
