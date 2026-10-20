@@ -1,7 +1,8 @@
 import { fragmentOf } from 'bake/fragments';
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
-import { HOME_COLUMNS, SITE_SETTINGS, homePrepaintSteps, prepaintScript, settingAttributes } from './settings.js';
+import { HOME_COLUMNS } from '../choices.js';
+import { SITE_SETTINGS, homePrepaintSteps, prepaintScript, settingAttributes } from './settings.js';
 
 export default function Home(props) {
   const { site, home, articles, assets } = props;
@@ -16,7 +17,7 @@ export default function Home(props) {
       lang={site.language}
       data-group={groupBy}
       data-columns={String(home.columns)}
-      style={`--group-index:${groups.indexOf(groupBy)};--columns-index:${HOME_COLUMNS.indexOf(String(home.columns))}`}
+      style={`--group-index:${groups.indexOf(groupBy)};--columns-index:${HOME_COLUMNS.indexOf(home.columns)}`}
       {...settingAttributes(SITE_SETTINGS)}
     >
       <head>
@@ -82,7 +83,7 @@ function Listing(props) {
         )}
         <div class="bk-home-controls">
           {groups.length === 1 ? null : <Switch name="group" label={labels.group} values={groups} current={groupBy} text={(value) => labels.groups[value]} />}
-          <Switch name="columns" label={labels.columns} values={HOME_COLUMNS} current={columns} text={(value) => value} />
+          <Switch name="columns" label={labels.columns} values={HOME_COLUMNS.map(String)} current={columns} text={(value) => value} />
         </div>
       </div>
       <main class="bk-home-main">

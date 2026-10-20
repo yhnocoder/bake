@@ -562,13 +562,13 @@ test('the AI chat on published pages', async (t) => {
 
     await page.locator('.bk-chat-launcher').click();
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
-    await page.locator('.bk-tab').nth(1).hover();
-    await page.locator('.bk-index.is-on').waitFor({ state: 'attached' });
+    await page.locator('.bk-toc-tab').nth(1).hover();
+    await page.locator('.bk-toc-index.is-on').waitFor({ state: 'attached' });
     await focusQuestion();
     await page.keyboard.press('Escape');
     await settle();
     assert.equal(await chatOpen(), false, 'Escape in the chat leaves the chat open');
-    assert.equal(await page.locator('.bk-index.is-on').count(), 1, 'Escape in the chat closes the chapter card');
+    assert.equal(await page.locator('.bk-toc-index.is-on').count(), 1, 'Escape in the chat closes the chapter card');
   });
 
   await t.test('an Escape that ends the composition of an input method closes neither the chat nor an overlay of the theme', async (t) => {
@@ -1154,7 +1154,7 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
       await page.waitForFunction(() => !document.documentElement.classList.contains('bk-buttons-hidden'));
       await placement('shown');
       await page.locator('.bk-toc-handle').click();
-      await page.waitForFunction(() => document.documentElement.classList.contains('bk-drawer-open'));
+      await page.waitForFunction(() => document.documentElement.classList.contains('bk-toc-drawer-open'));
       await placement('hidden');
       await page.keyboard.press('Escape');
       await placement('shown');

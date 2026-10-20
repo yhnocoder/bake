@@ -20,6 +20,7 @@ import { indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
+import { optionProblem, readThemeOptions } from './theme-options.js';
 import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
@@ -97,8 +98,9 @@ function shownPages(articles, pages, lastGood, config, errors) {
 async function readSettings(root) {
   const errors = [];
   const themeNames = availableThemes(root);
-  const config = await loadBakeConfig(root, themeNames, errors);
-  if (config === null) return { errors };
+  const themeOptions = await readThemeOptions(root, themeNames, errors);
+  const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
+  if (config === null || errors.length > 0) return { errors };
   const preamble = await readMathPreamble(root, errors);
   const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const componentErrors = [];
@@ -132,13 +134,14 @@ function shareImagesOf(root, pages, config, assetFiles, errors) {
 }
 
 function siteProps(config) {
-  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url), bento: { columns: config.bento.columns } };
+  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
 }
 
 function homeOutput(entries, { config, themes, chat }, errors) {
   const html = renderSitePage(config, themes, 'the homepage', errors, (theme) =>
     theme.renderHome({
       site: siteProps(config),
+      options: config.themes[config.theme],
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
       assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', [theme.script, chat.entry]) },
@@ -151,6 +154,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
   const html = renderSitePage(config, themes, 'the 404 page', errors, (theme) =>
     theme.renderNotFound({
       site: siteProps(config),
+      options: config.themes[config.theme],
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
       assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, [theme.script]) },
     }),
@@ -308,6 +312,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
   const root = pageRoot(entry.url);
   const props = {
     site: siteProps(config),
+    options: config.themes[name],
     article: {
       title: entry.title,
       summary: entry.summary,

@@ -65,7 +65,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   const english = mkdtempSync(join(tmpdir(), 'bake-bento-english-'));
   t.after(() => rmSync(english, { recursive: true, force: true }));
   writeFiles(english, {
-    'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', bento: { columns: 2 } };\n",
+    'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', themes: { bento: { columns: 2 } } };\n",
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: 'Text before the first section.\n\n## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n' }),
   });
   const englishBuild = bake(english, 'build');
@@ -101,7 +101,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the column count follows bento.columns in bake.config.js', async () => {
+  await t.test('the column count follows themes.bento.columns in bake.config.js', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);

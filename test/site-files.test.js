@@ -144,7 +144,8 @@ describe('site files', () => {
     assert.equal(scripts.length, 1);
     assert.match(scripts[0], /^\/bake\/assets\/probe-[\w-]+\.js$/);
     assert.deepEqual(props, {
-      site: { title: 'Notes & <Models>', url: 'https://x.github.io/bake', language: 'en', description: 'Short "notes".', link: 'https://x.github.io/bake/', bento: { columns: 4 } },
+      site: { title: 'Notes & <Models>', url: 'https://x.github.io/bake', language: 'en', description: 'Short "notes".', link: 'https://x.github.io/bake/' },
+      options: {},
       articles: [
         { title: 'Alpha', url: '2026-10/alpha/' },
         { title: "Rope & <'angles'>", url: '2026-10/rope/' },
