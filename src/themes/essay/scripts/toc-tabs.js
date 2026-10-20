@@ -63,11 +63,11 @@ export function tabsView({ outline, labels, host, reserve, jumping }) {
     update(state) {
       if (jumping() && current !== null) return;
       const next = Math.max(0, state.chapter);
+      if (next === current) return;
       items.forEach((item, index) => {
         item.tab.classList.toggle('is-current', index === next);
         item.tab.classList.toggle('is-read', index < next);
       });
-      if (next === current) return;
       const first = current === null;
       current = next;
       if (first) withoutTransition(items.flatMap((item) => [item.tab, item.title]), measure);

@@ -25,7 +25,6 @@ const knownFailures = [
   { name: 'scrolling the whole syntax article at 1440 pixels', reason: '5 to 18 percent of the frames are slower than the budget and the longest frame takes 150 to 200 ms', task: 'toc-writes' },
   { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 180 to 220 ms in five of five runs', task: 'toc-writes' },
   { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'up to 11 percent of the frames are slower than the budget in four of five runs', task: 'toc-writes' },
-  { name: 'opening and closing the table of contents drawer of the syntax article at 375 pixels', reason: 'opening the drawer takes one frame of 100 to 170 ms', task: 'toc-writes' },
   { name: 'opening and closing the AI chat panel on the syntax article at 1440 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
   { name: 'opening and closing the AI chat panel on the syntax article at 375 pixels', reason: 'opening the chat panel takes one frame of about 67 ms in four of five runs', task: 'chat-perf' },
   { name: 'dragging the slider of the function plot in the syntax article at 1440 pixels', reason: 'up to 13 percent of the frames are slower than the budget in two of five runs', task: 'kit-cleanup' },
