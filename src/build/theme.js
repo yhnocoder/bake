@@ -21,7 +21,6 @@ const RESOLVED_RENDER_ENTRY = `\0${RENDER_ENTRY}`;
 const RELATIVE_IMPORT = /^\.\.?[/]/;
 const STYLESHEET = /\.css(?:\?.*)?$/;
 const EVERY_IMPORT = /^/;
-const IMPORT_KEYWORD = /@import(?=[\s'"]|url\()/gi;
 
 export async function compileTheme(root, name, { siteTheme }, errors) {
   const folders = themeFolders(root, name);
@@ -35,8 +34,8 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   try {
     const [server, client, styles] = await Promise.all([
       build(serverConfig(alias, locate, siteTheme)),
-      browserBuild({ input: { [name]: locate(CLIENT_FILE) }, plugins: [lowercaseImports(folders), solid()], alias }),
-      siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), plugins: [lowercaseImports(folders)], alias, stylesheet: THEME_STYLES_PATH }) : null,
+      browserBuild({ input: { [name]: locate(CLIENT_FILE) }, plugins: [solid()], alias }),
+      siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
     return {
@@ -73,17 +72,6 @@ function themeFileAlias(folders, locate) {
       if (folder === undefined) return null;
       const path = relative(folder, resolve(dirname(importer), source));
       return path.startsWith('..') ? null : locate(path);
-    },
-  };
-}
-
-function lowercaseImports(folders) {
-  return {
-    name: 'bake:lowercase-imports',
-    enforce: 'pre',
-    transform(code, id) {
-      if (!STYLESHEET.test(id) || !folders.some((folder) => id.startsWith(`${folder}${sep}`))) return null;
-      return code.replace(IMPORT_KEYWORD, '@import');
     },
   };
 }
