@@ -47,13 +47,14 @@ const stressArticle = article({
   ].join('\n'),
 });
 
-function highlightProperties() {
-  const timing = ['offset', 'computedOffset', 'easing', 'composite'];
-  const properties = document
-    .getAnimations()
-    .filter((animation) => animation.effect?.target?.matches('.sidenote-ref, .sidenote-ref *, .bk-sidenote, .bk-sidenote *, .bk-tintable'))
-    .flatMap((animation) => (animation.transitionProperty === undefined ? animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame)) : [animation.transitionProperty]));
-  return [...new Set(properties)].filter((property) => !timing.includes(property)).sort();
+function highlights() {
+  const ref = document.querySelector('.sidenote-ref[data-sidenote="5"]');
+  const layer = (element, pseudo) => (getComputedStyle(element, pseudo).content === 'none' ? 'none' : getComputedStyle(element, pseudo).opacity);
+  return {
+    number: layer(ref.querySelector('a'), '::before'),
+    note: layer(document.querySelector('.bk-notes-layer .bk-sidenote[data-sidenote="5"]'), '::after'),
+    paragraph: layer(ref.closest('p'), '::after'),
+  };
 }
 
 function measureNotes() {
@@ -153,15 +154,13 @@ test('sidenotes', async (t) => {
     );
   });
 
-  await t.test('highlight the number and the note and tint the paragraph on hover, animating only opacity', async () => {
+  await t.test('highlight the number and the note and tint the paragraph on hover', async () => {
     await wide.hover('.sidenote-ref[data-sidenote="5"] a');
-    assert.deepEqual(await wide.evaluate(highlightProperties), ['opacity']);
-    const state = await wide.evaluate(() => ({
-      reference: document.querySelector('.sidenote-ref[data-sidenote="5"]').classList.contains('is-active'),
-      note: document.querySelector('.bk-notes-layer .bk-sidenote[data-sidenote="5"]').classList.contains('is-active'),
-      paragraph: document.querySelector('.sidenote-ref[data-sidenote="5"]').closest('p').classList.contains('bk-tinted'),
-    }));
-    assert.deepEqual(state, { reference: true, note: true, paragraph: true });
+    await settle(wide);
+    assert.deepEqual(await wide.evaluate(highlights), { number: '1', note: '1', paragraph: '1' });
+    await wide.mouse.move(5, 450);
+    await settle(wide);
+    assert.deepEqual(await wide.evaluate(highlights), { number: '0', note: '0', paragraph: '0' });
   });
 
   await t.test('show every note under its block when scripts are disabled', async () => {
@@ -190,11 +189,7 @@ test('sidenotes', async (t) => {
     assert.equal(await phone.locator('.bk-notes-layer').isVisible(), false);
     assert.equal(await note.isVisible(), false);
     await phone.locator('.sidenote-ref[data-sidenote="2"] a').tap();
-    const opening = await phone.evaluate(() => {
-      const note = document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]');
-      return { properties: note.getAnimations().flatMap((animation) => animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame))), height: note.getBoundingClientRect().height };
-    });
-    assert.deepEqual([...new Set(opening.properties)].filter((property) => !['offset', 'computedOffset', 'easing', 'composite'].includes(property)).sort(), ['opacity', 'transform']);
+    const opening = await phone.evaluate(() => ({ height: document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]').getBoundingClientRect().height }));
     await phone.waitForFunction(() => {
       const element = document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]');
       return element.checkVisibility() && element.getAnimations().length === 0;

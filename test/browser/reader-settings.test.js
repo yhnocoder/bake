@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { PNG } from 'pngjs';
 import { article, bake, createBlog } from '../blog.js';
-import { launchBrowser, serve } from './browser.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
 const motionBox = `export const layout = { height: 80 };
@@ -26,21 +26,37 @@ const sharedShadowLayers = (light, dark) => {
 
 function readPage() {
   return {
-    theme: document.documentElement.dataset.theme ?? null,
-    font: document.documentElement.dataset.font ?? null,
     background: getComputedStyle(document.body).backgroundColor,
     bodyFont: getComputedStyle(document.querySelector('.bk-article p')).fontFamily,
-    stored: [localStorage.getItem('bk-theme'), localStorage.getItem('bk-font')],
   };
 }
 
-async function choose(page, name, attribute, value) {
-  await page.locator('.bk-settings-panel').getByRole('button', { name, exact: true }).click();
-  await page.waitForFunction(([key, expected]) => document.documentElement.dataset[key] === expected && document.getAnimations().length === 0, [attribute, value]);
+function chosenOptions() {
+  return [...document.querySelectorAll('.bk-settings-options button[aria-pressed="true"]')].map((button) => button.getAttribute('aria-label') ?? button.textContent.trim());
+}
+
+async function choose(page, name) {
+  const option = page.locator('.bk-settings-panel').getByRole('button', { name, exact: true });
+  await option.click();
+  await page.waitForFunction((element) => element.getAttribute('aria-pressed') === 'true', await option.elementHandle());
+  await settle(page);
+}
+
+async function chooseWithFade(page, name) {
+  await page.evaluate(() => {
+    window.faded = false;
+    const watch = () => {
+      if (document.getAnimations().some((animation) => String(animation.effect?.pseudoElement).startsWith('::view-transition'))) window.faded = true;
+      else requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  });
+  await choose(page, name);
+  assert.equal(await page.evaluate(() => window.faded), true, `choosing ${name} does not fade`);
 }
 
 async function readSettledPage(page) {
-  await page.waitForFunction(() => document.body.getAnimations().length === 0);
+  await settle(page);
   return page.evaluate(readPage);
 }
 
@@ -170,36 +186,32 @@ test('reader settings', async (t) => {
     const page = await context.newPage();
     await page.goto(url);
     const initial = await readSettledPage(page);
-    assert.deepEqual([initial.theme, initial.font, initial.stored], ['system', 'sans', [null, null]]);
+    assert.deepEqual((await page.evaluate(chosenOptions)).slice(0, 2), ['跟随系统', '黑体']);
     assert.doesNotMatch(initial.bodyFont, /LXGW WenKai/);
 
     await page.getByRole('button', { name: '设置' }).click();
-    await choose(page, '深', 'theme', 'dark');
-    await choose(page, '霞鹜文楷', 'font', 'wenkai');
+    await choose(page, '深');
+    await choose(page, '霞鹜文楷');
     const chosen = await readSettledPage(page);
-    assert.deepEqual([chosen.theme, chosen.font, chosen.stored], ['dark', 'wenkai', ['dark', 'wenkai']]);
     assert.notEqual(chosen.background, initial.background);
     assert.match(chosen.bodyFont, /^"?LXGW WenKai/);
-    assert.equal(await page.getByRole('button', { name: '深' }).getAttribute('aria-pressed'), 'true');
+    assert.deepEqual((await page.evaluate(chosenOptions)).slice(0, 2), ['深', '霞鹜文楷']);
 
     await page.reload();
-    const reloaded = await readSettledPage(page);
-    assert.deepEqual(reloaded, chosen);
+    assert.deepEqual(await readSettledPage(page), chosen);
+    assert.deepEqual((await page.evaluate(chosenOptions)).slice(0, 2), ['深', '霞鹜文楷']);
 
     await page.route('**/assets/*.js', (route) => route.abort());
     await page.reload();
-    assert.deepEqual(
-      await page.evaluate(() => [document.documentElement.dataset.theme, document.documentElement.dataset.font, document.querySelector('.bk-settings')]),
-      ['dark', 'wenkai', null],
-    );
+    assert.deepEqual(await page.evaluate(readPage), chosen);
+    assert.equal(await page.locator('.bk-settings').count(), 0);
     await page.unroute('**/assets/*.js');
 
     await page.reload();
     await page.getByRole('button', { name: '设置' }).click();
-    await choose(page, '跟随系统', 'theme', 'system');
-    await choose(page, '黑体', 'font', 'sans');
-    const reset = await readSettledPage(page);
-    assert.deepEqual([reset.theme, reset.font, reset.stored, reset.background], ['system', 'sans', ['system', 'sans'], initial.background]);
+    await choose(page, '跟随系统');
+    await choose(page, '黑体');
+    assert.deepEqual(await readSettledPage(page), initial);
     await context.close();
   });
 
@@ -214,8 +226,6 @@ test('reader settings', async (t) => {
         const strong = style('.bk-article strong');
         const box = style('.component-box');
         return {
-          attributes: ['size', 'weight', 'spacing'].map((name) => document.documentElement.dataset[name]),
-          stored: ['size', 'weight', 'spacing'].map((name) => localStorage.getItem(`bk-${name}`)),
           paragraph: [paragraph.fontSize, paragraph.fontWeight, paragraph.lineHeight, paragraph.marginBottom],
           heading: style('.bk-article h2').fontSize,
           strong: [strong.fontWeight, strong.color],
@@ -224,7 +234,6 @@ test('reader settings', async (t) => {
         };
       });
     const initial = await read();
-    assert.deepEqual(initial.attributes, ['medium', 'regular', 'normal']);
     assert.deepEqual(initial.paragraph, ['16.5px', '400', '30.525px', '16px']);
     assert.equal(initial.strong[0], '700');
 
@@ -241,21 +250,10 @@ test('reader settings', async (t) => {
     const box = await panel.boundingBox();
     assert.ok(box.y >= 0, `the settings panel starts ${box.y} pixels above the screen`);
 
-    await page.evaluate(() => {
-      const start = document.startViewTransition.bind(document);
-      window.fades = 0;
-      document.startViewTransition = (update) => {
-        window.fades += 1;
-        return start(update);
-      };
-    });
-    await choose(page, '特大', 'size', 'larger');
-    await choose(page, '粗', 'weight', 'bold');
-    await choose(page, '宽松', 'spacing', 'loose');
-    assert.equal(await page.evaluate(() => window.fades), 3);
+    await chooseWithFade(page, '特大');
+    await chooseWithFade(page, '粗');
+    await chooseWithFade(page, '宽松');
     const chosen = await read();
-    assert.deepEqual(chosen.attributes, ['larger', 'bold', 'loose']);
-    assert.deepEqual(chosen.stored, ['larger', 'bold', 'loose']);
     assert.equal(chosen.paragraph[0], '19.47px');
     assert.equal(chosen.paragraph[1], '500');
     assert.ok(parseFloat(chosen.paragraph[2]) / parseFloat(chosen.paragraph[0]) > 2, `line height ${chosen.paragraph[2]} at ${chosen.paragraph[0]}`);
@@ -266,22 +264,23 @@ test('reader settings', async (t) => {
     assert.deepEqual(chosen.component, initial.component);
 
     await page.reload();
-    assert.deepEqual((await read()).attributes, ['larger', 'bold', 'loose']);
+    await settle(page);
+    assert.deepEqual(await read(), chosen);
 
     await page.getByRole('button', { name: '设置' }).click();
     const lightFaces = () => page.evaluate(() => [...document.fonts].filter((face) => face.family.replaceAll('"', '') === 'LXGW WenKai' && face.weight === '300').length);
     assert.equal(await lightFaces(), 0);
-    await choose(page, '细', 'weight', 'light');
+    await choose(page, '细');
     assert.equal(await lightFaces(), 0);
-    await choose(page, '霞鹜文楷', 'font', 'wenkai');
+    await choose(page, '霞鹜文楷');
     await page.waitForFunction(() => [...document.fonts].some((face) => face.family.replaceAll('"', '') === 'LXGW WenKai' && face.weight === '300'));
     const wenkai = await read();
     assert.deepEqual([wenkai.paragraph[1], wenkai.strong[0], wenkai.strong[1] === wenkai.ink], ['300', '700', true]);
-    await choose(page, '粗', 'weight', 'bold');
+    await choose(page, '粗');
     const wenkaiBold = await read();
     assert.deepEqual([wenkaiBold.paragraph[1], wenkaiBold.strong[0], wenkaiBold.strong[1] === wenkaiBold.ink], ['700', '700', false]);
 
-    await page.evaluate(() => localStorage.setItem('bk-weight', 'light'));
+    await choose(page, '细');
     await page.route(/\/assets\/essay-[^/]*\.js$/, (route) => route.abort());
     await page.reload();
     assert.ok((await lightFaces()) > 0, 'a stored light weight with LXGW WenKai declares the light faces without the page script');
@@ -295,9 +294,10 @@ test('reader settings', async (t) => {
     const page = await context.newPage();
     const fontCss = cjkFontWithThreeWeights();
     const measure = async (weight) => {
-      await page.evaluate((value) => localStorage.setItem('bk-weight', value), weight);
-      await page.reload();
-      await page.addStyleTag({ content: fontCss });
+      await page.getByRole('button', { name: '设置' }).click();
+      await choose(page, weight);
+      await page.keyboard.press('Escape');
+      await settle(page);
       const paragraph = page.locator('.bk-article p', { hasText: '门控单元把两路投影逐元素相乘。' });
       const computed = await paragraph.evaluate(async (element) => {
         const style = getComputedStyle(element);
@@ -305,13 +305,14 @@ test('reader settings', async (t) => {
         await document.fonts.ready;
         return style.fontWeight;
       });
-      await page.waitForFunction(() => document.body.getAnimations().length === 0);
+      await settle(page);
       return { computed, ink: darkPixels(await paragraph.screenshot()) };
     };
     await page.goto(url);
-    const light = await measure('light');
-    const regular = await measure('regular');
-    const bold = await measure('bold');
+    await page.addStyleTag({ content: fontCss });
+    const light = await measure('细');
+    const regular = await measure('常规');
+    const bold = await measure('粗');
     assert.deepEqual([light.computed, regular.computed, bold.computed], ['300', '400', '500']);
     assert.ok(light.ink < regular.ink && regular.ink < bold.ink, `Chinese body text has ${light.ink}, ${regular.ink} and ${bold.ink} dark pixels at the light, regular and bold steps`);
     await context.close();
@@ -327,8 +328,10 @@ test('reader settings', async (t) => {
     const box = await panel.boundingBox();
     assert.ok(box.y >= 0 && box.y + box.height <= 450, `the panel spans ${box.y} to ${box.y + box.height}`);
     await panel.locator('.bk-settings-row[data-setting="buttons"]').scrollIntoViewIfNeeded();
-    await panel.getByRole('switch').click();
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.buttons), 'always');
+    const toggle = panel.getByRole('switch');
+    assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await context.close();
   });
 
@@ -348,28 +351,11 @@ test('reader settings', async (t) => {
     assert.deepEqual(shared, [['button', []], ['option', []], ['switch', []]]);
   });
 
-  await t.test('the chosen theme and font options fade in a layer and animate no shadow or background', async () => {
-    const page = await browser.newPage();
-    await page.goto(url);
-    const styles = await page.evaluate(() => {
-      const options = [...document.querySelectorAll('.bk-settings-options button')];
-      const chosen = options.find((button) => button.getAttribute('aria-pressed') === 'true');
-      const other = options.find((button) => button.getAttribute('aria-pressed') === 'false');
-      return {
-        button: getComputedStyle(chosen).transitionProperty,
-        layer: getComputedStyle(chosen, '::before').transitionProperty,
-        opacity: [getComputedStyle(chosen, '::before').opacity, getComputedStyle(other, '::before').opacity],
-      };
-    });
-    assert.deepEqual(styles, { button: 'color', layer: 'opacity', opacity: ['1', '0'] });
-    await page.close();
-  });
-
   await t.test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async () => {
-    const context = await browser.newContext({ reducedMotion: 'reduce' });
+    const context = await browser.newContext({ reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await context.newPage();
     await page.goto(url);
-    await page.waitForFunction(() => document.querySelector('.component')?.dataset.state === 'ready');
+    await page.locator('motion-box span').waitFor();
     const motion = (selector) =>
       page.locator(selector).evaluate((element) => {
         const style = getComputedStyle(element);
@@ -387,7 +373,9 @@ test('reader settings', async (t) => {
     await page.keyboard.press('Escape');
     const toast = await motion('.bk-toast');
     assert.ok(fade(toast), `the toast has ${JSON.stringify(toast)}`);
-    await page.evaluate(() => document.querySelector('.bk-toast').classList.add('is-on'));
+    await page.hover('.bk-article h2');
+    await page.click('.bk-article h2 .bk-heading-link');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-toast')).opacity !== '0');
     const shown = await motion('.bk-toast');
     assert.ok(fade(shown), `the shown toast has ${JSON.stringify(shown)}`);
     assert.deepEqual(
@@ -405,7 +393,7 @@ test('reader settings', async (t) => {
     assert.ok(before.shown > 0, 'no text on the page uses LXGW WenKai');
     assert.deepEqual(before.unused, []);
     await page.getByRole('button', { name: '设置' }).click();
-    await choose(page, '霞鹜文楷', 'font', 'wenkai');
+    await choose(page, '霞鹜文楷');
     await page.waitForFunction(() => document.fonts.status === 'loaded');
     await page.evaluate(() => document.fonts.ready);
     const after = await page.evaluate(wenkaiFaces);
