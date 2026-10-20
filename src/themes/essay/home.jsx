@@ -1,7 +1,7 @@
 import { fragmentOf } from 'bake/fragments';
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
-import { HOME_COLUMNS, homePrepaintScript, prepaintScript, settingAttributes } from './settings.js';
+import { HOME_COLUMNS, homePrepaintSteps, prepaintScript, settingAttributes } from './settings.js';
 
 export default function Home(props) {
   const { site, home, articles, assets } = props;
@@ -25,14 +25,11 @@ export default function Home(props) {
         <title>{site.title}</title>
         {site.description === undefined ? null : <meta name="description" content={site.description} />}
         <PageMeta site={site} type="website" title={site.title} description={site.description} link={site.link} root={assets.root} />
-        <script innerHTML={prepaintScript + homePrepaintScript(groups)} />
+        <script innerHTML={prepaintScript(homePrepaintSteps(groups))} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
         {assets.scripts.map((src) => (
-          <script defer src={src} />
-        ))}
-        {assets.modules.map((src) => (
           <script type="module" src={src} />
         ))}
       </head>

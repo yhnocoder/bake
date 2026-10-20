@@ -235,14 +235,14 @@ describe('component blocks', () => {
     const [first, second, third, fourth] = article.intro;
     assert.equal(
       first.html,
-      '<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;range&#x22;:4,&#x22;beta&#x22;:1,&#x22;gamma&#x22;:1,&#x22;toggle&#x22;:true,&#x22;title&#x22;:&#x22;&#x22;,&#x22;data&#x22;:&#x22;&#x22;}" data-attributes="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;toggle&#x22;:true,&#x22;width&#x22;:&#x22;560px&#x22;}" style="width:560px">' +
+      '<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;range&#x22;:4,&#x22;beta&#x22;:1,&#x22;gamma&#x22;:1,&#x22;toggle&#x22;:true,&#x22;title&#x22;:&#x22;&#x22;,&#x22;data&#x22;:&#x22;&#x22;}" data-attributes="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;toggle&#x22;:true,&#x22;width&#x22;:&#x22;560px&#x22;}" data-line="7" style="width:560px">' +
         '<div class="component-box" style="--component-height:360px;--component-ratio:auto;--component-narrow-height:520px;--component-narrow-ratio:auto"></div>' +
         '<figcaption>The <em>curve</em> of SiLU.</figcaption></figure>',
     );
     assert.deepEqual([first.type, first.width, first.naturalWidth, first.name, first.attributes], ['component', undefined, '560px', 'act-fn-plot', { fn: 'silu', toggle: true, width: '560px' }]);
     assert.equal(
       second.html,
-      '<figure class="component" data-component="glu-heatmap" data-params="{}" data-attributes="{&#x22;width&#x22;:&#x22;70%&#x22;}" data-frame="none" style="width:70%"><div class="component-box" style="--component-height:auto;--component-ratio:1.7778;--component-narrow-height:auto;--component-narrow-ratio:1.7778"></div></figure>',
+      '<figure class="component" data-component="glu-heatmap" data-params="{}" data-attributes="{&#x22;width&#x22;:&#x22;70%&#x22;}" data-line="11" data-frame="none" style="width:70%"><div class="component-box" style="--component-height:auto;--component-ratio:1.7778;--component-narrow-height:auto;--component-narrow-ratio:1.7778"></div></figure>',
     );
     assert.deepEqual([second.width, second.naturalWidth], ['body', undefined]);
     assert.match(third.html, /style="--component-height:420px;--component-ratio:auto;--component-narrow-height:420px;--component-narrow-ratio:auto"/);
@@ -345,6 +345,24 @@ describe('building components', () => {
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);
     assert.match(readFileSync(join(dir, 'dist/assets', assets.find((name) => /^line-plot-[\w-]+\.css$/.test(name))), 'utf8'), /\.bk-kit-slider/);
     assert.ok(!assets.some((name) => name.startsWith('tick-list') && name.endsWith('.css')), assets.join(', '));
+  });
+
+  test('marks the frames of the article itself with their line and the frames of embedded content without one', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/grid-view.js': `${height}export default class GridView extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: '## Grid {#grid}\n\n:::grid-view\n:::\n' }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', body: '> :::grid-view\n> :::\n\n:::embed\n/2026-10/rope/#grid\n:::\n' }),
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const frames = (path) => readFileSync(join(dir, path), 'utf8').match(/<figure class="component"[^>]*>/g);
+    assert.deepEqual(frames('dist/2026-10/rope/index.html'), ['<figure class="component" data-component="grid-view" data-params="{}" data-line="9">']);
+    assert.deepEqual(frames('dist/2026-10/gelu/index.html'), [
+      '<figure class="component" data-component="grid-view" data-params="{}" data-line="7">',
+      '<figure class="component" data-component="grid-view" data-params="{}">',
+    ]);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<div class="embed-part"><h2 data-attributes="[^"]*">Grid<\/h2>\n<figure class="component" data-component="grid-view" data-params="{}">/);
   });
 
   test('reports component errors with the article errors and writes nothing', (t) => {

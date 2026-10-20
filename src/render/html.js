@@ -1,6 +1,6 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
-import { addressHref, encodePath } from '../build/urls.js';
+import { addressHref, encodePath } from '../urls.js';
 import { fragmentOf, idOfFragment, referenceId, sidenoteId } from '../fragments.js';
 import { highlightCode } from './code.js';
 import { relocateMath } from './math.js';
@@ -166,6 +166,7 @@ function blockElement(state, node, context) {
 function componentElement(state, node, context) {
   const { frame, frameWidth, height, narrowHeight } = node.component;
   const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
+  if (context.excerpt === undefined) properties.dataLine = node.position.start.line;
   if (!frame) properties.dataFrame = 'none';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
   const boxStyle = [

@@ -279,6 +279,50 @@ test('the essay theme lays out articles', async (t) => {
     await lightSystem.close();
   });
 
+  await t.test('display math shows a scroll shadow only on an overflowing side, during and after a theme switch', async () => {
+    const problems = [];
+    for (const width of [1440, 375]) {
+      const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Animation.enable');
+      const edges = async () => {
+        const boxes = await page.evaluate(() =>
+          [...document.querySelectorAll('.bk-article mjx-container[display]')].map((formula) => {
+            const box = formula.getBoundingClientRect();
+            return { left: Math.ceil(box.left), right: Math.floor(box.right) - 1, top: Math.ceil(box.top), overflows: formula.scrollWidth > formula.clientWidth };
+          }),
+        );
+        const { data, info } = await sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true });
+        const pixel = (x, y) => [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
+        return boxes.map((box) => ({ ...box, page: pixel(box.left, box.top - 6), start: pixel(box.left, box.top + 2), end: pixel(box.right, box.top + 2) }));
+      };
+      const distance = (a, b) => Math.max(...a.map((value, index) => Math.abs(value - b[index])));
+      const check = async (moment) => {
+        for (const [index, edge] of (await edges()).entries()) {
+          const name = `formula ${index + 1} at ${width}px ${moment}`;
+          if (distance(edge.start, edge.page) > 2) problems.push(`${name}: start edge ${edge.start} on page ${edge.page}`);
+          const endShadow = distance(edge.end, edge.page) > 2;
+          if (endShadow !== edge.overflows) problems.push(`${name}: end edge ${edge.end} on page ${edge.page}, overflows ${edge.overflows}`);
+        }
+      };
+      await page.locator('mjx-container[display]').nth(1).scrollIntoViewIfNeeded();
+      await settle(page);
+      await check('in the light scheme');
+      await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
+      await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+      await page.waitForTimeout(600);
+      const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      assert.ok(!['rgb(245, 246, 244)', 'rgb(17, 20, 19)'].includes(background), `the switch is still running, ${background}`);
+      await check('while switching to the dark scheme');
+      await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 });
+      await page.waitForTimeout(400);
+      await check('in the dark scheme');
+      if (width === 375) assert.ok((await edges()).some((edge) => edge.overflows), 'a formula overflows on a phone');
+      await page.close();
+    }
+    assert.deepEqual(problems, []);
+  });
+
   await t.test('tags are styled as inline code', async () => {
     const page = await open('stress');
     const tags = await page.evaluate(() => {

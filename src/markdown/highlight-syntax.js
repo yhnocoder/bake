@@ -16,6 +16,8 @@ import { resolveAll } from 'micromark-util-resolve-all';
 
 const EQUALS = 61;
 const ATTENTION_SIDE_AFTER = 2;
+const SEQUENCE = '==';
+const CONSTRUCTS_WITHOUT_HIGHLIGHT = ['autolink', 'destinationLiteral', 'destinationRaw', 'reference', 'titleQuote', 'titleApostrophe'];
 
 export function highlight() {
   const data = this.data();
@@ -27,6 +29,25 @@ export function highlight() {
   });
   (data.fromMarkdownExtensions ??= []).push(highlightFromMarkdown);
 }
+
+export const highlightToMarkdown = {
+  unsafe: [
+    { character: '=', before: '=', inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_HIGHLIGHT },
+    { character: '=', after: '=', inConstruct: 'phrasing', notInConstruct: CONSTRUCTS_WITHOUT_HIGHLIGHT },
+  ],
+  handlers: { highlight: writeHighlight },
+};
+
+function writeHighlight(node, _, state, info) {
+  const tracker = state.createTracker(info);
+  const exit = state.enter('highlight');
+  let value = tracker.move(SEQUENCE);
+  value += tracker.move(state.containerPhrasing(node, { ...tracker.current(), before: value, after: SEQUENCE[0] }));
+  value += tracker.move(SEQUENCE);
+  exit();
+  return value;
+}
+writeHighlight.peek = () => SEQUENCE[0];
 
 const highlightFromMarkdown = {
   enter: {

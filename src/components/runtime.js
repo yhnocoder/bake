@@ -127,6 +127,7 @@ function prefetchNext() {
     prefetchNext();
   });
 }
+
 function requestedByPage(address) {
   return performance.getEntriesByName(address).some((entry) => entry.initiatorType !== 'fetch');
 }

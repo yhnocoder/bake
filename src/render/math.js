@@ -2,8 +2,10 @@ import { liteAdaptor } from '@mathjax/src/js/adaptors/liteAdaptor.js';
 import { STATE } from '@mathjax/src/js/core/MathItem.js';
 import { RegisterHTMLHandler } from '@mathjax/src/js/handlers/html.js';
 import { TeX } from '@mathjax/src/js/input/tex.js';
-import { TagsFactory } from '@mathjax/src/js/input/tex/Tags.js';
+import { Configuration } from '@mathjax/src/js/input/tex/Configuration.js';
+import { CommandMap } from '@mathjax/src/js/input/tex/TokenMap.js';
 import { AmsTags } from '@mathjax/src/js/input/tex/ams/AmsConfiguration.js';
+import BaseMethods from '@mathjax/src/js/input/tex/base/BaseMethods.js';
 import { mathjax } from '@mathjax/src/js/mathjax.js';
 import { SVG } from '@mathjax/src/js/output/svg.js';
 import { MathJaxNewcmFont } from '@mathjax/mathjax-newcm-font/js/svg.js';
@@ -12,10 +14,6 @@ import { TEX_PACKAGES } from './tex.js';
 const EM = 16;
 const EX = 8;
 const CONTAINER_WIDTH = 820;
-const NUMBERED_ENVIRONMENT = /^\s*\\begin\{(equation|align|gather|multline|flalign|alignat|eqnarray)\*?\}/;
-const LABEL = /\\label\s*\{/;
-const LABEL_NAME = /\\label\s*\{([^{}]*)\}/g;
-const REFERENCE = /\\(?:eq)?ref\s*\{([^{}]*)\}/g;
 const ID_ATTRIBUTE = / id="([^"]*)"/g;
 const LATEX_ATTRIBUTE = / data-latex(?:-item)?="[^"]*"/g;
 const GLYPH_PATH = /<path id="([^"]+)"[^>]*><\/path>/g;
@@ -25,12 +23,51 @@ const GLYPH_DEFS_END = '</defs>';
 
 export const EQUATION_ID_PREFIX = 'eq-';
 
+const BAKE_PACKAGE = 'bake';
+const PACKAGE_BEFORE_BASE_AND_AMS = 4;
+
 class BakeTags extends AmsTags {
+  startEquation(math) {
+    super.startEquation(math);
+    this.recorded = { labels: [], references: [] };
+  }
+
+  finalize(node, env) {
+    if (!env.display || this.currentTag.env || !this.label || this.history.some((tag) => tag.taggable)) return super.finalize(node, env);
+    Object.assign(this.currentTag, { taggable: true, defaultTags: true });
+    const tag = this.getTag();
+    return tag === null ? node : this.enTag(node, tag);
+  }
+
   formatId(id) {
     return this.label ? id : `${EQUATION_ID_PREFIX}${id}`;
   }
 }
-TagsFactory.add('bake', BakeTags);
+
+function peekArgument(parser, name) {
+  const start = parser.i;
+  const argument = parser.GetArgument(name);
+  parser.i = start;
+  return argument;
+}
+
+function recordLabel(parser, name) {
+  parser.tags.recorded.labels.push(peekArgument(parser, name));
+  return BaseMethods.HandleLabel(parser, name);
+}
+
+function recordReference(parser, name, eqref) {
+  const label = peekArgument(parser, name);
+  parser.tags.recorded.references.push({ text: `${name}{${label}}`, label });
+  return BaseMethods.HandleRef(parser, name, eqref);
+}
+
+new CommandMap('bake-equation-references', { label: recordLabel, ref: [recordReference, false], eqref: [recordReference, true] });
+Configuration.create(BAKE_PACKAGE, {
+  handler: { macro: ['bake-equation-references'] },
+  tags: { [BAKE_PACKAGE]: BakeTags },
+  priority: PACKAGE_BEFORE_BASE_AND_AMS,
+});
 
 const adaptor = liteAdaptor();
 RegisterHTMLHandler(adaptor);
@@ -51,8 +88,8 @@ export async function typesetMath(definitions, formulas) {
   const font = await loadFont();
   let current = null;
   const tex = new TeX({
-    packages: TEX_PACKAGES,
-    tags: 'bake',
+    packages: [...TEX_PACKAGES, BAKE_PACKAGE],
+    tags: BAKE_PACKAGE,
     formatError(jax, error) {
       current.error ??= error.message;
       return jax.formatError(error);
@@ -64,10 +101,10 @@ export async function typesetMath(definitions, formulas) {
   const compile = (entry) => {
     current = entry;
     entry.item.convert(document, STATE.COMPILED);
+    entry.recorded = tex.parseOptions.tags.recorded;
   };
   const entries = [...definitions.map((definition) => ({ tex: definition.tex, display: false })), ...formulas].map((formula) => {
-    const source = formula.display && LABEL.test(formula.tex) && !NUMBERED_ENVIRONMENT.test(formula.tex) ? `\\begin{equation}${formula.tex}\\end{equation}` : formula.tex;
-    const item = new document.options.MathItem(source, tex, formula.display);
+    const item = new document.options.MathItem(formula.tex, tex, formula.display);
     item.start.node = adaptor.body(document.document);
     item.setMetrics(EM, EX, CONTAINER_WIDTH, 1);
     return { item, error: undefined };
@@ -85,10 +122,8 @@ export async function typesetMath(definitions, formulas) {
     entry.item.convert(document, STATE.LAST);
     const container = entry.item.typesetRoot;
     adaptor.setAttribute(container, 'data-tex', formulas[index].tex);
-    const references = [...formulas[index].tex.matchAll(REFERENCE)].map(([text, label]) => ({ text, label }));
     const html = adaptor.outerHTML(container).replace(LATEX_ATTRIBUTE, '');
-    const ownLabels = [...formulas[index].tex.matchAll(LABEL_NAME)].map(([, label]) => label);
-    return { html, error: entry.error, references, labels: ownLabels, ids: [...html.matchAll(ID_ATTRIBUTE)].map(([, id]) => id) };
+    return { html, error: entry.error, references: entry.recorded.references, labels: entry.recorded.labels, ids: [...html.matchAll(ID_ATTRIBUTE)].map(([, id]) => id) };
   });
   const glyphs = formulas.length === 0 ? undefined : adaptor.outerHTML(svg.pageElements(document));
   return { definitionErrors: entries.slice(0, definitions.length).map((entry) => entry.error), results, labels, glyphs };
