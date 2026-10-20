@@ -2,7 +2,8 @@ import { loaders } from 'bake:component-loaders';
 
 const FRAME = 'figure.component[data-component]';
 const BOX = '.component-box';
-const NEAR_VIEWPORT = '150% 0px';
+const NEAR_DISTANCE = 800;
+const NEAR_SCREENS = 1.5;
 const definitions = new Map();
 
 function define(name) {
@@ -68,7 +69,7 @@ const observer = new IntersectionObserver(
       start(entry.target);
     }
   },
-  { rootMargin: NEAR_VIEWPORT },
+  { rootMargin: `${Math.max(NEAR_DISTANCE, innerHeight * NEAR_SCREENS)}px 0px` },
 );
 function observeFrames() {
   const frames = [...document.querySelectorAll(FRAME)].filter((frame) => frame.dataset.state === undefined);
