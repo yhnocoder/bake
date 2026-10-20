@@ -80,7 +80,7 @@
   background: var(--surface);
   box-shadow:
     0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent),
-    0 2px 6px -3px rgba(0, 0, 0, 0.15);
+    var(--button-shadow);
   color: var(--ink);
   font-family: var(--font-body, inherit);
   overflow-wrap: anywhere;
@@ -324,7 +324,7 @@
   background: var(--surface);
   box-shadow:
     0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent),
-    0 2px 6px -3px rgba(0, 0, 0, 0.15);
+    var(--button-shadow);
   font-family: var(--font-ui, inherit);
 }
 
@@ -457,7 +457,7 @@
   overscroll-behavior: contain;
   border-radius: 10px;
   background: var(--surface);
-  box-shadow: var(--card-shadow, 0 6px 24px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--card-shadow);
   animation: bk-chat-pop 0.16s var(--ease-out, ease-out);
 }
 

@@ -1,5 +1,5 @@
 .bk-chat-pet {
-  --bk-chat-pet-outline: light-dark(transparent, rgb(240 238 232 / 0.55));
+  --bk-chat-pet-outline: light-dark(transparent, color-mix(in srgb, var(--ink) 55%, transparent));
   position: relative;
   display: block;
   flex: none;

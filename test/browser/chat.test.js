@@ -746,6 +746,25 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
   });
 
+  await t.test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async (t) => {
+    const seen = {};
+    for (const colorScheme of ['light', 'dark']) {
+      const { page, api } = await openBrowser(t, base, { contextOptions: { colorScheme } });
+      await page.goto(`${base}/2026-10/syntax/`);
+      await setUpKey(page);
+      api.answers.push({ body: text('好。') });
+      await ask(page, '你好');
+      await page.locator('.bk-chat-reply[data-done]').waitFor();
+      await openSettings(page);
+      seen[colorScheme] = await shadow(
+        page,
+        `const style = (selector, property) => getComputedStyle(root.querySelector(selector))[property];
+        return { bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: style('.bk-chat-ask', 'boxShadow'), pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
+      );
+    }
+    for (const part of Object.keys(seen.light)) assert.notEqual(seen.light[part], seen.dark[part], `the ${part} has the same shadow in both schemes: ${seen.light[part]}`);
+  });
+
   await t.test('opening and closing a chat with a long conversation runs no main-thread task over 25 milliseconds of CPU time at a quarter of the CPU speed, apart from one such as garbage collection, at 1440 and 375 pixels', async (t) => {
     const { context, page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);

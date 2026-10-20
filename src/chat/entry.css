@@ -70,7 +70,7 @@ button:focus-visible {
   color: var(--bg);
   font-size: 12.5px;
   line-height: 1;
-  box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--button-shadow);
   user-select: none;
   -webkit-user-select: none;
   animation: bk-chat-fade 0.14s var(--ease-out, ease-out);
