@@ -201,6 +201,11 @@ function caseName(interaction, device) {
   return `${interaction.name} at ${device === 'phone' ? 375 : 1440} pixels`;
 }
 
+test('every known failure names a measured case', () => {
+  const names = interactions.flatMap((interaction) => interaction.devices.map((device) => caseName(interaction, device)));
+  assert.deepEqual(knownFailures.map((entry) => entry.name).filter((name) => !names.includes(name)), []);
+});
+
 test('interactions draw every frame within the 60 fps budget on a CPU four times slower', async (t) => {
   const blog = mkdtempSync(join(tmpdir(), 'bake-frames-'));
   t.after(() => rmSync(blog, { recursive: true, force: true }));
@@ -214,7 +219,7 @@ test('interactions draw every frame within the 60 fps budget on a CPU four times
     for (const device of interaction.devices) {
       const name = caseName(interaction, device);
       const known = knownFailures.find((entry) => entry.name === name);
-      await t.test(name, { timeout: 120000, todo: known && `${known.reason}; Issue Board task ${known.task}` }, async (subtest) => {
+      await t.test(name, { timeout: 120000 }, async (subtest) => {
         const { context, page, errors } = await openPage(browser, base + interaction.path, { device, storage: interaction.storage });
         try {
           const run = await interaction.prepare(page, device);
@@ -223,7 +228,10 @@ test('interactions draw every frame within the 60 fps budget on a CPU four times
           subtest.diagnostic(describe(stats));
           assert.deepEqual(errors, []);
           assert.deepEqual(blank, [], 'components that were not ready when they entered the viewport');
-          assert.equal(frameProblem(stats), null, describe(stats));
+          const problem = frameProblem(stats);
+          if (known && !problem) subtest.diagnostic(`the known failure passed this time; Issue Board task ${known.task}`);
+          if (known && problem) subtest.todo(`${known.reason}; Issue Board task ${known.task}`);
+          else assert.equal(problem, null, describe(stats));
         } finally {
           await context.close();
         }

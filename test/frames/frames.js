@@ -76,7 +76,10 @@ export async function record(page, action) {
 export function frameStats(frames) {
   const sorted = [...frames].sort((a, b) => a - b);
   const slow = sorted.filter((frame) => frame > SLOW_FRAME).length;
+  const dropped = sorted.reduce((sum, frame) => sum + Math.max(0, Math.round(frame / FRAME_BUDGET) - 1), 0);
   return {
+    dropped,
+    droppedShare: dropped / (sorted.length + dropped),
     frames: sorted.length,
     median: sorted[Math.floor(sorted.length / 2)],
     p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
@@ -94,7 +97,7 @@ export function frameProblem(stats) {
 }
 
 export function describe(stats) {
-  return `${stats.frames} frames, median ${stats.median.toFixed(1)} ms, 95th percentile ${stats.p95.toFixed(1)} ms, longest ${stats.longest.toFixed(1)} ms, ${(stats.slowShare * 100).toFixed(1)}% slower than ${SLOW_FRAME.toFixed(1)} ms`;
+  return `${stats.frames} frames, median ${stats.median.toFixed(1)} ms, 95th percentile ${stats.p95.toFixed(1)} ms, longest ${stats.longest.toFixed(1)} ms, ${(stats.slowShare * 100).toFixed(1)}% slower than ${SLOW_FRAME.toFixed(1)} ms, ${stats.dropped} dropped frames (${(stats.droppedShare * 100).toFixed(1)}%)`;
 }
 
 export async function paced(steps, duration, step) {
