@@ -69,6 +69,8 @@ export function SvgTex(props) {
               <rect x={left() - 4} y={top() - 2} width={math().width + 8} height={math().height + 4} rx="3" fill="var(--surface)" opacity="0.9" />
             </Show>
             <svg
+              role="img"
+              aria-label={props.tex}
               x={left()}
               y={top()}
               width={math().width}

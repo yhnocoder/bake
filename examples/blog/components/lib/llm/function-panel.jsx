@@ -68,6 +68,8 @@ export function FunctionPanel(props) {
   const yTicks = createMemo(() => niceTicks(frame().y0, frame().y1, TICK_COUNT))
   const insideX = (x) => x >= frame().x0 && x <= frame().x1
   const insideY = (y) => y >= frame().y0 && y <= frame().y1
+  const placeX = (x) => Math.min(Math.max(frame().sx(x), MARGIN.left), frame().right)
+  const placeY = (y) => (Number.isFinite(y) ? Math.min(Math.max(frame().sy(y), MARGIN.top), frame().bottom) : frame().bottom)
 
   const pageOrigin = (rect) => ({ left: rect.left, top: rect.top })
   const showLabel = (label) => {
@@ -110,7 +112,7 @@ export function FunctionPanel(props) {
     const x = side < 0 ? x0 + (x1 - x0) * ARROW_INSET : x1 - (x1 - x0) * ARROW_INSET
     const xx = x - side * (x1 - x0) * ARROW_RUN
     const px = sx(x)
-    const py = sy(q.fn(x))
+    const py = Math.min(Math.max(sy(q.fn(x)), MARGIN.top), bottom)
     const shown = seriesShown(q) && !q.dash && !q.faint && py >= MARGIN.top + 6 && py <= bottom - 6
     if (!Number.isFinite(py)) return { shown: false, d: '' }
     const angle = Math.atan2(py - sy(q.fn(xx)), px - sx(xx))
@@ -284,7 +286,7 @@ export function FunctionPanel(props) {
                         onShow={showLabel}
                         onHide={hideLabel}
                       >
-                        <circle cx={frame().sx(p().x)} cy={Number.isFinite(p().y) ? frame().sy(p().y) : 0} r="4" fill="var(--surface)" stroke={q()?.color} stroke-width="2" />
+                        <circle cx={placeX(p().x)} cy={placeY(p().y)} r="4" fill="var(--surface)" stroke={q()?.color} stroke-width="2" />
                       </Mark>
                     )}
                   </Index>
@@ -321,8 +323,8 @@ export function FunctionPanel(props) {
                     onHide={hideLabel}
                   >
                     <circle
-                      cx={frame().sx(m().x)}
-                      cy={frame().sy(m().y)}
+                      cx={placeX(m().x)}
+                      cy={placeY(m().y)}
                       r="4"
                       fill={m().open ? 'var(--surface)' : color()}
                       stroke={m().open ? color() : 'var(--surface)'}
@@ -331,7 +333,7 @@ export function FunctionPanel(props) {
                   </Mark>
                   <Show when={m().label}>
                     <g class="llm-fade" classList={{ 'llm-shown': shown() }}>
-                      <SvgLabel text={m().label} x={frame().sx(m().x) + (m().dx ?? 8)} y={frame().sy(m().y) + (m().dy ?? -10)} fill={color()} interactive={false} />
+                      <SvgLabel text={m().label} x={placeX(m().x) + (m().dx ?? 8)} y={placeY(m().y) + (m().dy ?? -10)} fill={color()} interactive={false} />
                     </g>
                   </Show>
                 </>
