@@ -109,6 +109,16 @@ describe('reading components', () => {
     ]);
   });
 
+  test('reports a component file named after a custom element name that the HTML standard reserves', async (t) => {
+    const reserved = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
+    const { errors, components: read_ } = await read(t, Object.fromEntries(reserved.map((name) => [`components/${name}.js`, `${height}${component}`])));
+    assert.deepEqual(
+      errors,
+      reserved.map((name) => `components/${name}.js:1:1 ${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`).sort(),
+    );
+    assert.equal(read_.size, 0);
+  });
+
   test('reports problems in params and layout declarations at the start of the component file', async (t) => {
     const { errors, components: read_ } = await read(t, {
       'components/bad-type.js': `export const params = { n: { label: 'N', type: 'integer', default: 1 } };\n${height}${component}`,
@@ -238,6 +248,14 @@ describe('component blocks', () => {
     assert.match(fourth.html, /<figcaption>\n<p>One.<\/p>\n<p>Two.<\/p>\n<\/figcaption>/);
     assert.equal(fourth.width, 'page');
     assert.deepEqual(article.components, ['act-fn-plot', 'glu-heatmap']);
+  });
+
+  test('gives a component the URL-encoded path of a file parameter whose name holds #, ? or %', async () => {
+    const options = { components, folder: { path: '/blog/post', files: ['data#1.json', 'a?b.json', 'tables/100%.json'] } };
+    const article = await parsed(':::act-fn-plot{data=data#1.json}\n:::\n\n:::act-fn-plot{data="a?b.json"}\n:::\n\n:::act-fn-plot{data=tables/100%.json}\n:::\n', options);
+    const files = article.intro.map((block) => JSON.parse(/data-params="([^"]*)"/.exec(block.html)[1].replaceAll('&#x22;', '"')).data);
+    assert.deepEqual(files, ['data%231.json', 'a%3Fb.json', 'tables/100%25.json']);
+    assert.deepEqual(article.intro.map((block) => block.params.data), ['data#1.json', 'a?b.json', 'tables/100%.json']);
   });
 
   test('marks an example whose result holds a component or a figure with a pixel width with those widths', async () => {

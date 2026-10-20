@@ -9,6 +9,7 @@ import { contentType } from './content-types.js';
 import { DIST_DIR } from './dist.js';
 import { cardHtml } from './share-card.js';
 import { THEME_STYLES_PATH } from './theme.js';
+import { encodePath } from './urls.js';
 
 export const SHARE_IMAGE_DIR = 'og';
 export const SHARE_IMAGE_WIDTH = 1200;
@@ -125,7 +126,7 @@ async function drawCards(images, assets, errors) {
 
 async function drawCard(page, index, image) {
   await page.goto(`${ORIGIN}/${index}/${CARD_FILE}`);
-  const preview = image.card.preview === undefined ? null : `${ORIGIN}/${index}/${ARTICLE_DIR}/${encodeURI(image.card.preview)}`;
+  const preview = image.card.preview === undefined ? null : `${ORIGIN}/${index}/${ARTICLE_DIR}/${encodePath(image.card.preview)}`;
   let timer;
   const timeout = new Promise((resolve) => {
     timer = setTimeout(() => resolve({ problem: `it did not finish within ${DRAW_TIMEOUT / 1000} seconds`, stuck: true }), DRAW_TIMEOUT);

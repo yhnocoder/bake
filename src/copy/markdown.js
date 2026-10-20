@@ -8,6 +8,14 @@ const BLOCK =
   'address, article, aside, blockquote, details, dialog, div, dl, dt, dd, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, summary, table, thead, tbody, tfoot, tr, td, th, ul, mjx-container[display="true"]';
 const HEADING = 'h1, h2, h3, h4, h5, h6';
 const BARE_VALUE = /^[\w.%/-]+$/;
+const LINE_MARK = '\uFDD0';
+const LINE_START = new RegExp(`(^|\\n)((?:[ \\t]*(?:>[ \\t]?|(?:[-+*]|\\d{1,9}[.)])[ \\t]+))*[ \\t]*)(\\d*)${LINE_MARK}`, 'g');
+const LINE_SYNTAX = /^(?:#{1,6}(?:[ \t]|$)|>|[-+](?:[ \t]|$)|[- \t]+$|:{3})/;
+const LINE_NUMBER = /^\d{1,9}(?=[.)](?:[ \t]|$))/;
+const ALWAYS_ESCAPED = new Set(['\\', '`', '[', ']', '$']);
+const ASCII_WORD = /[A-Za-z0-9]/;
+const HTML_START = /[A-Za-z/!?]/;
+const CHARACTER_REFERENCE = /^&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/i;
 
 export function isUi(element, article) {
   const ui = element.closest(UI);
@@ -29,7 +37,7 @@ export class MarkdownWriter {
   write() {
     const common = this.range.commonAncestorContainer;
     const start = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
-    const markdown = tidy(this.selection(start));
+    const markdown = resolveLineStarts(tidy(this.selection(start)));
     const footnotes = this.footnotes();
     return footnotes.length === 0 ? markdown : `${markdown}\n\n${footnotes.join('\n\n')}`;
   }
@@ -143,7 +151,7 @@ export class MarkdownWriter {
     };
     for (const child of parent.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
-        run += this.textPart(child);
+        run += escapeText(this.textPart(child), false);
         continue;
       }
       if (child.nodeType !== Node.ELEMENT_NODE || child.matches(UI) || child.matches(NOTE) || !this.hasSelection(child)) continue;
@@ -185,7 +193,7 @@ export class MarkdownWriter {
     let text = '';
     for (const child of element.childNodes) {
       if (!this.range.intersectsNode(child)) continue;
-      if (child.nodeType === Node.TEXT_NODE) text += this.inCell ? this.textPart(child).replaceAll('|', '\\|') : this.textPart(child);
+      if (child.nodeType === Node.TEXT_NODE) text += escapeText(this.textPart(child), this.inCell);
       else if (child.nodeType === Node.ELEMENT_NODE) text += this.inlineElement(child);
     }
     return text;
@@ -365,6 +373,41 @@ function anchorOf(href) {
   }
 }
 
+function escapeText(text, inCell) {
+  let offset = 0;
+  return text
+    .split('\n')
+    .map((line) => {
+      let escaped = '';
+      for (let index = 0; index < line.length; index += 1) escaped += isSyntax(text, offset + index, inCell) ? `\\${line[index]}` : line[index];
+      offset += line.length + 1;
+      return markLineStart(escaped);
+    })
+    .join('\n');
+}
+
+function markLineStart(line) {
+  const content = line.trimStart();
+  const space = line.slice(0, line.length - content.length);
+  const number = LINE_NUMBER.exec(content);
+  if (number !== null) return `${space}${number[0]}${LINE_MARK}${content.slice(number[0].length)}`;
+  return LINE_SYNTAX.test(content) ? `${space}${LINE_MARK}${content}` : line;
+}
+
+function isSyntax(text, index, inCell) {
+  const character = text[index];
+  const previous = text[index - 1] ?? '';
+  const next = text[index + 1] ?? '';
+  if (ALWAYS_ESCAPED.has(character)) return true;
+  if (character === '*') return !(/\s/.test(previous) && /\s/.test(next));
+  if (character === '_') return !(ASCII_WORD.test(previous) && ASCII_WORD.test(next));
+  if (character === '=' || character === '~') return previous === character || next === character;
+  if (character === '<') return HTML_START.test(next);
+  if (character === '&') return CHARACTER_REFERENCE.test(text.slice(index));
+  if (character === '|') return inCell;
+  return false;
+}
+
 function wrap(marker, text) {
   const [, before, core, after] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
   return `${before}${marker}${core}${marker}${after}`;
@@ -452,6 +495,10 @@ function noteBody(definition, label) {
   const indents = rest.filter((line) => line.trim() !== '').map((line) => /^[ \t]*/.exec(line)[0].length);
   const common = indents.length === 0 ? 0 : Math.min(...indents);
   return [body, ...rest.map((line) => line.slice(common))].join('\n');
+}
+
+function resolveLineStarts(text) {
+  return text.replace(LINE_START, `$1$2$3\\`).replaceAll(LINE_MARK, '');
 }
 
 function tidy(text) {

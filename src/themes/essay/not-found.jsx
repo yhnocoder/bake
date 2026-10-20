@@ -33,7 +33,7 @@ export default function NotFound(props) {
             <ul>
               {articles.map((article) => (
                 <li data-url={article.url} hidden>
-                  <a href={`${assets.root}${encodeURI(article.url)}`}>{article.title}</a>
+                  <a href={`${assets.root}${article.url}`}>{article.title}</a>
                   <code>{`/${article.url}`}</code>
                 </li>
               ))}

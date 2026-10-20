@@ -17,7 +17,7 @@ import { indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
+import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
 
 export const PUBLIC_DIR = 'public';
 
@@ -25,7 +25,7 @@ const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
 export function createSite(root, { drafts = false, base, shareImages = false } = {}) {
-  return { root, drafts, base, shareImages, settings: null, articles: new Map(), themes: new Map(), bundle: null };
+  return { root, drafts, base, shareImages, settings: null, articles: new Map(), lastGood: new Map(), themes: new Map(), bundle: null };
 }
 
 export async function updateSite(site, changedPaths = null) {
@@ -49,26 +49,39 @@ export async function updateSite(site, changedPaths = null) {
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
   linkArticles(articles, errors);
-  const published = articles.filter((article) => article.url !== null && (site.drafts || article.fields.draft !== true));
+  const isPublished = (article) => article.url !== null && (site.drafts || article.fields.draft !== true);
+  const published = articles.filter(isPublished);
   const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, settings.config, errors), compileComponents(site, published, errors), chatBundle()]);
   const { config } = settings;
   const assetFiles = assetOutputs(themes, bundle, chat);
   const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, published, config, assetFiles, errors) : new Map();
   const pageSettings = { config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
   const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
-  const entries = published.map((article) => homeEntry(article, config)).sort(newestFirst);
+  const shown = lastGoodArticles(site, articles, errors).filter(isPublished);
+  const entries = shown.map((article) => homeEntry(article, config)).sort(newestFirst);
   const listed = entries.filter((entry) => !entry.draft);
   const home = homeOutput(entries, pageSettings, errors);
   const siteFiles = [
     { path: FEED_PATH, render: () => feedXml(config, listed), owner: 'the RSS feed' },
     { path: SITEMAP_PATH, render: () => sitemapXml(config, listed), owner: 'the sitemap' },
-    { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, catalogEntries(published)), owner: 'the AI chat' },
+    { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, catalogEntries(shown)), owner: 'the AI chat' },
     { path: CHAT_PREAMBLE_PATH, render: () => `${JSON.stringify(settings.preamble.map((definition) => definition.tex))}\n`, owner: 'the AI chat' },
     notFoundOutput(listed, site.base ?? sitePath(config.url), pageSettings, errors),
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
   return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
+}
+
+function lastGoodArticles(site, articles, errors) {
+  const failed = new Set(errors.map((error) => error.file));
+  site.lastGood = new Map(
+    articles.flatMap((article) => {
+      const good = failed.has(article.file) ? site.lastGood.get(article.file) : article;
+      return good === undefined ? [] : [[article.file, good]];
+    }),
+  );
+  return [...site.lastGood.values()];
 }
 
 async function readSettings(root) {
@@ -163,8 +176,8 @@ function homeEntry(article, config) {
     category: config.categories.find((category) => category.id === fields.category),
     draft: fields.draft === true,
     url: base,
-    preview: fields.preview === undefined ? undefined : `${base}${fields.preview}`,
-    image: content?.image === undefined ? undefined : `${base}${content.image}`,
+    preview: fields.preview === undefined ? undefined : `${base}${encodePath(fields.preview)}`,
+    image: content?.image === undefined ? undefined : `${base}${encodePath(content.image)}`,
   };
 }
 
