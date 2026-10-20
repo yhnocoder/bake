@@ -144,10 +144,10 @@ describe('bake dev', () => {
     const token = /data-token="([A-Za-z0-9_-]{43})"/.exec(html)?.[1];
     assert.ok(token, html.slice(-400));
     assert.ok(
-      html.endsWith(
-        `<script src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}" data-version="${version}" data-components="{}" data-token="${token}"></script></body></html>\n`,
+      html.includes(
+        `<head><script type="module" src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}" data-version="${version}" data-components="{}" data-token="${token}"></script>`,
       ),
-      html.slice(-400),
+      html.slice(0, 600),
     );
     assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7" data-end-line="7">/);
     assert.match(await (await get('/2026-10/gelu/')).text(), /<span class="bk-draft">Draft<\/span>/);
@@ -163,7 +163,7 @@ describe('bake dev', () => {
       listing,
       /<li><a href="\/2026-10\/gelu\/">GELU &lt;draft&gt;<\/a><span class="date">2026-10-20<\/span><span class="draft">Draft<\/span><span class="file">content\/posts\/gelu\/index.md<\/span><\/li><li><a href="\/2026-10\/rope\/">Rope<\/a>/,
     );
-    assert.match(listing, /<script src="\/__bake\/client.js" data-bake-dev data-missing><\/script><\/body>/);
+    assert.match(listing, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev data-missing><\/script>/);
   });
 
   test('serves the homepage at / with drafts and the page script', async (t) => {
@@ -179,7 +179,7 @@ describe('bake dev', () => {
     assert.match(html, /<title>Test Blog<\/title>/);
     assert.match(html, /href="2026-10\/rope\/"/);
     assert.match(html, /href="2026-10\/gelu\/"[\s\S]*<span class="bk-card-draft">Draft<\/span>/);
-    assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
+    assert.match(html, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev><\/script>/);
   });
 
   test('serves the feed, the sitemap, the theme stylesheet and the 404 page with assets from the root and without drafts', async (t) => {
@@ -208,7 +208,7 @@ describe('bake dev', () => {
     assert.equal((await get(stylesheet[1])).status, 200);
     assert.match(html, /<li data-url="2026-10\/rope\/" hidden><a href="\/2026-10\/rope\/">Rope<\/a>/);
     assert.doesNotMatch(html, /GELU/);
-    assert.ok(html.endsWith('<script src="/__bake/client.js" data-bake-dev></script></body></html>\n'), html.slice(-200));
+    assert.match(html, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev><\/script>/);
   });
 
   test('prints problems as file:line:col lines, sends them to the page and prints when they are fixed', async (t) => {
