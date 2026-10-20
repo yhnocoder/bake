@@ -17,7 +17,8 @@ export function browserModules({ preamble, components, prefetch }) {
   });
   return [
     mathModules(`export const definitions = ${JSON.stringify(preamble.map((definition) => definition.tex))};\n`),
-    { ...loaders, transform: markKitModulesSideEffectFree, generateBundle: (options, bundle) => writeComponentFiles(bundle, prefetch ? components : []) },
+    { ...loaders, generateBundle: (options, bundle) => writeComponentFiles(bundle, prefetch ? components : []) },
+    { name: 'bake-kit-side-effects', transform: markKitModulesSideEffectFree },
   ];
 }
 

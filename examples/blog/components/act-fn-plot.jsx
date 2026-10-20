@@ -15,11 +15,8 @@ export const layout = {
   narrowHeight: 560,
 };
 
-const FUNCTIONS = [
-  { value: 'relu', label: 'ReLU' },
-  { value: 'gelu', label: 'GELU' },
-  { value: 'silu', label: 'SiLU' },
-];
+const NAMES = { relu: 'ReLU', gelu: 'GELU', silu: 'SiLU' };
+const FUNCTIONS = params.fn.options.map((value) => ({ value, label: NAMES[value] }));
 const PANEL_GAP = 16;
 const TITLE_HEIGHT = 24;
 const TARGET_ASPECT = 1.5;
@@ -106,10 +103,10 @@ export default function ActFnPlot(props) {
       <div class="act-plot-head">
         <Legend items={curves()} />
         <Controls>
-          <Segmented label="函数" options={FUNCTIONS} value={fn()} onChange={setFn} />
-          <Slider label="横轴范围" min={1} max={10} step={0.5} value={span()} onInput={setSpan} format={(value) => `±${value.toFixed(1)}`} />
+          <Segmented label={params.fn.label} options={FUNCTIONS} value={fn()} onChange={setFn} />
+          <Slider label={params.range.label} min={params.range.min} max={params.range.max} step={params.range.step} value={span()} onInput={setSpan} format={(value) => `±${value.toFixed(1)}`} />
           <Show when={fn() === 'silu'}>
-            <Slider label="β" min={0} max={4} step={0.1} value={beta()} onInput={setBeta} format={(value) => formatNumber(value, 1)} />
+            <Slider label="β" min={params.beta.min} max={params.beta.max} step={params.beta.step} value={beta()} onInput={setBeta} format={(value) => formatNumber(value, 1)} />
           </Show>
           <Show when={fn() === 'gelu'}>
             <Toggle label="近似" checked={approximations()} onChange={setApproximations} />

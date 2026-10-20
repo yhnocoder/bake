@@ -2,8 +2,11 @@
   position: relative;
 }
 
-.bk-kit-plot-fill {
+.bk-kit-plot-fill-width {
   width: 100%;
+}
+
+.bk-kit-plot-fill-height {
   height: 100%;
   min-height: 0;
 }
@@ -79,6 +82,14 @@
 
 .bk-kit-readout-visible {
   opacity: 1;
+}
+
+.bk-kit-readout {
+  translate: 12px 0;
+}
+
+.bk-kit-readout-left {
+  translate: calc(-100% - 12px) 0;
 }
 
 .bk-kit-readout-row {

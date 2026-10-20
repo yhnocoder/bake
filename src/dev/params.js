@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
-import { folderFile } from '../config/rules.js';
-import { convertAttribute, valueProblem } from '../components/declarations.js';
+import { convertAttribute, fileProblem, valueProblem } from '../components/declarations.js';
 import { attributeTokens, writeAttribute } from '../markdown/attributes.js';
 import { describeValue } from '../report.js';
 
@@ -53,11 +52,6 @@ function paramEdit(name, param, declaration, value, token, files) {
   if (value === declaration.default) return { text: null };
   const text = writeAttribute(param, value);
   return text === null ? { error: `parameter "${param}" of ${name} cannot be written as an attribute, because its text contains both " and '` } : { text };
-}
-
-function fileProblem(declaration, value, files) {
-  if (declaration.type !== 'file' || value === '' || folderFile(value, files) !== null) return null;
-  return `must be a file in the article folder, got ${describeValue(value)}`;
 }
 
 function joinAttributes(text, tokens, edits) {

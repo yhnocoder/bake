@@ -1,8 +1,9 @@
-import { createEffect, createResource, createSignal } from 'solid-js';
+import { createResource } from 'solid-js';
 import './tex.css';
 
 const ANCHORS = { start: 0, middle: 0.5, end: 1 };
 const BASELINES = { top: 0, middle: 0.5, bottom: 1 };
+const TEXT_ANCHORS = { start: 'start', middle: 'middle', end: 'end' };
 
 function createFormula(tex, host) {
   const [formula] = createResource(tex, async (source) => {
@@ -32,22 +33,22 @@ export function Tex(props) {
 export function SvgTex(props) {
   let group;
   const formula = createFormula(() => props.tex, () => group);
-  const [size, setSize] = createSignal(null);
-  createEffect(() => {
+  const placed = () => {
     const svg = formula();
-    if (svg === undefined) return;
-    if (svg === null) return setSize({ width: 0, height: 0 });
-    const scale = group.getScreenCTM()?.a || 1;
-    const rect = svg.getBoundingClientRect();
-    setSize({ width: rect.width / scale, height: rect.height / scale });
-  });
-  const offset = () => {
-    const { width, height } = size();
-    return `translate(${props.x - width * ANCHORS[props.anchor ?? 'start']} ${props.y - height * BASELINES[props.baseline ?? 'middle']})`;
+    if (svg === undefined || svg === null) return svg;
+    const width = parseFloat(svg.getAttribute('width'));
+    const height = parseFloat(svg.getAttribute('height'));
+    const depth = -Number(/vertical-align:\s*(-?[\d.]+)ex/.exec(svg.getAttribute('style') ?? '')?.[1] ?? 0);
+    const top = props.baseline === 'baseline' ? height - depth : height * BASELINES[props.baseline ?? 'middle'];
+    svg.setAttribute('x', `${-width * ANCHORS[props.anchor ?? 'start']}ex`);
+    svg.setAttribute('y', `${-top}ex`);
+    svg.setAttribute('overflow', 'visible');
+    svg.removeAttribute('style');
+    return svg;
   };
   return (
-    <g ref={group} class="bk-kit-svg-tex" role="img" aria-label={props.label ?? props.tex} visibility={size() === null ? 'hidden' : 'visible'} transform={size() === null ? undefined : offset()}>
-      {formula() === null ? <text>{props.tex}</text> : formula()}
+    <g ref={group} class="bk-kit-svg-tex" role="img" aria-label={props.label ?? props.tex} transform={`translate(${props.x} ${props.y})`}>
+      {placed() === null ? <text text-anchor={TEXT_ANCHORS[props.anchor ?? 'start']}>{props.tex}</text> : placed()}
     </g>
   );
 }

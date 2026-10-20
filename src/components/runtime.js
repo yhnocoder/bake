@@ -15,12 +15,17 @@ function define(name) {
   if (!definitions.has(name)) {
     definitions.set(
       name,
-      loaders[name]().then(async (module) => {
-        const Component = module.default;
-        if (customElements.get(name) !== undefined) return;
-        if (Component.prototype instanceof HTMLElement) customElements.define(name, Component);
-        else customElements.define(name, (await import('./solid-element.js')).solidElement(Component));
-      }),
+      loaders[name]().then(
+        async (module) => {
+          const Component = module.default;
+          if (Component.prototype instanceof HTMLElement) customElements.define(name, Component);
+          else customElements.define(name, (await import('./solid-element.js')).solidElement(Component));
+        },
+        (error) => {
+          definitions.delete(name);
+          throw error;
+        },
+      ),
     );
   }
   return definitions.get(name);
