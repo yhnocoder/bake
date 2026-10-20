@@ -1,6 +1,9 @@
-import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { batch, createEffect, createResource, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { Portal } from 'solid-js/web'
+import { formatNumber } from 'bake/kit'
 import { fn } from './lib/llm/functions.js'
-import { richNodes } from './lib/llm/tex.js'
+import { richNodes, typesetAll } from './lib/llm/tex.js'
+import { createPointerFrames, hideOnScroll, tipTransform } from './lib/llm/tip.js'
 import './lib/llm/act.css'
 import './lib/llm/heatmap.css'
 
@@ -11,7 +14,17 @@ export const params = {
 
 export const layout = { width: 'body', height: 515, narrowHeight: { ratio: 0.99 } }
 
+const NAME = 'llm-glu-heatmap'
 const CELLS = 160
+const TIP_GAP = 12
+const TIP_BELOW = 14
+const FLIP_AT = 0.6
+const G = '$g$'
+const U = '$u$'
+const OUTPUT = '$\\mathrm{SiLU}(g)\\cdot u$'
+const U_TITLE = '线性分支 $u$'
+const G_TITLE = '门控分支 $g$'
+
 const minus = (value) => String(value).replace('-', '−')
 
 function rgb(context, color) {
@@ -26,7 +39,9 @@ const output = (g, u) => fn.silu.f(g) * u
 
 export default function GluHeatmap(props) {
   let canvas
-  const [tip, setTip] = createSignal(null)
+  const [ready] = createResource(() => typesetAll(NAME, [G, U, OUTPUT, U_TITLE, G_TITLE]))
+  const [point, setPoint] = createSignal({ g: 0, u: 0, left: 0, top: 0, flip: false })
+  const [tracking, setTracking] = createSignal(false)
 
   function draw() {
     const style = getComputedStyle(canvas)
@@ -43,7 +58,10 @@ export default function GluHeatmap(props) {
         const v = Math.max(-1, Math.min(1, output(g, u) / props.limit))
         const c = v < 0 ? mix(mid, low, -v) : mix(mid, high, v)
         const k = (j * CELLS + i) * 4
-        image.data.set([c[0], c[1], c[2], 255], k)
+        image.data[k] = c[0]
+        image.data[k + 1] = c[1]
+        image.data[k + 2] = c[2]
+        image.data[k + 3] = 255
       }
     }
     context.putImageData(image, 0, 0)
@@ -56,22 +74,34 @@ export default function GluHeatmap(props) {
     onCleanup(() => document.removeEventListener('bake:theme', draw))
   })
 
-  function onPointerMove(event) {
+  function follow(event) {
     const rect = canvas.getBoundingClientRect()
     const r = props.range
-    const g = -r + (2 * r * (event.clientX - rect.left)) / rect.width
-    const u = r - (2 * r * (event.clientY - rect.top)) / rect.height
-    const x = event.clientX - rect.left
-    setTip({
-      nodes: [
-        ...richNodes('$g$ ' + g.toFixed(2) + ' $u$ ' + u.toFixed(2)),
-        document.createElement('br'),
-        ...richNodes('$\\mathrm{SiLU}(g)\\cdot u$ ' + output(g, u).toFixed(3)),
-      ],
-      top: event.clientY - rect.top + 14,
-      left: x,
-      flip: x > rect.width * 0.6,
+    const left = event.clientX - rect.left
+    const top = event.clientY - rect.top
+    const next = {
+      g: -r + (2 * r * left) / rect.width,
+      u: r - (2 * r * top) / rect.height,
+      left: event.clientX,
+      top: event.clientY,
+      flip: left > rect.width * FLIP_AT,
+    }
+    batch(() => {
+      setPoint(next)
+      setTracking(true)
     })
+  }
+
+  const pointerFrames = createPointerFrames(follow)
+  const stopTracking = () => {
+    pointerFrames.cancel()
+    setTracking(false)
+  }
+  hideOnScroll(tracking, stopTracking)
+
+  const tipPosition = () => {
+    const { left, top, flip } = point()
+    return tipTransform(left + (flip ? -TIP_GAP : TIP_GAP), top + TIP_BELOW, flip)
   }
 
   return (
@@ -79,34 +109,33 @@ export default function GluHeatmap(props) {
       <div class="llm-heat-title">SwiGLU 单个通道的输出 SiLU(g)·u</div>
       <div class="llm-heat">
         <div class="llm-heat-plot">
-          <div class="llm-heat-axis-title">{richNodes('线性分支 $u$')}</div>
+          <div class="llm-heat-axis-title">
+            <Show when={ready()}>{richNodes(U_TITLE)}</Show>
+          </div>
           <div class="llm-heat-image">
             <canvas
               ref={canvas}
               width={CELLS}
               height={CELLS}
               aria-label={`SwiGLU 通道输出热图，横轴 g 从 −${props.range} 到 ${props.range}，纵轴 u 从下到上为 −${props.range} 到 ${props.range}`}
-              onPointerMove={onPointerMove}
-              onPointerLeave={() => setTip(null)}
+              onPointerMove={pointerFrames.track}
+              onPointerDown={pointerFrames.track}
+              onPointerLeave={stopTracking}
+              onPointerCancel={stopTracking}
             />
             <div class="llm-heat-y-ticks">
               <span>{props.range}</span>
               <span>0</span>
               <span>{minus(-props.range)}</span>
             </div>
-            <Show when={tip()}>
-              {(t) => (
-                <div
-                  class="llm-tip"
-                  style={{
-                    top: t().top + 'px',
-                    left: (t().flip ? t().left - 12 : t().left + 12) + 'px',
-                    transform: t().flip ? 'translateX(-100%)' : undefined,
-                  }}
-                >
-                  {t().nodes}
+            <Show when={ready()}>
+              <Portal>
+                <div class="llm-tip llm-fade" classList={{ 'llm-shown': tracking() }} style={{ transform: tipPosition() }} aria-hidden="true">
+                  {richNodes(G)} {formatNumber(point().g, 2)} {richNodes(U)} {formatNumber(point().u, 2)}
+                  <br />
+                  {richNodes(OUTPUT)} {formatNumber(output(point().g, point().u), 3)}
                 </div>
-              )}
+              </Portal>
             </Show>
           </div>
           <div class="llm-heat-x-ticks">
@@ -114,13 +143,17 @@ export default function GluHeatmap(props) {
             <span>0</span>
             <span>{props.range}</span>
           </div>
-          <div class="llm-heat-x-label">{richNodes('门控分支 $g$')}</div>
+          <div class="llm-heat-x-label">
+            <Show when={ready()}>{richNodes(G_TITLE)}</Show>
+          </div>
         </div>
         <div class="llm-heat-bar">
           <span class="llm-heat-bar-max">+{props.limit}</span>
           <div class="llm-heat-bar-scale" />
           <span class="llm-heat-bar-min">{minus(-props.limit)}</span>
-          <span class="llm-heat-bar-title">{richNodes('$\\mathrm{SiLU}(g)\\cdot u$')}</span>
+          <span class="llm-heat-bar-title">
+            <Show when={ready()}>{richNodes(OUTPUT)}</Show>
+          </span>
         </div>
       </div>
     </div>

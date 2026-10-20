@@ -1,42 +1,5 @@
-import { createSignal } from 'solid-js'
-
+const pending = new Map()
 const typeset = new Map()
-
-function request(tex) {
-  if (!typeset.has(tex)) {
-    const [state, setState] = createSignal(null)
-    typeset.set(tex, state)
-    import('bake/math')
-      .then(({ texToSvg }) => texToSvg(tex))
-      .then((svg) => {
-        svg.setAttribute('role', 'img')
-        svg.setAttribute('aria-label', tex)
-        setState(svg)
-      })
-      .catch((error) => {
-        console.error(`the TeX label "${tex}" cannot be typeset: ${error.message}`)
-        setState(false)
-      })
-  }
-  return typeset.get(tex)()
-}
-
-export function texSvg(tex) {
-  const svg = request(tex)
-  return svg ? svg.cloneNode(true) : null
-}
-
-export function texFailed(tex) {
-  return request(tex) === false
-}
-
-export function texBox(tex, emSize) {
-  const svg = texSvg(tex)
-  if (!svg) return null
-  const [, minY, width, height] = svg.getAttribute('viewBox').split(/\s+/).map(Number)
-  const scale = emSize / 1000
-  return { svg, scale, width: width * scale, height: height * scale, ascent: -minY * scale }
-}
 
 export const segments = (source) =>
   source
@@ -44,12 +7,57 @@ export const segments = (source) =>
     .map((text, index) => ({ math: index % 2 === 1, text }))
     .filter((part) => part.text)
 
+const formulasOf = (sources) => [...new Set(sources.flatMap((source) => segments(source).filter((part) => part.math).map((part) => part.text)))]
+
+function typesetOne(component, texToSvg, tex) {
+  if (!pending.has(tex)) {
+    pending.set(
+      tex,
+      texToSvg(tex).then(
+        (svg) => typeset.set(tex, svg),
+        (error) => console.error(`${component}: the TeX label "${tex}" cannot be typeset: ${error.message}`),
+      ),
+    )
+  }
+  return pending.get(tex)
+}
+
+export async function typesetAll(component, sources) {
+  const { texToSvg } = await import('bake/math')
+  await Promise.all(formulasOf(sources).map((tex) => typesetOne(component, texToSvg, tex)))
+  return true
+}
+
+const pause = () => new Promise((resolve) => setTimeout(resolve))
+
+export async function typesetLater(component, sources) {
+  const { texToSvg } = await import('bake/math')
+  for (const tex of formulasOf(sources)) {
+    if (pending.has(tex)) continue
+    await pause()
+    await typesetOne(component, texToSvg, tex)
+  }
+}
+
+export function texSvg(tex) {
+  const svg = typeset.get(tex)
+  return svg === undefined ? null : svg.cloneNode(true)
+}
+
+export function texBox(tex, emSize) {
+  const svg = texSvg(tex)
+  if (svg === null) return null
+  const [, minY, width, height] = svg.getAttribute('viewBox').split(/\s+/).map(Number)
+  const scale = emSize / 1000
+  return { svg, width: width * scale, height: height * scale, ascent: -minY * scale }
+}
+
 export function richNodes(source) {
   return segments(source).map((part) => {
-    if (!part.math) return document.createTextNode(part.text)
-    const svg = texSvg(part.text)
-    if (!svg) return document.createTextNode(texFailed(part.text) ? part.text : '')
+    const svg = part.math ? texSvg(part.text) : null
+    if (svg === null) return document.createTextNode(part.text)
     svg.classList.add('llm-tex')
+    svg.setAttribute('aria-hidden', 'true')
     return svg
   })
 }

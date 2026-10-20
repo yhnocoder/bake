@@ -139,17 +139,19 @@ const drawings = {
   },
 }
 
-async function draw(paths) {
+function draw(paths) {
   const { sketch, viewBox } = drawings[paths]()
-  return { viewBox, markup: await sketch.markup() }
+  return sketch.drawing(viewBox)
 }
 
 export default function BackpropPathDiagram(props) {
   return (
-    <SketchView
-      source={() => draw(props.paths)}
-      label={descriptions[props.paths]}
-      style="max-width:520px;margin:0 auto"
-    />
+    <div class="matrix-root">
+      <SketchView
+        drawing={draw(props.paths)}
+        label={descriptions[props.paths]}
+        style="max-width:520px;margin:0 auto"
+      />
+    </div>
   )
 }

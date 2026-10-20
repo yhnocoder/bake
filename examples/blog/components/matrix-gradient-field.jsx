@@ -1,4 +1,5 @@
 import { For, createSignal, onCleanup, onMount } from 'solid-js'
+import { Controls, Slider, Tex, formatNumber } from 'bake/kit'
 import { MathText, SvgTex } from './lib/matrix/view.jsx'
 
 export const params = {
@@ -39,7 +40,7 @@ const SB = 22
 const sliceX = (x) => SL + ((x - XR[0]) / (XR[1] - XR[0])) * (SW - SL - SR)
 const sliceY = (v) => ST + ((FR[1] - v) / (FR[1] - FR[0])) * (SH - ST - SB)
 
-const format = (v) => (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3)
+const format = (v) => formatNumber(Math.abs(v) < 5e-4 ? 0 : v, 3)
 
 function contour(c, side) {
   if (Math.abs(c) < 1e-6) return `M${FL},${fieldY(0)} L${FW - FRIGHT},${fieldY(0)}`
@@ -153,11 +154,10 @@ export default function PartialGradientField(props) {
   const px = () => fx(x0(), y0())
   const py = () => fy(x0())
   const ends = () => ({ ex: x0() + ARROW_SCALE * px(), ey: y0() + ARROW_SCALE * py(), p0: `${fieldX(x0())},${fieldY(y0())}` })
-  let dragging = false
+  let bounds = null
   function pointer(event) {
-    const rect = field.getBoundingClientRect()
-    const vx = ((event.clientX - rect.left) / rect.width) * VW
-    const vy = ((event.clientY - rect.top) / rect.height) * FW
+    const vx = ((event.clientX - bounds.left) / bounds.width) * VW
+    const vy = ((event.clientY - bounds.top) / bounds.height) * FW
     setX0(Math.max(XR[0], Math.min(XR[1], fromFieldX(vx))))
     setY0(Math.max(XR[0], Math.min(XR[1], fromFieldY(vy))))
   }
@@ -168,18 +168,10 @@ export default function PartialGradientField(props) {
   )
   return (
     <div ref={host} class="matrix-figure matrix-gradient">
-      <div class="matrix-controls">
-        <label>
-          <MathText text="$x_0$" />
-          <input type="range" min="-2" max="2" step="0.01" value={x0()} style="width:110px" onInput={(e) => setX0(+e.currentTarget.value)} />
-          <span class="matrix-value">{x0().toFixed(2)}</span>
-        </label>
-        <label>
-          <MathText text="$y_0$" />
-          <input type="range" min="-2" max="2" step="0.01" value={y0()} style="width:110px" onInput={(e) => setY0(+e.currentTarget.value)} />
-          <span class="matrix-value">{y0().toFixed(2)}</span>
-        </label>
-      </div>
+      <Controls>
+        <Slider label={<Tex tex="x_0" />} min={-2} max={2} step={0.01} value={x0()} onInput={setX0} />
+        <Slider label={<Tex tex="y_0" />} min={-2} max={2} step={0.01} value={y0()} onInput={setY0} />
+      </Controls>
       <div class="matrix-gradient-stage">
         <div class="matrix-plot matrix-gradient-field">
           <svg
@@ -189,13 +181,13 @@ export default function PartialGradientField(props) {
             role="img"
             aria-label="f(x,y) 的取值和等值线、当前位置、两个偏导数和梯度"
             onPointerDown={(e) => {
-              dragging = true
+              bounds = field.getBoundingClientRect()
               field.setPointerCapture(e.pointerId)
               pointer(e)
             }}
-            onPointerMove={(e) => dragging && pointer(e)}
-            onPointerUp={() => (dragging = false)}
-            onPointerCancel={() => (dragging = false)}
+            onPointerMove={(e) => bounds && pointer(e)}
+            onPointerUp={() => (bounds = null)}
+            onPointerCancel={() => (bounds = null)}
           >
             <defs>
               {marker('gradient', 'var(--series-7)')}

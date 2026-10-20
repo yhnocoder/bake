@@ -1,79 +1,89 @@
-import { createResource, createSignal, onCleanup, onMount } from 'solid-js'
+import { Show, createMemo, createResource } from 'solid-js'
+import { prefersReducedMotion } from 'bake/kit'
 import { convert, mathHtml } from './tex.js'
 import './view.css'
 
-export function SketchView(props) {
-  const [drawing] = createResource(() => props.source(), (source) => source)
+export function SketchLayer(props) {
+  const [labels] = createResource(
+    () => props.drawing.labels,
+    (labels) => labels,
+  )
   return (
-    <svg
-      class={'matrix-sketch ' + (props.class || '')}
-      viewBox={drawing()?.viewBox || props.viewBox}
-      role="img"
-      aria-label={props.label}
-      style={props.style}
-      innerHTML={drawing()?.markup || ''}
-    />
+    <>
+      <g innerHTML={props.drawing.shapes} />
+      <g class="matrix-tex" classList={{ 'matrix-tex-ready': labels() !== undefined }} innerHTML={labels() ?? ''} />
+    </>
   )
 }
 
-export function useWidth(element) {
-  const [width, setWidth] = createSignal(0)
-  onMount(() => {
-    const target = element()
-    setWidth(target.getBoundingClientRect().width)
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
-    observer.observe(target)
-    onCleanup(() => observer.disconnect())
-  })
-  return width
+export function SketchView(props) {
+  const drawing = createMemo(() => props.drawing)
+  return (
+    <svg class={'matrix-sketch ' + (props.class || '')} viewBox={drawing().viewBox} role="img" aria-label={props.label} style={props.style}>
+      <SketchLayer drawing={drawing()} />
+    </svg>
+  )
+}
+
+const easings = new WeakMap()
+
+export function fadeIn(element) {
+  if (!element || prefersReducedMotion()) return
+  if (!easings.has(element)) easings.set(element, getComputedStyle(element).getPropertyValue('--ease-out').trim() || 'ease-out')
+  element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: easings.get(element) })
 }
 
 export function MathText(props) {
   const [html] = createResource(() => props.text, mathHtml)
-  return <span class={props.class} style={props.style} innerHTML={html() ?? ''} />
+  return (
+    <span
+      ref={props.ref}
+      class={'matrix-tex ' + (props.class || '')}
+      classList={{ 'matrix-tex-ready': html() !== undefined }}
+      style={props.style}
+      innerHTML={html() ?? ''}
+    />
+  )
 }
 
 export function SvgTex(props) {
   const [shape] = createResource(() => props.tex, (tex) => convert(tex, false))
-  const size = () => props.size || 13
-  const box = () => {
+  const metrics = createMemo(() => {
     const math = shape()
     if (!math) return null
-    const ex = size() * 0.45
-    const width = math.width * ex
-    const height = math.height * ex
+    const ex = (props.size || 13) * 0.45
+    return { width: math.width * ex, height: math.height * ex, shift: math.shift * ex, viewBox: math.viewBox, body: math.body }
+  })
+  const left = () => {
+    const width = metrics().width
     const align = props.align || 'middle'
-    const left = align === 'middle' ? props.x - width / 2 : align === 'end' ? props.x - width : props.x
-    return { left, top: props.y - height - math.shift * ex, width, height, math }
+    return align === 'middle' ? props.x - width / 2 : align === 'end' ? props.x - width : props.x
   }
+  const top = () => props.y - metrics().height - metrics().shift
   return (
-    <>
-      {box() && props.backdrop && (
-        <rect
-          x={box().left - 4}
-          y={box().top - 2}
-          width={box().width + 8}
-          height={box().height + 4}
-          rx="3"
-          fill="var(--surface)"
-          opacity="0.9"
-        />
-      )}
-      {box() && (
-        <svg
-          role="img"
-          aria-label={props.tex}
-          x={box().left}
-          y={box().top}
-          width={box().width}
-          height={box().height}
-          viewBox={box().math.viewBox}
-          overflow="visible"
-          fill="currentColor"
-          style={{ color: props.color || 'var(--ink)', opacity: props.opacity ?? 1 }}
-          innerHTML={box().math.body}
-        />
-      )}
-    </>
+    <g class="matrix-tex" classList={{ 'matrix-tex-ready': !!metrics() }}>
+      <Show when={metrics()}>
+        {(math) => (
+          <>
+            <Show when={props.backdrop}>
+              <rect x={left() - 4} y={top() - 2} width={math().width + 8} height={math().height + 4} rx="3" fill="var(--surface)" opacity="0.9" />
+            </Show>
+            <svg
+              role="img"
+              aria-label={props.tex}
+              x={left()}
+              y={top()}
+              width={math().width}
+              height={math().height}
+              viewBox={math().viewBox}
+              overflow="visible"
+              fill="currentColor"
+              style={{ color: props.color || 'var(--ink)' }}
+              innerHTML={math().body}
+            />
+          </>
+        )}
+      </Show>
+    </g>
   )
 }

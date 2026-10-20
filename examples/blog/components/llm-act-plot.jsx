@@ -1,8 +1,9 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show, untrack } from 'solid-js'
+import { Controls, createElementSize, formatNumber, Slider, Swatch, Toggle } from 'bake/kit'
 import { catalog, swish, SWISH_MIN_AT_BETA_1 } from './lib/llm/functions.js'
-import { guidesFor, presetNames } from './lib/llm/guides.js'
+import { guideLabelSources, guidesFor, presetNames } from './lib/llm/guides.js'
 import { FunctionPanel } from './lib/llm/function-panel.jsx'
-import { richNodes } from './lib/llm/tex.js'
+import { richNodes, typesetAll, typesetLater } from './lib/llm/tex.js'
 import './lib/llm/act.css'
 
 const range = (label, value) => ({ label, type: 'number', min: -100, max: 100, step: 0.01, default: value })
@@ -28,15 +29,21 @@ export const params = {
 export const layout = {
   width: 'body',
   height: (params) => (params.toggle ? 365 : params.zoom ? 400 : keyList(params.fns).includes('swish') ? 430 : 360),
-  narrowHeight: (params) => (params.toggle ? 572 : params.zoom ? 600 : keyList(params.fns).includes('swish') ? 576 : keyList(params.fns).length > 2 ? 516 : 500),
+  narrowHeight: (params) => (params.toggle ? 572 : params.zoom ? 600 : keyList(params.fns).includes('swish') ? 566 : 500),
 }
 
+const NAME = 'llm-act-plot'
 const ZOOM_MIN = 0.25
 const TWO_COLUMN_MIN_WIDTH = 600
 const PANEL_GAP = 14
 const PANEL_TITLE_HEIGHT = 30
-const MIN_PLOT_HEIGHT = 160
-const FIXED_SLOT_HEIGHT = '(min-width: 1000px)'
+const MIN_PLOT_HEIGHT = 120
+const FIT_SAMPLES = 200
+const FIT_PAD = 0.12
+const LN9 = Math.log(9)
+const F_TITLE = '$f(x)$'
+const D_TITLE = '$\\frac{df(x)}{dx}$'
+const STATIC_TEX = [F_TITLE, D_TITLE, '$x$', '$x=$', '$x\\approx$', '$\\beta$']
 
 const keyList = (text) =>
   text
@@ -53,7 +60,7 @@ function seriesSpecs(props) {
   const colors = keyList(props.colors)
   return roles.map(({ key, role }, index) => {
     const entry = catalog[key]
-    if (!entry) throw new Error(`llm-act-plot: unknown function "${key}"`)
+    if (!entry) throw new Error(`${NAME}: unknown function "${key}"`)
     return {
       key,
       role,
@@ -72,27 +79,28 @@ function fitRange(series, derivative, a, b) {
   let hi = -Infinity
   for (const q of series) {
     if (q.hidden) continue
-    for (let i = 0; i <= 200; i++) {
-      const y = (derivative ? q.d : q.f)(a + ((b - a) * i) / 200)
+    for (let i = 0; i <= FIT_SAMPLES; i++) {
+      const y = (derivative ? q.d : q.f)(a + ((b - a) * i) / FIT_SAMPLES)
       if (isFinite(y)) {
         lo = Math.min(lo, y)
         hi = Math.max(hi, y)
       }
     }
   }
-  const pad = Math.max((hi - lo) * 0.12, 1e-3)
+  const pad = Math.max((hi - lo) * FIT_PAD, 1e-3)
   return [lo - pad, hi + pad]
 }
 
-function Slider(props) {
-  return (
-    <label>
-      <span>{props.label}</span>
-      <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onInput={(e) => props.onInput(+e.currentTarget.value)} />
-      <span class="llm-value">{props.value.toFixed(2)}</span>
-    </label>
-  )
-}
+const guideSources = (guides) =>
+  guides === null
+    ? []
+    : [
+        guides.left,
+        guides.right,
+        ...[...guides.bands, ...guides.references, ...guides.verticals, ...guides.points].map((item) => item.label ?? ''),
+      ]
+
+const twoDigits = (value) => formatNumber(value, 2)
 
 export default function ActFnPlot(props) {
   const specs = createMemo(() => seriesSpecs(props))
@@ -101,23 +109,8 @@ export default function ActFnPlot(props) {
   const [hidden, setHidden] = createSignal(new Set(keyList(props.off)))
   const [span, setSpan] = createSignal(props.xmax)
   const [center, setCenter] = createSignal(0)
-  const [size, setSize] = createSignal({ width: 0, height: 0 })
-  const fixedHeightQuery = matchMedia(FIXED_SLOT_HEIGHT)
-  const [fillHeight, setFillHeight] = createSignal(fixedHeightQuery.matches)
   let panels
-
-  onMount(() => {
-    const measure = () => setSize({ width: panels.clientWidth, height: panels.clientHeight })
-    const observer = new ResizeObserver(measure)
-    observer.observe(panels)
-    measure()
-    const onQuery = () => setFillHeight(fixedHeightQuery.matches)
-    fixedHeightQuery.addEventListener('change', onQuery)
-    onCleanup(() => {
-      observer.disconnect()
-      fixedHeightQuery.removeEventListener('change', onQuery)
-    })
-  })
+  const size = createElementSize(() => panels)
 
   const series = createMemo(() =>
     specs().map((s) => {
@@ -125,8 +118,9 @@ export default function ActFnPlot(props) {
       return { ...s, f: math.f, d: math.d, breaks: math.breaks ?? [], hidden: hidden().has(s.key) }
     }),
   )
-  const panelSeries = (derivative) =>
-    series().map((s) => ({ ...s, fn: derivative ? s.d : s.f, breaks: derivative ? s.breaks : [] }))
+  const panelSeries = (derivative) => createMemo(() => series().map((s) => ({ ...s, fn: derivative ? s.d : s.f, breaks: derivative ? s.breaks : [] })))
+  const functionSeries = panelSeries(false)
+  const derivativeSeries = panelSeries(true)
 
   const view = createMemo(() => {
     const zoomed = props.zoom && (span() < props.xmax || center() !== 0)
@@ -135,25 +129,35 @@ export default function ActFnPlot(props) {
     return { x, yf: fitRange(series(), false, ...x), yd: fitRange(series(), true, ...x) }
   })
 
-  const guides = (derivative) => (props.toggle ? null : guidesFor(props.guides, derivative, { series: series(), beta: beta(), range: [props.xmin, props.xmax] }))
+  const panelGuides = (derivative) =>
+    createMemo(() => (props.toggle ? null : guidesFor(props.guides, derivative, { series: series(), beta: beta(), range: [props.xmin, props.xmax] })))
+  const functionGuides = panelGuides(false)
+  const derivativeGuides = panelGuides(true)
+
+  const ownSources = () => [...STATIC_TEX, ...specs().map((s) => s.name), ...guideSources(functionGuides()), ...guideSources(derivativeGuides())]
+  const pageSources = () => [...STATIC_TEX, ...Object.values(catalog).map((entry) => entry.name), ...guideLabelSources()]
+  const [ready] = createResource(async () => {
+    await typesetAll(NAME, untrack(ownSources))
+    typesetLater(NAME, pageSources())
+    return true
+  })
 
   const width = () => size().width
   const twoColumns = () => width() >= TWO_COLUMN_MIN_WIDTH
   const panelWidth = () => (twoColumns() ? (width() - PANEL_GAP) / 2 : width())
   const plotHeight = () => {
-    if (!fillHeight()) return undefined
     const perPanel = twoColumns() ? size().height : (size().height - PANEL_GAP) / 2
     return Math.max(MIN_PLOT_HEIGHT, Math.floor(perPanel - PANEL_TITLE_HEIGHT))
   }
 
   const status = createMemo(() => {
     if (!hasSwish()) return null
-    const w = Math.log(9) / beta()
+    const w = LN9 / beta()
     const xmin = SWISH_MIN_AT_BETA_1 / beta()
     return (
-      'gate 过渡区：$[' + (-w).toFixed(2) + ',\\ ' + w.toFixed(2) + ']$；宽 ' + (2 * w).toFixed(2) +
+      'gate 过渡区：[' + twoDigits(-w) + ', ' + twoDigits(w) + ']；宽 ' + twoDigits(2 * w) +
       (w > props.xmax ? '（色带超出当前视野）' : '') +
-      (xmin < props.xmin ? '；最低点位于视野左侧，$x\\approx ' + xmin.toFixed(2) + '$' : '')
+      (xmin < props.xmin ? '；最低点位于视野左侧，$x\\approx$ ' + twoDigits(xmin) : '')
     )
   })
 
@@ -168,54 +172,56 @@ export default function ActFnPlot(props) {
   const hasControls = () => props.toggle || hasSwish() || props.zoom
 
   return (
-    <div class={'llm-plot' + (fillHeight() ? ' fill' : '')}>
-      <Show when={!props.toggle}>
-        <div class="llm-legend">
-          <For each={specs()}>
-            {(s) => (
-              <span>
-                <i class={'llm-swatch' + (s.dash ? ' dash' : '') + (s.faint ? ' faint' : '')} style={{ '--c': s.color }} />
-                <span>{richNodes(s.name)}</span>
-              </span>
-            )}
-          </For>
-        </div>
-      </Show>
-      <Show when={hasControls()}>
-        <div class="llm-controls">
-          <Show when={props.toggle}>
+    <div class="llm-plot">
+      <Show when={ready()}>
+        <Show when={!props.toggle}>
+          <div class="llm-legend">
             <For each={specs()}>
               {(s) => (
-                <label class="llm-check" style={{ '--c': s.color }}>
-                  <input type="checkbox" checked={!hidden().has(s.key)} onChange={(e) => toggleSeries(s.key, e.currentTarget.checked)} />
-                  <i class="llm-swatch" />
+                <span class="llm-legend-item" classList={{ 'llm-faint': s.faint }}>
+                  <Swatch color={s.color} dashed={s.dash} />
                   <span>{richNodes(s.name)}</span>
-                </label>
+                </span>
               )}
             </For>
-          </Show>
-          <Show when={hasSwish()}>
-            <Slider label={richNodes('$\\beta$')} min={0.1} max={5} step={0.05} value={beta()} onInput={setBeta} />
-          </Show>
-          <Show when={props.zoom}>
-            <Slider label="横轴范围 ±" min={ZOOM_MIN} max={props.xmax} step={0.25} value={span()} onInput={setSpan} />
-            <Slider label="横轴中心" min={props.xmin} max={props.xmax} step={0.1} value={center()} onInput={setCenter} />
-          </Show>
-        </div>
+          </div>
+        </Show>
+        <Show when={hasControls()}>
+          <div class="llm-controls">
+            <Controls>
+              <Show when={props.toggle}>
+                <For each={specs()}>
+                  {(s) => (
+                    <span class="llm-series-toggle" style={{ '--accent': s.color }}>
+                      <Toggle label={richNodes(s.name)} checked={!hidden().has(s.key)} onChange={(checked) => toggleSeries(s.key, checked)} />
+                    </span>
+                  )}
+                </For>
+              </Show>
+              <Show when={hasSwish()}>
+                <Slider label={richNodes('$\\beta$')} min={0.1} max={5} step={0.05} value={beta()} onInput={setBeta} />
+              </Show>
+              <Show when={props.zoom}>
+                <Slider label="横轴范围 ±" min={ZOOM_MIN} max={props.xmax} step={0.25} value={span()} onInput={setSpan} format={twoDigits} />
+                <Slider label="横轴中心" min={props.xmin} max={props.xmax} step={0.1} value={center()} onInput={setCenter} format={twoDigits} />
+              </Show>
+            </Controls>
+          </div>
+        </Show>
       </Show>
-      <div ref={panels} class={'llm-panels' + (twoColumns() ? '' : ' single')}>
-        <Show when={width() > 0}>
+      <div ref={panels} class="llm-panels" classList={{ 'llm-single': !twoColumns() }}>
+        <Show when={ready() && width() > 0 && size().height > 0}>
           <div class="llm-panel">
-            <div class="llm-panel-title">{richNodes('$f(x)$')}</div>
-            <FunctionPanel x={view().x} y={view().yf} width={panelWidth()} height={plotHeight()} series={panelSeries(false)} guides={guides(false)} label="函数" />
+            <div class="llm-panel-title">{richNodes(F_TITLE)}</div>
+            <FunctionPanel x={view().x} y={view().yf} width={panelWidth()} height={plotHeight()} series={functionSeries()} guides={functionGuides()} label="函数" />
           </div>
           <div class="llm-panel">
-            <div class="llm-panel-title">{richNodes('$\\frac{df(x)}{dx}$')}</div>
-            <FunctionPanel x={view().x} y={view().yd} width={panelWidth()} height={plotHeight()} series={panelSeries(true)} guides={guides(true)} label="导数" />
+            <div class="llm-panel-title">{richNodes(D_TITLE)}</div>
+            <FunctionPanel x={view().x} y={view().yd} width={panelWidth()} height={plotHeight()} series={derivativeSeries()} guides={derivativeGuides()} label="导数" />
           </div>
         </Show>
       </div>
-      <Show when={status()}>
+      <Show when={ready() && status()}>
         <div class="llm-status" aria-live="polite">
           {richNodes(status())}
         </div>

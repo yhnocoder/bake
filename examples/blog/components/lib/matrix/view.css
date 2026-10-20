@@ -1,19 +1,12 @@
 .matrix-sketch{display:block;width:100%;height:auto;overflow:visible}
 .matrix-display{display:block;text-align:center;margin:.3em 0 .5em;overflow-x:auto;overflow-y:hidden;max-width:100%}
 .matrix-display>svg{max-width:none}
-.matrix-figure{font-family:var(--font-ui);color:var(--ink);font-size:14px;line-height:1.6}
+.matrix-root{height:100%;content-visibility:auto}
+.matrix-figure{height:100%;contain:strict;content-visibility:auto;font-family:var(--font-ui);color:var(--ink);font-size:14px;line-height:1.6}
 .matrix-figure svg text{font-family:var(--font-mono);font-size:11px;fill:var(--ink-3)}
-.matrix-controls{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;font-size:13.5px;margin:4px 0 12px;color:var(--ink-2)}
-.matrix-controls label{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
-.matrix-controls input[type=range]{width:150px;accent-color:var(--accent)}
-.matrix-value{font-family:var(--font-mono);min-width:3.2em;color:var(--ink);font-variant-numeric:tabular-nums}
-.matrix-choices{display:flex;gap:6px;flex-wrap:wrap}
-.matrix-choices button{font:inherit;font-size:13px;padding:4px 12px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface);color:var(--ink-2);cursor:pointer}
-.matrix-choices button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
-.matrix-button{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);border-radius:6px;padding:5px 12px;cursor:pointer}
-.matrix-button:hover{border-color:var(--accent);color:var(--accent)}
-.matrix-button:disabled{opacity:.45;cursor:default;border-color:var(--line-2);color:var(--ink)}
-.matrix-button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.matrix-figure .bk-kit-controls{margin:0 0 10px}
+.matrix-actions{display:inline-flex;flex-wrap:wrap;gap:8px}
+.matrix-dx-slider{display:contents;--accent:var(--series-2)}
 .matrix-readout{display:grid;gap:8px 20px;font-size:14px;padding:10px 14px;background:var(--surface-2);border-radius:8px;align-items:center}
 .matrix-readout b,.matrix-number{font-family:var(--font-mono);font-weight:500;font-variant-numeric:tabular-nums}
 .matrix-plot>svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
@@ -22,3 +15,7 @@
 .matrix-gradient{container-type:inline-size}
 .matrix-gradient-stage{display:grid;grid-template-columns:minmax(0,348px) minmax(0,1fr);gap:10px 18px;align-items:start}
 @container (max-width:640px){.matrix-gradient-stage{grid-template-columns:minmax(0,1fr)}.matrix-gradient-slices{max-width:400px;width:100%;justify-self:center}.matrix-gradient-field{max-width:400px;width:100%;justify-self:center}}
+.matrix-tex{opacity:0;transition:opacity .15s var(--ease-out)}
+.matrix-tex.matrix-tex-ready{opacity:1}
+.matrix-fade{transition:opacity .15s var(--ease-out)}
+@media (prefers-reduced-motion:reduce){.matrix-tex,.matrix-fade{transition:none}}

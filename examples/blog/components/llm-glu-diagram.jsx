@@ -1,11 +1,15 @@
-import { createSignal, createUniqueId, onCleanup, onMount, Show } from 'solid-js'
+import { createResource, createUniqueId, Show } from 'solid-js'
+import { createElementSize } from 'bake/kit'
 import { SvgLabel } from './lib/llm/svg-label.jsx'
+import { typesetAll } from './lib/llm/tex.js'
 import './lib/llm/act.css'
 import './lib/llm/diagram.css'
 
 export const params = {}
 
-export const layout = { width: 'body', height: { ratio: 720 / 502 }, narrowHeight: { ratio: 0.543 } }
+export const layout = { width: 'body', height: { ratio: 720 / 502 }, narrowHeight: { ratio: 380 / 698 } }
+
+const NAME = 'llm-glu-diagram'
 
 const UNIT = 42
 const ACT_HEIGHT = 27
@@ -25,16 +29,20 @@ const STYLE = {
 
 function canvas(markerId) {
   const items = []
-  const text = (t, x, y, options = {}) =>
-    items.push(<SvgLabel text={t} x={x} y={y} anchor="middle" size={10} fill="var(--ink-2)" halo={false} {...options} />)
+  const sources = []
+  const text = (t, x, y, options = {}) => {
+    sources.push(t)
+    items.push(() => <SvgLabel text={t} x={x} y={y} anchor="middle" size={10} fill="var(--ink-2)" halo={false} {...options} />)
+  }
   const box = (x, cy, w, h, kind, name, shape) => {
-    items.push(<rect x={x} y={cy - h / 2} width={w} height={h} rx="5" stroke-width="1.4" {...STYLE[kind]} />)
+    items.push(() => <rect x={x} y={cy - h / 2} width={w} height={h} rx="5" stroke-width="1.4" {...STYLE[kind]} />)
     text(name, x + w / 2, cy + 4, { size: 12, fill: 'var(--ink)' })
     text('$' + shape + '$', x + w / 2, cy + h / 2 + 15)
     return x + w
   }
   return {
     items,
+    sources,
     text,
     box,
     act: (x, cy, w, name, shape) => box(x, cy, w, ACT_HEIGHT, 'act', name, shape),
@@ -42,14 +50,14 @@ function canvas(markerId) {
       text(t, x + OP / 2, cy + 4, { size: 13 })
       return x + OP
     },
-    path: (d) => items.push(<path d={d} fill="none" stroke="var(--ink-2)" stroke-width="1.4" marker-end={`url(#${markerId})`} />),
+    path: (d) => items.push(() => <path d={d} fill="none" stroke="var(--ink-2)" stroke-width="1.4" marker-end={`url(#${markerId})`} />),
     fn: (x, cy, w, t) => {
-      items.push(<rect x={x} y={cy - 12} width={w} height={24} rx="12" fill="var(--surface)" stroke="var(--ink-2)" stroke-width="1.4" />)
+      items.push(() => <rect x={x} y={cy - 12} width={w} height={24} rx="12" fill="var(--surface)" stroke="var(--ink-2)" stroke-width="1.4" />)
       text(t, x + w / 2, cy + 4, { size: 10.5, fill: 'var(--ink)' })
       return x + w
     },
     node: (cx, cy) => {
-      items.push(<circle cx={cx} cy={cy} r={NODE_RADIUS} fill="var(--surface)" stroke="var(--ink-2)" stroke-width="1.4" />)
+      items.push(() => <circle cx={cx} cy={cy} r={NODE_RADIUS} fill="var(--surface)" stroke="var(--ink-2)" stroke-width="1.4" />)
       text('$\\odot$', cx, cy + 4, { size: 12, fill: 'var(--ink)' })
     },
   }
@@ -92,7 +100,7 @@ function ffn(markerId, narrow) {
   x = c.op(x, '$=$', cy2)
   c.act(x, cy2, UNIT, '$Y$', 'T\\times d')
   c.text('参数合计 $2\\,d\\,d_{ff}$；$d_{ff}=4d$ 时为 $8d^2$', W / 2, H - 8, { size: 10.5 })
-  return { W, H, items: c.items }
+  return { W, H, items: c.items, sources: c.sources }
 }
 
 function glu(markerId, narrow) {
@@ -136,7 +144,7 @@ function glu(markerId, narrow) {
   x = c.op(x, '$=$', cy2)
   c.act(x, cy2, UNIT, '$Y$', 'T\\times d')
   c.text('参数合计 $3\\,d\\,d_{ff}$；$d_{ff}=\\tfrac{8}{3}d$ 时为 $8d^2$', W / 2, H - 8, { size: 10.5 })
-  return { W, H, items: c.items }
+  return { W, H, items: c.items, sources: c.sources }
 }
 
 const TITLE_HEIGHT = 28
@@ -166,7 +174,7 @@ function Diagram(props) {
     return (
       <g role="img" aria-label={d.label}>
         <SvgLabel text={d.title} x={0} y={y + 18} size={13} fill="var(--ink-2)" halo={false} />
-        <g transform={`translate(0 ${y + TITLE_HEIGHT})`}>{d.items}</g>
+        <g transform={`translate(0 ${y + TITLE_HEIGHT})`}>{d.items.map((item) => item())}</g>
       </g>
     )
   })
@@ -182,19 +190,16 @@ function Diagram(props) {
   )
 }
 
+const texSources = () => [...panels.map((panel) => panel.title), ...[false, true].flatMap((narrow) => panels.flatMap((panel) => panel.draw('', narrow).sources))]
+
 export default function FfnGluDiagram() {
-  const [width, setWidth] = createSignal(0)
   let root
-  onMount(() => {
-    const observer = new ResizeObserver(() => setWidth(root.clientWidth))
-    observer.observe(root)
-    setWidth(root.clientWidth)
-    onCleanup(() => observer.disconnect())
-  })
+  const size = createElementSize(() => root)
+  const [ready] = createResource(() => typesetAll(NAME, texSources()))
   return (
     <div ref={root} class="llm-diagram">
-      <Show when={width() > 0}>
-        <Show when={width() < NARROW_BELOW} fallback={<Diagram narrow={false} />}>
+      <Show when={ready() && size().width > 0}>
+        <Show when={size().width < NARROW_BELOW} fallback={<Diagram narrow={false} />}>
           <Diagram narrow />
         </Show>
       </Show>
