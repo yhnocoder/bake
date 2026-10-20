@@ -13,8 +13,13 @@
   font-size: 13.5px;
   line-height: 1.6;
   pointer-events: none;
+  opacity: 0;
+  translate: 0 6px;
   visibility: hidden;
-  transition: visibility 0s 0.2s;
+  transition:
+    opacity 0.2s var(--ease-out, ease-out),
+    translate 0.24s var(--ease-out, ease-out),
+    visibility 0s 0.2s;
 }
 
 .bk-chat * {
@@ -24,16 +29,19 @@
 .bk-chat[data-open] {
   pointer-events: auto;
   opacity: calc(1 - var(--chat-hidden, 0));
+  translate: none;
   visibility: var(--chat-visibility, visible);
   transition:
-    opacity 0.2s,
+    opacity 0.2s var(--ease-out, ease-out),
+    translate 0.24s var(--ease-out, ease-out),
     visibility 0s;
 }
 
 @container style(--chat-visibility: hidden) {
   .bk-chat[data-open] {
     transition:
-      opacity 0.2s,
+      opacity 0.2s var(--ease-out, ease-out),
+      translate 0.24s var(--ease-out, ease-out),
       visibility 0s 0.2s;
   }
 }
@@ -76,16 +84,9 @@
   color: var(--ink);
   font-family: var(--font-body, inherit);
   overflow-wrap: anywhere;
-  opacity: 0;
-  translate: 0 6px;
   transition:
     opacity 0.2s var(--ease-out, ease-out),
     translate 0.24s var(--ease-out, ease-out);
-}
-
-.bk-chat[data-open] .bk-chat-bubble {
-  opacity: 1;
-  translate: none;
 }
 
 @starting-style {
@@ -325,16 +326,6 @@
     0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent),
     0 2px 6px -3px rgba(0, 0, 0, 0.15);
   font-family: var(--font-ui, inherit);
-  opacity: 0;
-  translate: 0 6px;
-  transition:
-    opacity 0.18s var(--ease-out, ease-out),
-    translate 0.22s var(--ease-out, ease-out);
-}
-
-.bk-chat[data-open] .bk-chat-composer {
-  opacity: 1;
-  translate: none;
 }
 
 .bk-chat-composer input[name='question'],
@@ -629,8 +620,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bk-chat-bubble,
-  .bk-chat-composer {
+  .bk-chat {
     translate: none;
   }
 

@@ -160,6 +160,15 @@ function lastPet(page) {
   return page.evaluate(() => window.bakeTest.pet.at(-1).state);
 }
 
+function mainThreadTasks(trace) {
+  const events = trace.traceEvents;
+  const main = events.find((event) => event.name === 'thread_name' && event.args.name === 'CrRendererMain');
+  return events
+    .filter((event) => event.pid === main.pid && event.tid === main.tid && event.name === 'RunTask' && event.ph === 'X')
+    .map((event) => Math.round((event.tdur ?? event.dur) / 100) / 10)
+    .sort((a, b) => b - a);
+}
+
 function shadow(page, script, argument) {
   return page.evaluate(({ script, argument }) => new Function('root', 'argument', script)(document.querySelector('[data-bake-chat]').shadowRoot, argument), { script, argument });
 }
@@ -716,6 +725,36 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-bubbles:not([data-faded])').waitFor();
     await bubbles.evaluate((element) => (element.scrollTop = 0));
     await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
+  });
+
+  await t.test('opening and closing a chat with a long conversation runs no main-thread task over 25 milliseconds of CPU time at a quarter of the CPU speed, apart from one such as garbage collection, at 1440 and 375 pixels', async (t) => {
+    const { context, page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    for (let round = 0; round < 4; round += 1) {
+      api.answers.push({ body: text(`第 ${round + 1} 个回答，公式 $x^${round}$。\n\n${'这是一段较长的回答文字。'.repeat(6)}`, 40) });
+      await ask(page, `问题 ${round + 1}`);
+      await page.locator('.bk-chat-reply[data-done]').nth(round).waitFor();
+    }
+    const launcher = page.locator('.bk-chat-launcher');
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const longest = {};
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
+      await page.waitForTimeout(600);
+      await context.browser().startTracing(page, { categories: ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+      for (let round = 0; round < 3; round += 1) {
+        await launcher.click();
+        await page.waitForTimeout(400);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(400);
+      }
+      longest[width] = mainThreadTasks(JSON.parse(await context.browser().stopTracing()));
+    }
+    assert.ok(longest[1440][1] <= 25 && longest[375][1] <= 25, JSON.stringify({ 1440: longest[1440].slice(0, 3), 375: longest[375].slice(0, 3) }));
   });
 
   await t.test('a reader chooses a pet by the link of its pet.json, and a link that is too large or has the wrong size leaves the pet unchanged', async (t) => {
