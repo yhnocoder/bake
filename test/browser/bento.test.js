@@ -204,7 +204,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     for (const width of [1440, 1100]) {
       await resize(page, width);
       const grid = await page.evaluate(gridLayout);
-      assert.deepEqual(grid.starts, { ReLU: 0, GELU: 2, SiLU: 4, 怎么选: 4, 导数: 2, 反向传播: 4, '写成 Markdown': 0, 实现: 0, 对比: 3, 参考文献: 3 }, `${width}px`);
+      assert.deepEqual(grid.starts, { ReLU: 0, GELU: 2, SiLU: 4, 导数: 4, 怎么选: 2, 反向传播: 0, 实现: 0, '写成 Markdown': 4, 对比: 0, 参考文献: 4 }, `${width}px`);
       assert.ok(grid.inOrder, `${width}px`);
       const gaps = await page.evaluate(() => {
         const boxes = [...document.querySelectorAll('.bt-card')].map((card) => card.getBoundingClientRect());
@@ -407,6 +407,24 @@ test('the bento theme lays out sections as cards', async (t) => {
     }
   });
 
+  await t.test('the code blocks, tables and display formulas of the example article fit their cards, code wraps on a phone, and a component in a card has no frame of its own', async () => {
+    for (const width of [1440, 1100, 1000, 375]) {
+      const page = await open('activations', { viewport: { width, height: 900 } });
+      const overflowing = await page.evaluate((phone) =>
+        [...document.querySelectorAll(phone ? '.bt-card pre.shiki' : '.bt-card :is(pre.shiki, .table-scroll, mjx-container[display])')]
+          .filter((element) => element.scrollWidth > element.clientWidth + 1)
+          .map((element) => `${element.closest('.bt-card').querySelector('h2 .bk-heading-text').textContent} ${element.localName}`),
+      width < 1000);
+      assert.deepEqual(overflowing, [], `${width}px`);
+      const frame = await page.locator('.bt-card figure.component').evaluate((figure) => {
+        const style = getComputedStyle(figure);
+        return [style.borderTopWidth, style.paddingLeft, style.boxShadow];
+      });
+      assert.deepEqual(frame, ['0px', '0px', 'none'], `${width}px`);
+      await page.close();
+    }
+  });
+
   await t.test('without scripts the cards keep their declared spans and every sidenote is shown', async () => {
     const page = await open('bento-cards', { javaScriptEnabled: false });
     const grid = await page.evaluate(gridLayout);
@@ -521,11 +539,13 @@ function gridLayout() {
   const cards = [...grid.querySelectorAll(':scope > .bt-card')].map((card) => ({ title: card.querySelector('h2 .bk-heading-text').textContent, box: card.getBoundingClientRect() }));
   const spans = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.width + gap) / (track + gap))]));
   const starts = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.left - origin.left) / (track + gap))]));
-  const inOrder = cards.every(({ box }, index) => {
-    if (index === 0) return true;
-    const previous = cards[index - 1].box;
-    return Math.abs(box.top - previous.top) < 0.5 ? box.left > previous.left : box.top > previous.top;
-  });
+  const inOrder = cards.every(({ box }, index) =>
+    cards.slice(0, index).every(({ box: earlier }) => {
+      const sameColumns = box.left < earlier.right - 1 && box.right > earlier.left + 1;
+      if (sameColumns) return box.top > earlier.top;
+      return Math.abs(box.top - earlier.top) >= 0.5 || box.left > earlier.left;
+    }),
+  );
   return { columns, spans, starts, inOrder };
 }
 

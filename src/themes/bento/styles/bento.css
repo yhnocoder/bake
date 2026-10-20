@@ -206,7 +206,27 @@
 }
 
 .bt-card :is(.figure, .component:not([data-frame='none'])):where(:not(.component-box *)) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   box-shadow: none;
+}
+
+.bt-card > .bk-block > pre.shiki:where(:not(.component-box *)) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bt-card > .bk-block > pre.shiki .line:where(:not(.component-box *)) {
+  display: inline-block;
+  width: 100%;
+  padding-left: 4ch;
+  text-indent: -4ch;
+}
+
+.bt-card :is(th, td):where(:not(.component-box *)) {
+  white-space: normal;
 }
 
 .bt-card > .bk-references {
@@ -378,5 +398,13 @@
   .bt-grid[data-packed] > .bt-card::after,
   .bt-grid[data-packed] > .bt-card::before {
     display: none;
+  }
+}
+
+@media (min-width: 1000px) {
+  .bt-card mjx-container[display]:not([width='full']) > svg:where(:not(.component-box *)) {
+    flex: 0 1 auto;
+    max-width: 100%;
+    height: auto;
   }
 }
