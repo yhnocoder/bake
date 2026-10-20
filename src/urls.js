@@ -1,5 +1,4 @@
 import { fragmentOf, percentDecode } from './fragments.js';
-import { errorAt } from './report.js';
 
 const ARTICLE_ADDRESS = /^(\/\d{4}-\d{2}\/[^/?#]+)(\/|\/index\.html)?(\?[^#]*)?(?:#(.*))?$/;
 export const INVALID_PERCENT_ENCODING = 'has an invalid percent-encoding; write a literal % as %25';
@@ -31,12 +30,15 @@ export function addressHref(root, path, anchor, query = '') {
   return `${root}${path.slice(1)}${query}${anchor === undefined ? '' : fragmentOf(anchor)}`;
 }
 
-export function checkDuplicateUrls(articles, errors) {
-  const owners = new Map();
-  for (const article of articles) {
-    if (article.url === null) continue;
-    const owner = owners.get(article.url);
-    if (owner) errors.push(errorAt(article.file, article.positions.slug, `URL ${article.url} is already used by ${owner}`));
-    else owners.set(article.url, article.file);
-  }
+export function siteLink(url) {
+  return `${new URL(url).origin}${sitePath(url)}`;
+}
+
+export function sitePath(url) {
+  const { pathname } = new URL(url);
+  return pathname.endsWith('/') ? pathname : `${pathname}/`;
+}
+
+export function absoluteLink(config, path) {
+  return `${siteLink(config.url)}${encodePath(path)}`;
 }

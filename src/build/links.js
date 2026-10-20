@@ -1,3 +1,5 @@
+import { errorAt } from '../report.js';
+
 export function indexPages(pages) {
   const byUrl = new Map();
   for (const page of pages) {
@@ -23,4 +25,14 @@ function movedHint(address, byUrl) {
   if (moved.length === 0) return '';
   if (moved.length === 1) return `; the article with slug "${slug}" is at ${moved[0]}`;
   return `; the articles with slug "${slug}" are at ${moved.slice(0, -1).join(', ')} and ${moved.at(-1)}`;
+}
+
+export function checkDuplicateUrls(articles, errors) {
+  const owners = new Map();
+  for (const article of articles) {
+    if (article.url === null) continue;
+    const owner = owners.get(article.url);
+    if (owner) errors.push(errorAt(article.file, article.positions.slug, `URL ${article.url} is already used by ${owner}`));
+    else owners.set(article.url, article.file);
+  }
 }

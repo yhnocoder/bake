@@ -21,7 +21,7 @@ const CARD_FILE = 'card.html';
 const PAGE_COUNT = 4;
 const DRAW_TIMEOUT = 10000;
 const HASH_LENGTH = 12;
-const CARD_TEMPLATE = readFileSync(join(import.meta.dirname, 'share-card.js'));
+const DRAWING_CODE = ['share-card.js', 'share-images.js'].map((file) => readFileSync(join(import.meta.dirname, file)));
 const PLAYWRIGHT_VERSION = createRequire(import.meta.url)('playwright/package.json').version;
 const PNG = { extension: '.png', type: 'image/png' };
 const PUBLISHED_COVERS = {
@@ -50,7 +50,7 @@ export function shareImageOf(root, { article, entry }, config, assets) {
     summary: entry.summary,
     preview: fields.preview,
   };
-  const inputs = [CARD_TEMPLATE, PLAYWRIGHT_VERSION, JSON.stringify(card), assets.get(THEME_STYLES_PATH)];
+  const inputs = [...DRAWING_CODE, PLAYWRIGHT_VERSION, JSON.stringify(card), assets.get(THEME_STYLES_PATH)];
   if (fields.preview !== undefined) {
     for (const file of article.files) inputs.push(file, readFileSync(join(root, article.dir, file)));
   }

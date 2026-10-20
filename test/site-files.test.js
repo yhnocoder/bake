@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { createSite, updateSite } from '../src/build/site.js';
-import { siteLink, sitePath } from '../src/build/site-files.js';
+import { siteLink, sitePath } from '../src/urls.js';
 import { article, bake, createBlog, validConfig } from './blog.js';
 
 const subPathConfig = `export default {
