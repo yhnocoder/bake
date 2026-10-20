@@ -83,8 +83,9 @@ describe('homepage', () => {
     const { styles, scripts } = props.assets;
     assert.equal(styles.length, 1);
     assert.match(styles[0], /^assets\/probe-[\w-]+\.css$/);
-    assert.ok(scripts.every((path) => /^assets\/probe-[\w-]+\.js$/.test(path)));
-    assert.match(props.assets.modules.join(' '), /^assets\/chat-[\w-]+\.js$/);
+    assert.equal(scripts.length, 2);
+    assert.match(scripts[0], /^assets\/probe-[\w-]+\.js$/);
+    assert.match(scripts[1], /^assets\/chat-[\w-]+\.js$/);
     assert.deepEqual(props, {
       site: { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/', bento: { columns: 5 } },
       home: {
@@ -112,7 +113,7 @@ describe('homepage', () => {
         { title: 'Demo', summary: 'A page.', date: '2026-09-05', tags: ['html'], category: { id: 'ml', name: 'ML', color: '#2a78d6', desc: '' }, draft: false, url: '2026-09/demo/', preview: '2026-09/demo/anim/preview.js' },
         { title: 'Old', date: '2026-08-30', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-08/old/' },
       ],
-      assets: { root: './', styles, scripts, modules: props.assets.modules },
+      assets: { root: './', styles, scripts },
     });
     assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/', bento: { columns: 5 } });
     assert.equal(readFileSync(join(dir, 'dist/2026-09/demo/anim/preview.js'), 'utf8'), 'export default () => ({ start() {}, stop() {} });\n');
@@ -125,7 +126,7 @@ describe('homepage', () => {
       'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', date: '2026-10-14', extra: 'category: ml\n' }),
       'content/posts/chain/index.md': article({ title: 'Chain rule', slug: 'chain', date: '2026-09-01', extra: 'category: math\n' }),
     });
-    assert.match(html, /^<!doctype html>\n<html lang="en" data-group="category" data-columns="4" data-theme="system" data-font="sans">/);
+    assert.match(html, /^<!doctype html>\n<html lang="en" data-group="category" data-columns="4" style="--group-index:0;--columns-index:1" data-theme="system" data-font="sans">/);
     assert.match(html, /<title>Test Blog<\/title><meta name="description" content="Notes on models.">/);
     assert.match(html, /<h1 class="bk-home-title">Test Blog<\/h1><p class="bk-home-description">Notes on models.<\/p>/);
     assert.deepEqual(grouping(html, 'category'), [
@@ -151,7 +152,7 @@ describe('homepage', () => {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ title: 'Rope', slug: 'rope', extra: 'tags: [llm, position]\n' }),
     });
-    assert.match(html, /<html lang="en" data-group="month" data-columns="3" data-theme="system" data-font="sans">/);
+    assert.match(html, /<html lang="en" data-group="month" data-columns="3" style="--group-index:0;--columns-index:0" data-theme="system" data-font="sans">/);
     assert.equal(grouping(html, 'category'), null);
     assert.deepEqual(grouping(html, 'month'), [{ id: 'month-2026-10', title: '2026-10', count: '1 post', cards: ['Rope'] }]);
     assert.doesNotMatch(html, /data-control="group"/);
@@ -228,7 +229,7 @@ describe('homepage', () => {
       site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
       home: { groupBy: 'month', columns: 3, categories: [] },
       articles: [entry, { ...entry, title: 'GELU', draft: false, url: '2026-10/gelu/' }],
-      assets: { root: './', styles: [], scripts: [], modules: [] },
+      assets: { root: './', styles: [], scripts: [] },
     });
     const cards = html.split('<a class="bk-card"').slice(1);
     assert.match(cards[0], /<div class="bk-card-frame"><div class="bk-card-fallback">.*?<\/div><span class="bk-card-draft">草稿<\/span><\/div>/);
@@ -245,7 +246,7 @@ describe('homepage', () => {
       site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
       home: { groupBy: 'month', columns: 3, categories: [] },
       articles: [],
-      assets: { root: './', styles: [], scripts: [], modules: [] },
+      assets: { root: './', styles: [], scripts: [] },
     });
     assert.match(html, /<p class="bk-home-empty">还没有文章<\/p>/);
   });

@@ -4,8 +4,8 @@ import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { contentType } from '../build/content-types.js';
-import { escapeMarkup } from '../build/escape.js';
+import { contentType } from '../content-types.js';
+import { escapeMarkup } from '../escape.js';
 import { errorCount, formatError } from '../report.js';
 import { missingPage } from './missing.js';
 import { createPreview } from './preview.js';
@@ -178,7 +178,13 @@ function sendHtml(response, status, html) {
 }
 
 function problemsData(problems) {
-  return problems.map((problem) => ({ position: `${problem.file}:${problem.line}:${problem.column}`, text: formatError(problem) }));
+  return problems.map((problem) => ({
+    file: problem.file,
+    location: `${problem.line}:${problem.column}`,
+    message: problem.message,
+    position: `${problem.file}:${problem.line}:${problem.column}`,
+    text: formatError(problem),
+  }));
 }
 
 function send(response, event, data) {

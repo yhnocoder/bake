@@ -1,5 +1,5 @@
-import { fragmentOf, percentDecode } from '../fragments.js';
-import { errorAt } from '../report.js';
+import { fragmentOf, percentDecode } from './fragments.js';
+import { errorAt } from './report.js';
 
 const ARTICLE_ADDRESS = /^(\/\d{4}-\d{2}\/[^/?#]+)(\/|\/index\.html)?(\?[^#]*)?(?:#(.*))?$/;
 export const INVALID_PERCENT_ENCODING = 'has an invalid percent-encoding; write a literal % as %25';

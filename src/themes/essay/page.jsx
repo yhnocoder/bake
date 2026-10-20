@@ -23,9 +23,6 @@ export default function Page(props) {
         ))}
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
-          <script defer src={src} />
-        ))}
-        {assets.modules.map((src) => (
           <script type="module" src={src} />
         ))}
       </head>

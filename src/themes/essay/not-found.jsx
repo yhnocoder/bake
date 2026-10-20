@@ -16,7 +16,7 @@ export default function NotFound(props) {
           <link rel="stylesheet" href={href} />
         ))}
         {assets.scripts.map((src) => (
-          <script defer src={src} />
+          <script type="module" src={src} />
         ))}
       </head>
       <body class="bk-page">
