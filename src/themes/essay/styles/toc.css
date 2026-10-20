@@ -447,18 +447,35 @@ html[data-script] .bk-toc-chapters {
   background: var(--tab-hover);
 }
 
+.bk-tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    var(--tab-shadow),
+    0 6px 14px -6px color-mix(in srgb, var(--tab-current) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
 .bk-tab.is-current {
   width: 40px;
   background: var(--tab-current);
   color: var(--tab-current-ink);
-  box-shadow:
-    var(--tab-shadow),
-    0 6px 14px -6px color-mix(in srgb, var(--tab-current) 70%, transparent);
+}
+
+.bk-tab.is-current::before {
+  opacity: 1;
 }
 
 .bk-tab.is-current:is(:hover, .is-hover) {
   width: 45px;
-  box-shadow: none;
+}
+
+.bk-tab.is-current:is(:hover, .is-hover)::before {
+  opacity: 0;
 }
 
 .bk-tab-title {
@@ -1058,10 +1075,23 @@ html[data-script] .bk-toc-chapters {
 }
 
 .bk-drawer-dot i {
+  position: relative;
   width: 8px;
   height: 8px;
   border-radius: 4px;
   background: var(--line-2);
+}
+
+.bk-drawer-dot i::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 2.5px var(--surface),
+    0 0 0 4px var(--ink);
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
 .bk-drawer-dot.is-read i {
@@ -1075,10 +1105,8 @@ html[data-script] .bk-toc-chapters {
   background: var(--capsule-fill);
 }
 
-.bk-drawer-dot.is-selected i {
-  box-shadow:
-    0 0 0 2.5px var(--surface),
-    0 0 0 4px var(--ink);
+.bk-drawer-dot.is-selected i::before {
+  opacity: 1;
 }
 
 @media (max-width: 999.98px) {
