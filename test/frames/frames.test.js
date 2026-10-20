@@ -74,7 +74,7 @@ async function hoverSidenote(page, device) {
   };
 }
 
-const TOC_ENTRIES = { ticks: '.bk-ticks .bk-tick', tabs: '.bk-tabs .bk-tab', dots: '.bk-dots .bk-dot-item' };
+const TOC_ENTRIES = { ticks: '.bk-toc-ticks .bk-toc-tick', tabs: '.bk-toc-tabs .bk-toc-tab', dots: '.bk-toc-dots .bk-toc-dot-item' };
 
 function hoverToc(style) {
   return async (page) => {
@@ -103,7 +103,7 @@ async function openDrawer(page) {
     for (let round = 0; round < 2; round += 1) {
       await page.locator('.bk-toc-handle').click();
       await page.waitForTimeout(700);
-      await page.locator('.bk-drawer-close').click();
+      await page.locator('.bk-toc-drawer-close').click();
       await page.waitForTimeout(700);
     }
   };
