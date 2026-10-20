@@ -31,42 +31,44 @@
     padding-top: 0;
   }
 
-  .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
-    overflow: visible;
-    background-image: none;
-  }
+  @scope (.bk-article) to (.component-box) {
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display]) {
+      overflow: visible;
+      background-image: none;
+    }
 
-  .bk-article pre.shiki:where(:not(.component-box *)) {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
+    :scope pre.shiki {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
 
-  .bk-article :is(th, td):where(:not(.component-box *)) {
-    white-space: normal;
-  }
+    :scope :is(th, td) {
+      white-space: normal;
+    }
 
-  .bk-article details.fold:where(:not(.component-box *))::details-content {
-    content-visibility: visible;
-    height: auto;
-    opacity: 1;
-  }
+    :scope details.fold::details-content {
+      content-visibility: visible;
+      height: auto;
+      opacity: 1;
+    }
 
-  .bk-article details.fold > summary:where(:not(.component-box *))::after {
-    display: none;
-  }
+    :scope details.fold > summary::after {
+      display: none;
+    }
 
-  .bk-article .example:where(:not(.component-box *)) {
-    grid-template-columns: minmax(0, 1fr);
-  }
+    :scope .example {
+      grid-template-columns: minmax(0, 1fr);
+    }
 
-  .bk-block,
-  .bk-article :is(.figure, .component, .aside, .quote, blockquote, .example):where(:not(.component-box *)) {
-    break-inside: avoid;
-    box-shadow: none;
-  }
+    .bk-block,
+    :scope :is(.figure, .component, .aside, .quote, blockquote, .example) {
+      break-inside: avoid;
+      box-shadow: none;
+    }
 
-  .bk-article a:where(:not(.component-box *)) {
-    color: inherit;
-    text-decoration: none;
+    :scope a {
+      color: inherit;
+      text-decoration: none;
+    }
   }
 }

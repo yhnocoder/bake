@@ -66,14 +66,16 @@ html:not([data-script]) .bk-article .bk-sidenote {
     opacity: 1;
   }
 
-  .bk-article .bk-sidenote.is-open:where(:not(.component-box *)) {
-    display: block;
-    margin: 6px 0 14px;
-    padding: 10px 14px;
-    border-radius: 8px;
-    background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
-    font-size: calc(14px * var(--reader-scale));
-    line-height: calc(1.75 + var(--leading-shift));
+  @scope (.bk-article) to (.component-box) {
+    :scope .bk-sidenote.is-open {
+      display: block;
+      margin: 6px 0 14px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
+      font-size: calc(14px * var(--reader-scale));
+      line-height: calc(1.75 + var(--leading-shift));
+    }
   }
 }
 
@@ -82,14 +84,16 @@ html:not([data-script]) .bk-article .bk-sidenote {
     display: none;
   }
 
-  .bk-article .bk-sidenote:where(:not(.component-box *)) {
-    display: block;
-    margin: 4px 0 12px;
-    padding: 6px 10px;
-    border-left: 2px solid var(--line-2);
-    background: none;
-    font-size: 9.5pt;
-    break-inside: avoid;
+  @scope (.bk-article) to (.component-box) {
+    :scope .bk-sidenote {
+      display: block;
+      margin: 4px 0 12px;
+      padding: 6px 10px;
+      border-left: 2px solid var(--line-2);
+      background: none;
+      font-size: 9.5pt;
+      break-inside: avoid;
+    }
   }
 
   .sidenote-ref a {

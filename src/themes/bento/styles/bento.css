@@ -37,8 +37,10 @@
   margin-bottom: 36px;
 }
 
-.bt-intro > :last-child:where(:not(.component-box *)) {
-  margin-bottom: 0;
+@scope (.bk-article) to (.component-box) {
+  .bt-intro > :last-child {
+    margin-bottom: 0;
+  }
 }
 
 .bt-grid {
@@ -129,114 +131,116 @@
   line-height: var(--bt-leading);
 }
 
-.bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
-.bt-card > .bk-block[data-type='math'][data-width='auto'] {
-  max-width: var(--bt-measure);
-}
+@scope (.bk-article) to (.component-box) {
+  .bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
+  .bt-card > .bk-block[data-type='math'][data-width='auto'] {
+    max-width: var(--bt-measure);
+  }
 
-.bt-card > h2:where(:not(.component-box *)) {
-  margin: 0 0 14px;
-  font-size: calc(var(--bt-title-size) * var(--reader-scale));
-  line-height: var(--bt-title-leading);
-}
+  .bt-card > h2 {
+    margin: 0 0 14px;
+    font-size: calc(var(--bt-title-size) * var(--reader-scale));
+    line-height: var(--bt-title-leading);
+  }
 
-.bt-card > h2 > .bk-chapter-number {
-  margin-bottom: 4px;
-  font-size: calc(12px * var(--reader-scale));
-}
+  .bt-card > h2 > .bk-chapter-number {
+    margin-bottom: 4px;
+    font-size: calc(12px * var(--reader-scale));
+  }
 
-.bt-card > h2 > .bk-heading-link {
-  left: -1em;
-  font-size: calc(18px * var(--reader-scale));
-}
+  .bt-card > h2 > .bk-heading-link {
+    left: -1em;
+    font-size: calc(18px * var(--reader-scale));
+  }
 
-.bt-card > h3:where(:not(.component-box *)) {
-  margin: 26px 0 8px;
-  font-size: calc((var(--bt-title-size) - 3px) * var(--reader-scale));
-  line-height: var(--bt-title-leading);
-}
+  .bt-card > h3 {
+    margin: 26px 0 8px;
+    font-size: calc((var(--bt-title-size) - 3px) * var(--reader-scale));
+    line-height: var(--bt-title-leading);
+  }
 
-.bt-card > :is(h4, h5, h6):where(:not(.component-box *)) {
-  margin: 22px 0 6px;
-  font-size: calc(15.5px * var(--reader-scale));
-}
+  .bt-card > :is(h4, h5, h6) {
+    margin: 22px 0 6px;
+    font-size: calc(15.5px * var(--reader-scale));
+  }
 
-.bt-card > .bt-recap:where(:not(.component-box *)) {
-  margin: -4px 0 16px;
-}
+  .bt-card > .bt-recap {
+    margin: -4px 0 16px;
+  }
 
-.bt-card > h2 + .bt-recap:where(:not(.component-box *)) {
-  margin: -6px 0 18px;
-  padding-left: 0;
-  border-left: 0;
-  font-size: calc(14.5px * var(--reader-scale));
-  line-height: 1.7;
-  color: var(--recap);
-  text-wrap: pretty;
-}
+  .bt-card > h2 + .bt-recap {
+    margin: -6px 0 18px;
+    padding-left: 0;
+    border-left: 0;
+    font-size: calc(14.5px * var(--reader-scale));
+    line-height: 1.7;
+    color: var(--recap);
+    text-wrap: pretty;
+  }
 
-.bt-card > .bt-recap > :last-child:where(:not(.component-box *)) {
-  margin-bottom: 0;
-}
+  .bt-card > .bt-recap > :last-child {
+    margin-bottom: 0;
+  }
 
-.bt-card .embed h2:where(:not(.component-box *)) {
-  font-size: calc(18px * var(--reader-scale));
-  line-height: 1.5;
-}
+  .bt-card .embed h2 {
+    font-size: calc(18px * var(--reader-scale));
+    line-height: 1.5;
+  }
 
-.bt-card .bk-block[data-width]:where(:not(.component-box *)) {
-  margin: 18px 0 20px;
-}
+  .bt-card .bk-block[data-width] {
+    margin: 18px 0 20px;
+  }
 
-.bt-card .bk-block[data-type='math']:where(:not(.component-box *)) {
-  margin: 10px 0 14px;
-}
+  .bt-card .bk-block[data-type='math'] {
+    margin: 10px 0 14px;
+  }
 
-.bt-card :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
-  background-position:
-    left center,
-    right center,
-    left 1px center,
-    right 1px center;
-  background-size:
-    40px 200%,
-    40px 200%,
-    16px calc(100% - 2px),
-    16px calc(100% - 2px);
-}
+  .bt-card :is(pre.shiki, .table-scroll, mjx-container[display]) {
+    background-position:
+      left center,
+      right center,
+      left 1px center,
+      right 1px center;
+    background-size:
+      40px 200%,
+      40px 200%,
+      16px calc(100% - 2px),
+      16px calc(100% - 2px);
+  }
 
-.bt-card :is(.figure, .component:not([data-frame='none'])):where(:not(.component-box *)) {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
+  .bt-card :is(.figure, .component:not([data-frame='none'])) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
 
-.bt-card > .bk-block > pre.shiki:where(:not(.component-box *)) {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
+  .bt-card > .bk-block > pre.shiki {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
 
-.bt-card > .bk-block > pre.shiki .line:where(:not(.component-box *)) {
-  display: inline-block;
-  width: 100%;
-  padding-left: 4ch;
-  text-indent: -4ch;
-}
+  .bt-card > .bk-block > pre.shiki .line {
+    display: inline-block;
+    width: 100%;
+    padding-left: 4ch;
+    text-indent: -4ch;
+  }
 
-.bt-card :is(th, td):where(:not(.component-box *)) {
-  white-space: normal;
-}
+  .bt-card :is(th, td) {
+    white-space: normal;
+  }
 
-.bt-card > .bk-references {
-  margin-top: 8px;
-}
+  .bt-card > .bk-references {
+    margin-top: 8px;
+  }
 
-.bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)):where(:not(.component-box *)),
-.bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)) > :last-child:where(:not(.component-box *)),
-.bt-card > .bk-references:is(:last-child, :nth-last-child(2):has(+ .bt-notes)) .bk-references-list > :last-child > li:last-child {
-  margin-bottom: 0;
+  .bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)),
+  .bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)) > :last-child,
+  .bt-card > .bk-references:is(:last-child, :nth-last-child(2):has(+ .bt-notes)) .bk-references-list > :last-child > li:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .bt-notes {
@@ -366,9 +370,11 @@
 }
 
 @media (min-width: 1000px) {
-  .bt-card mjx-container[display]:not([width='full']) > svg:where(:not(.component-box *)) {
-    flex: 0 1 auto;
-    max-width: 100%;
-    height: auto;
+  @scope (.bk-article) to (.component-box) {
+    .bt-card mjx-container[display]:not([width='full']) > svg {
+      flex: 0 1 auto;
+      max-width: 100%;
+      height: auto;
+    }
   }
 }

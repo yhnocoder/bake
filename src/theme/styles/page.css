@@ -82,32 +82,35 @@ body {
   cursor: pointer;
 }
 
-a:where(:not(.component-box *)) {
-  color: var(--accent);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
-  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  transition: text-decoration-color var(--motion-fast);
-}
+@scope (body) to (.component-box) {
+  /* why: each selector is one step less specific than without @scope, so that an equally specific rule of a later stylesheet still overrides it */
+  :where(a) {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    transition: text-decoration-color var(--motion-fast);
+  }
 
-a:hover:where(:not(.component-box *)) {
-  text-decoration-color: var(--accent);
-}
+  :where(a):hover {
+    text-decoration-color: var(--accent);
+  }
 
-:focus:where(:not(.component-box *)) {
-  outline: none;
-}
+  :where(:focus) {
+    outline: none;
+  }
 
-:focus-visible:where(:not(.component-box *)) {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
+  :where(:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 
-button:where(:not(.component-box *)) {
-  font: inherit;
-  color: inherit;
+  :where(button) {
+    font: inherit;
+    color: inherit;
+  }
 }
 
 .bk-glyphs {
@@ -242,103 +245,116 @@ button:where(:not(.component-box *)) {
   letter-spacing: 0;
 }
 
-.bk-article {
-  position: relative;
-  margin-left: var(--body-left);
-  width: var(--body-width);
-  overflow-wrap: break-word;
-  font-size: var(--reading-size);
-  font-weight: var(--body-weight);
-  line-height: calc(1.85 + var(--leading-shift));
+@scope (.bk-article) to (.component-box) {
+  :scope {
+    position: relative;
+    margin-left: var(--body-left);
+    width: var(--body-width);
+    overflow-wrap: break-word;
+    font-size: var(--reading-size);
+    font-weight: var(--body-weight);
+    line-height: calc(1.85 + var(--leading-shift));
+  }
+
+  :scope > :first-child,
+  :scope > :first-child > :first-child {
+    margin-top: 0;
+  }
+
+  :scope p {
+    margin: 0 0 var(--paragraph-gap);
+  }
+
+  :scope strong {
+    font-weight: var(--strong-weight);
+    color: var(--strong-color);
+  }
+
+  :scope mark {
+    background: linear-gradient(transparent 58%, var(--mark) 58%);
+    color: inherit;
+  }
+
+  :scope code {
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    font-variant-ligatures: none;
+  }
+
+  :scope sup,
+  :scope sub {
+    line-height: 0;
+  }
+
+  :scope :is(ul, ol) {
+    margin: 0 0 var(--paragraph-gap);
+    padding-left: 22px;
+  }
+
+  :scope li {
+    margin: 4px 0;
+  }
+
+  :scope li > p {
+    margin-bottom: 8px;
+  }
+
+  :scope li > :is(ul, ol) {
+    margin-bottom: 0;
+  }
+
+  :scope hr {
+    clear: both;
+    margin: 40px 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  :scope :is(h2, h3, h4, h5, h6) {
+    position: relative;
+    clear: both;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  :scope h2 {
+    margin: 72px 0 14px;
+    font-size: calc(30px * var(--reader-scale));
+    line-height: 1.3;
+  }
+
+  :scope h3 {
+    margin: 40px 0 10px;
+    font-size: calc(21px * var(--reader-scale));
+    line-height: 1.4;
+  }
+
+  :scope :is(h4, h5, h6) {
+    margin: 28px 0 8px;
+    font-size: calc(18px * var(--reader-scale));
+    line-height: 1.5;
+  }
+
+  @media (max-width: 999.98px) {
+    :scope h2 {
+      margin-top: 56px;
+      font-size: calc(26px * var(--reader-scale));
+    }
+
+    :scope h3 {
+      font-size: calc(20px * var(--reader-scale));
+    }
+  }
 }
 
 .bk-article .component-box {
   font-size: var(--body-size);
   font-weight: 400;
   line-height: 1.85;
-}
-
-.bk-article > :first-child:where(:not(.component-box *)),
-.bk-article > :first-child > :first-child:where(:not(.component-box *)) {
-  margin-top: 0;
-}
-
-.bk-article p:where(:not(.component-box *)) {
-  margin: 0 0 var(--paragraph-gap);
-}
-
-.bk-article strong:where(:not(.component-box *)) {
-  font-weight: var(--strong-weight);
-  color: var(--strong-color);
-}
-
-.bk-article mark:where(:not(.component-box *)) {
-  background: linear-gradient(transparent 58%, var(--mark) 58%);
-  color: inherit;
-}
-
-.bk-article code:where(:not(.component-box *)) {
-  padding: 0.1em 0.4em;
-  border-radius: 4px;
-  background: var(--surface-2);
-  font-family: var(--font-mono);
-  font-size: 0.82em;
-  font-variant-ligatures: none;
-}
-
-.bk-article sup:where(:not(.component-box *)),
-.bk-article sub:where(:not(.component-box *)) {
-  line-height: 0;
-}
-
-.bk-article :is(ul, ol):where(:not(.component-box *)) {
-  margin: 0 0 var(--paragraph-gap);
-  padding-left: 22px;
-}
-
-.bk-article li:where(:not(.component-box *)) {
-  margin: 4px 0;
-}
-
-.bk-article li > p:where(:not(.component-box *)) {
-  margin-bottom: 8px;
-}
-
-.bk-article li > :is(ul, ol):where(:not(.component-box *)) {
-  margin-bottom: 0;
-}
-
-.bk-article hr:where(:not(.component-box *)) {
-  clear: both;
-  margin: 40px 0;
-  border: 0;
-  border-top: 1px solid var(--line);
-}
-
-.bk-article :is(h2, h3, h4, h5, h6):where(:not(.component-box *)) {
-  position: relative;
-  clear: both;
-  font-family: var(--font-heading);
-  font-weight: 700;
-  text-wrap: balance;
-}
-
-.bk-article h2:where(:not(.component-box *)) {
-  margin: 72px 0 14px;
-  font-size: calc(30px * var(--reader-scale));
-  line-height: 1.3;
-}
-
-.bk-article h3:where(:not(.component-box *)) {
-  margin: 40px 0 10px;
-  font-size: calc(21px * var(--reader-scale));
-  line-height: 1.4;
-}
-
-.bk-article :is(h4, h5, h6):where(:not(.component-box *)) {
-  margin: 28px 0 8px;
-  font-size: calc(18px * var(--reader-scale));
-  line-height: 1.5;
 }
 
 .bk-chapter-number {
@@ -380,15 +396,6 @@ button:where(:not(.component-box *)) {
   .bk-header {
     padding-top: 40px;
     margin-bottom: 32px;
-  }
-
-  .bk-article h2:where(:not(.component-box *)) {
-    margin-top: 56px;
-    font-size: calc(26px * var(--reader-scale));
-  }
-
-  .bk-article h3:where(:not(.component-box *)) {
-    font-size: calc(20px * var(--reader-scale));
   }
 }
 

@@ -61,7 +61,7 @@ export default class TexView extends HTMLElement {
 
 export default class TextView extends HTMLElement {
   connectedCallback() {
-    this.innerHTML = '<h3>Title</h3><p>Text with <code>code</code> and <a href="#top">a link</a>.</p>';
+    this.innerHTML = '<h3>Title</h3><p>Text with <code>code</code> and <a href="#top">a link</a>.</p><ul><li>An item</li></ul>';
   }
 }
 `,
@@ -111,7 +111,7 @@ ${spacer}
   'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
   'content/posts/source/index.md': article({ slug: 'source', body: '## Grid {#grid}\n\n:::grid-view{mode=far}\n:::\n' }),
   'content/posts/embedder/index.md': article({ slug: 'embedder', body: 'An article without components of its own.\n\n:::embed\n/2026-10/source/#grid\n:::\n' }),
-  'content/posts/text/index.md': article({ slug: 'text', body: 'An article paragraph.\n\n### An article heading\n\n:::text-view\n:::\n' }),
+  'content/posts/text/index.md': article({ slug: 'text', body: 'An article paragraph.\n\n- An article item\n\n### An article heading\n\n:::text-view\n:::\n' }),
 };
 
 function frameHeights() {
@@ -405,7 +405,7 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
-  await t.test('the article styles of the essay theme do not reach the content of a component', async () => {
+  await t.test('the article styles of the essay theme do not reach the headings, paragraphs, code, links and lists of a component', async () => {
     const page = await open('text');
     await waitForReady(page);
     const styles = await page.evaluate(() => {
@@ -419,24 +419,28 @@ test('components run in the browser', async (t) => {
           color: style.color,
           background: style.backgroundColor,
           decoration: style.textDecorationThickness,
+          paddingLeft: style.paddingLeft,
         };
       };
       const component = document.querySelector('text-view');
       const host = document.createElement('div');
       host.attachShadow({ mode: 'open' }).innerHTML = component.innerHTML;
       component.append(host);
-      const reference = ['h3', 'p', 'code', 'a'].map((tag) => read(host.shadowRoot.querySelector(tag)));
+      const tags = ['h3', 'p', 'code', 'a', 'ul', 'li'];
+      const reference = tags.map((tag) => read(host.shadowRoot.querySelector(tag)));
       host.remove();
       return {
-        component: ['h3', 'p', 'code', 'a'].map((tag) => read(document.querySelector(`text-view ${tag}`))),
+        component: tags.map((tag) => read(document.querySelector(`text-view ${tag}`))),
         reference,
-        article: [read(document.querySelector('.bk-article > h3, .bk-article h3')), read(document.querySelector('.bk-article p'))],
+        article: ['h3', 'p', 'ul', 'li'].map((tag) => read(document.querySelector(`.bk-article ${tag}`))),
       };
     });
     assert.deepEqual(styles.component, styles.reference);
     assert.notEqual(styles.component[0].marginTop, styles.article[0].marginTop);
     assert.notEqual(styles.component[0].fontSize, styles.article[0].fontSize);
     assert.notEqual(styles.component[1].marginTop, styles.article[1].marginTop);
+    assert.notEqual(styles.component[4].paddingLeft, styles.article[2].paddingLeft);
+    assert.notEqual(styles.component[5].marginTop, styles.article[3].marginTop);
     await page.close();
   });
 

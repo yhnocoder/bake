@@ -41,15 +41,17 @@
   color: var(--accent);
 }
 
-.bk-sidenote-body,
-.bk-sidenote-body > :first-child {
-  display: inline;
-}
+@scope (.bk-article) to (.component-box) {
+  .bk-sidenote-body,
+  .bk-sidenote-body > :first-child {
+    display: inline;
+  }
 
-.bk-sidenote-body p {
-  margin: 0 0 6px;
-}
+  .bk-sidenote-body p {
+    margin: 0 0 6px;
+  }
 
-.bk-sidenote-body > :last-child {
-  margin-bottom: 0;
+  .bk-sidenote-body > :last-child {
+    margin-bottom: 0;
+  }
 }
