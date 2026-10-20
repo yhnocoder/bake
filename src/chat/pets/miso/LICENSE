@@ -1,3 +1,12 @@
+Miso Artwork License
+
+"Miso" by gaerae, licensed under the MIT License below.
+
+SPDX-License-Identifier: MIT
+Source: https://github.com/gaerae/playpets/tree/40d0c5aa87038e4e73d0ca61da35a2b4a900e65b/assets/pets/miso
+
+Changes made for Bake: the spritesheet was cropped to its first 9 rows (1536x1872 pixels) and converted to lossy WebP. pet.json keeps only the id, the display name, the description and the spritesheet path.
+
 MIT License
 
 Copyright (c) 2026 gaerae

@@ -1,3 +1,4 @@
+import { escapeMarkup } from '../build/escape.js';
 import { articleSource } from '../copy/copy.js';
 
 export const CATALOG_PATH = '_bake/articles.json';
@@ -89,7 +90,7 @@ export function systemPrompt({ page, catalog, scopes = [], sources = [] }) {
       ...intro,
       `The reader limited the question to ${scopes.map((scope) => scope.label).join(', ')}. Answer from these articles. Say so when they do not cover something, and mark what you add from elsewhere.`,
       links,
-      ...sources.map((source) => [`<article address="/${source.url}" title="${source.title}">`, source.content, '</article>'].join('\n')),
+      ...sources.map((source) => [`<article address="${escapeMarkup(`/${source.url}`)}" title="${escapeMarkup(source.title)}">`, source.content, '</article>'].join('\n')),
       ...(listed.size === 0 ? [] : [`Read these articles with ${READ_ARTICLE} before you answer; read every one that may be relevant. They are listed one JSON object per line:`, ...catalogLines(catalog.articles.filter((entry) => listed.has(entry.url)))]),
     ].join('\n');
   }

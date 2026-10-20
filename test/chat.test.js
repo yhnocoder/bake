@@ -294,6 +294,8 @@ describe('AI chat context', () => {
     assert.ok(prompt.includes('{"address":"/2026-09/demo/"'));
     assert.ok(!prompt.includes('{"address":"/2026-10/rope/"'));
     assert.ok(!prompt.includes('# Source'));
+    const quoted = systemPrompt({ page, catalog, scopes, sources: [{ url: '2026-10/rope/', title: 'Rope "and" <RoPE> & co', content: '' }] });
+    assert.match(quoted, /<article address="\/2026-10\/rope\/" title="Rope &quot;and&quot; &lt;RoPE&gt; &amp; co">/);
   });
 
   test('reads an article by its address in any common form and reports unknown addresses', async () => {

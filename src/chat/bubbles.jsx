@@ -465,7 +465,7 @@ function Chat(props) {
         <Show when={quote() !== null}>
           <span class="bk-chat-chip bk-chat-quote" title={quote()}>
             <span>
-              {labels.quote}：{quote()}
+              {labels.quoted(quote())}
             </span>
             <button type="button" aria-label={labels.removeQuote} onClick={() => setQuote(null)}>
               ✕
@@ -556,9 +556,8 @@ function Settings(props) {
     .then((response) => (response.ok ? response.json() : null))
     .then(setSite, () => setSite(null));
 
-  const use = async (event) => {
-    event.preventDefault();
-    if (loading()) return;
+  const use = async () => {
+    if (loading() || address().trim() === '') return;
     setLoading(true);
     setStatus({ text: labels.petLoading });
     try {
@@ -599,15 +598,28 @@ function Settings(props) {
           {labels.clearKey}
         </button>
       </Show>
-      <form class="bk-chat-pet-form" onSubmit={use}>
+      <div class="bk-chat-pet-form">
         <label>
           <span>{labels.pet}</span>
-          <input type="url" name="pet" value={address()} placeholder={labels.petAddress} aria-label={labels.petAddress} spellcheck={false} onInput={(event) => setAddress(event.currentTarget.value)} />
+          <input
+            type="url"
+            name="pet"
+            value={address()}
+            placeholder={labels.petAddress}
+            aria-label={labels.petAddress}
+            spellcheck={false}
+            onInput={(event) => setAddress(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || event.isComposing) return;
+              event.preventDefault();
+              use();
+            }}
+          />
         </label>
-        <button type="submit" class="bk-chat-menu-button" disabled={loading() || address().trim() === ''}>
+        <button type="button" class="bk-chat-menu-button" disabled={loading() || address().trim() === ''} onClick={use}>
           {labels.petUse}
         </button>
-      </form>
+      </div>
       <Show when={status() !== null}>
         <p class="bk-chat-pet-status" data-failed={status().failed ? '' : undefined} role={status().failed ? 'alert' : undefined}>
           {status().text}

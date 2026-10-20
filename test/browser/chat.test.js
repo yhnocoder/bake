@@ -791,13 +791,15 @@ test('the AI chat on published pages', async (t) => {
     const siteFrame = await frame();
     assert.equal(siteFrame, `${base}/_bake/pet/frame.webp`);
     await openSettings(page);
+    assert.equal(await shadow(page, "return root.querySelectorAll('form form').length;"), 0);
     const credit = page.locator('.bk-chat-credit a');
     assert.equal(await credit.textContent(), 'CRT Monitor，作者 wxy，CC BY 4.0，已裁成 9 行并转成有损 WebP');
     assert.equal(await credit.getAttribute('href'), `${base}/_bake/pet/LICENSE.txt`);
     const status = page.locator('.bk-chat-pet-status');
-    const choose = async (path) => {
-      await page.locator('.bk-chat-pet-form input[name="pet"]').fill(`${PETS}${path}`);
-      await page.locator('.bk-chat-pet-form button[type="submit"]').click();
+    const choose = async (path, key = false) => {
+      const field = page.locator('.bk-chat-pet-form input[name="pet"]');
+      await field.fill(`${PETS}${path}`);
+      await (key ? field.press('Enter') : page.locator('.bk-chat-pet-form button').click());
       await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…');
     };
     for (const [path, message] of [
@@ -806,12 +808,27 @@ test('the AI chat on published pages', async (t) => {
       ['/text/pet.json', '形象图片不是 PNG 或 WebP 图片。'],
       ['/missing/pet.json', '读不到这个链接，对方网站可能不允许跨域请求。'],
     ]) {
-      await choose(path);
+      await choose(path, true);
       assert.equal(await status.textContent(), message);
       assert.equal(await status.getAttribute('data-failed'), '');
       assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
       assert.equal(await frame(), siteFrame);
     }
+
+    await page.evaluate(() => {
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'bk-chat-pet') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+        return setItem.call(this, key, value);
+      };
+      window.restoreSetItem = () => (Storage.prototype.setItem = setItem);
+    });
+    await choose('/bun/pet.json');
+    assert.equal(await status.textContent(), '浏览器的存储空间已满，无法记住这个形象。');
+    assert.equal(await frame(), siteFrame);
+    await page.evaluate(() => window.restoreSetItem());
+    const sheetRequests = () => api.petRequests.filter((request) => request.path === '/bun/art/sheet.webp').length;
+    const before = sheetRequests();
 
     await choose('/bun/pet.json');
     assert.equal(await status.textContent(), '已换成 <b>Bun</b>。');
@@ -821,7 +838,7 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await credit.count(), 0);
     assert.ok(api.petRequests.length > 0 && api.petRequests.every((request) => request.headers.referer === undefined && request.headers.cookie === undefined), JSON.stringify(api.petRequests));
     await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
-    assert.equal(api.petRequests.filter((request) => request.path === '/bun/art/sheet.webp').length, 1);
+    assert.equal(sheetRequests() - before, 1);
 
     await page.reload();
     assert.match(await frame(), /^data:image\/webp;base64,/);

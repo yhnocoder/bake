@@ -348,12 +348,12 @@ export default {
 
 `bake build` publishes the pet in `_bake/pet/`, together with its first frame as a small image that the page shows until the pointer or the keyboard reaches the pet; the page downloads the whole spritesheet only then. A spritesheet of another size or one that is not a PNG or WebP image is reported as an error, and so is a spritesheet larger than 5 MB, whether it comes from a folder or an address, or one that would be larger than 5 MB after Bake converts it to WebP. `pet.json` may have at most 64 KB, and `spritesheetPath` must name a file inside the pet folder.
 
-Readers can choose their own pet in the chat settings by pasting the address of a `pet.json`. The browser downloads it without cookies and without the address of the page, refuses a spritesheet larger than 5 MB or of another size, shows the name of the pet only as text, and remembers the choice in this browser.
+Readers can choose their own pet in the chat settings by pasting the address of a `pet.json`. The browser downloads it without cookies and without the address of the page, refuses a spritesheet larger than 5 MB, of another size or in a format other than PNG and WebP, shows the name of the pet only as text, and remembers the choice in this browser.
 
 The built-in pets have their own licenses, which the chat settings name in one line:
 
-- CRT Monitor, "CRT Monitor — Codex Pet" by wxy, from https://github.com/wxy/codex-pets, is licensed under CC BY 4.0. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license notice is `src/chat/pets/crt-monitor/LICENSE`.
-- Miso, by gaerae, from https://github.com/gaerae/playpets, is licensed under the MIT license. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license is `src/chat/pets/miso/LICENSE`.
+- CRT Monitor, "CRT Monitor — Codex Pet" by wxy, from https://github.com/wxy/codex-pets/tree/57a8c87c2abe1a9f3140c84ed2bdfcea0bc6b1de/pets/crt-monitor, is licensed under CC BY 4.0. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license notice is `src/chat/pets/crt-monitor/LICENSE`.
+- Miso, by gaerae, from https://github.com/gaerae/playpets/tree/40d0c5aa87038e4e73d0ca61da35a2b4a900e65b/assets/pets/miso, is licensed under the MIT license. Bake cropped the spritesheet to its first 9 rows and converted it to lossy WebP. The license is `src/chat/pets/miso/LICENSE`.
 
 ## Themes
 

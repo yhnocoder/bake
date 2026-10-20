@@ -4,6 +4,6 @@ CRT Monitor Artwork License
 
 SPDX-License-Identifier: CC-BY-4.0
 License: https://creativecommons.org/licenses/by/4.0/
-Source: https://github.com/wxy/codex-pets/tree/main/pets/crt-monitor
+Source: https://github.com/wxy/codex-pets/tree/57a8c87c2abe1a9f3140c84ed2bdfcea0bc6b1de/pets/crt-monitor
 
 Changes made for Bake: the spritesheet was cropped to its first 9 rows (1536x1872 pixels) and converted to lossy WebP at quality 80. pet.json keeps only the id, the display name, the description and the spritesheet path.
