@@ -60,7 +60,7 @@ function grouping(html, name) {
 
 describe('homepage', () => {
   test('passes the site, the homepage settings and the published articles newest first to home.jsx', async (t) => {
-    const config = categoriesConfig.replace("language: 'en',", "language: 'en',\n  theme: 'probe',");
+    const config = categoriesConfig.replace("language: 'en',", "language: 'en',\n  theme: 'probe',\n  bento: { columns: 5 },");
     const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
     const dir = createBlog(t, {
       'bake.config.js': config,
@@ -86,7 +86,7 @@ describe('homepage', () => {
     assert.ok(scripts.every((path) => /^assets\/probe-[\w-]+\.js$/.test(path)));
     assert.match(props.assets.modules.join(' '), /^assets\/chat-[\w-]+\.js$/);
     assert.deepEqual(props, {
-      site: { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/' },
+      site: { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/', bento: { columns: 5 } },
       home: {
         groupBy: 'category',
         columns: 4,
@@ -114,7 +114,7 @@ describe('homepage', () => {
       ],
       assets: { root: './', styles, scripts, modules: props.assets.modules },
     });
-    assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/' });
+    assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/', bento: { columns: 5 } });
     assert.equal(readFileSync(join(dir, 'dist/2026-09/demo/anim/preview.js'), 'utf8'), 'export default () => ({ start() {}, stop() {} });\n');
   });
 

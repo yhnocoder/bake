@@ -106,7 +106,7 @@ function shareImagesOf(root, published, config, assetFiles, errors) {
 }
 
 function siteProps(config) {
-  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
+  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url), bento: { columns: config.bento.columns } };
 }
 
 function catalogEntries(published) {
