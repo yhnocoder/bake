@@ -58,6 +58,11 @@ const files = {
   'content/posts/attention/index.md': article({ title: longWord, slug: 'attention', date: '2026-07-01', extra: `category: ml\ntags: [注意力]\nsummary: ${longWord} 的摘要。\n` }),
 };
 
+const sharedShadowLayers = (light, dark) => {
+  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
+  return layers(light).filter((layer) => layers(dark).includes(layer));
+};
+
 test('the essay homepage', async (t) => {
   const dir = createBlog(t, files);
   const result = bake(dir, 'build');
@@ -291,7 +296,7 @@ test('the essay homepage', async (t) => {
     }, control);
     await page.getByRole('button', { name: '5', exact: true }).click();
     await page.getByRole('button', { name: '月份' }).click();
-    await page.waitForFunction(() => document.querySelector('[data-control="columns"] .bk-switch-options').getAnimations({ subtree: true }).length === 0);
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-switch-options')].every((options) => options.getAnimations({ subtree: true }).length === 0));
     assert.deepEqual([await thumb('group'), await thumb('columns')], [true, true]);
 
     const moving = await page.evaluate(() =>
@@ -382,9 +387,12 @@ test('the essay homepage', async (t) => {
     assert.deepEqual(clipped, []);
     const colors = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
     assert.deepEqual(colors, ['rgb(17, 20, 19)', 'rgb(26, 30, 28)']);
+    const pressedShadow = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-switch[data-control="group"] .bk-switch-options'), '::before').boxShadow);
+    const darkShadow = await pressedShadow();
     await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '浅' }).click();
     await page.waitForFunction(() => getComputedStyle(document.body).backgroundColor === 'rgb(245, 246, 244)');
+    assert.deepEqual(sharedShadowLayers(await pressedShadow(), darkShadow), [], 'the shadow of the chosen grouping follows dark mode');
     await context.close();
   });
 });

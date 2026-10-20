@@ -178,7 +178,7 @@
   vertical-align: middle;
 }
 
-.bk-article .figure:where(:not(.component-box *)) {
+.bk-article :is(.figure, .component):where(:not(.component-box *)) {
   position: relative;
   clear: both;
   width: 100%;
@@ -191,7 +191,7 @@
   box-shadow: var(--shadow);
 }
 
-.bk-article :not(.bk-block) > .figure:where(:not(.component-box *)) {
+.bk-article :not(.bk-block) > :is(.figure, .component):where(:not(.component-box *)) {
   margin: 22px auto 26px;
 }
 
@@ -207,23 +207,6 @@
   font-size: 14px;
   line-height: 1.7;
   color: var(--ink-2);
-}
-
-.bk-article .component {
-  position: relative;
-  clear: both;
-  width: 100%;
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 18px 18px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.bk-article :not(.bk-block) > .component {
-  margin: 22px auto 26px;
 }
 
 .bk-article .component[data-frame='none'] {
@@ -272,10 +255,6 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article .component-box > * {
   display: block;
   height: 100%;
-}
-
-.bk-article .component :is(button, summary, select, label, [role='button'], input:is([type='checkbox'], [type='radio'], [type='range'])):not(:disabled) {
-  cursor: pointer;
 }
 
 .bk-article .figure[data-float]:where(:not(.component-box *)) {

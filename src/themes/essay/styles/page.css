@@ -77,12 +77,7 @@ body {
   background: var(--selection-quiet);
 }
 
-a,
-button,
-summary,
-select,
-[role='button'],
-label:has(input) {
+:where(a, button, summary, select, label, [role='button'], input:is([type='checkbox'], [type='radio'], [type='range'])):where(:not(:disabled)) {
   cursor: pointer;
 }
 
@@ -393,9 +388,9 @@ button:where(:not(.component-box *)) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :where(:not(.component-box *, .bk-settings-panel, .bk-toast)),
+  :where(:not(.component-box *))::before,
+  :where(:not(.component-box *))::after {
     transition-duration: 0s !important;
     animation-duration: 0s !important;
     scroll-behavior: auto !important;

@@ -1,4 +1,4 @@
-import { cardKeyboard, chapterCard, clamp, el, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
+import { cardKeyboard, chapterCard, clamp, createElement, floorFor, hoverIntent, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 110;
 const TAB_PITCH = 28;
@@ -10,17 +10,17 @@ const TOP_SHARE = 0.16;
 const TOP_MIN = 24;
 const BOTTOM_ROOM = 76;
 
-export function tabsView(ctx) {
-  const { outline } = ctx;
-  const root = el('nav', 'bk-tabs');
-  root.setAttribute('aria-label', ctx.labels.toc);
+export function tabsView(context) {
+  const { outline } = context;
+  const root = createElement('nav', 'bk-tabs');
+  root.setAttribute('aria-label', context.labels.toc);
   const intent = hoverIntent(SHOW_DELAY);
-  const index = indexCard(ctx);
+  const index = indexCard(context);
   const items = outline.chapters.map((chapter, chapterIndex) => {
     const tab = tocLink(chapter.id, 'bk-tab');
     tab.textContent = chapter.number;
     tab.setAttribute('aria-label', `${chapter.number} ${chapter.title}`);
-    const title = el('div', 'bk-tab-title');
+    const title = createElement('div', 'bk-tab-title');
     const text = tocLink(chapter.id, 'bk-tab-title-text');
     text.textContent = chapter.title;
     text.tabIndex = -1;
@@ -37,7 +37,7 @@ export function tabsView(ctx) {
   index.element.addEventListener('pointerleave', (event) => {
     if (!root.contains(event.relatedTarget)) leave();
   });
-  ctx.host.append(root, index.element);
+  context.host.append(root, index.element);
   cardKeyboard({ groups: items.map((item) => [item.tab]), card: index.element, shown: () => (index.shown() ? hovered : -1), leave: () => leave() });
   let shownCurrent = null;
   let hovered = -1;
@@ -88,7 +88,7 @@ export function tabsView(ctx) {
   return {
     columns: [root],
     update(state) {
-      if (!ctx.jumping() || shownCurrent === null) layout(state);
+      if (!context.jumping() || shownCurrent === null) layout(state);
       const key = stateKey(state);
       if (hovered >= 0 && index.shown() && key !== shownState) index.refresh();
       shownState = key;
@@ -105,11 +105,11 @@ export function tabsView(ctx) {
   };
 }
 
-function indexCard(ctx) {
-  const element = el('div', 'bk-index');
-  const tab = el('a', 'bk-index-tab');
+function indexCard(context) {
+  const element = createElement('div', 'bk-index');
+  const tab = createElement('a', 'bk-index-tab');
   tab.tabIndex = -1;
-  const body = el('div', 'bk-index-body');
+  const body = createElement('div', 'bk-index-body');
   element.append(tab, body);
   let shown = -1;
   let anchor = null;
@@ -131,13 +131,13 @@ function indexCard(ctx) {
     frame = requestAnimationFrame(follow);
   }
   function render() {
-    const state = ctx.state();
-    const chapter = ctx.outline.chapters[shown];
+    const state = context.state();
+    const chapter = context.outline.chapters[shown];
     tab.href = `#${encodeURIComponent(chapter.id)}`;
     tab.textContent = chapter.number;
     tab.classList.toggle('is-current', shown === Math.max(0, state.chapter));
     const scrollTop = body.scrollTop;
-    body.replaceChildren(chapterCard(ctx, shown, state));
+    body.replaceChildren(chapterCard(context, shown, state));
     body.scrollTop = scrollTop;
   }
   return {

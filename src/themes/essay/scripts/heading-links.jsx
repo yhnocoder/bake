@@ -7,7 +7,7 @@ const JUMP_MARGIN = 24;
 const SCROLL_TIMEOUT = 1500;
 const FLASHED = 'h1, h2, h3, h4, h5, h6, p, li, aside, .bk-block';
 
-export function jumpTo(target, { smooth = true } = {}) {
+function jumpTo(target, { smooth = true } = {}) {
   openFoldsAround(target);
   const bottom = document.documentElement.scrollHeight - innerHeight;
   const top = Math.min(bottom, Math.max(0, target.getBoundingClientRect().top + scrollY - JUMP_MARGIN));

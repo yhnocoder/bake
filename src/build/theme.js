@@ -7,11 +7,11 @@ import { errorAt, fileStart } from '../report.js';
 import { compileProblem, outputOf, viteConfig } from './vite.js';
 
 export const THEMES_DIR = 'themes';
-export const PAGE_FILE = 'page.jsx';
-export const CLIENT_FILE = 'client.jsx';
-export const HOME_FILE = 'home.jsx';
-export const NOT_FOUND_FILE = 'not-found.jsx';
-export const THEME_STYLES_FILE = 'theme.css';
+const PAGE_FILE = 'page.jsx';
+const CLIENT_FILE = 'client.jsx';
+const HOME_FILE = 'home.jsx';
+const NOT_FOUND_FILE = 'not-found.jsx';
+const THEME_STYLES_FILE = 'theme.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');

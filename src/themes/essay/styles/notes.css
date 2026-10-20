@@ -100,10 +100,6 @@ html:not([data-script]) .bk-article .bk-sidenote {
   width: 100%;
 }
 
-.bk-notes-layer .bk-sidenote[hidden] {
-  display: none;
-}
-
 @media (max-width: 999.98px) {
   .bk-notes-layer {
     display: none;

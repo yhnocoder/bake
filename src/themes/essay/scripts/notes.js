@@ -1,7 +1,7 @@
 import { labelsFor } from '../labels.js';
 import { CONTENT_EVENT, EASING, LAYOUT_EVENT, flash, oncePerFrame, reducedMotion } from './motion.js';
+import { notesColumnScreen } from './screens.js';
 
-const wideScreen = matchMedia('(min-width: 1000px)');
 const NOTE_GAP = 12;
 const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, .bk-block';
 const OPEN_DURATION = 200;
@@ -50,7 +50,7 @@ export function startNotes(article) {
   });
   document.fonts.ready.then(layout);
   document.fonts.addEventListener('loadingdone', layout);
-  wideScreen.addEventListener('change', layout);
+  notesColumnScreen.addEventListener('change', layout);
 
   const activate = (number) => {
     if (number === active) return;
@@ -71,7 +71,7 @@ export function startNotes(article) {
     if (link === null || event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
     const number = link.parentElement.dataset.sidenote;
-    if (wideScreen.matches) {
+    if (notesColumnScreen.matches) {
       const note = layer?.querySelector(`.bk-sidenote[data-sidenote="${number}"]`) ?? null;
       if (note !== null) flash(note);
       return;
@@ -82,7 +82,7 @@ export function startNotes(article) {
 }
 
 function placeNotes(article, layer, placed) {
-  if (!wideScreen.matches) return;
+  if (!notesColumnScreen.matches) return;
   const column = layer.getBoundingClientRect();
   const blocked = obstacles(article, layer, column);
   let floor = -Infinity;

@@ -1,3 +1,4 @@
+import { escapeMarkup } from './escape.js';
 import { encodePath } from './urls.js';
 
 export const FEED_PATH = 'feed.xml';
@@ -27,7 +28,7 @@ export function feedXml(config, entries) {
       '<item>',
       element('title', entry.title),
       element('link', address),
-      `<guid isPermaLink="true">${escapeXml(address)}</guid>`,
+      `<guid isPermaLink="true">${escapeMarkup(address)}</guid>`,
       element('pubDate', new Date(`${entry.date}T00:00:00Z`).toUTCString()),
       ...(entry.category === undefined ? [] : [element('category', entry.category.name)]),
       ...(entry.summary === undefined ? [] : [element('description', entry.summary)]),
@@ -42,7 +43,7 @@ export function feedXml(config, entries) {
     element('link', link),
     element('description', config.description ?? config.title),
     element('language', config.language),
-    `<atom:link href="${escapeXml(absoluteLink(config, FEED_PATH))}" rel="self" type="application/rss+xml"/>`,
+    `<atom:link href="${escapeMarkup(absoluteLink(config, FEED_PATH))}" rel="self" type="application/rss+xml"/>`,
     ...items,
     '</channel>',
     '</rss>',
@@ -81,9 +82,5 @@ export function chatCatalogJson(config, articles) {
 }
 
 function element(name, text) {
-  return `<${name}>${escapeXml(text)}</${name}>`;
-}
-
-function escapeXml(text) {
-  return String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
+  return `<${name}>${escapeMarkup(text)}</${name}>`;
 }

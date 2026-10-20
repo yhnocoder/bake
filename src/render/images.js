@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import sharp from 'sharp';
 
-export const PAGE_WIDTH = 1340;
+const PAGE_WIDTH = 1340;
 const PIXEL_DENSITY = 2;
 const CONVERTED = ['png', 'jpeg', 'gif', 'webp'];
 const LOSSLESS = ['png', 'gif'];
