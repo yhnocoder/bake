@@ -120,7 +120,7 @@ function Chat(props) {
     if (messages.length === 0) greet();
     pet.setState(busy() || pending() !== null ? activity : 'open');
     focusInput();
-    if (view() === 'locked' && !unlockTried) unlockRemembered();
+    if (!unlockTried) unlockRemembered();
   };
   const hide = ({ focus = true } = {}) => {
     if (!open()) return;

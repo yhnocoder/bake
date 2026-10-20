@@ -226,6 +226,17 @@ test('the AI chat on published pages', async (t) => {
       assert.ok(tries < 50, 'clearing the key forgets the remembered key');
       await page.waitForTimeout(20);
     }
+
+    await setUpKey(page);
+    assert.notEqual(await remembered(), null);
+    await page.evaluate(() => localStorage.removeItem('bk-chat-key'));
+    await page.reload();
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator(KEY).waitFor();
+    for (let tries = 0; (await remembered()) !== null; tries += 1) {
+      assert.ok(tries < 50, 'a chat without bk-chat-key forgets the remembered key when it opens');
+      await page.waitForTimeout(20);
+    }
   });
 
   await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {

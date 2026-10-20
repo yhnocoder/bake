@@ -89,14 +89,20 @@ export async function unlockKey() {
 
 export async function rememberedKey({ now = Date.now() } = {}) {
   const record = storedKey();
-  if (record !== null) {
+  let remembered;
+  try {
+    remembered = await keyStore('readonly', (store) => store.get(REMEMBERED));
+  } catch {
+    return null;
+  }
+  if (remembered === undefined) return null;
+  const left = remembered.until - now;
+  if (record !== null && remembered.credential === record.credential && left > 0 && left <= REMEMBER_DAYS * DAY) {
     try {
-      const remembered = await keyStore('readonly', (store) => store.get(REMEMBERED));
-      const left = remembered?.until - now;
-      if (remembered?.credential === record.credential && left > 0 && left <= REMEMBER_DAYS * DAY) return await decryptWith(remembered.key, record);
+      return await decryptWith(remembered.key, record);
     } catch {}
   }
-  await forgetRemembered();
+  await forgetRemembered(remembered);
   return null;
 }
 
@@ -114,9 +120,16 @@ async function remember(secret, credential) {
   } catch {}
 }
 
-async function forgetRemembered() {
+async function forgetRemembered(expected) {
   try {
-    await keyStore('readwrite', (store) => store.delete(REMEMBERED));
+    await keyStore('readwrite', (store) => {
+      const request = store.get(REMEMBERED);
+      request.onsuccess = () => {
+        const current = request.result;
+        if (expected === undefined || (current?.credential === expected.credential && current?.until === expected.until)) store.delete(REMEMBERED);
+      };
+      return request;
+    });
   } catch {}
 }
 
