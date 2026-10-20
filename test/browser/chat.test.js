@@ -866,7 +866,8 @@ test('the AI chat on published pages', async (t) => {
     const bubbles = page.locator('.bk-chat-bubbles');
     assert.ok((await bubbles.boundingBox()).height <= 230);
     assert.equal(await bubbles.evaluate((element) => getComputedStyle(element).scrollbarWidth), 'none');
-    const room = await bubbles.evaluate((element) => {
+    const room = await bubbles.evaluate(async (element) => {
+      await Promise.all(element.closest('.bk-chat').getAnimations({ subtree: true }).map((animation) => animation.finished));
       const box = element.getBoundingClientRect();
       const rects = [...element.querySelectorAll('.bk-chat-bubble')].map((bubble) => bubble.getBoundingClientRect());
       const launcher = element.getRootNode().querySelector('.bk-chat-launcher').getBoundingClientRect();
