@@ -128,6 +128,19 @@ describe('share images', () => {
     assert.deepEqual(readTree(join(dir, 'dist')), published);
   });
 
+  test('draws the first frame of a preview whose file name holds #, ? or %', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': config,
+      'content/posts/rope/index.md': article({ title: 'Rope', slug: 'rope', date: '2026-10-14', extra: 'category: ml\npreview: preview#1?100%.js\n' }),
+      'content/posts/rope/preview#1?100%.js': preview.replace('./colour.js', './colour%231.js'),
+      'content/posts/rope/colour#1.js': "export const colour = '#ff00ff';\n",
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const [card] = readdirSync(join(dir, 'dist/og/2026-10'));
+    assert.deepEqual(pixel(PNG.sync.read(readFileSync(join(dir, 'dist/og/2026-10', card))), 904, 315), MAGENTA);
+  });
+
   test('the name of a card changes with its title, its preview and the files the preview imports', async (t) => {
     const dir = createBlog(t, blogFiles);
     const site = createSite(dir, { shareImages: true });

@@ -3,7 +3,8 @@ import { cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
-import { bake, createBlog } from '../blog.js';
+import { parse } from '../article.js';
+import { article, bake, createBlog, validConfig } from '../blog.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
@@ -193,5 +194,72 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal(await page.locator('.bk-toast').textContent(), '已复制为 Markdown');
   });
 
+  await t.test('the toast takes the colours of the light and the dark scheme and does not cover the settings button', async () => {
+    const luminance = (color) => {
+      const values = color.match(/[\d.]+/g).map(Number);
+      const [r, g, b] = color.startsWith('color(') ? values.slice(0, 3).map((value) => value * 255) : values;
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    };
+    for (const width of [1440, 375]) {
+      for (const colorScheme of ['light', 'dark']) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ colorScheme });
+        await page.waitForFunction(() => !document.querySelector('.bk-toast').classList.contains('is-on'));
+        await page.locator('.bk-header .bk-copy-source').evaluate((button) => button.click());
+        await page.waitForFunction(() => document.querySelector('.bk-toast').classList.contains('is-on') && getComputedStyle(document.querySelector('.bk-toast')).opacity === '1');
+        const { toast, background, own, settings } = await page.evaluate(() => ({
+          toast: getComputedStyle(document.querySelector('.bk-toast')).backgroundColor,
+          background: getComputedStyle(document.body).backgroundColor,
+          own: document.querySelector('.bk-toast').getBoundingClientRect().toJSON(),
+          settings: document.querySelector('.bk-settings-toggle').getBoundingClientRect().toJSON(),
+        }));
+        const at = `${colorScheme} at ${width}px`;
+        assert.ok(Math.abs(luminance(toast) - luminance(background)) < 0.2, `${at}: the toast ${toast} on the page ${background}`);
+        assert.ok(own.right <= settings.left || own.left >= settings.right || own.bottom <= settings.top || own.top >= settings.bottom, `${at}: the toast ${JSON.stringify(own)} covers the settings button ${JSON.stringify(settings)}`);
+        assert.ok(own.left >= 0 && own.right <= width, `${at}: the toast ${JSON.stringify(own)} leaves the screen`);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'light' });
+  });
+
+  await context.close();
+});
+
+test('a partly selected paragraph escapes the text that Markdown would read as syntax, so the copy renders the same text', async (t) => {
+  const paragraphs = [
+    ['Start: a \\*literal\\* star, snake_case\\_name, a \\_literal\\_ underscore, \\`ticks\\` and C:\\\\path.', 'a *literal*', 'path'],
+    ['Money: \\$5 or \\$6, a \\==mark\\== and \\~~strike\\~~ here.', '$5', 'here'],
+    ['Brackets: \\[text\\](url), \\[^note\\], \\[@key\\], \\<b\\> and \\&amp; here.', '[text]', 'here'],
+    ['\\# Not a heading but text', '# Not', 'heading'],
+    ['1\\. Not a list item', '1. Not', 'list'],
+    ['\\- Not a list either', '- Not', 'list'],
+    ['\\> Not a quote at all', '> Not', 'quote'],
+    ['中文，标点：“引号”（括号）！还有 snake_case 和 a * b。', '标点', 'b'],
+  ];
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/escapes/index.md': article({ title: 'Escapes', slug: 'escapes', body: `${paragraphs.map(([text]) => text).join('\n\n')}\n` }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/escapes/`);
+  for (const [, from, to] of paragraphs) {
+    const point = { selector: '.bk-article p', contains: from };
+    await select(page, { ...point, text: from }, { ...point, text: to, after: true });
+    const selected = await page.evaluate(() => getSelection().toString());
+    const { text } = await copied(page);
+    const { article: copy, errors } = await parse(`${text}\n`);
+    assert.deepEqual(errors, [], text);
+    const rendered = await page.evaluate((html) => new DOMParser().parseFromString(html, 'text/html').body.textContent.trim(), copy.intro.map((block) => block.html).join('\n'));
+    assert.equal(rendered, selected, `${text} renders as ${rendered}`);
+  }
+  await select(page, { selector: '.bk-article p', text: '标点' }, { selector: '.bk-article p', text: 'b。', after: true });
+  assert.equal((await copied(page)).text, '标点：“引号”（括号）！还有 snake_case 和 a * b。');
   await context.close();
 });

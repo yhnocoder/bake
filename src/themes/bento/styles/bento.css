@@ -47,6 +47,7 @@
   padding: var(--bt-card-padding);
   border: 1px solid var(--line);
   border-radius: 14px;
+  --scroll-cover: var(--surface);
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: calc(var(--body-size) - 1px);
