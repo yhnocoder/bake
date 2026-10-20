@@ -2,7 +2,8 @@
 .matrix-display{display:block;text-align:center;margin:.3em 0 .5em;overflow-x:auto;overflow-y:hidden;max-width:100%}
 .matrix-display>svg{max-width:none}
 .matrix-root{height:100%;content-visibility:auto}
-.matrix-figure{height:100%;contain:strict;content-visibility:auto;font-family:var(--font-ui);color:var(--ink);font-size:14px;line-height:1.6}
+.matrix-figure{height:100%;contain:content;content-visibility:auto;contain-intrinsic-block-size:auto var(--component-height);font-family:var(--font-ui);color:var(--ink);font-size:14px;line-height:1.6}
+@media (max-width:599.98px){.matrix-figure{contain-intrinsic-block-size:auto var(--component-narrow-height)}}
 .matrix-figure svg text{font-family:var(--font-mono);font-size:11px;fill:var(--ink-3)}
 .matrix-figure .bk-kit-controls{margin:0 0 10px}
 .matrix-actions{display:inline-flex;flex-wrap:wrap;gap:8px}
