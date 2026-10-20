@@ -183,17 +183,27 @@ test('the essay homepage', async (t) => {
 
   await t.test('a column switch measures every card before it starts the card animations, which only move and scale the cards', async () => {
     const { context, page } = await open();
-    const session = await context.newCDPSession(page);
-    await session.send('Performance.enable');
-    const restyles = async () => (await session.send('Performance.getMetrics')).metrics.find((metric) => metric.name === 'RecalcStyleCount').value;
-    const before = await restyles();
-    const properties = await page.evaluate(() => {
+    const { calls, properties } = await page.evaluate(() => {
+      const calls = [];
+      const measure = Element.prototype.getBoundingClientRect;
+      const animate = Element.prototype.animate;
+      Element.prototype.getBoundingClientRect = function () {
+        calls.push('measure');
+        return measure.call(this);
+      };
+      Element.prototype.animate = function (...options) {
+        calls.push('animate');
+        return animate.apply(this, options);
+      };
       document.querySelector('[data-control="columns"] button[data-value="5"]').click();
-      return [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
+      Element.prototype.getBoundingClientRect = measure;
+      Element.prototype.animate = animate;
+      const properties = [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
+      return { calls, properties };
     });
-    const after = await restyles();
+    assert.ok(calls.includes('animate'), 'the column switch animated no card');
+    assert.equal(calls.lastIndexOf('measure') < calls.indexOf('animate'), true, `a card was measured after the first animation started: ${calls.join(' ')}`);
     assert.deepEqual(properties.filter((name) => !['composite', 'computedOffset', 'easing', 'offset'].includes(name)), ['scale', 'translate']);
-    assert.ok(after - before <= 3, `the column switch restyled the page ${after - before} times`);
     await context.close();
   });
 
