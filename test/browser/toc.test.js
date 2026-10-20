@@ -72,11 +72,11 @@ const VISIBLE_ENTRIES = {
 
 function current(style) {
   const selector = {
-    notes: '.bk-toc :is(.bk-toc-chapter[data-here] > .bk-toc-chapter-title, .bk-toc-section[data-state="current"] > .bk-toc-section-title)',
-    rail: '.bk-toc-ticks.is-rail .bk-toc-tick.is-current',
-    tabs: '.bk-toc-tab.is-current',
-    dots: '.bk-toc-dot-item.is-current',
-    ticks: '.bk-toc-tick.is-current',
+    notes: '.bk-toc [aria-current="true"]',
+    rail: '.bk-toc-ticks.is-rail [aria-current="true"]',
+    tabs: '.bk-toc-tabs [aria-current="true"]',
+    dots: '.bk-toc-dots [aria-current="true"]',
+    ticks: '.bk-toc-ticks [aria-current="true"]',
   }[style];
   const element = document.querySelector(selector);
   return element === null ? null : decodeURIComponent(element.getAttribute('href').slice(1));
@@ -388,7 +388,7 @@ test('the table of contents', async (t) => {
     for (const colorScheme of ['light', 'dark']) {
       const desk = await open({ style: 'tabs', colorScheme });
       await scrollToHeading(desk.page, 'chapter-2');
-      const tab = await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-tab.is-current'), '::before').boxShadow);
+      const tab = await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-tab[aria-current="true"]'), '::before').boxShadow);
       await desk.context.close();
       const phone = await open({ style: 'tabs', colorScheme, viewport: { width: 375, height: 760 } });
       const handle = await phone.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle.is-tab')).boxShadow);
@@ -585,11 +585,10 @@ test('the table of contents', async (t) => {
     for (const style of ['dots', 'tabs']) {
       const { page, context } = await open({ style, reducedMotion: 'no-preference' });
       await page.evaluate((name) => {
-        const selector = name === 'dots' ? '.bk-toc-dot-item.is-current' : '.bk-toc-tab-title.is-on';
+        const entry = name === 'dots' ? '.bk-toc-dot-item' : '.bk-toc-tab';
         window.seen = [];
         const record = () => {
-          const element = document.querySelector(selector);
-          const index = [...element.parentElement.children].filter((child) => child.matches(name === 'dots' ? '.bk-toc-dot-item' : '.bk-toc-tab-title')).indexOf(element);
+          const index = [...document.querySelectorAll(entry)].findIndex((element) => element.getAttribute('aria-current') === 'true');
           if (window.seen.at(-1) !== index) window.seen.push(index);
           window.recording = requestAnimationFrame(record);
         };
@@ -649,6 +648,8 @@ test('the table of contents', async (t) => {
       assert.equal(await page.locator('.bk-toc-drawer-detail .bk-toc-card-number').textContent(), '01');
       await page.locator('.bk-toc-drawer-index button').nth(2).click();
       assert.equal(await page.locator('.bk-toc-drawer-detail .bk-toc-card-title').textContent(), '第3章');
+      const marked = await page.locator('.bk-toc-drawer-index button').evaluateAll((buttons) => ['aria-current', 'aria-expanded'].map((name) => buttons.findIndex((button) => button.getAttribute(name) === 'true')));
+      assert.deepEqual(marked, [0, 2], `${style}: the first chapter is current and the third chapter's card is shown`);
       await page.locator('.bk-toc-drawer-detail .bk-toc-card-section').click();
       await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().right <= 0);
       await page.waitForFunction(() => Math.abs(document.getElementById('chapter-3-a').getBoundingClientRect().top - 24) < 2, null, { timeout: 3000 });

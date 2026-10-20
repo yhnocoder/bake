@@ -124,7 +124,7 @@ html:has(> body > .bk-home) {
   opacity: 0.5;
 }
 
-.bk-home .bk-chip:is(.is-current, [aria-pressed='true'])::before {
+.bk-home .bk-chip:is([aria-current='true'], [aria-pressed='true'])::before {
   opacity: 1;
 }
 
@@ -147,7 +147,7 @@ html:has(> body > .bk-home) {
   color: var(--ink-3);
 }
 
-.bk-home .bk-chip.is-current {
+.bk-home .bk-chip[aria-current='true'] {
   color: var(--ink);
 }
 

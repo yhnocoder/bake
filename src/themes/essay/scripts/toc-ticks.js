@@ -1,4 +1,4 @@
-import { currentLayout } from 'bake/theme/client';
+import { currentLayout, markCurrent } from 'bake/theme/client';
 import { ENTRY_GAP, clamp, createElement, tocLink } from './toc-card.js';
 
 export const TICKS_CARD = { variant: 'ticks', showDelay: 70 };
@@ -41,7 +41,7 @@ export function ticksColumn({ outline, labels, article, reserve }, rail = false)
     anchor: (chapter) => ({ left: left + COLUMN_WIDTH + CARD_GAP, top: rows[outline.chapters[chapter].index].getBoundingClientRect().top - CARD_RISE }),
     update(state) {
       rows.forEach((row, index) => {
-        row.classList.toggle('is-current', index === state.entry);
+        markCurrent(row, index === state.entry);
         row.classList.toggle('is-read', state.read[index] || index < state.entry);
       });
     },

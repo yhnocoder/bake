@@ -1,5 +1,6 @@
 export { labelsFor } from './labels.js';
 export { startMarkdownCopy } from './scripts/copy.js';
+export { markCurrent } from './scripts/current.js';
 export { closeOnEscape } from './scripts/escape.js';
 export { startFolds } from './scripts/folds.js';
 export { followLink, startHeadingLinks } from './scripts/heading-links.jsx';

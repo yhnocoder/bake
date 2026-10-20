@@ -1,3 +1,4 @@
+import { markCurrent } from 'bake/theme/client';
 import { ENTRY_GAP, clamp, createElement, tocLink, withoutTransition } from './toc-card.js';
 
 export const TABS_CARD = { variant: 'tabs', showDelay: 110 };
@@ -65,7 +66,7 @@ export function tabsView({ outline, labels, host, reserve, jumping }) {
       const next = Math.max(0, state.chapter);
       if (next === current) return;
       items.forEach((item, index) => {
-        item.tab.classList.toggle('is-current', index === next);
+        markCurrent(item.tab, index === next);
         item.tab.classList.toggle('is-read', index < next);
       });
       const first = current === null;

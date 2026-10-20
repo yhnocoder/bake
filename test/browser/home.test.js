@@ -99,7 +99,7 @@ test('the essay homepage', async (t) => {
       chosen,
     );
   const currentChips = (page) =>
-    page.evaluate(() => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => getComputedStyle(chip, '::before').opacity === '1').map((chip) => chip.getAttribute('href')));
+    page.evaluate(() => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => chip.getAttribute('aria-current') === 'true').map((chip) => chip.getAttribute('href')));
   const cardIn = (grouping, url) => `[data-grouping="${grouping}"] .bk-card[href="${url}"]`;
   const previewState = (page, selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview')?.dataset.state ?? null);
 
@@ -264,7 +264,7 @@ test('the essay homepage', async (t) => {
     const math = page.getByRole('link', { name: '数学' });
     await math.click();
     await settled();
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-chip[href="#category-math"]'), '::before').opacity === '1');
+    await page.waitForFunction(() => document.querySelector('.bk-chip[href="#category-math"]').getAttribute('aria-current') === 'true');
     assert.deepEqual(await currentChips(page), ['#category-math']);
     const chip = await math.boundingBox();
     const before = await page.evaluate(() => scrollY);
@@ -276,7 +276,7 @@ test('the essay homepage', async (t) => {
         new Promise((done) => {
           let seen = false;
           const record = () => {
-            if (scrollY > 0 && parseFloat(getComputedStyle(document.querySelector('.bk-chip[href="#category-ml"]'), '::before').opacity) > 0) seen = true;
+            if (scrollY > 0 && document.querySelector('.bk-chip[href="#category-ml"]').getAttribute('aria-current') === 'true') seen = true;
             requestAnimationFrame(record);
           };
           addEventListener('scrollend', () => done(seen), { once: true });
@@ -285,14 +285,14 @@ test('the essay homepage', async (t) => {
         }),
     );
     assert.equal(followed, true, 'the highlight did not move to the first group while the page scrolled to the top');
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-chip[href="#category-ml"]'), '::before').opacity === '1');
+    await page.waitForFunction(() => document.querySelector('.bk-chip[href="#category-ml"]').getAttribute('aria-current') === 'true');
     assert.deepEqual(await currentChips(page), ['#category-ml']);
     await context.close();
   });
 
   await t.test('category chips jump to their group and mark the group on screen, and tag chips filter the month grouping', async () => {
     const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
-    const current = (href) => page.waitForFunction((target) => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].every((chip) => getComputedStyle(chip, '::before').opacity === (chip.getAttribute('href') === target ? '1' : '0')), href);
+    const current = (href) => page.waitForFunction((target) => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].every((chip) => (chip.getAttribute('aria-current') === 'true') === (chip.getAttribute('href') === target)), href);
     await page.getByRole('link', { name: '数学' }).click();
     await page.waitForFunction(() => {
       const atEnd = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;

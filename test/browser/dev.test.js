@@ -793,7 +793,7 @@ test('bake dev rebuilds every table of contents style from the saved headings an
       const drawer = () =>
         page.evaluate(() => ({
           open: document.querySelector('.bk-toc-handle').getAttribute('aria-expanded'),
-          selected: [...document.querySelectorAll('.bk-toc-drawer-index button')].findIndex((button) => button.getAttribute('aria-pressed') === 'true'),
+          selected: [...document.querySelectorAll('.bk-toc-drawer-index button')].findIndex((button) => button.getAttribute('aria-expanded') === 'true'),
           title: document.querySelector('.bk-toc-drawer-detail .bk-toc-card-title').textContent,
           scroll: document.querySelector('.bk-toc-drawer-detail').scrollTop,
         }));
