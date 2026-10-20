@@ -2,7 +2,7 @@
 
 BASE ?= origin/main
 
-check:
+check: node_modules
 	scripts/test.sh
 
 node_modules: package.json package-lock.json
@@ -14,7 +14,7 @@ browser: node_modules
 
 example: node_modules
 	cd examples/blog && node ../../src/cli.js build
-	python3 -m http.server --directory examples/blog/dist --bind 127.0.0.1 8000
+	node --input-type=module -e "const { serveStatic } = await import('./scripts/static-server.js'); const { origin } = await serveStatic('examples/blog/dist'); console.log(origin.replace('127.0.0.1', 'localhost') + '/');"
 
 dev: node_modules
 	cd examples/blog && node ../../src/cli.js dev
