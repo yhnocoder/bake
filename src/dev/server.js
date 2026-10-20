@@ -13,8 +13,8 @@ import { rewriteSource, sourceVersion } from './params.js';
 import { createPreview } from './preview.js';
 import { watchBlog } from './watch.js';
 
-export const DEFAULT_PORT = 4321;
-export const DEFAULT_HOST = '127.0.0.1';
+const DEFAULT_PORT = 4321;
+const DEFAULT_HOST = '127.0.0.1';
 const WILDCARD_HOSTS = new Set(['0.0.0.0', '::']);
 const TOKEN_HEADER = 'x-bake-token';
 const PORT_ATTEMPTS = 20;
