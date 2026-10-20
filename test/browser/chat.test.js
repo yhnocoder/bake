@@ -398,7 +398,7 @@ test('the AI chat on published pages', async (t) => {
       await page.waitForFunction(() => !document.documentElement.classList.contains('bk-buttons-hidden'));
       await placement('shown');
       await page.locator('.bk-toc-handle').click();
-      await page.waitForFunction(() => document.documentElement.classList.contains('bk-drawer-open'));
+      await page.waitForFunction(() => document.documentElement.classList.contains('bk-toc-drawer-open'));
       await placement('hidden');
       await page.keyboard.press('Escape');
       await placement('shown');
