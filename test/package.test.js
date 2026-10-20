@@ -21,8 +21,10 @@ test('the npm package holds the tool, its license, the notices and the changelog
   assert.deepEqual(outside, []);
 });
 
-test('the bin entry of the package is packed and starts with a node shebang', () => {
-  const { bin } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+test('the package is published as @yhnocoder/bake with the command bake, whose file is packed and starts with a node shebang', () => {
+  const { name, bin } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  assert.equal(name, '@yhnocoder/bake');
+  assert.deepEqual(Object.keys(bin), ['bake']);
   assert.ok(packedFiles().includes(bin.bake));
   assert.match(readFileSync(join(root, bin.bake), 'utf8'), /^#!\/usr\/bin\/env node\n/);
 });

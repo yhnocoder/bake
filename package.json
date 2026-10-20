@@ -1,5 +1,5 @@
 {
-  "name": "bake",
+  "name": "@yhnocoder/bake",
   "version": "0.1.0",
   "description": "A static site generator for technical blogs with math, sidenotes and interactive components",
   "keywords": [
@@ -27,6 +27,9 @@
     "THIRD_PARTY_NOTICES.md",
     "CHANGELOG.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24",
     "npm": ">=11 <12"
