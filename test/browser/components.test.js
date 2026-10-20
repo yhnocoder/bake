@@ -532,6 +532,19 @@ function distinctColors({ data }) {
   return colors.size;
 }
 
+function contentHeights() {
+  const frames = [...document.querySelectorAll('figure.component[data-height="auto"]')];
+  if (frames.length === 0) return ['the page has no component with autoHeight'];
+  return frames.flatMap((frame) => {
+    const box = frame.querySelector('.component-box');
+    const element = box.firstElementChild;
+    const parts = [...element.querySelectorAll('*')].map((part) => part.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
+    const bottom = Math.max(...parts.map((rect) => rect.bottom));
+    const blank = box.getBoundingClientRect().bottom - bottom;
+    return blank < -1 || blank > 24 || element.scrollHeight > element.clientHeight + 1 ? [`${frame.dataset.component}: the box ends ${Math.round(blank)} pixels below its content`] : [];
+  });
+}
+
 function componentOverflow() {
   const problems = [];
   for (const frame of document.querySelectorAll('figure.component')) {
@@ -562,14 +575,14 @@ test('the example components run on the syntax page', async (t) => {
   const browser = await chromium.launch();
   t.after(() => browser.close());
 
-  const start = async (options) => {
+  const start = async (options, path = '2026-10/syntax/') => {
     const page = await browser.newPage(options);
     const problems = [];
     page.on('console', (message) => {
       if (['error', 'warning'].includes(message.type())) problems.push(`${message.type()}: ${message.text()}`);
     });
     page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
-    await page.goto(`${origin}/2026-10/syntax/`);
+    await page.goto(`${origin}/${path}`);
     await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
     await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state === 'ready'));
     await page.evaluate(async () => {
@@ -598,6 +611,15 @@ test('the example components run on the syntax page', async (t) => {
         assert.deepEqual(problems, [], `${width}px ${colorScheme}`);
         await page.close();
       }
+    }
+  });
+
+  await t.test('a component with autoHeight is as tall as its content at 1440, 800, 600 and 375 pixels', async () => {
+    for (const width of [1440, 800, 600, 375]) {
+      const { page, problems } = await start({ viewport: { width, height: 900 } }, '2026-09/matrix-calculus/');
+      assert.deepEqual(await page.evaluate(contentHeights), [], `${width}px`);
+      assert.deepEqual(problems, [], `${width}px`);
+      await page.close();
     }
   });
 

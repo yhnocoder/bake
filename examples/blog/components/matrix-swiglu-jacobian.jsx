@@ -8,7 +8,7 @@ import './lib/matrix/steps.css'
 export const params = {
   step: { label: '初始步骤', type: 'number', min: 1, max: 8, step: 1, default: 1 },
 }
-export const layout = { width: 'body', height: 512, narrowHeight: 508 }
+export const layout = { width: 'body', height: 512, narrowHeight: 508, autoHeight: true }
 
 const COLORS = { gate: 'var(--series-2)', up: 'var(--series-3)', down: 'var(--ink)' }
 const SWISH = '\\mathrm{Swish}(\\mathbf{a})'
