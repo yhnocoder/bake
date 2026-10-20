@@ -11,6 +11,8 @@
   "undefined-footnote.md": "undefined-footnote.md:7:20 footnote \"gemm\" has no definition",
   "missing-citation.md": "missing-citation.md:7:3 citation \"vaswani2017\" is not in :::references",
   "unknown-eqref.md": "unknown-eqref.md:11:4 \\eqref{eq:fnn} refers to an unknown \\label",
+  "label-space.md": "label-space.md:7:1 \\label{eq ffn} has a space; a label name has no spaces, for example \\label{eq:ffn}",
+  "label-outside-environment.md": "label-outside-environment.md:7:1 \\label{eq:ffn} is outside the environment of its equation; write it inside \\begin{…} and \\end{…}, on the line it labels",
   "list-table-cell-count.md": "list-table-cell-count.md:11:1 list-table row 2 has 2 cells, the header row has 3",
   "image-width-tier.md": "image-width-tier.md:7:18 image width must be a positive number of pixels or a percentage, got \"wide\"; use :::{width=wide} around the image",
   "unknown-component-parameter.md": "unknown-component-parameter.md:7:16 unknown parameter \"bta\" for act-fn-plot",

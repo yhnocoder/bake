@@ -156,8 +156,8 @@ test('the essay homepage', async (t) => {
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
     assert.equal(await page.locator(jacobian).getAttribute('data-active'), '');
     await page.locator(jacobian).evaluate((card) => scrollBy({ top: card.getBoundingClientRect().bottom + 20, behavior: 'instant' }));
-    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', jacobian);
-    assert.equal(await page.locator(jacobian).getAttribute('data-active'), null);
+    await page.waitForFunction((selector) => document.querySelector(selector).dataset.active === undefined, jacobian);
+    assert.equal(await page.locator(jacobian).locator('.bk-card-preview').getAttribute('data-state'), 'stopped');
     await context.close();
   });
 

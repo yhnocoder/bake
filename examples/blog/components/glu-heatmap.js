@@ -32,7 +32,13 @@ function element(tag, className, children = []) {
 function texSlot(className, text, tex, width) {
   const slot = element('span', 'glu-heat-tex');
   slot.style.width = width;
-  texToSvg(tex).then((svg) => slot.replaceChildren(svg));
+  texToSvg(tex).then(
+    (svg) => slot.replaceChildren(svg),
+    (error) => {
+      slot.textContent = tex;
+      console.error(`glu-heatmap: the TeX label "${tex}" cannot be typeset: ${error.message}`);
+    },
+  );
   return element('span', className, text ? [text, slot] : [slot]);
 }
 
@@ -91,9 +97,15 @@ export default class GluHeatmap extends HTMLElement {
     this.pointsSource = source;
     this.points = [];
     if (source !== '') {
-      const response = await fetch(source);
-      if (source !== this.pointsSource) return;
-      this.points = response.ok ? await response.json() : [];
+      try {
+        const response = await fetch(source);
+        const points = response.ok ? await response.json() : [];
+        if (source !== this.pointsSource) return;
+        this.points = points;
+      } catch (error) {
+        if (source !== this.pointsSource) return;
+        console.error(`glu-heatmap: the points ${source} cannot be loaded: ${error.message}`);
+      }
     }
     this.placePoints();
   }

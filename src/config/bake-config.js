@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
 import { DEFAULT_PET, petSourceProblem } from './pet.js';
@@ -39,6 +39,11 @@ export async function loadBakeConfig(root, themes, optionProblem, errors) {
     errors.push(errorAt(CONFIG_FILE, { line: error.loc.line, column: error.loc.column + 1 }, error.message.replace(/ \(\d+:\d+\)$/, '')));
     return null;
   }
+  const packageFile = nearestPackageFile(root);
+  if (packageFile && packageType(packageFile) === 'commonjs') {
+    errors.push(errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} is an ES module, but ${relative(root, packageFile)} sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there or remove the field`));
+    return null;
+  }
   let exported;
   try {
     exported = (await import(`${pathToFileURL(path).href}?version=${createHash('sha256').update(source).digest('hex')}`)).default;
@@ -50,6 +55,21 @@ export async function loadBakeConfig(root, themes, optionProblem, errors) {
   const count = errors.length;
   const config = validateConfig(exported, themes, optionProblem, (path, part, message) => errors.push(errorAt(CONFIG_FILE, locate(path, part), message)));
   return errors.length === count ? deepFreeze(config) : null;
+}
+
+function nearestPackageFile(folder) {
+  const file = join(folder, 'package.json');
+  if (statSync(file, { throwIfNoEntry: false })?.isFile()) return file;
+  const parent = dirname(folder);
+  return parent === folder ? null : nearestPackageFile(parent);
+}
+
+function packageType(file) {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')).type;
+  } catch {
+    return undefined;
+  }
 }
 
 export function configPosition(root, path) {

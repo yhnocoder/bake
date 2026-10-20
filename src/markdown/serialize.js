@@ -3,7 +3,7 @@ import { mathToMarkdown } from 'mdast-util-math';
 import { defaultHandlers, toMarkdown } from 'mdast-util-to-markdown';
 import { cjkFriendlyToMarkdown } from 'mdast-util-to-markdown-cjk-friendly';
 import { cjkFriendlyGfmStrikethroughToMarkdown } from 'mdast-util-to-markdown-cjk-friendly-gfm-strikethrough';
-import { writeAttributes } from './attributes.js';
+import { HEADING_ATTRIBUTE_SUFFIX, PARAGRAPH_ANCHOR_SUFFIX, writeAttributes } from './attributes.js';
 import { bakeBlocksToMarkdown } from './block-syntax.js';
 import { citationsToMarkdown } from './bracket-syntax.js';
 import { equationReferencesToMarkdown } from './eqref-syntax.js';
@@ -33,7 +33,7 @@ const OPTIONS = {
     equationReferencesToMarkdown,
     bakeBlocksToMarkdown,
   ],
-  handlers: { root: writeRoot, heading: writeHeading, image: writeImage, verbatim: (node) => node.value },
+  handlers: { root: writeRoot, paragraph: writeParagraph, heading: writeHeading, image: writeImage, verbatim: (node) => node.value },
 };
 
 export function serializeMarkdown(tree) {
@@ -49,10 +49,23 @@ function isEveryAsteriskInPhrasing(pattern) {
   return pattern.character === '*' && pattern.inConstruct === 'phrasing' && !pattern.atBreak && pattern.before === undefined && pattern.after === undefined;
 }
 
+function writeParagraph(node, parent, state, info) {
+  const paragraph = defaultHandlers.paragraph(node, parent, state, info);
+  return node.children.at(-1)?.type === 'text' ? escapeSuffix(paragraph, PARAGRAPH_ANCHOR_SUFFIX, '^') : paragraph;
+}
+
 function writeHeading(node, parent, state, info) {
   const heading = defaultHandlers.heading(node, parent, state, info);
   const attributes = writeAttributes(node.attributes ?? {});
-  return attributes === '' ? heading : `${heading} ${attributes}`;
+  if (attributes !== '') return `${heading} ${attributes}`;
+  return node.children.at(-1)?.type === 'text' ? escapeSuffix(heading, HEADING_ATTRIBUTE_SUFFIX, '{') : heading;
+}
+
+function escapeSuffix(markdown, suffix, character) {
+  const match = suffix.exec(markdown);
+  if (match === null) return markdown;
+  const index = markdown.indexOf(character, match.index);
+  return markdown[index - 1] === '\\' ? markdown : `${markdown.slice(0, index)}\\${markdown.slice(index)}`;
 }
 
 function writeImage(node, parent, state, info) {

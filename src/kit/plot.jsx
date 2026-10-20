@@ -1,4 +1,4 @@
-import { createContext, createMemo, createSignal, createUniqueId, For, onCleanup, Show, useContext } from 'solid-js';
+import { batch, createContext, createMemo, createSignal, createUniqueId, For, Index, onCleanup, Show, useContext } from 'solid-js';
 import { Swatch } from './legend.jsx';
 import { formatNumber, linearScale, niceTicks, samplePath } from './numbers.js';
 import { createElementSize } from './size.js';
@@ -9,7 +9,6 @@ const X_TICK_SPACING = 44;
 const Y_TICK_SPACING = 40;
 const SAMPLE_SPACING = 2;
 const MIN_SAMPLES = 40;
-const READOUT_OFFSET = 12;
 const READOUT_TOP = 2;
 
 const PlotContext = createContext();
@@ -22,7 +21,9 @@ export function usePlot() {
 
 export function Plot(props) {
   let box;
-  const measured = createElementSize(() => box);
+  const fillsWidth = props.width === undefined;
+  const fillsHeight = props.height === undefined;
+  const measured = fillsWidth || fillsHeight ? createElementSize(() => box) : () => ({ width: 0, height: 0 });
   const width = () => props.width ?? measured().width;
   const height = () => props.height ?? measured().height;
   const margin = () => ({ ...MARGIN, ...props.margin });
@@ -57,17 +58,21 @@ export function Plot(props) {
     const rect = event.currentTarget.getBoundingClientRect();
     const position = ((event.clientX - rect.left) / rect.width) * width();
     const within = position >= area().left && position <= area().right;
-    setInside(within);
-    setPointer(within ? x().invert(position) : null);
+    batch(() => {
+      setInside(within);
+      setPointer(within ? x().invert(position) : null);
+    });
   }
 
   function leave() {
-    setInside(false);
-    setPointer(null);
+    batch(() => {
+      setInside(false);
+      setPointer(null);
+    });
   }
 
   return (
-    <div ref={box} class="bk-kit-plot" classList={{ 'bk-kit-plot-fill': props.width === undefined }} style={{ width: props.width === undefined ? undefined : `${props.width}px`, height: props.height === undefined ? undefined : `${props.height}px` }}>
+    <div ref={box} class="bk-kit-plot" classList={{ 'bk-kit-plot-fill-width': fillsWidth, 'bk-kit-plot-fill-height': fillsHeight }} style={{ width: fillsWidth ? undefined : `${props.width}px`, height: fillsHeight ? undefined : `${props.height}px` }}>
       <Show when={width() > 0 && height() > 0}>
         <svg
           class="bk-kit-plot-svg"
@@ -143,43 +148,52 @@ export function Curve(props) {
 
 export function Crosshair(props) {
   const plot = usePlot();
-  let readout;
-  const shownX = () => Number(plot.pointer().toFixed(props.xDigits ?? 2));
-  const values = () => plot.series().map((item) => ({ item, value: item.f(shownX()) }));
+  const shownX = createMemo(() => (plot.pointer() === null ? null : Number(plot.pointer().toFixed(props.xDigits ?? 2))));
+  const at = () => plot.x()(shownX());
   const visible = () => plot.inside() && plot.pointer() !== null;
   const inRange = (value) => Number.isFinite(value) && value >= plot.yDomain()[0] && value <= plot.yDomain()[1];
-  const left = () => {
-    if (!visible()) return 0;
-    const at = plot.x()(shownX());
-    const width = readout.offsetWidth;
-    const right = at + READOUT_OFFSET;
-    const chosen = right + width > plot.width() ? at - READOUT_OFFSET - width : right;
-    return Math.max(0, Math.min(plot.width() - width, chosen));
-  };
+  const readX = createMemo((last) => (visible() ? shownX() : last), null);
+  const labelled = () => plot.series().filter((item) => item.label !== undefined);
   return (
     <>
-      <Show when={plot.pointer() !== null}>
-        <line class="bk-kit-crosshair" x1={plot.x()(shownX())} x2={plot.x()(shownX())} y1={plot.area().top} y2={plot.area().bottom} />
-        <For each={values().filter(({ value }) => inRange(value))}>{({ item, value }) => <circle class="bk-kit-dot" cx={plot.x()(shownX())} cy={plot.y()(value)} r="3.5" fill={item.color} />}</For>
+      <Show when={shownX() !== null}>
+        <line class="bk-kit-crosshair" x1={at()} x2={at()} y1={plot.area().top} y2={plot.area().bottom} />
+        <Index each={plot.series()}>
+          {(item) => {
+            const value = () => item().f(shownX());
+            return (
+              <Show when={inRange(value())}>
+                <circle class="bk-kit-dot" cx={at()} cy={plot.y()(value())} r="3.5" fill={item().color} />
+              </Show>
+            );
+          }}
+        </Index>
       </Show>
       <foreignObject class="bk-kit-readout-layer" x="0" y="0" width={plot.width()} height={plot.height()} aria-hidden="true">
-        <div ref={readout} class="bk-kit-readout" classList={{ 'bk-kit-readout-visible': visible() }} style={{ left: `${left()}px`, top: `${plot.area().top + READOUT_TOP}px` }}>
-          <Show when={plot.pointer() !== null}>
+        <div
+          class="bk-kit-readout"
+          classList={{ 'bk-kit-readout-visible': visible(), 'bk-kit-readout-left': readX() !== null && plot.x()(readX()) > plot.width() / 2 }}
+          style={{ left: `${readX() === null ? 0 : plot.x()(readX())}px`, top: `${plot.area().top + READOUT_TOP}px` }}
+        >
+          <Show when={readX() !== null}>
             <div class="bk-kit-readout-row">
               <span>{props.xLabel ?? 'x'}</span>
-              <span class="bk-kit-readout-number">{formatNumber(shownX(), props.xDigits ?? 2)}</span>
+              <span class="bk-kit-readout-number">{formatNumber(readX(), props.xDigits ?? 2)}</span>
             </div>
-            <For each={values().filter(({ item }) => item.label !== undefined)}>
-              {({ item, value }) => (
-                <div class="bk-kit-readout-row">
-                  <span>
-                    <Swatch color={item.color} dashed={item.dashed} />
-                    {item.label}
-                  </span>
-                  <span class="bk-kit-readout-number">{Number.isFinite(value) ? formatNumber(value, props.yDigits ?? 3) : '—'}</span>
-                </div>
-              )}
-            </For>
+            <Index each={labelled()}>
+              {(item) => {
+                const value = () => item().f(readX());
+                return (
+                  <div class="bk-kit-readout-row">
+                    <span>
+                      <Swatch color={item().color} dashed={item().dashed} />
+                      {item().label}
+                    </span>
+                    <span class="bk-kit-readout-number">{Number.isFinite(value()) ? formatNumber(value(), props.yDigits ?? 3) : '—'}</span>
+                  </div>
+                );
+              }}
+            </Index>
           </Show>
         </div>
       </foreignObject>

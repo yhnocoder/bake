@@ -52,7 +52,7 @@ function peekArgument(parser, name) {
 }
 
 function recordLabel(parser, name) {
-  parser.tags.recorded.labels.push(peekArgument(parser, name));
+  parser.tags.recorded.labels.push({ name: peekArgument(parser, name), afterEnvironment: !parser.tags.currentTag.env && parser.tags.history.length > 0 });
   return BaseMethods.HandleLabel(parser, name);
 }
 
@@ -71,12 +71,12 @@ Configuration.create(BAKE_PACKAGE, {
 
 const adaptor = liteAdaptor();
 RegisterHTMLHandler(adaptor);
-mathjax.asyncLoad = (name) => import(name);
-
 let fontPromise = null;
 
 function loadFont() {
   fontPromise ??= (async () => {
+    // why: a component module that Bake reads in Node shares this MathJax and can replace asyncLoad with a loader of its closed Vite runner
+    mathjax.asyncLoad = (name) => import(name);
     const font = new MathJaxNewcmFont();
     await font.loadDynamicFiles();
     return font;

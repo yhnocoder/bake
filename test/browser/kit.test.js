@@ -34,6 +34,7 @@ export default function KitDemo() {
           <Curve f={(x) => 1000 * x} color="var(--series-2)" label="steep" />
           <Crosshair />
           <SvgTex tex="\\R^{n}" x={120} y={30} anchor="middle" baseline="middle" />
+          <SvgTex tex="\\R" x={200} y={60} anchor="start" baseline="baseline" />
         </Plot>
       </div>
     </div>
@@ -79,6 +80,28 @@ export default function StepSliders() {
   );
 }
 `,
+  'components/sized-plots.jsx': `import { Axes, Plot } from 'bake/kit';
+
+export const layout = { height: 240 };
+
+export default function SizedPlots() {
+  return (
+    <div>
+      <div class="sized-width" style={{ height: '120px' }}>
+        <Plot width={200} x={[0, 1]} y={[0, 1]} label="Width only">
+          <Axes />
+        </Plot>
+      </div>
+      <div class="sized-height" style={{ width: '300px' }}>
+        <Plot height={90} x={[0, 1]} y={[0, 1]} label="Height only">
+          <Axes />
+        </Plot>
+      </div>
+    </div>
+  );
+}
+`,
+  'content/posts/sized-plots/index.md': article({ slug: 'sized-plots', body: ':::sized-plots\n:::\n' }),
   'content/posts/step-sliders/index.md': article({ slug: 'step-sliders', body: ':::step-sliders\n:::\n' }),
   'content/posts/plain/index.md': article({ slug: 'plain', body: ':::plain-view\n:::\n' }),
   'content/posts/broken-tex/index.md': article({ slug: 'broken-tex', body: ':::broken-tex\n:::\n' }),
@@ -109,6 +132,11 @@ function setSlider({ index, label, value }) {
   const input = slider.querySelector('input');
   input.value = String(value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+async function settled() {
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  await Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {})));
 }
 
 function nextFrames() {
@@ -157,10 +185,11 @@ test('the kit draws the example function plot', async (t) => {
     await page.goto(`${origin}/2026-10/syntax/`);
     await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
     await waitForComponents(page);
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-kit-tex, .bk-kit-svg-tex')].every((label) => label.querySelector('svg, text') !== null || label.textContent !== ''));
     await page.evaluate(async () => {
       await document.fonts.ready;
-      await new Promise((done) => setTimeout(done, 400));
     });
+    await page.evaluate(settled);
     return { page, problems };
   };
 
@@ -206,10 +235,10 @@ test('the kit draws the example function plot', async (t) => {
         };
       });
     await page.mouse.move(svg.x + svg.width * 0.3, svg.y + svg.height / 2);
-    await page.waitForTimeout(250);
+    await page.evaluate(settled);
     const left = await readout();
     await page.mouse.move(svg.x + svg.width * 0.7, svg.y + svg.height / 2);
-    await page.waitForTimeout(250);
+    await page.evaluate(settled);
     const right = await readout();
     assert.equal(left.visible, '1');
     assert.equal(left.otherReadout, '0');
@@ -223,7 +252,7 @@ test('the kit draws the example function plot', async (t) => {
     assert.ok(right.left !== left.left, 'the readout moves with the pointer');
     assert.ok(right.left + 112 <= svg.width + 1 && right.left >= 0);
     await page.mouse.move(svg.x + svg.width / 2, svg.y - 120);
-    await page.waitForTimeout(250);
+    await page.evaluate(settled);
     const gone = await readout();
     assert.equal(gone.visible, '0');
     assert.ok(Number.isNaN(gone.crosshair));
@@ -294,7 +323,8 @@ test('the kit draws the example function plot', async (t) => {
         slider.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
         const early = path();
-        await new Promise((done) => setTimeout(done, 400));
+        const started = performance.now();
+        while (path() === early && performance.now() - started < 1000) await new Promise((done) => requestAnimationFrame(done));
         return { transitions, tweening: early !== path() };
       });
       assert.deepEqual(problems, []);
@@ -314,7 +344,8 @@ test('the kit draws the example function plot', async (t) => {
     assert.equal(await frame.getByRole('slider', { name: '横轴范围', exact: true }).getAttribute('aria-valuetext'), '±4.0');
     assert.equal(await frame.getByRole('radio', { name: 'SiLU', exact: true }).count(), 1);
     assert.equal(await frame.getByRole('switch', { name: '近似', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('img', { name: '\\mathrm{GELU}(x)', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('img', { name: 'GELU', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('img', { name: '\\mathrm{GELU}(x)', exact: true }).count(), 0);
     assert.equal(await frame.getByRole('img', { name: "f'(x)", exact: true }).count(), 1);
     const heights = await frame.locator('.bk-kit-segment').evaluateAll((segments) => segments.map((segment) => segment.getBoundingClientRect().height));
     assert.ok(heights.every((height) => height >= 24), heights.join(', '));
@@ -331,12 +362,12 @@ test('the kit draws the example function plot', async (t) => {
       const chosen = segments.find((span) => span.previousElementSibling.checked);
       const other = segments.find((span) => !span.previousElementSibling.checked);
       return {
-        span: getComputedStyle(chosen).transitionProperty,
+        span: getComputedStyle(chosen).transitionDuration,
         layer: getComputedStyle(chosen, '::before').transitionProperty,
         opacity: [getComputedStyle(chosen, '::before').opacity, getComputedStyle(other, '::before').opacity],
       };
     });
-    assert.deepEqual(styles, { span: 'color', layer: 'opacity', opacity: ['1', '0'] });
+    assert.deepEqual(styles, { span: '0s', layer: 'opacity', opacity: ['1', '0'] });
     assert.deepEqual(problems, []);
     await page.close();
   });
@@ -354,6 +385,12 @@ test('the kit draws the example function plot', async (t) => {
     await page.keyboard.press('ArrowRight');
     const outline = await page.evaluate(() => getComputedStyle(document.activeElement.nextElementSibling).outlineStyle);
     assert.equal(outline, 'solid');
+    for (const control of ['.bk-kit-slider input', '.bk-kit-toggle input']) {
+      await frame.locator(control).first().focus();
+      await page.keyboard.press('Shift');
+      const style = await frame.locator(control).first().evaluate((input) => getComputedStyle(input.type === 'checkbox' ? input.nextElementSibling : input).outlineStyle);
+      assert.equal(style, 'solid', control);
+    }
     assert.deepEqual(problems, []);
     await page.close();
   });
@@ -370,7 +407,7 @@ test('the kit draws the example function plot', async (t) => {
         await frame.scrollIntoViewIfNeeded();
         const svg = await frame.locator('.bk-kit-plot-svg').first().boundingBox();
         await page.mouse.move(svg.x + svg.width * 0.6, svg.y + svg.height / 2);
-        await page.waitForTimeout(200);
+        await page.evaluate(settled);
         const image = await frame.screenshot();
         const file = join(screenshotDir, `act-fn-plot-${width}-${colorScheme}.png`);
         writeFileSync(file, image);
@@ -402,13 +439,31 @@ test('the kit works for any component that imports it', async (t) => {
   const browser = await chromium.launch();
   t.after(() => browser.close());
 
+  await t.test('a plot with only a width fills the height of its parent, and a plot with only a height fills its width', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto(`${origin}/2026-10/sized-plots/`);
+    await waitForComponents(page);
+    await page.waitForFunction(() => document.querySelectorAll('.bk-kit-plot-svg').length === 2);
+    const sizes = await page.evaluate(() =>
+      ['.sized-width', '.sized-height'].map((selector) => {
+        const rect = document.querySelector(`${selector} .bk-kit-plot-svg`).getBoundingClientRect();
+        return [Math.round(rect.width), Math.round(rect.height)];
+      }),
+    );
+    assert.deepEqual(sizes, [
+      [200, 120],
+      [300, 90],
+    ]);
+    await page.close();
+  });
+
   await t.test('a plot without a size fills its parent, a button changes it and a TeX label sits inside the SVG', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const problems = [];
     page.on('pageerror', (error) => problems.push(error.message));
     await page.goto(`${origin}/2026-10/demo/`);
     await waitForComponents(page);
-    await page.waitForFunction(() => document.querySelector('.bk-kit-svg-tex')?.getAttribute('visibility') === 'visible');
+    await page.waitForFunction(() => document.querySelector('.bk-kit-svg-tex svg') !== null);
     const read = () =>
       page.evaluate(() => {
         const area = document.querySelector('.kit-demo-area').getBoundingClientRect();
@@ -422,6 +477,10 @@ test('the kit works for any component that imports it', async (t) => {
           centre: [formula.left + formula.width / 2 - plot.left, formula.top + formula.height / 2 - plot.top],
           formula: formula.width > 0 && formula.height > 0,
           doubleStruck: label.querySelector('[data-c="211D"]') !== null,
+          baseline: (() => {
+            const formula = document.querySelectorAll('.bk-kit-svg-tex')[1].querySelector('svg').getBoundingClientRect();
+            return [formula.left - plot.left, formula.bottom - plot.top];
+          })(),
           path: svg.querySelector('path.bk-kit-curve').getAttribute('d'),
           slope: document.querySelector('.kit-demo-slope').textContent,
           cursor: getComputedStyle(document.querySelector('.bk-kit-button')).cursor,
@@ -432,7 +491,11 @@ test('the kit works for any component that imports it', async (t) => {
     assert.ok(before.formula);
     assert.ok(before.doubleStruck, 'the label uses the \\R macro of preamble.sty');
     assert.ok(Math.abs(before.centre[0] - 120) < 1 && Math.abs(before.centre[1] - 30) < 1, `the formula is centred at ${before.centre}`);
+    assert.ok(Math.abs(before.baseline[0] - 200) < 1 && Math.abs(before.baseline[1] - 60) < 1, `the formula starts at ${before.baseline} with its baseline on its point`);
     assert.equal(before.cursor, 'pointer');
+    await page.focus('.bk-kit-button');
+    await page.keyboard.press('Shift');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-kit-button')).outlineStyle), 'solid');
     const svg = await page.locator('.bk-kit-plot-svg').boundingBox();
     await page.mouse.move(svg.x + svg.width * 0.613, svg.y + svg.height / 2);
     const rows = await page.evaluate(() => [...document.querySelectorAll('.bk-kit-readout-row')].map((row) => row.lastElementChild.textContent));

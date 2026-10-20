@@ -5,7 +5,12 @@ const DOLLAR = '$';
 const PRIVATE_USE_START = 0xe000;
 const PRIVATE_USE_END = 0xf8ff;
 
-export function protectPipesInMath(source) {
+export function parseWithPipesInMath(processor, source) {
+  const pipes = protectPipesInMath(source);
+  return { tree: restorePipesInMath(processor.parse(pipes.text), pipes.sentinel), unreadLine: pipes.unreadLine };
+}
+
+function protectPipesInMath(source) {
   const lines = source.split('\n');
   const pipes = lines.map((line) => (line.includes(PIPE) && line.includes(DOLLAR) ? pipesInMath([...line]) : []));
   const first = pipes.findIndex((indexes) => indexes.length > 0);
@@ -22,7 +27,7 @@ export function protectPipesInMath(source) {
   return { text, sentinel };
 }
 
-export function restorePipesInMath(value, sentinel) {
+function restorePipesInMath(value, sentinel) {
   if (sentinel === null) return value;
   if (typeof value === 'string') return value.replaceAll(sentinel, PIPE);
   if (Array.isArray(value)) return value.map((item) => restorePipesInMath(item, sentinel));

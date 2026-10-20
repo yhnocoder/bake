@@ -13,7 +13,7 @@ export function Legend(props) {
         {(item) => (
           <span class="bk-kit-legend-item">
             <Swatch color={item.color} dashed={item.dashed} />
-            {item.tex === undefined ? item.label : <Tex tex={item.tex} width={item.texWidth} />}
+            {item.tex === undefined ? item.label : <Tex tex={item.tex} width={item.texWidth} label={item.label} />}
           </span>
         )}
       </For>
