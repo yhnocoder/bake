@@ -4,7 +4,7 @@ Bake is being rebuilt from scratch to follow the redesign. This file holds the a
 
 ## Tool and blog are separate
 
-This repository contains only the tool: the CLI, the Markdown pipeline, the built-in themes and the optional component kit. Posts, components, custom themes and site settings live in the blog's own repository. Bake never assumes a particular blog. `examples/blog/` is the only blog in this repository: it holds the syntax article that lists every syntax item, serves as the source of the tutorial, and is the integration test fixture. Unit tests that need other blogs, such as error cases, create them in temporary directories.
+This repository contains only the tool: the CLI, the Markdown pipeline, the built-in themes and the optional component kit. Posts, components, custom themes and site settings live in the blog's own repository. Bake never assumes a particular blog. `examples/blog/` is the only blog in this repository: it holds the syntax article that lists every syntax item, serves as the source of the tutorial, and is the integration test fixture. Unit tests that need other blogs, such as error cases, create them in temporary directories. The npm package holds only `src/`, the README, `LICENSE`, `THIRD_PARTY_NOTICES.md`, which lists the licenses of the fonts, libraries and images that a built site contains, and `CHANGELOG.md`, which lists the changes of each release; `files` in `package.json` sets this.
 
 ## Planned layout
 
@@ -450,6 +450,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 |---|---|
 | No comments except `why: <reason>` | `scripts/check_comment.py`, tested by `test/check-comment.test.js` |
 | The directories of `src/` import each other without a cycle, only `src/cli.js` and `src/dev/` import `src/build/`, and the modules that run in the browser import no built-in module of Node, with or without the `node:` prefix | `test/layers.test.js` |
+| The npm package holds `src/`, `package.json`, `README.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md` and `CHANGELOG.md` and no other file, and its `bin` entry is packed | `test/package.test.js` |
 | CLI output is English and lists the commands, `bake init` creates a blog that `bake build` publishes and refuses a folder that holds one of its files, `bake dev` names `--no-open` and says why it is opened at localhost, and `bake dev` reports a missing `bake.config.js`, prints its address, accepts `--port` and `--host` in either order, reports wrong, repeated or unknown options with the usage line, prints the addresses on the local network only for a wildcard host, stops on an interrupt and exits with a message when it can no longer watch the blog | `test/cli.test.js` |
 | Every width media query in Bake's styles uses a breakpoint of `screens.js` or the phone screen width of 600 pixels, and every `--layer-…` variable that the styles use is defined, and the essay fonts declare an LXGW WenKai face that uses the installed font in each weight after the faces of the package, and no rule tests the root element or `<body>` with `:has()` on its descendants | `test/theme-styles.test.js` |
 | Published files get their media types from `mime`, with the UTF-8 charset for text | `test/content-types.test.js` |

@@ -57,6 +57,19 @@ describe('bake.config.js', () => {
     assert.deepEqual(lines, ['bake.config.js:2:10 Unexpected token']);
   });
 
+  test('reports a package.json that makes Node read bake.config.js as CommonJS at 1:1', async (t) => {
+    const { config, lines } = await load(t, { 'package.json': '{ "type": "commonjs" }\n', 'bake.config.js': `export default { ${base} };\n` });
+    assert.equal(config, null);
+    assert.deepEqual(lines, ['bake.config.js:1:1 bake.config.js is an ES module, but package.json sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there or remove the field']);
+  });
+
+  test('reads bake.config.js next to a package.json with "type": "module" or without a type', async (t) => {
+    for (const packageJson of ['{ "type": "module" }\n', '{ "private": true }\n']) {
+      const { lines } = await load(t, { 'package.json': packageJson, 'bake.config.js': `export default { ${base} };\n` });
+      assert.deepEqual(lines, []);
+    }
+  });
+
   test('reports an error thrown while importing at 1:1', async (t) => {
     const { lines } = await load(t, { 'bake.config.js': 'export default { title: missingName };\n' });
     assert.deepEqual(lines, ['bake.config.js:1:1 missingName is not defined']);
