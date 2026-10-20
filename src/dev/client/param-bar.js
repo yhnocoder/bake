@@ -1,4 +1,5 @@
-const FRAMES = '[data-region] figure.component[data-line]';
+import { FRAMES } from './regions.js';
+
 const BAR = 'bake-param-bar';
 const MESSAGE_DURATION = 8000;
 const SAVED_KEY = 'bake-dev-param-values';
@@ -37,6 +38,18 @@ export async function startParamBars({ file, token, version, setVersion, compone
     },
     shown: (frame) => controllers.get(frame)?.values() ?? null,
     rebase: (frame) => controllers.get(frame)?.rebase(),
+    move(moves) {
+      const moved = (key) => (moves.has(key.slice(file.length + 1)) ? `${file} ${moves.get(key.slice(file.length + 1))}` : null);
+      states.move(file, moved);
+      const listed = [...bars.values()];
+      bars.clear();
+      for (const controller of listed) {
+        const key = moved(controller.key());
+        if (key === null) continue;
+        controller.rekey(key);
+        bars.set(key, controller);
+      }
+    },
   };
 }
 
@@ -55,10 +68,14 @@ function createStates() {
       return {};
     }
   };
-  const saved = read();
+  const write = (all) => {
+    try {
+      sessionStorage.setItem(SAVED_KEY, JSON.stringify(all));
+    } catch {}
+  };
   return {
     get(key) {
-      if (!states.has(key)) states.set(key, { changes: saved[key] ?? {}, message: null });
+      if (!states.has(key)) states.set(key, { changes: read()[key] ?? {}, message: null });
       return states.get(key);
     },
     save(key, changes) {
@@ -66,9 +83,14 @@ function createStates() {
       const all = read();
       if (Object.keys(changes).length === 0) delete all[key];
       else all[key] = changes;
-      try {
-        sessionStorage.setItem(SAVED_KEY, JSON.stringify(all));
-      } catch {}
+      write(all);
+    },
+    move(file, moved) {
+      const rename = (key) => (key.startsWith(`${file} `) ? moved(key) : key);
+      const entries = [...states].map(([key, state]) => [rename(key), state]).filter(([key]) => key !== null);
+      states.clear();
+      for (const [key, state] of entries) states.set(key, state);
+      write(Object.fromEntries(Object.entries(read()).map(([key, changes]) => [rename(key), changes]).filter(([key]) => key !== null)));
     },
     prune(file, exists) {
       const all = read();
@@ -80,10 +102,7 @@ function createStates() {
           return exists(name, Number(index));
         }),
       );
-      if (Object.keys(kept).length === Object.keys(all).length) return;
-      try {
-        sessionStorage.setItem(SAVED_KEY, JSON.stringify(kept));
-      } catch {}
+      if (Object.keys(kept).length !== Object.keys(all).length) write(kept);
     },
   };
 }
@@ -103,7 +122,7 @@ function validValue(declaration, value) {
 
 function createBar(frame, index, declarations, server, { states, bars }) {
   const name = frame.dataset.component;
-  const key = `${server.file} ${name} ${index}`;
+  let key = `${server.file} ${name} ${index}`;
   const host = document.createElement(BAR);
   host.dataset.bakeDev = '';
   const shadow = host.attachShadow({ mode: 'open' });
@@ -146,6 +165,10 @@ function createBar(frame, index, declarations, server, { states, bars }) {
 
   const controller = {
     host,
+    key: () => key,
+    rekey(next) {
+      key = next;
+    },
     values: () => ({ ...current }),
     rebase() {
       Object.assign(markdown, JSON.parse(frame.dataset.params));

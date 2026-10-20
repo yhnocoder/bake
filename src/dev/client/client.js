@@ -1,5 +1,5 @@
 import { copyText, createOverlay } from './overlay.js';
-import { BLOCKS, anchorFor, changedLines, planUpdate, sectionOf, skeleton } from './regions.js';
+import { BLOCKS, anchorFor, changedLines, frameMoves, planUpdate, sectionOf, skeleton } from './regions.js';
 
 const script = document.querySelector('script[data-bake-dev]');
 const { source, missing, file, token } = script.dataset;
@@ -118,6 +118,7 @@ async function refresh() {
   const anchor = findAnchor(pristine, next);
   const details = detailsState();
   const { changed, regions } = planUpdate(pristine, next, document, { isPageNode: (node) => pageNodes.has(node), shownParams: (frame) => barControls?.shown(frame) ?? null });
+  barControls?.move(frameMoves(pristine, next));
   const kept = applyUpdate(regions);
   pristine = next;
   const data = next.querySelector('script[data-bake-dev]')?.dataset ?? {};

@@ -1,4 +1,5 @@
 export const BLOCKS = '[data-region] [data-line]';
+export const FRAMES = '[data-region] figure.component[data-line]';
 const FRAME = 'figure.component[data-line]';
 
 export function skeleton(doc) {
@@ -109,6 +110,34 @@ export function changedLines(old, next) {
     else lines.push(line);
   }
   return lines;
+}
+
+export function frameMoves(old, next) {
+  const before = framesOf(old);
+  const free = framesOf(next);
+  const moves = new Map();
+  const left = [];
+  for (const frame of before) {
+    const same = free.findIndex((candidate) => candidate.signature === frame.signature);
+    if (same === -1) left.push(frame);
+    else moves.set(frame.key, free.splice(same, 1)[0].key);
+  }
+  for (const name of new Set(left.map((frame) => frame.name))) {
+    const removed = left.filter((frame) => frame.name === name);
+    const added = free.filter((frame) => frame.name === name);
+    if (removed.length === added.length) removed.forEach((frame, index) => moves.set(frame.key, added[index].key));
+  }
+  return moves;
+}
+
+function framesOf(doc) {
+  const seen = new Map();
+  return [...doc.querySelectorAll(FRAMES)].map((frame) => {
+    const name = frame.dataset.component;
+    const index = seen.get(name) ?? 0;
+    seen.set(name, index + 1);
+    return { name, key: `${name} ${index}`, signature: signature(frame) };
+  });
 }
 
 export function anchorFor(old, next, line) {

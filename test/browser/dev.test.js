@@ -628,19 +628,20 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await refuseThenWrite(3, '第三次改', true);
   });
 
+  const plotAt = (directive) => `figure.component[data-line="${lineOf(readFileSync(file, 'utf8'), directive)}"]`;
+  const shown = async (selector) => {
+    await page.locator(selector).scrollIntoViewIfNeeded();
+    await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready' && document.querySelector(selector).querySelector('act-fn-plot')?.params !== undefined, selector);
+    return {
+      range: await page.locator(`${selector} bake-param-bar .control[data-param="range"] .number`).inputValue(),
+      unsaved: !(await page.locator(`${selector} bake-param-bar .write`).isDisabled()),
+      live: await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.range, selector),
+    };
+  };
+
   await t.test('after a reload, an unsaved value that the declaration no longer accepts and the value of a removed component are dropped', async () => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const plotAt = (directive) => `figure.component[data-line="${lineOf(readFileSync(file, 'utf8'), directive)}"]`;
-    const shown = async (selector) => {
-      await page.locator(selector).scrollIntoViewIfNeeded();
-      await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params !== undefined, selector);
-      return {
-        range: await page.locator(`${selector} bake-param-bar .control[data-param="range"] .number`).inputValue(),
-        unsaved: !(await page.locator(`${selector} bake-param-bar .write`).isDisabled()),
-        live: await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.range, selector),
-      };
-    };
     const reloaded = async (change) => {
       await page.evaluate(() => {
         window.beforeReload = true;
@@ -672,6 +673,29 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.waitForFunction((caption) => document.querySelector('.bk-article').textContent.includes(caption), caption);
     assert.deepEqual(await shown(plotAt(directive)), { range: '6', unsaved: false, live: 6 });
     assert.deepEqual(errors, []);
+  });
+
+  await t.test('removing a component from the middle of the article drops its unsaved value, and the other components of the same name keep theirs', async () => {
+    const middle = ':::act-fn-plot{fn=relu width=70%}';
+    const last = ':::act-fn-plot{fn=silu range=6}';
+    const block = `::::example\n${middle}\n:::\n::::\n\n`;
+    const after = '像素宽度超过正文栏时';
+    assert.ok(readFileSync(file, 'utf8').includes(`${block}${after}`));
+    await shown(plotAt(middle));
+    await page.locator(`${plotAt(middle)} bake-param-bar .control[data-param="range"] .number`).fill('5');
+    await shown(plotAt(last));
+    await page.locator(`${plotAt(last)} bake-param-bar .control[data-param="range"] .number`).fill('8');
+    const lastLine = plotAt(last);
+    edit(block, '');
+    await page.locator(lastLine).waitFor({ state: 'detached' });
+    assert.deepEqual(await shown(plotAt(last)), { range: '8', unsaved: true, live: 8 });
+    await page.reload();
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    assert.deepEqual(await shown(plotAt(last)), { range: '8', unsaved: true, live: 8 });
+    edit(after, `${block}${after}`);
+    await page.locator(plotAt(middle)).waitFor();
+    assert.deepEqual(await shown(plotAt(middle)), { range: '4', unsaved: false, live: 4 });
+    assert.deepEqual(await shown(plotAt(last)), { range: '8', unsaved: true, live: 8 });
   });
 
   await page.close();
