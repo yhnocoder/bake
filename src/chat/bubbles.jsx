@@ -44,9 +44,8 @@ function Chat(props) {
   const [thinking, setThinking] = createSignal(readThinking());
   const [faded, setFaded] = createSignal(false);
   let apiKey = null;
-  let history = [];
   let abort = null;
-  let generation = 0;
+  let lastId = 0;
   let unlockTried = false;
   let activity = 'idle';
   let container;
@@ -57,9 +56,29 @@ function Chat(props) {
     activity = state;
     if (open()) pet.setState(state);
   };
-  const note = (text, extra = {}) => setMessages(messages.length, { role: 'note', text, ...extra });
-  const problem = (text, retry = null) => setMessages(messages.length, { role: 'problem', text, retry });
-  const focusInput = () => requestAnimationFrame(() => input?.focus({ preventScroll: true }));
+  const add = (message) => {
+    lastId += 1;
+    setMessages(messages.length, { id: lastId, ...message });
+    return lastId;
+  };
+  const update = (id, patch) => setMessages((message) => message.id === id, patch);
+  const remove = (id) =>
+    setMessages(
+      produce((all) =>
+        all.splice(
+          all.findIndex((message) => message.id === id),
+          1,
+        ),
+      ),
+    );
+  const present = (id) => messages.some((message) => message.id === id);
+  const note = (text, extra = {}) => add({ role: 'note', text, ...extra });
+  const problem = (text, retry = null) => add({ role: 'problem', text, retry });
+  const conversation = () =>
+    messages.flatMap((message) =>
+      message.role === 'assistant' && message.done && message.error === null && message.sent.length > 0 ? [{ role: 'user', content: message.ask.content }, ...message.sent] : [],
+    );
+  const focusInput = () => requestAnimationFrame(() => open() && input?.focus({ preventScroll: true }));
 
   const show = () => {
     if (open()) return;
@@ -131,10 +150,8 @@ function Chat(props) {
   }
 
   const newChat = () => {
-    generation += 1;
     abort?.abort();
     setBusy(false);
-    history = [];
     setMessages([]);
     setQuote(null);
     setScopes([]);
@@ -154,8 +171,6 @@ function Chat(props) {
     clearKey();
     apiKey = null;
     unlockTried = false;
-    generation += 1;
-    history = [];
     setBusy(false);
     setMessages([]);
     setMenu(false);
@@ -174,18 +189,17 @@ function Chat(props) {
     if (view() === 'locked' && !(await unlock())) return;
     const picked = scopes();
     const quoted = quote();
-    setMessages(messages.length, { role: 'user', text, quote: quoted, scopes: picked.map((scope) => scope.label) });
+    add({ role: 'user', text, quote: quoted, scopes: picked.map((scope) => scope.label) });
     setDraft('');
     setQuote(null);
     setScopes([]);
-    run(quoted === null ? text : `${quoted.replace(/^/gm, '> ')}\n\n${text}`, picked);
+    run({ content: quoted === null ? text : `${quoted.replace(/^/gm, '> ')}\n\n${text}`, scopes: picked });
   }
 
-  async function run(content, picked) {
-    const index = messages.length;
-    const chat = generation;
-    setMessages(index, { role: 'assistant', content: '', reasoning: '', reads: [], error: null, done: false, ask: { content, scopes: picked } });
-    history.push({ role: 'user', content });
+  async function run(ask) {
+    const { content, scopes: picked } = ask;
+    const history = [...conversation(), { role: 'user', content }];
+    const id = add({ role: 'assistant', content: '', reasoning: '', reads: [], error: null, done: false, ask, sent: [] });
     setBusy(true);
     setPet(picked.some((scope) => scope.kind !== 'article') ? 'reading' : 'answering');
     const controller = new AbortController();
@@ -194,12 +208,13 @@ function Chat(props) {
     let frame = 0;
     const commit = () => {
       frame = 0;
-      if (chat !== generation) return;
-      setMessages(index, { content: latest.content, reasoning: latest.reasoning, reads: latest.reads });
+      if (!present(id)) return;
+      update(id, { content: latest.content, reasoning: latest.reasoning, reads: latest.reads });
       const state = latest.reads.some((read) => !read.done) ? 'reading' : 'answering';
       if (activity !== state) setPet(state);
     };
     let failure = null;
+    let sent = [];
     try {
       const catalog = await loadCatalog(root).catch(() => Promise.reject(new CatalogError()));
       const articles = picked.filter((scope) => scope.kind === 'article');
@@ -222,34 +237,30 @@ function Chat(props) {
           frame ||= requestAnimationFrame(commit);
         },
       });
-      if (chat === generation) history.push(...added);
+      sent = added;
     } catch (error) {
       failure = controller.signal.aborted ? null : error;
-      if (chat === generation) {
-        if (failure === null && latest !== null && latest.content !== '') history.push({ role: 'assistant', content: latest.content, reasoning_content: latest.reasoning });
-        else history.pop();
-      }
+      if (failure === null && latest !== null && latest.content !== '') sent = [{ role: 'assistant', content: latest.content, reasoning_content: latest.reasoning }];
     }
     cancelAnimationFrame(frame);
     if (abort === controller) abort = null;
-    if (chat !== generation) return;
+    if (!present(id)) return;
     if (latest !== null) commit();
-    if (failure !== null) setMessages(index, 'error', requestProblem(failure, labels));
-    setMessages(index, 'done', true);
+    update(id, { sent, error: failure === null ? null : requestProblem(failure, labels), done: true });
     setPet(failure !== null ? 'failed' : controller.signal.aborted ? 'idle' : 'answered');
     setBusy(false);
   }
 
-  const retryable = (index) => !busy() && pending() === null && index === messages.length - 1;
-  const retry = (index) => {
-    if (!retryable(index)) return;
-    const asked = messages[index].ask;
-    setMessages(produce((all) => all.splice(index, 1)));
-    run(asked.content, asked.scopes);
+  const retryable = (id) => !busy() && pending() === null && messages.at(-1)?.id === id;
+  const retry = (id) => {
+    if (!retryable(id)) return;
+    const { ask } = messages.at(-1);
+    remove(id);
+    run(ask);
   };
-  const retryProblem = (index) => {
-    if (!retryable(index)) return;
-    setMessages(produce((all) => all.splice(index, 1)));
+  const retryProblem = (id) => {
+    if (!retryable(id)) return;
+    remove(id);
     unlock();
   };
 
@@ -373,17 +384,17 @@ function Chat(props) {
       <div class="bk-chat-bubbles" data-faded={faded() ? '' : undefined} ref={list} aria-live="polite" onScroll={updateFade}>
         <div class="bk-chat-thread" ref={(element) => resize.observe(element)}>
           <For each={messages}>
-            {(message, index) =>
+            {(message) =>
               message.role === 'user' ? (
                 <UserBubble message={message} />
               ) : message.role === 'assistant' ? (
-                <Reply message={message} root={root} labels={labels} canRetry={retryable(index())} onRetry={() => retry(index())} />
+                <Reply message={message} root={root} labels={labels} canRetry={retryable(message.id)} onRetry={() => retry(message.id)} />
               ) : message.role === 'problem' ? (
                 <p class="bk-chat-bubble bk-chat-problem" role="alert">
                   {message.text}
-                  <Show when={message.retry !== null && retryable(index())}>
+                  <Show when={message.retry !== null && retryable(message.id)}>
                     {' '}
-                    <button type="button" class="bk-chat-link" onClick={() => retryProblem(index())}>
+                    <button type="button" class="bk-chat-link" onClick={() => retryProblem(message.id)}>
                       {labels.retry}
                     </button>
                   </Show>

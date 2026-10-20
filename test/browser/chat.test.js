@@ -373,6 +373,25 @@ test('the AI chat on published pages', async (t) => {
     );
   });
 
+  await t.test('a new chat started while an answer streams drops that answer from the bubbles and from the next request', async (t) => {
+    const { page, api } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await page.evaluate(() => (window.bakeTest.hold = true));
+    await ask(page, '旧问题');
+    await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
+    await openSettings(page);
+    await page.locator('.bk-chat-menu-item', { hasText: '新对话' }).click();
+    await page.locator('.bk-chat-send[data-action="stop"]').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('.bk-chat-reply, .bk-chat-user').count(), 0);
+    await page.evaluate(() => (window.bakeTest.hold = false));
+    api.answers.push({ body: text('新回答。') });
+    await ask(page, '新问题');
+    await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '新回答。' }).waitFor();
+    assert.equal(await page.locator('.bk-chat-reply').count(), 1);
+    assert.deepEqual(api.requests.at(-1).body.messages.slice(1), [{ role: 'user', content: '新问题' }]);
+  });
+
   await t.test('only the last failed reply offers a retry, and never while another answer streams', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
@@ -435,6 +454,15 @@ test('the AI chat on published pages', async (t) => {
     await ask(page, '现在写了什么？');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
     assert.match(api.requests.at(-1).body.messages[0].content, /<article>\n# Saved again\n\nThe new text\.\n\n<\/article>/);
+  });
+
+  await t.test('a chat closed right after the key is saved leaves the keyboard focus on the pet', async (t) => {
+    const { page } = await openBrowser(t, base);
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+    assert.equal(await shadow(page, 'return root.activeElement?.className ?? null;'), 'bk-chat-launcher');
   });
 
   await t.test('a rejected key is reported before any passkey is created', async (t) => {
