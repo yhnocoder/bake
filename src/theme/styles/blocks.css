@@ -75,6 +75,7 @@
 
 .bk-article :is(p, li, td, th, figcaption) mjx-container:not([display]):where(:not(.component-box *)) {
   font-size: 1.04em;
+  line-height: 0;
 }
 
 .bk-article .eqref:where(:not(.component-box *)) {
@@ -646,6 +647,7 @@ h4 + .bk-references {
 
 .bk-article .example-result > :is(p, h2, h3, h4, h5, h6, ul, ol, .recap):where(:not(.component-box *)) {
   text-box-edge: cap alphabetic;
+  text-wrap: pretty;
 }
 
 .bk-article .example-result > :is(p, h2, h3, h4, h5, h6, ul, ol, .recap):first-child:where(:not(.component-box *)) {
