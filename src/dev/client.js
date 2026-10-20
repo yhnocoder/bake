@@ -1,21 +1,29 @@
 (() => {
   const script = document.currentScript;
-  const { source, missing } = script.dataset;
+  const { source, missing, file, token } = script.dataset;
   const scrollKey = `bake-dev-scroll:${location.pathname}`;
   const pagePath = location.pathname.replace(/index\.html$/, '');
   const BLOCKS = '[data-region] [data-line]';
+  const FRAME = 'figure.component[data-line]';
   const HIGHLIGHT_DURATION = 1200;
   const HIGHLIGHT_OUTSET = 6;
   const NOTICE_DURATION = 8000;
   const COPIED_DURATION = 1200;
+  const BARS_KEY = 'bake-dev-param-bars';
 
   let pristine = null;
   let outline = JSON.parse(script.dataset.outline ?? '[]');
+  let version = script.dataset.version;
+  let components = JSON.parse(script.dataset.components ?? '{}');
   let serverId = null;
   let refreshing = null;
   let refreshAgain = false;
+  const pageNodes = new WeakSet();
+  for (const region of document.querySelectorAll('[data-region]')) for (const node of region.childNodes) rememberPageNode(node);
 
   const ui = createInterface();
+  let barControls = null;
+  const bars = file === undefined ? null : startBars();
   restoreScroll();
   const loaded =
     missing === undefined
@@ -42,6 +50,40 @@
       else if (refresh.includes(pagePath)) queueRefresh();
     });
     return connected;
+  }
+
+  function startBars() {
+    const shown = barsShown();
+    ui.showBarSwitch(shown, (value) => {
+      try {
+        localStorage.setItem(BARS_KEY, value ? 'shown' : 'hidden');
+      } catch {}
+      bars.then((module) => module.setShown(value));
+    });
+    return import('/__bake/param-bar.js').then((module) =>
+      module.startParamBars({
+        file,
+        token,
+        version: () => version,
+        setVersion: (next) => {
+          version = next;
+        },
+        components: () => components,
+        copyText,
+        shown,
+      }).then((controls) => {
+        barControls = controls;
+        return controls;
+      }),
+    );
+  }
+
+  function barsShown() {
+    try {
+      return localStorage.getItem(BARS_KEY) !== 'hidden';
+    } catch {
+      return true;
+    }
   }
 
   async function fetchPage() {
@@ -75,9 +117,12 @@
     const lines = changedLines(pristine, next);
     const anchor = findAnchor(pristine, next);
     const details = detailsState();
-    const replaced = replaceRegions(pristine, next);
+    const { replaced, kept } = replaceRegions(pristine, next);
     pristine = next;
-    outline = JSON.parse(next.querySelector('script[data-bake-dev]')?.dataset.outline ?? '[]');
+    const data = next.querySelector('script[data-bake-dev]')?.dataset ?? {};
+    outline = JSON.parse(data.outline ?? '[]');
+    version = data.version;
+    components = JSON.parse(data.components ?? '{}');
     if (!replaced) return;
     restoreDetails(details);
     document.dispatchEvent(new CustomEvent('bake:content'));
@@ -85,7 +130,7 @@
       anchor.align();
       requestAnimationFrame(() => requestAnimationFrame(anchor.align));
     }
-    showChanges(lines);
+    showChanges(lines, kept);
   }
 
   function skeleton(doc) {
@@ -101,15 +146,107 @@
 
   function replaceRegions(old, next) {
     let replaced = false;
+    const kept = [];
     for (const region of next.querySelectorAll('[data-region]')) {
       const selector = regionSelector(region.dataset.region);
-      if (old.querySelector(selector)?.innerHTML === region.innerHTML) continue;
+      const before = old.querySelector(selector);
+      if (before?.innerHTML === region.innerHTML) continue;
       for (const live of document.querySelectorAll(selector)) {
-        live.replaceChildren(...[...region.childNodes].map((node) => document.importNode(node, true)));
+        const plan = [];
+        if (before !== null && planChildren(before, region, live, plan)) {
+          for (const step of plan) {
+            if (step.frame === undefined) step.live.replaceWith(importPageNode(step.next));
+            else kept.push(keepFrame(step));
+          }
+        } else {
+          live.replaceChildren(...[...region.childNodes].map(importPageNode));
+        }
       }
       replaced = true;
     }
-    return replaced;
+    return { replaced, kept };
+  }
+
+  function rememberPageNode(node) {
+    pageNodes.add(node);
+    for (const child of node.childNodes) rememberPageNode(child);
+  }
+
+  function importPageNode(node) {
+    const copy = document.importNode(node, true);
+    rememberPageNode(copy);
+    return copy;
+  }
+
+  function planChildren(old, next, live, plan) {
+    const oldNodes = [...old.childNodes];
+    const nextNodes = [...next.childNodes];
+    const liveNodes = [...live.childNodes].filter((node) => pageNodes.has(node));
+    if (oldNodes.length !== nextNodes.length || liveNodes.length !== oldNodes.length) return false;
+    const steps = [];
+    for (const [index, node] of oldNodes.entries()) {
+      if (!sameNode(node, liveNodes[index])) return false;
+      planNode(node, nextNodes[index], liveNodes[index], steps);
+    }
+    plan.push(...steps);
+    return true;
+  }
+
+  function sameNode(a, b) {
+    if (a.nodeType !== b.nodeType) return false;
+    return !(a instanceof Element) || (a.tagName === b.tagName && a.getAttribute('data-line') === b.getAttribute('data-line'));
+  }
+
+  function planNode(old, next, live, plan) {
+    if (nodeHtml(old) === nodeHtml(next)) return;
+    if (old instanceof Element && next instanceof Element) {
+      const frame = frameChange(old, next, live);
+      if (frame !== null) {
+        plan.push(frame);
+        return;
+      }
+      if (!next.matches('figure.component') && old.tagName === next.tagName && sameAttributes(old, next) && planChildren(old, next, live, plan)) return;
+    }
+    plan.push({ live, next });
+  }
+
+  function nodeHtml(node) {
+    return node instanceof Element ? node.outerHTML : node.textContent;
+  }
+
+  function sameAttributes(a, b) {
+    return a.attributes.length === b.attributes.length && [...a.attributes].every((attribute) => b.getAttribute(attribute.name) === attribute.value);
+  }
+
+  function frameChange(old, next, live) {
+    if (!old.matches(FRAME) || !next.matches(FRAME) || old.dataset.component !== next.dataset.component) return null;
+    const strip = (frame) => {
+      const copy = frame.cloneNode(true);
+      copy.removeAttribute('data-params');
+      copy.removeAttribute('data-attributes');
+      copy.querySelector(':scope > .component-box')?.removeAttribute('style');
+      return copy.outerHTML;
+    };
+    if (strip(old) !== strip(next)) return null;
+    const params = JSON.parse(next.dataset.params);
+    const shown = barControls?.shown(live) ?? JSON.parse(old.dataset.params);
+    if (!sameValues(shown, params)) return null;
+    return { frame: live, params: next.dataset.params, attributes: next.dataset.attributes, boxStyle: next.querySelector(':scope > .component-box')?.getAttribute('style') ?? null };
+  }
+
+  function sameValues(a, b) {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key]);
+  }
+
+  function keepFrame({ frame, params, attributes, boxStyle }) {
+    frame.dataset.params = params;
+    if (attributes === undefined) delete frame.dataset.attributes;
+    else frame.dataset.attributes = attributes;
+    const box = frame.querySelector(':scope > .component-box');
+    if (box !== null && boxStyle !== null) box.setAttribute('style', boxStyle);
+    barControls?.rebase(frame);
+    return frame;
   }
 
   function blocksOf(doc) {
@@ -184,9 +321,10 @@
     }
   }
 
-  function showChanges(lines) {
+  function showChanges(lines, kept) {
     const changed = new Set(lines);
-    const elements = [...document.querySelectorAll(BLOCKS)].filter((element) => changed.has(element.dataset.line));
+    const lineElements = [...document.querySelectorAll(BLOCKS)].filter((element) => changed.has(element.dataset.line) && !kept.some((frame) => element.contains(frame)));
+    const elements = lineElements.filter((element) => !lineElements.some((other) => other !== element && other.contains(element)));
     elements.forEach(highlight);
     const shown = elements.filter(isShown);
     if (shown.length === 0) return;
@@ -239,6 +377,7 @@
 
   function openInEditor(event) {
     if (source === undefined || !(event.target instanceof Element) || event.target.closest('input, textarea, select') !== null) return;
+    if (event.composedPath().some((target) => target instanceof Element && target.matches('bake-param-bar'))) return;
     const block = event.target.closest(BLOCKS);
     if (block === null) return;
     window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
@@ -246,6 +385,7 @@
 
   function copyText(text) {
     if (navigator.clipboard !== undefined) return navigator.clipboard.writeText(text);
+    // why: navigator.clipboard exists only in secure contexts, and bake dev opened from another device on the local network is plain http
     const field = document.createElement('textarea');
     field.value = text;
     field.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
@@ -262,13 +402,14 @@
     host.dataset.bakeDev = '';
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.innerHTML = [
-      '<link rel="stylesheet" href="/__bake/client.css">',
+      '<link rel="stylesheet" href="/__bake/client.css"><link rel="stylesheet" href="/__bake/switch.css">',
       '<div class="marks"></div>',
       '<div class="bar">',
       '<button type="button" class="notice" hidden></button>',
       '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',
       '<section class="problems" data-state="clear" hidden aria-label="Problems">',
       '<header><span class="status" aria-hidden="true"></span><span class="title">No problems</span>',
+      '<label class="bars" hidden><input type="checkbox" role="switch" class="switch">Parameter bars</label>',
       '<button type="button" class="copy-all" hidden>Copy all</button>',
       '<button type="button" class="close" aria-label="Close the problems list" title="Close">',
       '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -368,6 +509,13 @@
           closedProblems = null;
           setOpen(false);
         }
+      },
+      showBarSwitch(shown, change) {
+        const label = shadow.querySelector('.bars');
+        const toggle = label.querySelector('input');
+        toggle.checked = shown;
+        toggle.addEventListener('change', () => change(toggle.checked));
+        label.hidden = false;
       },
       hideNotice() {
         clearTimeout(noticeTimer);
