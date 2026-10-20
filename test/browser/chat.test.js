@@ -1188,7 +1188,7 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     await openSettings(page);
     const field = page.locator('.bk-chat-pet-form input[name="pet"]');
     const status = page.locator('.bk-chat-pet-status');
-    const settled = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…');
+    const settled = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…', null, { timeout: 5000 });
     await field.fill(`${PETS}/slow/pet.json`);
     await field.press('Enter');
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent === '正在读取…');

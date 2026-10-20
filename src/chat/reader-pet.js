@@ -103,11 +103,16 @@ function imageHeader(bytes) {
 }
 
 async function download(url, limit, tooLarge) {
+  const controller = new AbortController();
+  // why: AbortSignal.timeout runs on a timer that page.clock in the browser tests cannot advance
+  const timer = setTimeout(() => controller.abort(new DOMException('The download did not finish in time.', 'TimeoutError')), TIMEOUT);
   try {
-    return await read(url, limit, tooLarge, AbortSignal.timeout(TIMEOUT));
+    return await read(url, limit, tooLarge, controller.signal);
   } catch (error) {
     if (error instanceof PetError) throw error;
     throw error.name === 'TimeoutError' ? new PetError('timeout') : new PetError('network', error.message);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
