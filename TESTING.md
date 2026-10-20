@@ -4,104 +4,45 @@
 
 | Command | What it runs |
 |---|---|
-| `make check` | `scripts/lint.sh` (comment check, shellcheck on shell scripts when installed), then the unit tests |
-| `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
-| `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`), each test with a time limit of 120 seconds, so a test that never ends fails with its name |
-| `npm run test:frames` | The frame time gate (`node --test` on the files in `test/frames/` that end in `.test.js`), described in "Frame times"; with `BAKE_FRAMES=all` it measures every interaction |
-| `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
-| `make example` | Installs the dependencies when needed, builds `examples/blog/` and serves `examples/blog/dist/` at http://localhost:8000/ |
-| `make dev` | Installs the dependencies when needed and runs `bake dev` in `examples/blog/`, which serves it at http://localhost:4321/ and updates the page on every save |
-| `make screenshots [BASE=ref]` | Screenshots of every page of `examples/blog/` built from the working tree, compared with the same pages built from `BASE` (default `origin/main`); the report is `test-out/screenshots/report/summary.md` |
-| `make perf` | Installs the dependencies when needed, builds `examples/blog/`, measures its pages with `scripts/measure-pages.js`, writes `test-out/perf/report.json` and checks it against `test/perf/budgets.json` |
-| `node scripts/measure-pages.js <dist folder> [--out report.json]` | Measures every page of a built site except the 404 page, prints a table and writes the report as JSON when `--out` is given |
-| `node scripts/check-budgets.js <report.json> [budgets.json]` | Checks a report against `test/perf/budgets.json` or the given budget file |
-| `python3 scripts/check_comment.py [file...]` | Comment check on the given files, or on every tracked file |
+| `make check` | Installs the dependencies when needed, runs `scripts/lint.sh` (shellcheck on the shell scripts when it is installed), then the unit tests |
+| `npm test` | The unit tests, the files in `test/` that end in `.test.js` |
+| `npm run test:browser` | The browser tests, the files in `test/browser/` that end in `.test.js`, each test with a time limit of 120 seconds |
+| `npm run test:frames` | The frame time gate in `test/frames/`; with `BAKE_FRAMES=all` it measures every interaction |
+| `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests |
+| `make perf` | Builds `examples/blog/`, measures its pages and checks them against the performance budgets |
+| `make example` | Builds `examples/blog/` and serves `examples/blog/dist/` at the `localhost` address it prints |
+| `make dev` | Runs `bake dev` in `examples/blog/` |
 
-## Tiers and time limits
+`bake build` draws share images with Chromium, so the unit tests need Playwright's Chromium too. On macOS, run `make browser` once to download it. In the cloud environment Chromium is preinstalled at `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`; do not run `playwright install` there. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together.
+
+## Tiers
 
 | Tier | When | Time limit |
 |---|---|---|
-| Local check | After every change | 3 minutes |
-| Pull request CI | Every push | 5 minutes |
-| Nightly | Once a day | No fixed limit |
+| Local check | After a change to code | 3 minutes |
+| Pull request CI | Every push to a pull request or to `main` | 5 minutes per job |
+| Nightly | Once a day | 30 minutes per job |
 
-During development, run the unit tests plus the tests the change affects. CI runs the full PR tier; watch it and fix it when it turns red. Run the full suite locally only for large or risky changes, or for what CI cannot cover, such as performance measurements or screenshot comparisons at a milestone. Small gaps between tiers are acceptable; a large regression, and whatever is being fixed right now, must be tested in every tier.
+`.github/workflows/test.yml` runs on every pull request, on every push to `main` and when started by hand; a new push cancels the run that is still going for the same pull request or branch. Its jobs `lint`, `unit` (two shards), `browser` (three shards) and `frames` run in parallel, and the job `test` passes when all of them passed, so `test` is the check to read. `node --test --test-shard` runs each test file whole on one shard; when a shard comes close to its time limit, add a shard to the matrix and to the command. The jobs that run tests set up Node, the dependencies and Chromium with `.github/actions/setup`.
 
-`.github/workflows/test.yml` runs on every pull request, on every push to `main` and when started by hand. A push to another branch runs nothing until the branch has a pull request. A new push cancels the run of the same pull request or branch that is still going. The jobs run in parallel, each on its own runner with a time limit of 5 minutes:
-
-| Job | What it runs |
-|---|---|
-| `lint` | `scripts/lint.sh`: the comment check and shellcheck |
-| `unit` | The unit tests in two shards, `node --test --test-shard=1/2` and `2/2` |
-| `browser` | The browser tests in three shards, `--test-shard=1/3` to `3/3` |
-| `frames` | The frame time gate for pull requests, alone on its runner, described in "Frame times" |
-| `test` | Passes when `lint`, every `unit` shard, every `browser` shard and `frames` passed; this is the check to read for the result of a run |
-
-`node --test --test-shard=i/n` sorts the test files and gives shard `i` every `n`-th file, so a test file always runs whole on one runner and the slowest test file sets the shortest time its shard can take. The unit tests need Chromium too, because `bake build` draws share images with it. Every job except `lint` uses the composite action `.github/actions/setup`, which installs Node 24 with the npm cache, runs `npm ci` and installs Playwright's Chromium headless shell with its system libraries, keeping the browser in the Actions cache under the Playwright version. When a shard comes close to 5 minutes, add a shard in the matrix of its job and in the command. `.github/workflows/nightly.yml` runs the nightly tier once a day and when started by hand, described in "Performance measurements" and "Frame times" below. Every job runs on its own virtual machine, so the `frames` job and the performance jobs share no processor with another job, also while the other jobs of the workflow run at the same time.
+`.github/workflows/nightly.yml` runs once a day and when started by hand. Its job `performance` measures the pages of the example blog and checks the budgets, and its job `frames` runs the frame time gate with `BAKE_FRAMES=all`.
 
 ## Rules for tests
 
-- A test that prints a `FAIL` line, throws or exits non-zero is a failure and turns CI red.
-- Never skip, disable or quarantine a test to get green. A known failure tracked elsewhere goes into an explicit list in the test file, named `knownFailures`, with the Issue Board task that fixes it; the entry is removed in the change that fixes it.
+- A test that prints a `FAIL` line, throws or exits with a non-zero status is a failure.
+- Never skip, disable or quarantine a test to get green. A known failure goes into a list named `knownFailures` in the test file, with the task or issue that fixes it; the change that fixes it removes the entry.
 - Name tests by what they test, never by version or task number.
-- Tests are isolated: temporary directories, no fixed ports, no global configuration or home directory, no dependence on network, DNS or machine load. Tests can run in parallel.
+- Tests are isolated: temporary directories, free ports, no global configuration or home directory, no dependence on the network, DNS or machine load. Tests can run in parallel.
 - A flaky test is a bug. Find the cause and fix it; do not rely on reruns.
-- A noisy performance gate that fails on one row just past its threshold is rerun once before investigating.
-- Every bug found by hand is first turned into an automated check when possible. Validate a new check by running it against the code before the fix and seeing it fail.
+- A noisy performance gate that fails on one case just past its limit is rerun once before investigating.
+- A bug found by hand first becomes an automated check when possible. Validate the check by running it against the code before the fix and seeing it fail.
 
-## Browsers
+## Test suites
 
-Browser tests use Playwright with the preinstalled Chromium in the cloud environment (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); do not run `playwright install` there. A browser test builds its blog into a temporary directory and serves `dist/` over HTTP on a free port with `serve` in `test/browser/server.js`, so the page loads its scripts and fonts the way a published site does. `serve` starts the static server in `scripts/static-server.js`, which the screenshot script uses too, and closes it when the test ends. The server then closes every connection that is still open, because Chromium can hold a connection on which it has not sent a request yet, and `server.close()` waits for such a connection. Like GitHub Pages, the server answers an address without a file with `dist/404.html` and status 404, and it sends `cache-control: max-age=600`, which GitHub Pages sends for every file, for the files in `dist/assets/`, whose names change with their content, so a test can check that a file the page downloaded in advance is read from the HTTP cache. With the option `gzip: true`, which only the performance measurement sets, it sends text files compressed with gzip to a browser that accepts it. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together. Manual testing on macOS goes through Makefile targets, and those targets must keep working. On macOS, `make browser` downloads Playwright's Chromium; run it once before the first `make check`, `make example` or `make screenshots`, because `bake build` draws share images with Chromium.
+**Unit tests** (`test/*.test.js`) run the CLI and the build on blogs created in temporary directories and on a copy of `examples/blog/`, and check the output files and the reported problems.
 
-## Performance measurements
+**Browser tests** (`test/browser/`) build a blog into a temporary directory, serve its `dist/` over HTTP on a free port with `test/browser/server.js` and drive it with Playwright, so the page loads its scripts and fonts as a published site does. The server, `scripts/static-server.js`, answers like GitHub Pages: `404.html` with status 404 for a missing file, and `cache-control: max-age=600` for the files in `assets/`.
 
-The nightly workflow has two jobs, `performance` and `frames`, which run one after the other, each alone on its runner. `performance` sets up the runner with `.github/actions/setup`, builds `examples/blog/`, runs `scripts/measure-pages.js` on `examples/blog/dist/`, runs `scripts/check-budgets.js` on the report and uploads the report as the workflow artifact `performance-report`, also when the budget check fails. On the development machine the measurement takes about 2 minutes.
+**Frame time gate** (`test/frames/`) opens pages of the example blog in Chromium with the CPU slowed down, records the frame times while Playwright performs an interaction, and fails when too many frames are slow or dropped, when one frame is too long, when the page throws or when a component enters the viewport before it is ready. The limits, the slowdown and the screen sizes are in `test/frames/frames.js`; the interactions, and which of them run only in the nightly tier, are in `test/frames/frames.test.js`. A case listed in `knownFailures` reports its numbers and is marked as a todo instead of failing.
 
-`scripts/measure-pages.js` serves the built site with `scripts/static-server.js` at `localhost`, where the AI chat appears, with `gzip: true`, so HTML, CSS, JavaScript, JSON, XML and SVG files are sent compressed with gzip as GitHub Pages sends them. It opens every HTML page except `404.html` in Chromium twice: 1440 by 900 pixels, and 375 by 812 pixels as a mobile device with touch. Each page and width gets a new browser context, so nothing is cached. Through the Chrome DevTools Protocol the page runs with `Emulation.setCPUThrottlingRate` at 4, so the CPU is 4 times slower, and with `Network.emulateNetworkConditions` set to the Fast 4G preset of Chrome DevTools: 9 Mbit/s down and 1.5 Mbit/s up, each multiplied by 0.9, and 60 milliseconds of round-trip time multiplied by 2.75, which is 165 milliseconds of latency. The script waits for the `load` event, for 500 milliseconds without requests, for the first contentful paint and for every component frame in the first screen to get `data-state="ready"` or `"failed"`. It then scrolls to the end of the page by 100 pixels every 100 milliseconds, which is 1000 pixels per second, waits again until no request is pending and every component frame on the page is ready or failed, and records:
-
-| Metric | What it measures |
-|---|---|
-| `transferBytes` | Every byte transferred for the page after scrolling to its end, headers included, as `encodedDataLength` of the Chrome DevTools Protocol counts them |
-| `firstScreenTransferBytes` | The bytes transferred before the script starts to scroll |
-| `htmlBytes`, `cssBytes`, `imageBytes` | The bytes of the document, the stylesheets and the images |
-| `themeScriptBytes` | The scripts that a classic `<script>` element of the page loads, and the scripts they import, apart from previews |
-| `componentScriptBytes` | The component runtime, the module script `components-….js`, and every script it imports: the component chunks, `components/lib/`, Solid, the kit and MathJax |
-| `chatScriptBytes` | The chat module, the module script `chat-….js`, and every script it imports |
-| `previewScriptBytes` | Scripts outside `assets/` and the scripts they import, which are the `preview` modules that the homepage loads |
-| `otherScriptBytes` | Scripts that none of these roots loaded |
-| `fontBytes`, `fontFiles` | The bytes and the number of the font files |
-| `firstContentfulPaintMs`, `largestContentfulPaintMs` | First Contentful Paint and Largest Contentful Paint from a `PerformanceObserver`, before the script scrolls |
-| `firstScreenComponents` | The component frames that intersect the first screen |
-| `componentsReadyMs` | The time from the start of the navigation until the last of those frames got `data-state="ready"` or `"failed"`, or `null` when the first screen has no component |
-| `componentsBlankOnScroll` | The component frames that were in view without `data-state="ready"` while the script scrolled |
-| `failedComponents`, `failedRequests` | The frames with `data-state="failed"`, and the requests that failed or got a status of 400 or more |
-
-A script is assigned to the root of its chain of initiators that the Chrome DevTools Protocol reports. The report also lists every request of each page with its path, its type, its bytes and, for a script, its group, so a change of a metric can be traced to a file.
-
-`test/perf/budgets.json` holds one limit per metric, which applies to every page and both widths, and states for each limit what it is based on. The limits on bytes and on font files are the largest value of two measurements of `examples/blog/` plus 20 percent; the byte counts do not change between runs. The limits on times are twice the largest measured time, because times vary by up to about 35 percent between runs on the same machine and the runners of GitHub Actions are slower than the development machine. `otherScriptBytes`, `componentsBlankOnScroll`, `failedComponents` and `failedRequests` have the limit 0. `firstScreenComponents` describes the page and has no limit. `scripts/check-budgets.js` prints one line for each exceeded limit, such as `/2026-10/syntax/ at 375 pixels: fontBytes is 1001, over the limit of 1000`, followed by the count, and exits with status 1. When a change makes a page larger or slower on purpose, the pull request raises the limit and rewrites its basis; a gap that stays is written down in "Clean code" in CONTRIBUTING.md together with who accepted it.
-
-The `performance` job measures loading and scrolling. It records no frame times and no long tasks, so it does not check the 60 frames per second that every interaction and animation must reach.
-
-## Frame times
-
-Every interaction on a page draws at least 60 frames per second on a CPU twice as slow as the runner's. `test/frames/frames.test.js` builds `examples/blog/` into a temporary directory, serves it at `localhost` and opens each page in Chromium at 1440 by 900 pixels and at 375 by 812 pixels with a device pixel ratio of 2, without reduced motion, so the animations run as a reader sees them. After the page has loaded, it slows the CPU down twice with the Chrome DevTools Protocol, records the time between consecutive `requestAnimationFrame` callbacks while Playwright performs the interaction, and fails when:
-
-- more than 3% of the frames take longer than 17.7 ms, one frame budget at 60 frames per second plus 1 ms,
-- more than 3% of the frames that the display showed were dropped, where a frame of n frame budgets counts as n − 1 dropped frames,
-- one frame takes longer than 34.3 ms, two frame budgets plus 1 ms,
-- fewer than 20 frames were drawn,
-- the page throws an error, or
-- a component enters the viewport before its `data-state` is `ready`.
-
-Each case prints its frame count, median, 95th percentile, longest frame, share of slow frames and number and share of dropped frames. The `frames` job of pull requests measures scrolling, highlighting a sidenote, moving over the table of contents and switching the theme on the syntax article. The `frames` job of the nightly workflow runs the gate with `BAKE_FRAMES=all` and also measures the other table of contents styles, the phone drawer, the AI chat panel, folds, dragging a function plot, scrolling the bento article and the homepage, and resizing the bento article. A case that is known to be too slow is listed in `knownFailures` in the test file with the Issue Board task that fixes it; it runs and reports its numbers, and a frame time over a limit marks it as a todo instead of failing the run. A page error, a component that is blank when it enters the viewport and an interaction that does not complete still fail a known case, and a name in `knownFailures` that matches no case fails the run. A case that fails just past one threshold is rerun once before it is investigated. The limits are calibrated on the runners of GitHub Actions from five runs of every case: with the CPU slowed down twice, the longest frame of a case outside `knownFailures` took at most two frame budgets, and at most 0.6 percent of its frames were slow or dropped. A slower or busier machine can fail cases that pass on the runners: in the cloud development container, scrolling the first 8000 pixels of the syntax article at 1440 pixels fails with 5 to 8 percent slow frames on unchanged code.
-
-## Screenshot comparison
-
-`make screenshots [BASE=ref]` compares every page of `examples/blog/` built from the working tree with the same pages built from `BASE`, `origin/main` by default. It runs on the development machine only; CI takes no screenshots.
-
-1. `scripts/screenshots.sh <base ref>` builds `examples/blog/` twice: from the working tree, and from the base ref in a temporary git worktree. The script removes that worktree when it ends, also after an error or an interrupt. For each build, `scripts/capture-pages.js` serves `dist/` on a free local port with the static server of the browser tests, `scripts/static-server.js`, and takes a full-page screenshot of every HTML page in four variants: 1440 pixels wide and 375 pixels wide, each in the light and the dark color scheme. It serves the pages at `localhost`, where the AI chat appears, and on the first article page whose build has the chat it also opens the chat and takes a screenshot of the screen, named after the page with `-chat` added, and then takes the remaining screenshots in a new browser page, so the pointer that clicked the pet does not rest on the pet of the following pages.
-2. `scripts/compare-screenshots.js` finds the changed areas of each pair of screenshots and draws the images of the report with Playwright. It compares the screenshots row by row with the `diff` library, so content inserted in the middle of a page is reported once and the content below it, which only moved down, is not. It first matches identical rows. Inside each group of differing rows it then also matches two rows when every color value of one lies between the smallest and the largest value of the 3 by 3 pixels around the same position in the other, give or take 16. Text that moved by a fraction of a pixel is drawn slightly differently, and this second step treats it as unchanged. A change confined to a single row is ignored, because a fractional height adds or removes one row and a fractional shift redraws one row of an underline or a dashed border differently. Differing rows less than 160 rows apart form one changed area. Each changed area becomes one image with a Before and an After panel, plus a Diff panel drawn by pixelmatch when the changed rows have the same height before and after. The panels are cropped to the changed rows and the columns that differ in them, plus 80 pixels on each side, at least 640 pixels wide and at most 1200 pixels tall; at most four areas are drawn for one screenshot. The images have a white background, a thin border around each panel and a label above it. Every image is at most 880 pixels wide, so it fits a Markdown preview. Panels sit side by side while they fit in that width at their original size, and are stacked otherwise; a panel wider than 872 pixels is scaled down to fit and is never cut. A new or removed page is shown from the top. For every page it also draws the first screen of the desktop and the mobile variants, cropped to the viewport. When the light and the dark variant give the same image, as they do while no dark styles exist, the image is drawn once and labeled with both. `summary.md` starts with the count of changed screenshots, followed by two collapsed sections: the changes, and the first screen of every page with one collapsed section per page. The full-page screenshots stay in `test-out/screenshots/head/` and `test-out/screenshots/base/`.
-
-Only pages of `examples/blog/` are captured. A change that should be visible needs a page in the example blog that shows it, and the pull request adds that page or that content when it is missing.
-
-The report in `test-out/screenshots/report/` uses relative links, so `summary.md` opens in a Markdown preview. A screenshot difference fails nothing; it is there for the author and the reviewer to look at.
+**Performance budgets.** `scripts/measure-pages.js` loads and scrolls every page of a built site in Chromium with a slowed CPU and network and writes the bytes, paint times and component states per page and screen width; the settings and the metrics are defined at the top of the script. `scripts/check-budgets.js` checks the report against `test/perf/budgets.json`, which holds one limit per metric with the basis of each limit. A change that makes pages larger or slower on purpose raises the limit and rewrites its basis in the same change.
