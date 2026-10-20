@@ -100,7 +100,7 @@ describe('layers of src/', () => {
 
   test('the modules that run in the browser import no Node built-in module', () => {
     const modules = browserModules();
-    assert.ok(modules.includes(join(SRC, 'chat/panel.jsx')));
+    assert.ok(modules.includes(join(SRC, 'chat/bubbles.jsx')));
     assert.ok(modules.includes(join(SRC, 'kit/plot.jsx')));
     const offending = modules.flatMap((file) => imports.get(file).filter(({ specifier }) => isBuiltin(specifier)).map(({ specifier }) => `${name(file)} imports ${specifier}`));
     assert.deepEqual(offending, []);

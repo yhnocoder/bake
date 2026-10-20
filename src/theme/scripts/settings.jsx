@@ -106,9 +106,10 @@ function Settings(props) {
   let toggle;
   onMount(() =>
     closeOnEscape(root, () => {
-      if (!open()) return;
+      if (!open()) return false;
       setOpen(false);
       toggle.focus();
+      return true;
     }),
   );
   document.addEventListener('pointerdown', (event) => {
