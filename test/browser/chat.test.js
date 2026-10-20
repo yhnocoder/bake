@@ -363,40 +363,47 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
   });
 
-  await t.test('on a phone the entry slides out with the essay buttons while the reader scrolls down and while the drawer is open', async (t) => {
-    const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, hasTouch: true } });
-    await page.goto(`${base}/2026-10/syntax/`);
-    const launcher = page.locator('.bk-chat-launcher');
-    await launcher.waitFor();
-    const placement = (state) =>
-      page.waitForFunction((hidden) => {
-        const element = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher');
-        const box = element.getBoundingClientRect();
-        const opacity = getComputedStyle(element).opacity;
-        element.focus();
-        const focused = element.getRootNode().activeElement === element;
-        element.blur();
-        return hidden ? box.left >= innerWidth && opacity === '0' && !focused : box.right <= innerWidth && opacity === '1' && focused;
-      }, state === 'hidden');
-    const scrollBy = async (delta) => {
-      for (let step = 0; step < 5; step += 1) {
-        await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-        await page.waitForTimeout(30);
-      }
-    };
-    await placement('shown');
-    await scrollBy(800);
-    await page.waitForFunction(() => document.documentElement.classList.contains('bk-buttons-hidden'));
-    await placement('hidden');
-    await scrollBy(-200);
-    await page.waitForFunction(() => !document.documentElement.classList.contains('bk-buttons-hidden'));
-    await placement('shown');
-    await page.locator('.bk-toc-handle').click();
-    await page.waitForFunction(() => document.documentElement.classList.contains('bk-drawer-open'));
-    await placement('hidden');
-    await page.keyboard.press('Escape');
-    await placement('shown');
-  });
+  for (const reducedMotion of ['no-preference', 'reduce']) {
+    const moves = reducedMotion === 'reduce' ? 'fades where it is' : 'slides out';
+    await t.test(`on a phone the entry ${moves} with the essay buttons while the reader scrolls down and while the drawer is open`, async (t) => {
+      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, hasTouch: true, reducedMotion } });
+      await page.goto(`${base}/2026-10/syntax/`);
+      const launcher = page.locator('.bk-chat-launcher');
+      await launcher.waitFor();
+      const placement = (state) =>
+        page.waitForFunction(
+          ({ hidden, inPlace }) => {
+            const element = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher');
+            const box = element.getBoundingClientRect();
+            const opacity = getComputedStyle(element).opacity;
+            element.focus();
+            const focused = element.getRootNode().activeElement === element;
+            element.blur();
+            if (!hidden) return box.right <= innerWidth && opacity === '1' && focused;
+            return (inPlace ? box.right <= innerWidth : box.left >= innerWidth) && opacity === '0' && !focused;
+          },
+          { hidden: state === 'hidden', inPlace: reducedMotion === 'reduce' },
+        );
+      const scrollBy = async (delta) => {
+        for (let step = 0; step < 5; step += 1) {
+          await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
+          await page.waitForTimeout(30);
+        }
+      };
+      await placement('shown');
+      await scrollBy(800);
+      await page.waitForFunction(() => document.documentElement.classList.contains('bk-buttons-hidden'));
+      await placement('hidden');
+      await scrollBy(-200);
+      await page.waitForFunction(() => !document.documentElement.classList.contains('bk-buttons-hidden'));
+      await placement('shown');
+      await page.locator('.bk-toc-handle').click();
+      await page.waitForFunction(() => document.documentElement.classList.contains('bk-drawer-open'));
+      await placement('hidden');
+      await page.keyboard.press('Escape');
+      await placement('shown');
+    });
+  }
 
   await t.test('the entry and the panel use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async (t) => {
     const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, reducedMotion: 'reduce' } });
