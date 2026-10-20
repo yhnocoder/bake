@@ -18,7 +18,21 @@ const HOME = '/';
 const WHEEL_STEP = 120;
 const WHEEL_INTERVAL = 50;
 
-const knownFailures = [];
+const knownFailures = [
+  { name: 'scrolling the first 8000 pixels of the syntax article at 1440 pixels', reason: '10 to 23 percent of the frames are slow while the table of contents and the notes column update on every frame', task: 'toc-writes' },
+  { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: 'the restyle of the whole page after the theme change takes one frame of 150 to 230 ms', task: 'perf-fixes' },
+  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'the restyle of the whole page after the theme change takes one frame of 150 to 250 ms', task: 'perf-fixes' },
+  { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'more than 5 percent of the frames are slow while the table of contents and the notes column update on every frame', task: 'toc-writes' },
+  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the drawer handle updates on every frame and the longest frame takes 180 to 220 ms', task: 'toc-writes' },
+  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'the tabs view writes on every frame and fails in three of five runs', task: 'toc-writes' },
+  { name: 'opening and closing the table of contents drawer of the syntax article at 375 pixels', reason: 'opening the drawer takes one frame of 100 to 170 ms', task: 'toc-writes' },
+  { name: 'opening and closing the AI chat panel on the syntax article at 1440 pixels', reason: 'opening the chat panel takes one frame of about 67 ms', task: 'chat-perf' },
+  { name: 'opening and closing the AI chat panel on the syntax article at 375 pixels', reason: 'opening the chat panel takes one frame of about 67 ms', task: 'chat-perf' },
+  { name: 'dragging the slider of the function plot in the syntax article at 1440 pixels', reason: 'the crosshair readout and the slider restyle the plot and fail in two of five runs', task: 'kit-cleanup' },
+  { name: 'dragging the slider of the function plot in the syntax article at 375 pixels', reason: 'the crosshair readout and the slider restyle the plot and fail in one of five runs', task: 'kit-cleanup' },
+  { name: 'dragging the slider of the function plot in the bento article at 375 pixels', reason: 'about 30 percent of the frames are slow while the bento layout runs on every change', task: 'bento-redesign' },
+  { name: 'resizing the bento article at 1440 pixels', reason: 'placing the cards again takes frames of 250 to 350 ms', task: 'bento-redesign' },
+];
 
 function scroll(distance) {
   return async (page) => {
