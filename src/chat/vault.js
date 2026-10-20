@@ -87,8 +87,7 @@ export async function unlockKey() {
   return apiKey;
 }
 
-export async function rememberedKey({ now = Date.now() } = {}) {
-  const record = storedKey();
+export async function rememberedKey() {
   let remembered;
   try {
     remembered = await keyStore('readonly', (store) => store.get(REMEMBERED));
@@ -96,7 +95,8 @@ export async function rememberedKey({ now = Date.now() } = {}) {
     return null;
   }
   if (remembered === undefined) return null;
-  const left = remembered.until - now;
+  const record = storedKey();
+  const left = remembered.until - Date.now();
   if (record !== null && remembered.credential === record.credential && left > 0 && left <= REMEMBER_DAYS * DAY) {
     try {
       return await decryptWith(remembered.key, record);

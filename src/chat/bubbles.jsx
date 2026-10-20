@@ -113,8 +113,10 @@ function Chat(props) {
   };
   const focusInput = () => requestAnimationFrame(() => open() && input?.focus({ preventScroll: true }));
 
+  let closeNoteOnHide = false;
   const show = () => {
     if (open()) return;
+    closeNoteOnHide = false;
     pet.load();
     setOpen(true);
     launcher.setAttribute('aria-expanded', 'true');
@@ -127,14 +129,19 @@ function Chat(props) {
     if (!open()) return;
     setOpen(false);
     setPopover(null);
-    setNoteOpen(false);
-    setRedo(false);
+    closeNoteOnHide = noteOpen() || redo();
     setQuery(null);
     launcher.setAttribute('aria-expanded', 'false');
     pet.setState('idle');
     if (focus) launcher.focus({ preventScroll: true });
   };
   const toggle = () => (open() ? hide() : show());
+  const hidden = (event) => {
+    if (open() || !closeNoteOnHide || event.pseudoElement !== '::before' || event.propertyName !== 'opacity') return;
+    closeNoteOnHide = false;
+    setNoteOpen(false);
+    setRedo(false);
+  };
 
   function greet() {
     if (view() === 'setup') note(labels.setupText, { link: { href: DEEPSEEK_KEYS, text: labels.setupLink } });
@@ -545,7 +552,7 @@ function Chat(props) {
   const placeholder = () => (view() === 'setup' ? labels.placeholder.key : scopes().length > 0 ? labels.placeholder.scoped : labels.placeholder[page.article === null ? 'blog' : 'article']);
 
   return (
-    <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>
+    <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown} on:transitionend={hidden}>
       <p class="bk-chat-status" role="status">
         <Show when={announcement()} keyed>
           {({ text }) => <span>{text}</span>}

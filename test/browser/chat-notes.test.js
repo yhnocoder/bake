@@ -291,8 +291,29 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
     assert.equal(await card.locator('h4').textContent(), '锚点');
-    await page.keyboard.press('Escape');
-    await card.waitFor({ state: 'detached' });
+    const fading = page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const chat = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat');
+          const frames = [];
+          const sample = () => {
+            const opacity = Number(getComputedStyle(chat, '::before').opacity);
+            frames.push({ opacity, card: chat.querySelector('.bk-chat-note-card') !== null, width: Math.round(chat.getBoundingClientRect().width) });
+            if (opacity === 0 && !chat.hasAttribute('data-open')) setTimeout(() => resolve({ frames, card: chat.querySelector('.bk-chat-note-card') !== null }), 50);
+            else requestAnimationFrame(sample);
+          };
+          requestAnimationFrame(sample);
+        }),
+    );
+    await page.locator('.bk-chat-launcher').click();
+    const fade = await fading;
+    const shown = fade.frames.filter((frame) => frame.opacity > 0);
+    assert.ok(shown.length > 1, JSON.stringify(fade.frames));
+    assert.deepEqual(new Set(shown.map((frame) => `${frame.card} ${frame.width}`)), new Set([`true ${shown[0].width}`]), 'the note card stays at its size while the glass fades out');
+    assert.equal(fade.card, false, 'the note card closes once the glass has faded out');
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator('.bk-chat-bubbles').waitFor();
+    assert.equal(await card.count(), 0);
     await page.keyboard.press('Escape');
     await page.locator('.bk-chat:not([data-open])').waitFor();
     assert.deepEqual(problems, []);

@@ -92,6 +92,24 @@ async function openSettings(page) {
   await page.locator('.bk-chat-menu').waitFor();
 }
 
+function backdropRoots(chat) {
+  const roots = [];
+  for (let node = chat; node !== null; node = node.parentNode instanceof ShadowRoot ? node.parentNode.host : node.parentElement) {
+    const style = getComputedStyle(node);
+    const reasons = [
+      Number(style.opacity) < 1 && 'opacity',
+      style.filter !== 'none' && 'filter',
+      style.maskImage !== 'none' && 'mask',
+      style.clipPath !== 'none' && 'clip-path',
+      style.mixBlendMode !== 'normal' && 'mix-blend-mode',
+      style.backdropFilter !== 'none' && 'backdrop-filter',
+      /opacity|filter|mask|clip-path|mix-blend-mode/.test(style.willChange) && 'will-change',
+    ].filter(Boolean);
+    if (reasons.length > 0) roots.push(`${node.localName}.${node.classList[0] ?? ''} ${reasons.join(' ')}`);
+  }
+  return roots;
+}
+
 test('the AI chat on published pages', async (t) => {
   const base = await buildExample(t);
 
@@ -137,13 +155,15 @@ test('the AI chat on published pages', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('the frosted glass lies under every part of the chat that asks for the key, at 1440 and 375 pixels', async (t) => {
+  await t.test('the frosted glass lies under every part of the chat that asks for the key and blurs the page also while it fades in, at 1440 and 375 pixels', async (t) => {
     for (const [width, height] of [[1440, 900], [375, 812]]) {
       const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width, height } } });
       await page.goto(`${base}/2026-09/llm-act-fns/`);
       await page.locator('.bk-chat-launcher').click();
       await page.locator(KEY).waitFor();
+      assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass while it fades in at ${width} pixels`);
       await page.waitForTimeout(400);
+      assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass at ${width} pixels`);
       const layout = await page.locator('.bk-chat').evaluate((chat) => {
         const glass = chat.getBoundingClientRect();
         const style = getComputedStyle(chat, '::before');
@@ -262,6 +282,34 @@ test('the AI chat on published pages', async (t) => {
       assert.ok(tries < 50, 'a chat without bk-chat-key forgets the remembered key when it opens');
       await page.waitForTimeout(20);
     }
+
+    await page.addInitScript(() => {
+      const open = indexedDB.open.bind(indexedDB);
+      let delayed = false;
+      indexedDB.open = (...args) => {
+        if (delayed) return open(...args);
+        delayed = true;
+        const request = open(...args);
+        const late = { result: undefined, error: null, onsuccess: null, onerror: null, onupgradeneeded: null, onblocked: null };
+        request.onupgradeneeded = (event) => {
+          late.result = request.result;
+          late.onupgradeneeded?.(event);
+        };
+        request.onsuccess = (event) => setTimeout(() => {
+          late.result = request.result;
+          window.bakeTest.lateRead = 'started';
+          late.onsuccess?.(event);
+          setTimeout(() => (window.bakeTest.lateRead = 'done'), 300);
+        }, 3000);
+        request.onerror = (event) => late.onerror?.(event);
+        return late;
+      };
+    });
+    await page.reload();
+    await setUpKey(page);
+    assert.notEqual(await remembered(), null);
+    await page.waitForFunction(() => window.bakeTest.lateRead === 'done');
+    assert.notEqual(await remembered(), null, 'a key saved while the chat still reads the remembered key stays');
   });
 
   await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {
@@ -734,6 +782,7 @@ test('the AI chat on published pages', async (t) => {
     };
     await launcher.click();
     await page.locator('.bk-chat[data-open]').waitFor();
+    assert.deepEqual(await chat.evaluate(backdropRoots), [], 'no ancestor stops the blur of the glass while the chat opens');
     assert.deepEqual(await petSeen(page, 'open'), petEntry('open'));
     assert.equal(await launcher.getAttribute('aria-expanded'), 'true');
     assert.deepEqual(
@@ -742,8 +791,9 @@ test('the AI chat on published pages', async (t) => {
         return { slide: getComputedStyle(element).transitionProperty, opacity: getComputedStyle(element).opacity, fade: glass.transitionProperty, blur: glass.backdropFilter.startsWith('blur(') };
       }),
       { slide: 'translate', opacity: '1', fade: 'opacity', blur: true },
-      'the chat slides as one element and its layers fade, so no ancestor of the frosted glass has an opacity below 1 that would stop its blur',
+      'the chat slides as one element and its layers fade',
     );
+    assert.deepEqual(await chat.evaluate(backdropRoots), [], 'no ancestor stops the blur of the glass while the chat is open');
     const box = await chat.boundingBox();
     const pet = await launcher.boundingBox();
     assert.ok(box.x + box.width <= pet.x && box.width === 400, JSON.stringify({ box, pet }));
