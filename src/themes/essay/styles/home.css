@@ -1,4 +1,4 @@
-html:has(.bk-home) {
+html:has(> body > .bk-home) {
   --home-bar-height: 72px;
   scroll-behavior: smooth;
   scroll-padding-top: var(--home-bar-height);
@@ -506,7 +506,7 @@ html:has(.bk-home) {
 }
 
 @media (max-width: 599.98px) {
-  html:has(.bk-home) {
+  html:has(> body > .bk-home) {
     --home-bar-height: 64px;
   }
 

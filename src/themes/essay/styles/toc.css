@@ -1110,7 +1110,7 @@ html[data-script] .bk-toc-chapters {
 }
 
 @media (max-width: 999.98px) {
-  html:is(.bk-drawer-open, .bk-buttons-hidden) {
+  html:is(.bk-drawer-open, .bk-buttons-hidden) [data-bake-chat] {
     --chat-hidden: 1;
     --chat-visibility: hidden;
   }
