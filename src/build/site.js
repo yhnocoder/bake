@@ -38,7 +38,7 @@ export async function updateSite(site, changedPaths = null) {
     site.bundle = null;
   }
   const { settings } = site;
-  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], assetFiles: [], shareImages: [], publicFiles: [] };
+  if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articleErrorsOnly: false, articles: [], pages: [], siteFiles: [], assetFiles: [], shareImages: [], publicFiles: [] };
   const articles = [];
   for (const found of findArticles(root)) {
     const cached = site.articles.get(found.file);
@@ -57,7 +57,8 @@ export async function updateSite(site, changedPaths = null) {
   const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, published, config, assetFiles, errors) : new Map();
   const pageSettings = { config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
   const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
-  const shown = lastGoodArticles(site, articles, errors).filter(isPublished);
+  const lastGood = lastGoodArticles(site, articles, errors);
+  const shown = [...lastGood.values()].filter(isPublished);
   const entries = shown.map((article) => homeEntry(article, config)).sort(newestFirst);
   const listed = entries.filter((entry) => !entry.draft);
   const home = homeOutput(entries, pageSettings, errors);
@@ -70,18 +71,20 @@ export async function updateSite(site, changedPaths = null) {
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
-  return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
+  const articleFiles = new Set(articles.map((article) => article.file));
+  const articleErrorsOnly = errors.every((error) => articleFiles.has(error.file));
+  if (articleErrorsOnly) site.lastGood = lastGood;
+  return { errors: sortErrors(errors), articleErrorsOnly, articles, pages, home, siteFiles, assetFiles, shareImages: [...shareImages.values()], publicFiles };
 }
 
 function lastGoodArticles(site, articles, errors) {
   const failed = new Set(errors.map((error) => error.file));
-  site.lastGood = new Map(
+  return new Map(
     articles.flatMap((article) => {
       const good = failed.has(article.file) ? site.lastGood.get(article.file) : article;
       return good === undefined ? [] : [[article.file, good]];
     }),
   );
-  return [...site.lastGood.values()];
 }
 
 async function readSettings(root) {
