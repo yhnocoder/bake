@@ -19,7 +19,7 @@ export default function Page(props) {
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
         <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
-        <script innerHTML={prepaintScript} />
+        <script innerHTML={prepaintScript()} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}

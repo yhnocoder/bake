@@ -173,7 +173,7 @@ export class MarkdownWriter {
     if (element.matches('.example-source')) return [verbatim(this.selectedText(element).replace(/\n+$/, ''))];
     if (element.matches('pre')) return [this.code(element)];
     if (element.matches('mjx-container[data-tex]')) return [this.math(element)];
-    if (element.matches('ul, ol')) return element.matches('.references') ? [this.references(element)] : this.list(element);
+    if (element.matches('ul, ol')) return isReferenceList(element) ? [this.references(element)] : this.list(element);
     if (element.matches('blockquote')) return [{ type: 'blockquote', children: this.blocks(element) }];
     if (element.matches('figure.quote')) return [this.quoteWithSource(element)];
     if (element.matches('figure.figure')) return this.figure(element);
@@ -204,7 +204,7 @@ export class MarkdownWriter {
       const label = this.addNote(element.dataset.sidenote);
       return [{ type: 'footnoteReference', identifier: label, label }];
     }
-    if (element.matches('a.citation')) return [{ type: 'citation', key: element.dataset.key }];
+    if (element.matches('a.citation[data-key]')) return [{ type: 'citation', key: element.dataset.key }];
     if (element.matches('a.eqref')) return [{ type: 'eqref', label: idOfFragment(hashOf(element.getAttribute('href'))) }];
     if (element.matches('br')) return [{ type: 'break' }];
     if (element.matches('img')) return [image(element, element.style.width === '' ? {} : { width: element.style.width })];
@@ -319,6 +319,10 @@ export class MarkdownWriter {
 
 function indexOf(node) {
   return [...node.parentNode.childNodes].indexOf(node);
+}
+
+function isReferenceList(list) {
+  return list.matches('.references') && [...list.children].every((item) => item.dataset.key !== undefined);
 }
 
 function hashOf(href) {

@@ -1,0 +1,20 @@
+name: Set up Bake
+description: Installs Node 24, the npm dependencies and Playwright's Chromium headless shell with its system libraries.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: npm
+    - run: npm ci
+      shell: bash
+    - id: playwright
+      run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-headless-shell-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+    - run: npx playwright install --with-deps --only-shell chromium
+      shell: bash

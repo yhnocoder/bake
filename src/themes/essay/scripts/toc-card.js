@@ -91,11 +91,14 @@ export function hoverIntent(delay) {
   let hideTimer = 0;
   let warmUntil = 0;
   let shown = false;
+  let dismissed = null;
   return {
     get shown() {
       return shown;
     },
-    enter(show, now = false) {
+    enter(show, now, entry) {
+      if (!now && entry === dismissed) return;
+      dismissed = null;
       clearTimeout(hideTimer);
       clearTimeout(showTimer);
       const run = () => {
@@ -109,6 +112,7 @@ export function hoverIntent(delay) {
       clearTimeout(hideTimer);
     },
     leave(hide) {
+      dismissed = null;
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
@@ -121,6 +125,10 @@ export function hoverIntent(delay) {
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
       shown = false;
+    },
+    dismiss(entry, elements) {
+      this.stop();
+      dismissed = elements.some((element) => element?.matches(':hover')) ? entry : null;
     },
   };
 }

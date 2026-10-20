@@ -432,16 +432,22 @@ test('the table of contents', async (t) => {
 
   await t.test('Escape closes the chapter card of the tabs, dots and ticks styles, and returns the focus from the card to its entry', async () => {
     for (const style of ['tabs', 'dots', 'ticks']) {
-      const { page, context } = await open({ style });
+      const { page, context } = await open({ style, reducedMotion: 'no-preference' });
       const trigger = { tabs: '.bk-tab', dots: '.bk-dot-item', ticks: '.bk-tick.is-chapter' }[style];
       const frame = style === 'tabs' ? '.bk-index' : '.bk-popover';
       const shown = () => page.evaluate((selector) => document.querySelector(selector).classList.contains('is-on'), frame);
       const focused = () => page.evaluate((selector) => (document.activeElement.closest(selector) === null ? `${document.activeElement.classList[0]} ${decodeURIComponent(document.activeElement.getAttribute('href') ?? '')}` : 'card'), frame);
-      await pointAt(page, page.locator(trigger).nth(1));
+      const entry = await page.locator(trigger).nth(1).boundingBox();
+      const rest = (offset) => page.mouse.move(entry.x + entry.width / 2 + offset, entry.y + entry.height / 2);
+      await rest(0);
       await page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame);
+      await page.waitForTimeout(300);
+      await rest(1);
       await page.keyboard.press('Escape');
       assert.equal(await shown(), false, `${style}: Escape leaves the card of the hovered entry open`);
       await page.waitForTimeout(300);
+      await rest(0);
+      await page.waitForTimeout(500);
       assert.equal(await shown(), false, `${style}: the card opens again while the pointer rests on its entry`);
       await page.mouse.move(900, 450);
       await page.waitForTimeout(300);
@@ -454,6 +460,16 @@ test('the table of contents', async (t) => {
       assert.equal(await focused(), { tabs: 'bk-tab #one', dots: 'bk-dot-item #one', ticks: 'bk-tick #one-b' }[style], `${style}: the focus does not return to the entry`);
       await page.waitForTimeout(300);
       assert.equal(await shown(), false, `${style}: the card opens again when the focus returns to its entry`);
+      const focusedEntry = await page.evaluate(() => {
+        const box = document.activeElement.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      });
+      await page.mouse.move(focusedEntry.x, focusedEntry.y);
+      const opened = await page.waitForFunction((selector) => document.querySelector(selector).classList.contains('is-on'), frame, { timeout: 2000 }).then(
+        () => true,
+        () => false,
+      );
+      assert.equal(opened, true, `${style}: the card stays closed when the pointer reaches the entry that the keyboard closed it from`);
       await context.close();
     }
   });

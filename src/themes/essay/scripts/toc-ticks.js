@@ -119,7 +119,7 @@ export function ticksView(context) {
       card.getBoundingClientRect();
       card.classList.remove('is-snap');
       card.classList.add('is-on');
-    }, now);
+    }, now, index);
   }
   function hide() {
     card.classList.remove('is-on');
@@ -131,7 +131,7 @@ export function ticksView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.stop();
+    intent.dismiss(pointed, [ticks.rows[pointed], card]);
     hide();
   }
   return {

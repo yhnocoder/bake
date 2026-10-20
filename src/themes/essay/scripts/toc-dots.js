@@ -68,7 +68,7 @@ export function dotsView(context) {
       card.getBoundingClientRect();
       card.classList.remove('is-snap');
       card.classList.add('is-on');
-    }, now);
+    }, now, chapterIndex);
   }
   function hide() {
     card.classList.remove('is-on');
@@ -79,7 +79,7 @@ export function dotsView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.stop();
+    intent.dismiss(hovered, [items[hovered]?.item, card]);
     hide();
   }
   function measure() {

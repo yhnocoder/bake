@@ -49,7 +49,7 @@ export function tabsView(context) {
     intent.enter(() => {
       hovered = chapterIndex;
       index.show(chapterIndex, items[chapterIndex].tab);
-    }, now);
+    }, now, chapterIndex);
   }
   function hide() {
     index.hide();
@@ -60,7 +60,7 @@ export function tabsView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.stop();
+    intent.dismiss(hovered, [items[hovered]?.tab, index.element]);
     hide();
   }
   function layout(state) {
