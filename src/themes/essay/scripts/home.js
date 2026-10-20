@@ -56,6 +56,7 @@ export function startHome(home) {
   reducedMotion.addEventListener('change', () => previews.forEach((preview) => preview.sync()));
 
   if (home.querySelector('.bk-chips[data-for="category"]') !== null) startCurrentChip(home);
+  startStuckBar(home);
 
   const switches = [...home.querySelectorAll('.bk-switch')];
   const showPressed = () => {
@@ -81,6 +82,13 @@ export function startHome(home) {
       moveCards(visibleCards(), () => filterMonths(home, chip.dataset.tag, labels, previews));
     });
   }
+}
+
+function startStuckBar(home) {
+  const bar = home.querySelector('.bk-home-bar');
+  if (bar === null) return;
+  const watch = new IntersectionObserver(([entry]) => bar.toggleAttribute('data-stuck', !entry.isIntersecting));
+  watch.observe(home.querySelector('.bk-home-header'));
 }
 
 function startCurrentChip(home) {
@@ -122,7 +130,9 @@ function startCurrentChip(home) {
 }
 
 function choose(name, value) {
+  const values = [...document.querySelectorAll(`.bk-switch[data-control="${name}"] button`)].map((button) => button.dataset.value);
   document.documentElement.dataset[name] = value;
+  document.documentElement.style.setProperty(`--${name}-index`, values.indexOf(value));
   try {
     localStorage.setItem(storageKey(name), value);
   } catch {}

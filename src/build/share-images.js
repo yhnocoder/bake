@@ -32,9 +32,9 @@ const PUBLISHED_COVERS = {
   webp: { extension: '.webp', type: 'image/webp' },
 };
 
-export function shareImageOf(root, article, config, assets) {
+export function shareImageOf(root, { article, entry }, config, assets) {
   const { fields } = article;
-  const name = `${SHARE_IMAGE_DIR}${article.url.slice(0, -1)}`;
+  const name = `${SHARE_IMAGE_DIR}${entry.url.slice(0, -1)}`;
   if (fields.cover !== undefined) {
     const from = join(root, article.dir, fields.cover);
     const { format, width, height } = article.cover;
@@ -42,14 +42,13 @@ export function shareImageOf(root, article, config, assets) {
     const image = { path: `${name}-${hashOf(readFileSync(from))}${(published ?? PNG).extension}`, owner: article.file, type: (published ?? PNG).type, width, height };
     return published === undefined ? { ...image, render: () => sharp(from).png().toBuffer() } : { ...image, from };
   }
-  const category = config.categories.find((entry) => entry.id === fields.category);
   const card = {
     language: config.language,
     site: config.title,
-    category: category?.name,
-    color: category?.color,
-    title: fields.title,
-    summary: fields.summary,
+    category: entry.category?.name,
+    color: entry.category?.color,
+    title: entry.title,
+    summary: entry.summary,
     preview: fields.preview,
   };
   const inputs = [CARD_TEMPLATE, PLAYWRIGHT_VERSION, JSON.stringify(card), assets.get(THEME_STYLES_PATH)];

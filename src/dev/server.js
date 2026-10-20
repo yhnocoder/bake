@@ -178,7 +178,13 @@ function sendHtml(response, status, html) {
 }
 
 function problemsData(problems) {
-  return problems.map((problem) => ({ position: `${problem.file}:${problem.line}:${problem.column}`, text: formatError(problem) }));
+  return problems.map((problem) => ({
+    file: problem.file,
+    location: `${problem.line}:${problem.column}`,
+    message: problem.message,
+    position: `${problem.file}:${problem.line}:${problem.column}`,
+    text: formatError(problem),
+  }));
 }
 
 function send(response, event, data) {

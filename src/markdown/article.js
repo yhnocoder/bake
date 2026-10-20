@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { eastAsianWidth } from 'get-east-asian-width';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
 import remarkCjkFriendly from 'remark-cjk-friendly';
@@ -69,9 +70,8 @@ const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
 const IMAGE_ATTRIBUTE_TEXT = /^\{[^{}\n]*\}/;
 const MATH_MIN_WIDTH = /min-width: ([\d.]+ex)/;
 const MATH_WIDTH = /<svg [^>]*?width="([\d.]+ex)"/;
-const WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/u;
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
-const HAN_CHARACTER = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
+const HAN_CHARACTER = /\p{Script=Han}/gu;
 const WORD = /[\p{L}\p{N}]+/gu;
 const PREVIEW_BLOCKS = 3;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
@@ -1013,7 +1013,7 @@ function countWords(tree) {
 }
 
 function textColumns(line) {
-  return [...line].reduce((columns, character) => columns + (WIDE_CHARACTER.test(character) ? 2 : 1), 0);
+  return [...line].reduce((columns, character) => columns + eastAsianWidth(character.codePointAt(0)), 0);
 }
 
 function displayWidth(node, image) {

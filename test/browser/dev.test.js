@@ -88,22 +88,29 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
 
   await t.test('saving the Markdown replaces the changed block in place and keeps the scroll position and open folds', async () => {
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
     const before = await scrollPosition();
     await page.evaluate(() => {
       window.highlighted = [];
       const animate = Element.prototype.animate;
       Element.prototype.animate = function (keyframes, options) {
-        if (options?.id === 'bake-changed') window.highlighted.push(this.textContent);
+        if (options?.id === 'bake-changed') window.highlighted.push(this.dataset.line);
         return animate.call(this, keyframes, options);
       };
     });
     edit('The edited paragraph says hello.', 'The edited paragraph says goodbye.');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('says goodbye'));
     const block = page.locator('.bk-block', { hasText: 'says goodbye' });
-    assert.ok(await block.evaluate((element) => element.getAnimations().some((animation) => animation.id === 'bake-changed')), 'the changed block is not highlighted');
-    assert.deepEqual(await page.evaluate(() => window.highlighted), ['The edited paragraph says goodbye.1']);
+    const covered = await block.evaluate((element) => {
+      const mark = document.querySelector('#bake-dev').shadowRoot.querySelector(`.mark[data-line="${element.dataset.line}"]`);
+      if (mark === null || !mark.getAnimations().some((animation) => animation.id === 'bake-changed')) return null;
+      const box = element.getBoundingClientRect();
+      const cover = mark.getBoundingClientRect();
+      return cover.left <= box.left && cover.right >= box.right && cover.top <= box.top && cover.bottom >= box.bottom;
+    });
+    assert.equal(covered, true, 'the changed block is not covered by a highlight');
+    assert.deepEqual(await page.evaluate(() => window.highlighted), [await block.getAttribute('data-line')]);
     await page.waitForTimeout(100);
     assert.equal(await scrollPosition(), before);
     assert.equal(await page.evaluate(() => document.querySelector('details.fold').open), true);
@@ -116,7 +123,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     });
     edit('Paragraph 1 about folds.', 'An added paragraph.\n\nParagraph 1 about folds.');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('An added paragraph.'));
-    assert.deepEqual(await page.evaluate(() => window.highlighted), ['An added paragraph.']);
+    assert.deepEqual(await page.evaluate(() => window.highlighted), [await page.locator('.bk-block', { hasText: 'An added paragraph.' }).getAttribute('data-line')]);
     assert.equal(await page.evaluate(() => JSON.parse(document.querySelector('script.bk-source').textContent)), readFileSync(file, 'utf8'));
   });
 
@@ -129,10 +136,13 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     }));
     assert.deepEqual(state, { notes: [['1The note next to the edited paragraph.', true]], unresolved: 0 });
     await page.click('details.fold > summary');
-    assert.ok(await page.evaluate(() => document.querySelector('details.fold').getAnimations().length > 0), 'closing the replaced fold does not animate');
+    await page.waitForFunction(() => {
+      const fold = document.querySelector('details.fold');
+      return fold.open && Number(getComputedStyle(fold, '::details-content').opacity) < 1;
+    });
     await page.waitForFunction(() => !document.querySelector('details.fold').open);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').open && document.querySelector('details.fold').getAnimations().length === 0);
+    await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     edit('gives a width.\n```\n', 'gives a width.\n```\n\nSee [the far section](/2026-10/live/#far).\n');
     const link = page.locator('.bk-article a.internal-link', { hasText: 'the far section' });
     await link.waitFor();
@@ -171,12 +181,18 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await fades('dot');
     await dot.waitFor({ state: 'hidden' });
     const line = lineOf(readFileSync(file, 'utf8'), 'The edited paragraph');
-    const text = await problem.textContent();
-    assert.match(text, new RegExp(`^${ARTICLE.replaceAll('.', '\\.')}:${line}:\\d+ \\S`));
+    assert.equal(await panel.locator('.title').textContent(), '1 problem');
+    assert.equal(await panel.locator('.file-name').textContent(), ARTICLE);
+    const where = await problem.locator('.where').textContent();
+    assert.match(where, new RegExp(`^${line}:\\d+$`));
+    assert.match(await problem.locator('.message').textContent(), /^\S/);
     assert.ok(await page.locator('.bk-block', { hasText: 'says goodbye' }).isVisible());
     await problem.click();
     await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.problem[data-copied]') !== null);
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), text.split(' ')[0]);
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `${ARTICLE}:${where}`);
+    await panel.locator('.copy-all').click();
+    await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.copy-all[data-copied]') !== null);
+    assert.match(await page.evaluate(() => navigator.clipboard.readText()), new RegExp(`^${ARTICLE.replaceAll('.', '\\.')}:${where} \\S`));
     await clearTransitions();
     edit('[^missing]', ' again');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('says goodbye again'));
@@ -218,7 +234,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     const transitions = () => page.evaluate(() => [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => getComputedStyle(element).transitionProperty));
     assert.ok((await transitions()).every((property) => property.includes('translate')));
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    assert.deepEqual(await transitions(), Array(3).fill('opacity, background-color, color, display'));
+    assert.deepEqual(await transitions(), Array(3).fill('opacity, display'));
     await page.emulateMedia({ reducedMotion: null });
   });
 
@@ -441,5 +457,55 @@ test('bake dev rebuilds every table of contents style from the saved headings an
         assert.ok(after.titles.includes(name) && !after.titles.includes(old), `the ${view.style} style shows ${name} after the save`);
       }
     });
+  }
+});
+
+test('the bake dev dot and problems list leave the chat button and the settings button uncovered', async (t) => {
+  const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
+  const file = join(dir, ARTICLE);
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  for (const width of [1440, 375]) {
+    const context = await browser.newContext({ viewport: { width, height: width < 600 ? 812 : 900 } });
+    const page = await context.newPage();
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('WebAuthn.enable');
+    await cdp.send('WebAuthn.addVirtualAuthenticator', {
+      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
+    });
+    writeFileSync(file, article({ title: 'Live', slug: 'live', body }));
+    await page.goto(`${server.url}2026-10/live/`, { waitUntil: 'load' });
+    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+    await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
+    const boxes = (selector) =>
+      page.evaluate((selector) => {
+        const box = (element) => {
+          const { left, right, top, bottom } = element.getBoundingClientRect();
+          return { left, right, top, bottom };
+        };
+        const shadow = document.querySelector('#bake-dev').shadowRoot;
+        return {
+          own: box(shadow.querySelector(selector)),
+          others: [document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher'), ...document.querySelectorAll('.bk-settings-toggle, .bk-toc-handle')].map(box),
+        };
+      }, selector);
+    const settle = (selector) => page.waitForFunction((selector) => document.querySelector('#bake-dev').shadowRoot.querySelector(selector).getAnimations().length === 0, selector);
+    const check = async (selector, state) => {
+      await settle(selector);
+      const { own, others } = await boxes(selector);
+      assert.ok(others.length >= 2, `the chat button and the settings button are on the page at ${width} pixels`);
+      for (const other of others) assert.ok(!overlaps(own, other), `the ${state} at ${width} pixels covers ${JSON.stringify(other)} with ${JSON.stringify(own)}`);
+    };
+    await check('.dot', 'quiet dot');
+    writeFileSync(file, article({ title: 'Live', slug: 'live', body: body.replace('says hello.', 'says hello[^missing].') }));
+    await page.locator('#bake-dev .problems').waitFor();
+    await check('.problems', 'problems list');
+    await page.click('#bake-dev .close');
+    await page.locator('#bake-dev .dot').waitFor();
+    await check('.dot', 'dot with the problem count');
+    await context.close();
   }
 });

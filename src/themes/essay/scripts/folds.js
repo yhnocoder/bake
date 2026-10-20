@@ -1,8 +1,13 @@
-import { animateHeight, layoutChanged, reducedMotion, stopAnimations } from './motion.js';
+import { EASING, layoutChanged, reducedMotion } from './motion.js';
 
 const OPEN_DURATION = 220;
-const CLOSE_DURATION = 180;
-const targets = new WeakMap();
+const CLOSE_DURATION = 140;
+const CONTENT = '::details-content';
+const SHOWN = { opacity: 1, transform: 'none' };
+const ENTERING = { opacity: 0, transform: 'translateY(-6px)' };
+const LEAVING = { opacity: 0, transform: 'translateY(-4px)' };
+const closing = new WeakSet();
+const running = new WeakMap();
 
 export function startFolds(article) {
   article.addEventListener('click', (event) => {
@@ -15,7 +20,7 @@ export function startFolds(article) {
   const openedForPrint = [];
   addEventListener('beforeprint', () => {
     for (const fold of article.querySelectorAll('details.fold')) {
-      const wasOpen = targets.get(fold) ?? fold.open;
+      const wasOpen = fold.open && !closing.has(fold);
       settle(fold, true);
       if (!wasOpen) openedForPrint.push(fold);
     }
@@ -29,7 +34,7 @@ export function startFolds(article) {
 export function openFoldsAround(target) {
   let opened = false;
   for (let fold = target.closest('details.fold'); fold !== null; fold = fold.parentElement.closest('details.fold')) {
-    if (fold === target || (targets.get(fold) ?? fold.open)) continue;
+    if (fold === target || (fold.open && !closing.has(fold))) continue;
     settle(fold, true);
     opened = true;
   }
@@ -37,32 +42,36 @@ export function openFoldsAround(target) {
 }
 
 function toggleFold(fold) {
-  const opening = !(targets.get(fold) ?? fold.open);
+  const opening = !fold.open || closing.has(fold);
   if (reducedMotion.matches) {
     settle(fold, opening);
     layoutChanged();
     return;
   }
-  const content = [...fold.children].filter((child) => child.tagName !== 'SUMMARY');
-  const from = fold.getBoundingClientRect().height;
-  const opacities = content.map((child) => Number(getComputedStyle(child).opacity));
-  settle(fold, false);
-  const closed = fold.getBoundingClientRect().height;
-  fold.open = true;
-  const open = fold.getBoundingClientRect().height;
-  targets.set(fold, opening);
-  const timing = { duration: opening ? OPEN_DURATION : CLOSE_DURATION };
-  content.forEach((child, index) => child.animate([{ opacity: opacities[index] }, { opacity: opening ? 1 : 0 }], { ...timing, fill: 'forwards' }));
-  animateHeight(fold, from, opening ? open : closed, timing).then((done) => {
-    if (!done) return;
-    settle(fold, opening);
+  const from = fold.open ? { opacity: Number(getComputedStyle(fold, CONTENT).opacity), transform: getComputedStyle(fold, CONTENT).transform } : ENTERING;
+  settle(fold, true);
+  if (opening) {
     layoutChanged();
-  });
+    const animation = fold.animate([from, SHOWN], { pseudoElement: CONTENT, duration: OPEN_DURATION, easing: EASING });
+    running.set(fold, animation);
+    animation.finished.then(layoutChanged, () => {});
+    return;
+  }
+  closing.add(fold);
+  const animation = fold.animate([from, LEAVING], { pseudoElement: CONTENT, duration: CLOSE_DURATION, easing: EASING, fill: 'forwards' });
+  running.set(fold, animation);
+  animation.finished.then(
+    () => {
+      settle(fold, false);
+      layoutChanged();
+    },
+    () => {},
+  );
 }
 
 function settle(fold, open) {
-  stopAnimations(fold);
-  for (const child of fold.children) for (const animation of child.getAnimations()) animation.cancel();
-  targets.delete(fold);
+  closing.delete(fold);
+  running.get(fold)?.cancel();
+  running.delete(fold);
   fold.open = open;
 }
