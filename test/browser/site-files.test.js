@@ -64,6 +64,38 @@ test('the 404 page and the theme stylesheet', async (t) => {
     await context.close();
   });
 
+  await t.test('the 404 page centres its content in a column in the middle of the screen at 1440 and 375 pixels in both schemes', async () => {
+    for (const [width, height] of [
+      [1440, 900],
+      [375, 760],
+    ]) {
+      for (const colorScheme of ['light', 'dark']) {
+        const { context, page } = await open('/2026-01/rope/', { viewport: { width, height }, colorScheme });
+        const layout = await page.evaluate(() => {
+          const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+          const title = box('.bk-not-found-title');
+          const home = box('.bk-not-found-home');
+          const column = box('.bk-not-found-matches');
+          const style = getComputedStyle(document.querySelector('.bk-not-found'));
+          return {
+            top: title.top,
+            bottom: home.bottom,
+            gutters: [column.left, document.documentElement.clientWidth - column.right],
+            scrollWidth: document.documentElement.scrollWidth,
+            padding: parseFloat(style.paddingLeft),
+          };
+        });
+        const at = `${colorScheme} at ${width}px`;
+        assert.ok(layout.top >= height * 0.2, `${at}: the heading starts at ${layout.top}`);
+        assert.ok(layout.bottom <= height * 0.8, `${at}: the link home ends at ${layout.bottom}`);
+        assert.ok(Math.abs(layout.gutters[0] - layout.gutters[1]) <= 1, `${at}: the gutters are ${layout.gutters.join(' and ')}`);
+        assert.ok(layout.gutters[0] >= 16, `${at}: the gutters are ${layout.gutters.join(' and ')}`);
+        assert.equal(layout.scrollWidth, width);
+        await context.close();
+      }
+    }
+  });
+
   await t.test('an address deeper in the site and one with an unknown slug list no article', async () => {
     const { context, page } = await open('/2026-01/unknown/');
     assert.deepEqual(await visible(page), { path: '/2026-01/unknown/', matches: [] });
