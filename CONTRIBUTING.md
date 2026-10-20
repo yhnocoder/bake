@@ -350,6 +350,7 @@ The format is `file:line:col message`, with the path relative to the blog root a
 - Math is typeset by MathJax 4 (`@mathjax/src`) into SVG with the New Computer Modern font. Each article is typeset in its own MathJax document, so macros defined in one article do not reach another, and every formula is compiled twice so that `\eqref` can refer to a later label.
 - Code is highlighted by Shiki with a theme created by `createCssVariablesTheme`, so the colors are CSS variables that themes and dark mode set.
 - Images are read and converted by sharp. sharp reports an AVIF image as the format `heif` with the compression `av1`, and `readImage` in `src/render/images.js` treats exactly that combination as AVIF; other HEIF images are not accepted. Size values such as `560px` and `70%` are parsed by `parseSize` and checked by `sizeProblem` in `src/config/rules.js`, which every syntax with a pixel or percent size uses.
+- The media type of a served or published file comes from `mime` through `contentType` in `src/build/content-types.js`, which adds the UTF-8 charset to `text/` types. The column width of a character in a code block comes from `get-east-asian-width`, and the word count counts every character of `\p{Script=Han}` as one word.
 - Text that Bake writes into HTML or XML by hand, in the feed, the sitemap, the share card and the pages that `bake dev` generates, is escaped by `stringify-entities` through `escapeMarkup` in `src/build/escape.js`.
 - Themes are compiled by Vite with `vite-plugin-solid`, and their page structure and page scripts are written with SolidJS.
 - The essay theme self-hosts LXGW WenKai from `lxgw-wenkai-webfont`, whose stylesheet splits the font into files by character range so that a page only downloads the files for the characters it shows, and JetBrains Mono from `@fontsource/jetbrains-mono`.
@@ -370,6 +371,8 @@ The format is `file:line:col message`, with the path relative to the blog root a
 |---|---|
 | No comments except `why: <reason>` | `scripts/check_comment.py`, tested by `test/check-comment.test.js` |
 | CLI output is English and lists the commands, and `bake dev` reports a missing `bake.config.js`, prints its address, stops on an interrupt and exits with a message when it can no longer watch the blog | `test/cli.test.js` |
+| Every width media query in Bake's styles uses a breakpoint of `screens.js` or the phone screen width of 600 pixels, and the dark tokens of `tokens.css` for `data-theme` and for the system color scheme are the same | `test/theme-styles.test.js` |
+| Published files get their media types from `mime`, with the UTF-8 charset for text | `test/content-types.test.js` |
 | Errors are reported as `file:line:col message`, all in one run, sorted, with the count line, and a build with errors leaves `dist/` unchanged | `test/build.test.js` |
 | Every `bake.config.js` and front matter error states its exact position | `test/config.test.js`, `test/front-matter.test.js` |
 | The front matter fixtures in `test/fixtures/syntax-errors/` report the lines in `expected.json` | `test/front-matter.test.js` |
