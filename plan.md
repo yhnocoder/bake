@@ -74,9 +74,12 @@ Done in two parts: 3a fixes the macOS failures and the hang, completes the test 
 - Make the suites pass on macOS, the development machine. At the start of this step, on unchanged code, 8 unit tests fail on macOS (6 of them because the temporary folder is reported as `/var/...` and resolved as `/private/var/...`; 2 `bake dev` port tests for another reason), and 26 browser tests in `copy.test.js` and `bento.test.js` fail. Find each cause; fix the code when Bake itself handles the path wrongly, and the test otherwise.
 - `test/dev.test.js` "stops with a message when the blog folder can no longer be watched" sometimes hangs on macOS because it deletes the folder before the watcher has started reporting; wait for the watcher first.
 
-### 4. Input fix
+### 4. Fixes found so far
 
 - The IME composition check exists in several versions; `src/chat/bubbles.jsx` lines 482, 875 and 975 check only `event.isComposing`, so confirming a candidate with Enter in Safari triggers the action. One shared helper used at every call site, with a test.
+- The `bake dev` parameter bar keeps unsaved values by component name and position, so after a component is removed from the middle of an article, the next component with the same name takes over its unsaved value. Key the values so a removed component's value is dropped, with a test that removes a component from the middle.
+- `bake build` prints Node's `MODULE_TYPELESS_PACKAGE_JSON` warning when the blog's `package.json` has no `"type"`. Bake reports the problem itself in its own format, or loads the config so that Node does not warn; the output of a build contains only Bake's messages.
+- The two large chat browser tests share one 120 second limit across many subtests and time out under load; split them so each file stays well under the limit.
 
 ### 5. Design the split between core and themes
 
@@ -88,7 +91,8 @@ Write the design into this file under "Theme and core design" before implementin
 - Components: `params` and `layout` become static data, so the build no longer runs component modules in Node with patched browser globals (`src/components/read.js`, `src/render/math.js`). Placeholder heights are measured at build time or come from automatic height, instead of hand-tuned constants per breakpoint.
 - Edge controls (chat, settings, dev overlay) share one area the theme owns, instead of informal CSS variables.
 - Reduced motion: motion tokens instead of a blanket `!important` rule with exclusions.
-- Lifecycle of client modules: one `start(article)` returning a dispose function.
+- Lifecycle of client modules: one `start(article)` returning a dispose function, used by the partial update of `bake dev` (kept after the step 2 measurement) instead of eight `bake:content` listeners.
+- States a reader sees but no accessible attribute exposes (the current table of contents entry, the current homepage chip, the chosen bento card) get `aria-current` or the fitting ARIA attribute, and the tests read that instead of theme classes.
 - Layout: widths decided at build time or with container queries where possible; runtime measurement only for the table of contents.
 - Copy as Markdown: slice the source using source positions on rendered nodes instead of converting rendered HTML back to Markdown.
 
