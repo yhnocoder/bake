@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { PNG } from 'pngjs';
 import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
-import { launchBrowser, serve } from './browser.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
 
@@ -322,7 +322,7 @@ test('components run in the browser', async (t) => {
     await waitForReady(page, 1);
     const pattern = { count: /[/](count-view|solid-element)-[\w-]{8}\.(js|css)$/, tex: /[/](tex-view|math)-[\w-]{8}\.js$/ };
     await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]tex-view-[\w-]{8}\.js$/.test(entry.name) && entry.responseEnd > 0));
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     const entries = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name, startTime, responseEnd }) => ({ name, startTime, responseEnd })));
     const count = entries.filter((entry) => pattern.count.test(entry.name));
     const tex = entries.filter((entry) => pattern.tex.test(entry.name));
@@ -344,7 +344,7 @@ test('components run in the browser', async (t) => {
       if (delayed) return route.continue();
       delayed = true;
       firstRequest();
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await page.waitForEvent('requestfailed', (request) => request === route.request());
       await route.continue().catch(() => {});
     });
     await page.goto(`${origin}/2026-10/later/`);
@@ -368,7 +368,7 @@ test('components run in the browser', async (t) => {
       }, distance);
     const lastState = () => page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null);
     await scrollToDistance(1000);
-    await page.waitForTimeout(300);
+    await settle(page);
     assert.equal(await lastState(), null);
     await scrollToDistance(700);
     await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
@@ -383,7 +383,7 @@ test('components run in the browser', async (t) => {
       page.on('request', (request) => requests.push(request.url()));
       await page.goto(`${origin}/2026-10/below/`, { waitUntil: 'load' });
       await waitForReady(page, 1);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       assert.deepEqual(requests.filter((url) => /[/]text-view-[\w-]{8}\.js$/.test(url)), [], JSON.stringify(connection));
       await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
       await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
@@ -394,19 +394,11 @@ test('components run in the browser', async (t) => {
   await t.test('a component far below the screen starts when its code could not be loaded right after the page loaded', async () => {
     const page = await open(null);
     let blocked = true;
-    let aborted;
-    const firstAbort = new Promise((resolve) => {
-      aborted = resolve;
-    });
-    await page.route(/[/]text-view-[\w-]{8}\.js$/, async (route) => {
-      if (!blocked) return route.continue();
-      await route.abort();
-      aborted();
-    });
+    await page.route(/[/]text-view-[\w-]{8}\.js$/, (route) => (blocked ? route.abort() : route.continue()));
+    const failed = page.waitForEvent('requestfailed', (request) => /[/]text-view-[\w-]{8}\.js$/.test(request.url()));
     await page.goto(`${origin}/2026-10/below/`);
     await waitForReady(page, 1);
-    await firstAbort;
-    await page.waitForTimeout(200);
+    await failed;
     blocked = false;
     await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
     await page.waitForFunction(() => ['ready', 'failed'].includes([...document.querySelectorAll('figure.component')].at(-1).dataset.state));

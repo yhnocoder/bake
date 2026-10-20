@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { startDevServer } from '../../src/dev/server.js';
 import { article, copyExample, createBlog, validConfig } from '../blog.js';
-import { launchBrowser } from './browser.js';
+import { launchBrowser, settle, until } from './browser.js';
 
 const filler = (topic, count = 4) => Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
@@ -112,7 +112,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     });
     assert.equal(covered, true, 'the changed block is not covered by a highlight');
     assert.deepEqual(await page.evaluate(() => window.highlighted), [await block.getAttribute('data-line')]);
-    await page.waitForTimeout(100);
+    await settle(page);
     assert.equal(await scrollPosition(), before);
     assert.equal(await page.evaluate(() => document.querySelector('details.fold').open), true);
     assert.equal(await page.locator('#bake-dev .notice').isVisible(), false);
@@ -165,7 +165,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await notice.waitFor();
     await fades('notice');
     assert.equal(await notice.textContent(), 'Changed above in the introduction');
-    await page.waitForTimeout(100);
+    await settle(page);
     const after = await top();
     assert.ok(Math.abs(after - before) <= 1, `the heading moved from ${before}px to ${after}px`);
   });
@@ -343,7 +343,8 @@ function startConnectionProxy(target) {
 test('bake dev updates a page with a save that it made while the event stream was disconnected', async (t) => {
   const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
   const file = join(dir, ARTICLE);
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  let printed = '';
+  const server = await startDevServer(dir, { port: 0, print: (text) => (printed += `${text}\n`) });
   t.after(() => server.close());
   const proxy = await startConnectionProxy(new URL(server.url));
   t.after(() => proxy.close());
@@ -359,7 +360,7 @@ test('bake dev updates a page with a save that it made while the event stream wa
   });
   proxy.cut();
   writeFileSync(file, readFileSync(file, 'utf8').replace('The edited paragraph says hello.', 'The edited paragraph was saved while the stream was down.'));
-  await new Promise((done) => setTimeout(done, 1000));
+  await until(() => printed.includes('Updated '), 'bake dev did not update the page after the save');
   assert.equal(await page.evaluate(() => document.querySelector('.bk-article').textContent.includes('saved while the stream was down')), false);
   proxy.restore();
   await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('saved while the stream was down'));
@@ -506,7 +507,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await message.filter({ hasText: `Wrote line ${line} of ${SYNTAX}` }).waitFor();
     assert.equal(readFileSync(file, 'utf8'), original.replace(directive, `:::act-fn-plot{fn=silu range=6 beta=${beta} width=body}`));
     await page.waitForFunction(([selector, expected]) => JSON.parse(document.querySelector(selector).dataset.params).beta === expected, [frameSelector, beta]);
-    await page.waitForTimeout(300);
+    await settle(page);
     assert.deepEqual(await unmarked(), []);
     assert.deepEqual(await page.evaluate(() => [window.highlighted, window.states]), [[], []]);
     assert.equal(await top(), before);
@@ -524,7 +525,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await watchFrames();
     edit('这篇文章列出 Bake 的全部写法。', '这篇文章列出 Bake 的全部写法，第一次改。');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('第一次改'));
-    await page.waitForTimeout(300);
+    await settle(page);
     assert.deepEqual(await page.evaluate(() => window.states), []);
     assert.deepEqual(await unmarked(), []);
     assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
@@ -659,7 +660,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await bar.locator('.write').click();
     await message.filter({ hasText: refused }).waitFor();
     await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
-    await page.waitForTimeout(300);
+    await settle(page);
     assert.deepEqual([await message.isVisible(), await message.getAttribute('data-kind'), await message.textContent()], [true, 'error', refused]);
     assert.deepEqual([await control('range').locator('.number').inputValue(), await control('range').getAttribute('data-changed')], [String(range), '']);
     assert.equal((await liveParams()).range, range);

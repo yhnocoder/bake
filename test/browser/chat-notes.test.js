@@ -321,12 +321,8 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
     await card.waitFor();
     const host = page.locator('[data-bake-chat]');
-    const glass = () => page.evaluate(() => Number(getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat'), '::before').opacity));
     await host.evaluate((element) => element.style.setProperty('--chat-hidden', '1'));
-    for (let tries = 0; (await glass()) !== 0; tries += 1) {
-      assert.ok(tries < 100, 'the theme hides the chat');
-      await page.waitForTimeout(20);
-    }
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat'), '::before').opacity === '0');
     await page.mouse.click(400, 300);
     await page.locator('.bk-chat:not([data-open])').waitFor();
     await card.waitFor({ state: 'detached' });

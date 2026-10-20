@@ -1,3 +1,5 @@
+import { settle } from '../browser/browser.js';
+
 export const FRAME_BUDGET = 1000 / 60;
 export const SLOW_FRAME = FRAME_BUDGET + 1;
 export const MAX_SLOW_SHARE = 0.03;
@@ -59,13 +61,8 @@ export async function openPage(browser, url, { device, storage = {} }) {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state !== 'loading'));
   await session.send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
-  await settle(page, 1000);
+  await settle(page);
   return { context, page, errors };
-}
-
-export async function settle(page, milliseconds = 500) {
-  await page.waitForTimeout(milliseconds);
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
 export async function record(page, action) {

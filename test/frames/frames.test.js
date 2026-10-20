@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { launchBrowser, serveExample } from '../browser/browser.js';
-import { describe, frameProblem, frameStats, openPage, paced, record, settle } from './frames.js';
+import { launchBrowser, serveExample, settle } from '../browser/browser.js';
+import { describe, frameProblem, frameStats, openPage, paced, record } from './frames.js';
 
 const everyInteraction = process.env.BAKE_FRAMES === 'all';
 
@@ -31,7 +31,10 @@ function scroll(distance) {
       const steps = Math.ceil(length / WHEEL_STEP);
       const start = await page.evaluate(() => scrollY);
       await paced(steps, steps * WHEEL_INTERVAL, () => page.mouse.wheel(0, WHEEL_STEP));
-      await settle(page, 300);
+      await page.waitForFunction(() => new Promise((done) => {
+        const start = scrollY;
+        requestAnimationFrame(() => requestAnimationFrame(() => done(scrollY === start)));
+      }));
       const scrolled = (await page.evaluate(() => scrollY)) - start;
       assert.ok(scrolled >= length * 0.9, `the page scrolled ${scrolled} of ${length} pixels`);
     };
@@ -41,7 +44,7 @@ function scroll(distance) {
 async function hoverSidenote(page, device) {
   const reference = page.locator('.bk-article .sidenote-ref a').nth(1);
   await reference.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-  await settle(page, 800);
+  await settle(page);
   const box = await reference.boundingBox();
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
@@ -71,7 +74,7 @@ const TOC_ENTRIES = { ticks: '.bk-toc-ticks .bk-toc-tick', tabs: '.bk-toc-tabs .
 function hoverToc(style) {
   return async (page) => {
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight * 0.3));
-    await settle(page, 1000);
+    await settle(page);
     const points = await page.locator(TOC_ENTRIES[style]).evaluateAll((entries) =>
       entries.map((entry) => entry.getBoundingClientRect()).filter((box) => box.height > 0).map((box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })),
     );
@@ -90,7 +93,7 @@ function hoverToc(style) {
 async function openDrawer(page) {
   await page.evaluate(() => scrollTo(0, innerHeight * 3));
   await page.mouse.wheel(0, -200);
-  await settle(page, 800);
+  await settle(page);
   return async () => {
     for (let round = 0; round < 2; round += 1) {
       await page.locator('.bk-toc-handle').click();
@@ -103,7 +106,7 @@ async function openDrawer(page) {
 
 async function changeTheme(page) {
   await page.evaluate(() => scrollTo(0, innerHeight * 2));
-  await settle(page, 800);
+  await settle(page);
   return async () => {
     const toggle = page.locator('.bk-settings-toggle');
     const choose = (value) => page.locator(`.bk-settings-panel button[data-value="${value}"]`).first().click();
@@ -120,7 +123,7 @@ async function changeTheme(page) {
 
 async function openChat(page) {
   await page.locator('.bk-chat-launcher').waitFor();
-  await settle(page, 500);
+  await settle(page);
   return async () => {
     for (let round = 0; round < 2; round += 1) {
       await page.locator('.bk-chat-launcher').click();
@@ -135,7 +138,7 @@ async function dragPlot(page) {
   const frame = page.locator('figure.component[data-component="act-fn-plot"]').first();
   await frame.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await page.waitForFunction((element) => element.dataset.state === 'ready', await frame.elementHandle());
-  await settle(page, 1000);
+  await settle(page);
   const slider = await frame.getByRole('slider').first().boundingBox();
   const plot = await frame.locator('svg').first().boundingBox();
   return async () => {
@@ -154,7 +157,7 @@ async function dragPlot(page) {
 async function toggleFold(page) {
   const summary = page.locator('.bk-article details.fold > summary').first();
   await summary.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-  await settle(page, 800);
+  await settle(page);
   return async () => {
     for (let round = 0; round < 2; round += 1) {
       await summary.click();

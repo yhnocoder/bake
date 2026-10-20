@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { launchBrowser, serveExample } from './browser.js';
+import { launchBrowser, serveExample, settle } from './browser.js';
 
 test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async (t) => {
   const origin = await serveExample(t);
@@ -47,7 +47,7 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
 
   const link = page.locator('a.internal-link[data-target="/2026-10/syntax-linked/#chain-rule"]').first();
   await link.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-  await page.waitForTimeout(100);
+  await settle(page);
   await link.hover();
   await page.waitForFunction(() => document.querySelector('.bk-preview').classList.contains('is-on'));
   const card = await page.evaluate(() => {

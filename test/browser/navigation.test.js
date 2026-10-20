@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { article, bake, createBlog, validConfig } from '../blog.js';
-import { launchBrowser, serve } from './browser.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
 const filler = (topic) => Array.from({ length: 6 }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
@@ -64,7 +64,7 @@ test('links, folds and citation previews', async (t) => {
     });
     await page.click('details.fold > summary');
     const opening = await content();
-    await page.waitForTimeout(400);
+    await settle(page);
     const opened = await content();
     assert.equal(opening.open, true);
     assert.ok(opening.opacity < 1, `the content starts at opacity ${opening.opacity}`);
@@ -79,7 +79,7 @@ test('links, folds and citation previews', async (t) => {
     await page.click('details.fold > summary');
     await page.click('details.fold > summary');
     await page.click('details.fold > summary');
-    await page.waitForTimeout(400);
+    await settle(page);
     assert.deepEqual(await content().then(({ open, opacity }) => [open, opacity]), [true, 1]);
     await page.close();
   });

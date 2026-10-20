@@ -406,7 +406,7 @@ test('the essay theme lays out articles', async (t) => {
         await new Promise((done) => requestAnimationFrame(done));
       });
       await check('in the first frame of the dark scheme');
-      await page.waitForTimeout(400);
+      await settle(page);
       await check('in the dark scheme');
       if (width === 375) assert.ok((await edges()).some((edge) => edge.overflows), 'a formula overflows on a phone');
       await page.close();

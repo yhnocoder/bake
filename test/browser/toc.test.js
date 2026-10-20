@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { article, bake, createBlog } from '../blog.js';
-import { launchBrowser, serve, settle } from './browser.js';
+import { launchBrowser, nextFrame, serve, settle } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
 const STYLES = ['notes', 'tabs', 'dots', 'ticks'];
@@ -150,7 +150,7 @@ async function restingBox(locator) {
 async function scrollInSteps(page, delta) {
   for (let step = 0; step < 5; step += 1) {
     await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-    await page.waitForTimeout(30);
+    await nextFrame(page);
   }
   await settle(page);
 }
@@ -280,7 +280,7 @@ test('the table of contents', async (t) => {
     const { page, context } = await open({ style: 'tabs' });
     await page.hover('.bk-toc-tab:nth-of-type(2)');
     await page.waitForFunction(() => document.querySelector('.bk-toc-index').classList.contains('is-on'));
-    await page.waitForTimeout(300);
+    await settle(page);
     const shape = await page.evaluate(() => {
       const tab = document.querySelector('.bk-toc-tab.is-hover').getBoundingClientRect();
       const white = document.querySelector('.bk-toc-index-tab').getBoundingClientRect();
@@ -462,16 +462,15 @@ test('the table of contents', async (t) => {
       const rest = (offset) => page.mouse.move(entry.x + entry.width / 2 + offset, entry.y + entry.height / 2);
       await rest(0);
       await cardOpens('the card does not open while the pointer rests on its entry');
-      await page.waitForTimeout(300);
+      await settle(page);
       await rest(1);
       await page.keyboard.press('Escape');
       assert.equal(await shown(), false, `${style}: Escape leaves the card of the hovered entry open`);
-      await page.waitForTimeout(300);
+      await settle(page);
       await rest(0);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       assert.equal(await shown(), false, `${style}: the card opens again while the pointer rests on its entry`);
       await page.mouse.move(900, 450);
-      await page.waitForTimeout(300);
       await page.keyboard.press('Tab');
       await cardOpens('the card does not open when the keyboard reaches its entry');
       for (let step = 0; step < (style === 'ticks' ? 3 : 1); step += 1) await page.keyboard.press('Tab');
@@ -609,7 +608,7 @@ test('the table of contents', async (t) => {
       }, style);
       await page.click(style === 'dots' ? '.bk-toc-dot-item:nth-child(5)' : '.bk-toc-tab:nth-of-type(5)');
       await page.waitForFunction(() => Math.abs(document.getElementById('chapter-5').getBoundingClientRect().top - 24) < 2, null, { timeout: 5000 });
-      await page.waitForTimeout(200);
+      await settle(page);
       const seen = await page.evaluate(() => {
         cancelAnimationFrame(window.recording);
         return window.seen;
@@ -627,7 +626,6 @@ test('the table of contents', async (t) => {
       await page.goto(url);
       await settle(page);
       await scrollToHeading(page, 'chapter-3');
-      await page.waitForTimeout(600);
       const { moved, moving } = await page.evaluate(async () => {
         const entries = () => [...document.querySelectorAll('.bk-toc-tab, .bk-toc-dot-item, .bk-toc-marker')].map((entry) => `${getComputedStyle(entry).translate} ${getComputedStyle(entry).transform}`).join();
         const before = entries();
@@ -714,7 +712,7 @@ test('the table of contents', async (t) => {
     assert.ok(handle > 0 && settings > 0);
     for (let step = 0; step < 5; step += 1) {
       await page.evaluate(() => window.scrollBy(0, 120));
-      await page.waitForTimeout(30);
+      await nextFrame(page);
     }
     await page.waitForFunction(() => document.documentElement.classList.contains('bk-buttons-hidden'));
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle')).transform === 'none'), false);
@@ -745,7 +743,7 @@ test('the table of contents', async (t) => {
     const scrollBy = async (delta) => {
       for (let step = 0; step < 5; step += 1) {
         await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-        await page.waitForTimeout(30);
+        await nextFrame(page);
       }
       await settle(page);
     };
@@ -880,7 +878,7 @@ test('the table of contents', async (t) => {
         assert.deepEqual(await page.evaluate(coveredEntries, selector), [], `${style} at the top of the page, ${viewport.width}×${viewport.height}`);
         await scrollToHeading(page, 'chapter-9');
         await page.waitForFunction(() => document.querySelector('#chapter-9').closest('.bk-section').querySelector('figure.component').dataset.state === 'ready');
-        await page.waitForTimeout(100);
+        await settle(page);
         assert.deepEqual(await page.evaluate(coveredEntries, selector), [], `${style} in the middle of the page, ${viewport.width}×${viewport.height}`);
         const box = await page.evaluate((entries) => {
           const all = [...document.querySelectorAll(entries)].map((entry) => entry.getBoundingClientRect()).filter((rect) => rect.height > 0);
