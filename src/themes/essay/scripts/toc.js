@@ -36,6 +36,7 @@ export function startToc(article) {
   let view = null;
   let card = null;
   let crossing = [];
+  let yielded = false;
 
   const go = (hash) => {
     jumping = true;
@@ -54,6 +55,8 @@ export function startToc(article) {
     view.update(state);
     card?.update(state);
     const yielding = crossing.some(isOnScreen);
+    if (yielding === yielded) return;
+    yielded = yielding;
     for (const element of view.columns ?? []) {
       element.classList.toggle('is-yielding', yielding);
       element.inert = yielding;
@@ -78,6 +81,7 @@ export function startToc(article) {
       element.classList.remove('is-yielding');
       element.inert = false;
     }
+    yielded = false;
     mounted = key;
     state = readingState(outline, currentLayout(article));
     card = spec.card === undefined ? null : createCardHost(spec.card);

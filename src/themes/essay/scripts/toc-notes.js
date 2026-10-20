@@ -109,7 +109,7 @@ function notesList(list, outline) {
     const top = offset + (chapter ? padding - 2 : 3);
     const height = title.offsetHeight - (chapter ? padding + 1 : 6);
     marker.style.transform = `translateY(${top}px) scaleY(${height / MARKER_HEIGHT})`;
-    marker.classList.add('is-on');
+    marker.classList.toggle('is-on', true);
   }
 
   return {
@@ -122,13 +122,14 @@ function notesList(list, outline) {
       current = state.entry;
       chapters.forEach((chapter, chapterIndex) => {
         const relation = chapterIndex < state.chapter ? 'read' : chapterIndex === state.chapter ? 'current' : 'ahead';
-        chapter.box.dataset.state = relation;
+        if (chapter.box.dataset.state !== relation) chapter.box.dataset.state = relation;
         chapter.box.toggleAttribute('data-here', relation === 'current' && state.section === -1);
         const first = outline.chapters[chapterIndex].index;
         chapter.recap?.classList.toggle('is-read', state.read[first]);
         chapter.sections.forEach((row, sectionIndex) => {
           const index = first + 1 + sectionIndex;
-          row.dataset.state = index === state.entry ? 'current' : index < state.entry ? 'read' : 'ahead';
+          const rowState = index === state.entry ? 'current' : index < state.entry ? 'read' : 'ahead';
+          if (row.dataset.state !== rowState) row.dataset.state = rowState;
           row.classList.toggle('is-read', state.read[index]);
         });
       });

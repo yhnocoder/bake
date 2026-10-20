@@ -45,9 +45,13 @@ export async function browserBuild({ input, plugins = [], alias = [], stylesheet
   const outputs = outputOf(result);
   const chunks = new Map(outputs.filter((output) => output.type === 'chunk').map((chunk) => [chunk.fileName, chunk]));
   const entry = [...chunks.values()].find((chunk) => chunk.isEntry);
+  const stylesheets = entry === undefined ? [] : staticStylesheets(entry, chunks);
   return {
     entry: entry?.fileName,
-    stylesheets: entry === undefined ? [] : staticStylesheets(entry, chunks),
+    stylesheets,
+    lazyStylesheets: Object.fromEntries(
+      outputs.filter((output) => output.type === 'asset' && isStylesheet(output) && !stylesheets.includes(output.fileName)).map((asset) => [asset.names[0].replace(/\.css$/, ''), asset.fileName]),
+    ),
     files: outputs.map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source })),
     modules: [...chunks.values()].flatMap((chunk) => chunk.moduleIds),
   };

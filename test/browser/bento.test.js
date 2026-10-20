@@ -365,6 +365,13 @@ test('the bento theme lays out sections as cards', async (t) => {
         return box.left >= card.left && box.right <= card.right && element.height > 100;
       });
       assert.ok(fits, `${width}px`);
+      const typography = await frame.evaluate((figure) => {
+        const box = getComputedStyle(figure.querySelector('.component-box'));
+        const card = getComputedStyle(figure.closest('.bt-card'));
+        return { box: [box.fontSize, box.lineHeight], card: [card.fontSize, card.lineHeight] };
+      });
+      assert.deepEqual(typography.box, typography.card, `${width}px`);
+      assert.deepEqual(typography.box, { 1440: ['15.5px', '27.9px'], 1100: ['14px', '21.7px'], 375: ['15px', '27px'] }[width], `${width}px`);
       await page.close();
     }
   });
@@ -426,12 +433,12 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('the settings panel offers the theme and the body font and no table of contents style', async () => {
+  await t.test('the settings panel offers the theme, the body font, the text size, the weight and the spacing and no table of contents style', async () => {
     for (const width of [1440, 375]) {
       const page = await open('activations', { viewport: { width, height: 900 } });
       await page.locator('.bk-settings-toggle').click();
       const rows = await page.locator('.bk-settings-row').evaluateAll((elements) => elements.filter((row) => row.checkVisibility()).map((row) => row.dataset.setting));
-      assert.deepEqual(rows, ['theme', 'font'], `${width}px`);
+      assert.deepEqual(rows, ['theme', 'font', 'size', 'weight', 'spacing'], `${width}px`);
       await page.locator('.bk-settings-row[data-setting="theme"] button[data-value="dark"]').click();
       assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)', `${width}px`);
       await page.close();

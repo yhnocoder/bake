@@ -1,6 +1,6 @@
 .sidenote-ref {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--reader-scale));
   font-style: normal;
   font-weight: 400;
   line-height: 0;
@@ -40,8 +40,8 @@
 
 .bk-sidenote {
   display: none;
-  font-size: 13.5px;
-  line-height: 1.7;
+  font-size: calc(13.5px * var(--reader-scale));
+  line-height: calc(1.7 + var(--leading-shift));
   color: var(--ink-2);
 }
 
@@ -55,7 +55,7 @@ html:not([data-script]) .bk-article .bk-sidenote {
 .bk-sidenote-number {
   margin-right: 6px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--reader-scale));
   color: var(--accent);
 }
 
@@ -119,8 +119,8 @@ html:not([data-script]) .bk-article .bk-sidenote {
     padding: 10px 14px;
     border-radius: 8px;
     background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
-    font-size: 14px;
-    line-height: 1.75;
+    font-size: calc(14px * var(--reader-scale));
+    line-height: calc(1.75 + var(--leading-shift));
   }
 }
 
