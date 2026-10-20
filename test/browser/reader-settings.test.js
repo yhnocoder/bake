@@ -199,9 +199,9 @@ test('reader settings', async (t) => {
         const style = getComputedStyle(element);
         const durations = style.transitionDuration.split(', ');
         const properties = style.transitionProperty.split(', ');
-        return { opacity: durations[properties.indexOf('opacity')] ?? null, translate: style.translate };
+        return { opacity: durations[properties.indexOf('opacity')] ?? null, translate: style.translate, transformY: new DOMMatrix(style.transform).m42 };
       });
-    const fade = (shown) => shown.opacity !== null && parseFloat(shown.opacity) > 0 && shown.translate === '0px';
+    const fade = (shown) => shown.opacity !== null && parseFloat(shown.opacity) > 0 && ['0px', 'none'].includes(shown.translate) && shown.transformY === 0;
     const panel = await motion('.bk-settings-panel');
     assert.ok(fade(panel), `the closed panel has ${JSON.stringify(panel)}`);
     await page.getByRole('button', { name: '设置' }).click();
