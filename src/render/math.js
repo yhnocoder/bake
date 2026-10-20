@@ -101,10 +101,6 @@ export async function mathStyles() {
   return adaptor.textContent(svg.styleSheet(document));
 }
 
-export function equationHref(id) {
-  return `#${encodeURIComponent(id)}`;
-}
-
 export function relocateMath(html, base) {
   return html.replace(ID_ATTRIBUTE, '').replace(IN_PAGE_HREF, () => ` href="${base}#`);
 }

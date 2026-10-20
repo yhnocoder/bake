@@ -11,7 +11,8 @@ import { unified } from 'unified';
 import { resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, folderFile, parseSize, sizeProblem } from '../config/rules.js';
 import { indexPages } from '../build/links.js';
-import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress, percentDecode } from '../build/urls.js';
+import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress } from '../build/urls.js';
+import { idOfFragment, percentDecode, referenceId, sidenoteId } from '../fragments.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
@@ -187,16 +188,16 @@ class ArticleParser {
           if (node.type === 'paragraph' && node.anchor !== undefined) add(node.anchor, 'paragraph');
           if (node.type === 'math') for (const id of node.ids ?? []) add(id, 'equation');
           const sidenote = node.type === 'footnoteReference' ? this.sidenotes.get(node.identifier) : undefined;
-          if (sidenote?.definition !== undefined) add(`sidenote-${sidenote.number}`, 'sidenote', sidenote.definition);
+          if (sidenote?.definition !== undefined) add(sidenoteId(sidenote.number), 'sidenote', sidenote.definition);
           if (node.type === 'bakeBlock' && node.name === 'references') {
-            for (const entry of this.references) add(`reference-${entry.key}`, 'reference', entry);
+            for (const entry of this.references) add(referenceId(entry.key), 'reference', entry);
           }
         },
         tree,
       );
     }
     for (const { number, definition } of this.sidenotes.values()) {
-      if (definition !== undefined && !this.targets.has(`sidenote-${number}`)) this.targets.set(`sidenote-${number}`, { kind: 'sidenote', node: definition, parent: null, top: null });
+      if (definition !== undefined && !this.targets.has(sidenoteId(number))) this.targets.set(sidenoteId(number), { kind: 'sidenote', node: definition, parent: null, top: null });
     }
   }
 
@@ -232,7 +233,7 @@ class ArticleParser {
   checkLink(node, site, ids) {
     if (node.url.startsWith('#')) {
       if (node.url === '#') return;
-      const id = percentDecode(node.url.slice(1));
+      const id = idOfFragment(node.url);
       if (id === null) this.report(node.position.start, `link target ${node.url} ${INVALID_PERCENT_ENCODING}`);
       else if (!ids.has(id)) this.report(node.position.start, `link target #${id} does not exist`);
       return;
@@ -526,8 +527,8 @@ class ArticleParser {
 
   generatedIds() {
     const ids = new Map();
-    for (const { number } of this.sidenotes.values()) ids.set(`sidenote-${number}`, `sidenote ${number}`);
-    for (const { key } of this.references) ids.set(`reference-${key}`, `the reference "${key}"`);
+    for (const { number } of this.sidenotes.values()) ids.set(sidenoteId(number), `sidenote ${number}`);
+    for (const { key } of this.references) ids.set(referenceId(key), `the reference "${key}"`);
     const labelled = new Map([...this.equations].map(([label, { id }]) => [id, label]));
     for (const id of this.equationIds.keys()) ids.set(id, labelled.has(id) ? `the equation \\label{${labelled.get(id)}}` : `the equation (${id.slice(EQUATION_ID_PREFIX.length)})`);
     return ids;
@@ -885,13 +886,13 @@ class ArticleParser {
     }
     const sidenotes = [...this.sidenotes.values()].map(({ number, definition }) => ({
       number,
-      id: `sidenote-${number}`,
+      id: sidenoteId(number),
       label: definition.label,
       line: definition.position.start.line,
       endLine: definition.position.end.line,
       html: renderChildrenHtml(definition.children, this.context),
     }));
-    const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: `reference-${entry.key}`, html: renderInlineHtml(entry.children, this.context) }));
+    const references = this.references.map((entry) => ({ key: entry.key, number: entry.number, id: referenceId(entry.key), html: renderInlineHtml(entry.children, this.context) }));
     const previews = [...this.linked.values()].filter((target) => target.page.article !== null).map((target) => target.page.article.preview(target, this));
     const toc = sections.map((section) => ({
       id: section.id,
