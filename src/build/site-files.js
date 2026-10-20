@@ -1,4 +1,5 @@
 import { escapeMarkup } from './escape.js';
+import { encodePath } from './urls.js';
 
 export const FEED_PATH = 'feed.xml';
 export const SITEMAP_PATH = 'sitemap.xml';
@@ -16,7 +17,7 @@ export function sitePath(url) {
 }
 
 export function absoluteLink(config, path) {
-  return `${siteLink(config.url)}${encodeURI(path)}`;
+  return `${siteLink(config.url)}${encodePath(path)}`;
 }
 
 export function feedXml(config, entries) {

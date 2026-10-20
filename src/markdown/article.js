@@ -11,7 +11,7 @@ import { unified } from 'unified';
 import { resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
 import { indexPages } from '../build/links.js';
-import { INVALID_PERCENT_ENCODING, addressHref, pageRoot, parseAddress, percentDecode } from '../build/urls.js';
+import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress, percentDecode } from '../build/urls.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
@@ -1033,7 +1033,7 @@ function displayWidth(node, image) {
 function imageProperties(attributes, published) {
   const width = parseSize(attributes.width);
   const height = parseSize(attributes.height);
-  const properties = { src: encodeURI(published.path), width: published.width, height: published.height };
+  const properties = { src: encodePath(published.path), width: published.width, height: published.height };
   if (width !== null && height !== null) return { ...properties, height: Math.round((published.width * height.number) / width.number), boxWidth: attributes.width };
   if (width !== null) return { ...properties, boxWidth: attributes.width };
   if (height !== null) return { ...properties, boxWidth: `${Number(((height.number * published.width) / published.height).toFixed(2))}${height.unit}` };

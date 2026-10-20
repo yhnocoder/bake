@@ -10,7 +10,7 @@ describe('kit helpers', () => {
   });
 
   test('stepDigits gives the decimals that a step needs', () => {
-    assert.deepEqual([1, 0.5, 0.1, 0.25, 0.01, 10].map(stepDigits), [0, 1, 1, 1, 2, 0]);
+    assert.deepEqual([1, 0.5, 0.1, 0.25, 0.01, 10, 2.5, 0.125, 1e-7, 0.1 + 0.2, 0.2 * 3, 250].map(stepDigits), [0, 1, 1, 2, 2, 0, 1, 3, 7, 1, 1, 0]);
   });
 
   test('niceTicks chooses steps of 1, 2 or 5 times a power of ten and labels zero without a sign', () => {

@@ -3,6 +3,7 @@ import { cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import { parse } from '../article.js';
 import { article, bake, createBlog, validConfig } from '../blog.js';
 import { serve } from './server.js';
 
@@ -219,4 +220,43 @@ test('a converted citation keeps its key as written, also when the key contains 
   const paragraph = '.bk-article p';
   await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' here', after: true });
   assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here');
+  await context.close();
+});
+
+test('a partly selected paragraph escapes the text that Markdown would read as syntax, so the copy renders the same text', async (t) => {
+  const paragraphs = [
+    ['Start: a \\*literal\\* star, snake_case\\_name, a \\_literal\\_ underscore, \\`ticks\\` and C:\\\\path.', 'a *literal*', 'path'],
+    ['Money: \\$5 or \\$6, a \\==mark\\== and \\~~strike\\~~ here.', '$5', 'here'],
+    ['Brackets: \\[text\\](url), \\[^note\\], \\[@key\\], \\<b\\> and \\&amp; here.', '[text]', 'here'],
+    ['\\# Not a heading but text', '# Not', 'heading'],
+    ['1\\. Not a list item', '1. Not', 'list'],
+    ['\\- Not a list either', '- Not', 'list'],
+    ['\\> Not a quote at all', '> Not', 'quote'],
+    ['中文，标点：“引号”（括号）！还有 snake_case 和 a * b。', '标点', 'b'],
+  ];
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'content/posts/escapes/index.md': article({ title: 'Escapes', slug: 'escapes', body: `${paragraphs.map(([text]) => text).join('\n\n')}\n` }),
+  });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/escapes/`);
+  for (const [, from, to] of paragraphs) {
+    const point = { selector: '.bk-article p', contains: from };
+    await select(page, { ...point, text: from }, { ...point, text: to, after: true });
+    const selected = await page.evaluate(() => getSelection().toString());
+    const { text } = await copied(page);
+    const { article: copy, errors } = await parse(`${text}\n`);
+    assert.deepEqual(errors, [], text);
+    const rendered = await page.evaluate((html) => new DOMParser().parseFromString(html, 'text/html').body.textContent.trim(), copy.intro.map((block) => block.html).join('\n'));
+    assert.equal(rendered, selected, `${text} renders as ${rendered}`);
+  }
+  await select(page, { selector: '.bk-article p', text: '标点' }, { selector: '.bk-article p', text: 'b。', after: true });
+  assert.equal((await copied(page)).text, '标点：“引号”（括号）！还有 snake_case 和 a * b。');
+  await context.close();
 });

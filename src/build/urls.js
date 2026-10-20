@@ -30,6 +30,10 @@ export function percentDecode(text) {
   }
 }
 
+export function encodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
 export function addressHref(root, path, anchor, query = '') {
   return `${root}${path.slice(1)}${query}${anchor === undefined ? '' : `#${encodeURIComponent(anchor)}`}`;
 }
