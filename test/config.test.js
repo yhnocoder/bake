@@ -46,7 +46,7 @@ describe('bake.config.js', () => {
   test('reports a missing bake.config.js at 1:1', async (t) => {
     const { config, lines } = await load(t, {});
     assert.equal(config, null);
-    assert.deepEqual(lines, ['bake.config.js:1:1 bake.config.js not found, run bake from the blog root']);
+    assert.deepEqual(lines, ['bake.config.js:1:1 bake.config.js not found, run bake from the blog root or create a blog with bake init']);
   });
 
   test('reports a JavaScript syntax error at its position', async (t) => {

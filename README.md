@@ -2,17 +2,20 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-> Bake is being rebuilt from scratch to follow its new design. `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
+> Bake is being rebuilt from scratch to follow its new design. `bake init`, `bake new`, `bake dev` and `bake build` work today. `bake build` checks the blog, parses the Markdown of every article, typesets its math, highlights its code, converts its images, checks the links between articles, embeds the content that `:::embed` blocks list and writes one page per article in the `essay` or the `bento` theme, the homepage, the 404 page, the RSS feed, the sitemap and one share image per Markdown article. `bake dev` serves the same pages and the homepage and updates them on every save.
 
 ## Commands
 
 ```bash
+bake init my-blog       # create a blog with bake.config.js and a first post in my-blog/
 bake new 2026-10/rope   # create content/posts/2026-10/rope/index.md as a draft
-bake dev                # serve the blog at http://localhost:4321/ and update pages on save
+bake dev                # serve the blog at http://localhost:4321/, open it and update pages on save
 bake build              # check the blog and generate the static site into dist/
 ```
 
-Run every command from the blog root, the folder that contains `bake.config.js`.
+Run every command except `bake init` from the blog root, the folder that contains `bake.config.js`.
+
+`bake init [folder]` creates a blog in `folder`, or in the current folder when none is given: `bake.config.js` with the folder name as the site title, a first post at `content/posts/hello/index.md` and a `.gitignore` that leaves out `node_modules/`, `dist/`, `.dist-staging/` and `.dist-previous/`. It writes nothing when the folder already holds one of these files.
 
 `bake new <path>` creates `content/posts/<path>/index.md` with front matter for a draft dated today. The last folder name of the path becomes the slug.
 
@@ -20,7 +23,7 @@ Run every command from the blog root, the folder that contains `bake.config.js`.
 
 ### bake dev
 
-You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, and serves it at http://localhost:4321/. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. `bake dev` listens only on this computer, at `127.0.0.1`, because Write to file in a parameter bar changes files in the blog folder. `--host 0.0.0.0` makes it listen on every network interface, so a phone on the same network can open the pages too, and the terminal then also shows the addresses of the computer on the local network. Open the pages at one of those IP addresses: `bake dev` refuses requests for any host name other than `localhost`, a name that ends with `.localhost` and the name given with `--host`, so that a site cannot reach it through a DNS name that points at the computer. Only use it on a network you trust: the pages and their parameter bars are then open to everyone on that network. `bake dev` writes into the blog folder only when you press Write to file in a parameter bar, and it stops when you press Ctrl+C.
+You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, serves it at http://localhost:4321/ and opens that address in the default browser when it runs in a terminal; `--no-open` leaves the browser closed. Open the pages at `localhost` and not at `127.0.0.1`: the AI chat stores its key with a passkey, and browsers do not create passkeys for an IP address. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. `bake dev` listens only on this computer, at `127.0.0.1`, because Write to file in a parameter bar changes files in the blog folder. `--host 0.0.0.0` makes it listen on every network interface, so a phone on the same network can open the pages too, and the terminal then also shows the addresses of the computer on the local network. Open the pages at one of those IP addresses: `bake dev` refuses requests for any host name other than `localhost`, a name that ends with `.localhost` and the name given with `--host`, so that a site cannot reach it through a DNS name that points at the computer. Only use it on a network you trust: the pages and their parameter bars are then open to everyone on that network. `bake dev` writes into the blog folder only when you press Write to file in a parameter bar, and it stops when you press Ctrl+C.
 
 Bake watches the blog folder and rebuilds what changed each time you save a file:
 
