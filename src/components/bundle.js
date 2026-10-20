@@ -11,7 +11,6 @@ export async function bundleComponents(root, components, preamble, errors) {
       input: { components: RUNTIME_FILE },
       plugins: [...browserModules({ preamble, components }), solid()],
       alias: publicModules('components'),
-      format: 'es',
     });
     return { runtime: entry, files };
   } catch (error) {

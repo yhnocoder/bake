@@ -54,7 +54,6 @@ async function buildBundle() {
     input: { chat: ENTRY },
     plugins: [mathModules(fetchedPreamble(`../${CHAT_PREAMBLE_PATH}`)), solid()],
     alias: publicModules('chat'),
-    format: 'es',
   });
   const sources = modules.filter((id) => !id.startsWith('\0')).map((id) => id.replace(QUERY, ''));
   storeBundle(entry, files, [...new Set([...buildFiles(), ...sources])]);
