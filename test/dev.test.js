@@ -317,6 +317,65 @@ describe('preview updates', () => {
     for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
   });
 
+  test('an article whose slug changes together with an error keeps its old address in the listings and in the link check of the articles that link to it', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
+      'content/posts/chain/index.md': article({ title: 'Chain', slug: 'chain', date: '2026-10-01', body: 'See [the rope article](/2026-10/rope/).\n' }),
+    });
+    const preview = createPreview(dir);
+    assert.deepEqual((await preview.update()).problems, []);
+    const served = (path) => preview.find(path)?.output.render() ?? null;
+    const chain = served('2026-10/chain/index.html');
+    for (const body of ['Rope[^missing].\n', 'Rope and [a missing article](/2026-10/missing/).\n']) {
+      writeFiles(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body }) });
+      const result = await preview.update(['content/posts/rope/index.md']);
+      assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
+      assert.deepEqual([result.applied, result.reload, result.refresh], [true, [], []]);
+      assert.match(served('2026-10/rope/index.html'), /Rope\./);
+      assert.equal(served('2026-10/rotary/index.html'), null);
+      assert.equal(served('2026-10/chain/index.html'), chain);
+      for (const path of ['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json']) {
+        assert.ok(served(path).includes('2026-10/rope/'), path);
+        assert.doesNotMatch(served(path), /rotary/, path);
+      }
+    }
+    writeFiles(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }) });
+    const fixed = await preview.update(['content/posts/rope/index.md']);
+    assert.deepEqual(fixed.problems.map(formatError), ['content/posts/chain/index.md:7:5 link target /2026-10/rope/ does not exist']);
+    assert.match(served('2026-10/rotary/index.html'), /Rope\./);
+    assert.equal(served('2026-10/rope/index.html'), null);
+    assert.equal(served('2026-10/chain/index.html'), chain);
+  });
+
+  test('an article that only fails because an article it links to fell back to its last good version falls back too, so an article that links to it reports no new error', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/alpha/index.md': article({ title: 'Alpha', slug: 'alpha', body: 'Alpha.\n' }),
+      'content/posts/beta/index.md': article({ title: 'Beta', slug: 'beta', body: 'Beta.\n' }),
+      'content/posts/gamma/index.md': article({ title: 'Gamma', slug: 'gamma', body: 'See [the beta article](/2026-10/beta/).\n' }),
+    });
+    const preview = createPreview(dir);
+    assert.deepEqual((await preview.update()).problems, []);
+    const served = (path) => preview.find(path)?.output.render() ?? null;
+    const gamma = served('2026-10/gamma/index.html');
+    writeFiles(dir, {
+      'content/posts/alpha/index.md': article({ title: 'Alpha', slug: 'alpha-two', body: 'Alpha and [a missing article](/2026-10/missing/).\n' }),
+      'content/posts/beta/index.md': article({ title: 'Beta', slug: 'beta-two', body: 'Beta follows [the alpha article](/2026-10/alpha-two/).\n' }),
+    });
+    const result = await preview.update(['content/posts/alpha/index.md', 'content/posts/beta/index.md']);
+    assert.deepEqual(result.problems.map(formatError), [
+      'content/posts/alpha/index.md:7:11 link target /2026-10/missing/ does not exist',
+      'content/posts/beta/index.md:7:14 link target /2026-10/alpha-two/ does not exist',
+    ]);
+    assert.match(served('2026-10/alpha/index.html'), /Alpha\./);
+    assert.match(served('2026-10/beta/index.html'), /Beta\./);
+    assert.equal(served('2026-10/alpha-two/index.html'), null);
+    assert.equal(served('2026-10/beta-two/index.html'), null);
+    assert.equal(served('2026-10/gamma/index.html'), gamma);
+    for (const path of ['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json']) assert.doesNotMatch(served(path), /alpha-two|beta-two/, path);
+  });
+
   test('a change in one article checks the links of every article again and updates the sections embedded elsewhere', async (t) => {
     const gelu = (heading, text) => article({ title: 'GELU', slug: 'gelu', body: `## ${heading}\n\n${text}\n` });
     const dir = createBlog(t, {

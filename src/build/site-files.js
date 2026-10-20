@@ -22,19 +22,18 @@ export function absoluteLink(config, path) {
 
 export function feedXml(config, entries) {
   const link = siteLink(config.url);
-  const items = entries.map((entry) => {
-    const address = absoluteLink(config, entry.url);
-    return [
+  const items = entries.map((entry) =>
+    [
       '<item>',
       element('title', entry.title),
-      element('link', address),
-      `<guid isPermaLink="true">${escapeMarkup(address)}</guid>`,
+      element('link', entry.link),
+      `<guid isPermaLink="true">${escapeMarkup(entry.link)}</guid>`,
       element('pubDate', new Date(`${entry.date}T00:00:00Z`).toUTCString()),
       ...(entry.category === undefined ? [] : [element('category', entry.category.name)]),
       ...(entry.summary === undefined ? [] : [element('description', entry.summary)]),
       '</item>',
-    ].join('\n');
-  });
+    ].join('\n'),
+  );
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
@@ -52,7 +51,7 @@ export function feedXml(config, entries) {
 }
 
 export function sitemapXml(config, entries) {
-  const addresses = [siteLink(config.url), ...entries.map((entry) => absoluteLink(config, entry.url))];
+  const addresses = [siteLink(config.url), ...entries.map((entry) => entry.link)];
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -62,23 +61,23 @@ export function sitemapXml(config, entries) {
   ].join('\n');
 }
 
-export function chatCatalogJson(config, articles) {
-  const entries = articles.map(({ url, fields, content }) => ({
-    url: url.slice(1),
-    title: fields.title,
-    date: fields.date,
-    summary: fields.summary,
-    tags: fields.tags ?? [],
-    category: config.categories.find((category) => category.id === fields.category)?.name,
-    source: fields.page === undefined ? `${url.slice(1)}index.md` : undefined,
-    sections: (content?.toc ?? []).map((section) => ({
+export function chatCatalogJson(config, pages) {
+  const articles = pages.map(({ article, entry }) => ({
+    url: entry.path,
+    title: entry.title,
+    date: entry.date,
+    summary: entry.summary,
+    tags: entry.tags,
+    category: entry.category?.name,
+    source: article.fields.page === undefined ? `${entry.path}index.md` : undefined,
+    sections: (article.content?.toc ?? []).map((section) => ({
       id: section.id,
       number: section.number,
       title: section.title,
       subsections: section.children.map((child) => ({ id: child.id, title: child.title })),
     })),
   }));
-  return `${JSON.stringify({ title: config.title, description: config.description, language: config.language, articles: entries })}\n`;
+  return `${JSON.stringify({ title: config.title, description: config.description, language: config.language, articles })}\n`;
 }
 
 function element(name, text) {
