@@ -41,6 +41,8 @@
     events.addEventListener('hello', (event) => {
       const { id } = JSON.parse(event.data);
       if (serverId !== null && serverId !== id) reloadPage();
+      else if (serverId === id && missing === undefined) queueRefresh();
+      else if (serverId === id) reloadPage();
       serverId = id;
     });
     events.addEventListener('problems', (event) => ui.showProblems(JSON.parse(event.data)));
