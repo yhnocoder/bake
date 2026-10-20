@@ -119,8 +119,6 @@ const sharedShadowLayers = (light, dark) => {
 
 async function settle(page) {
   await page.evaluate(async () => {
-    const styled = () => [...document.querySelectorAll('link[rel="stylesheet"], link[rel="preload"][as="style"]')].every((link) => link.rel === 'stylesheet' && link.sheet !== null);
-    while (!styled()) await new Promise((done) => requestAnimationFrame(done));
     await document.fonts.ready;
     for (let frame = 0; frame < 3; frame += 1) await new Promise((done) => requestAnimationFrame(done));
   });
