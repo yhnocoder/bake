@@ -322,6 +322,25 @@ test('the kit draws the example function plot', async (t) => {
     await page.close();
   });
 
+  await t.test('the chosen segment fades in a layer and animates no shadow or background', async () => {
+    const { page, problems } = await open();
+    const frame = page.locator(PLOT).first();
+    await frame.scrollIntoViewIfNeeded();
+    const styles = await page.evaluate(() => {
+      const segments = [...document.querySelector('figure.component[data-component="act-fn-plot"]').querySelectorAll('.bk-kit-segment span')];
+      const chosen = segments.find((span) => span.previousElementSibling.checked);
+      const other = segments.find((span) => !span.previousElementSibling.checked);
+      return {
+        span: getComputedStyle(chosen).transitionProperty,
+        layer: getComputedStyle(chosen, '::before').transitionProperty,
+        opacity: [getComputedStyle(chosen, '::before').opacity, getComputedStyle(other, '::before').opacity],
+      };
+    });
+    assert.deepEqual(styles, { span: 'color', layer: 'opacity', opacity: ['1', '0'] });
+    assert.deepEqual(problems, []);
+    await page.close();
+  });
+
   await t.test('controls show the pointer cursor and a focus outline', async () => {
     const { page, problems } = await open();
     const frame = page.locator(PLOT).first();

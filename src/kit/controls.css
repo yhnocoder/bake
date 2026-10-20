@@ -129,15 +129,27 @@
 }
 
 .bk-kit-segment span {
+  position: relative;
+  isolation: isolate;
   display: block;
   padding: 0 10px;
   border-radius: 5px;
   line-height: 24px;
   color: var(--ink-2);
   white-space: nowrap;
-  transition:
-    background-color 0.15s var(--ease-out),
-    color 0.15s var(--ease-out);
+  transition: color 0.15s var(--ease-out);
+}
+
+.bk-kit-segment span::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line-2);
+  opacity: 0;
+  transition: opacity 0.15s var(--ease-out);
 }
 
 .bk-kit-segment:hover span {
@@ -145,9 +157,11 @@
 }
 
 .bk-kit-segment input:checked + span {
-  background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 0 0 1px var(--line-2);
+}
+
+.bk-kit-segment input:checked + span::before {
+  opacity: 1;
 }
 
 .bk-kit-segment input:focus-visible + span {
@@ -237,6 +251,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bk-kit-segment span,
+  .bk-kit-segment span::before,
   .bk-kit-toggle-track,
   .bk-kit-toggle-track::after,
   .bk-kit-button {
