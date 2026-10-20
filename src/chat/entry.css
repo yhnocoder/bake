@@ -5,10 +5,16 @@
   color: var(--ink);
 }
 
+::selection {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
 button {
   font: inherit;
   color: inherit;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 

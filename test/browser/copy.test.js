@@ -293,6 +293,25 @@ test('a converted image keeps the address and the attributes written in the sour
   await context.close();
 });
 
+test('a converted paragraph escapes an ending that reads as a paragraph anchor, and the text of a button in raw HTML is left out of the Markdown and the HTML', async (t) => {
+  const body = '## Ends\n\nThe note ends with \\^b\n\n<p>Press <button>OK</button> now.</p>\n';
+  const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await openWithSelectionModule(page, `${base}/2026-10/rope/`);
+  const paragraph = '.bk-article p';
+  await select(page, { selector: paragraph, contains: 'note', text: 'note' }, { selector: paragraph, contains: 'Press', text: 'now', after: true });
+  const { text, html } = await copied(page);
+  assert.equal(text, 'note ends with \\^b\n\nPress  now');
+  assert.doesNotMatch(html, /OK/);
+  await context.close();
+});
+
 test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list, and an image with unreadable data-attributes as a plain image', async (t) => {
   const body = '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n\n<p>Raw shows <img src="q.png" alt="q" data-attributes="oops"> and <img src="r.png" alt="r" data-attributes="{&quot;x} y&quot;:&quot;1&quot;,&quot;width&quot;:{&quot;a&quot;:1},&quot;height&quot;:&quot;12px&quot;}"> here.</p>\n';
   const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
@@ -455,7 +474,7 @@ test('the module that writes a selection as Markdown loads when the reader selec
     };
     for (const [name, trigger] of Object.entries(triggers)) {
       const { page, requested } = await opened(`${base}/2026-10/rope/`);
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState('networkidle');
       assert.deepEqual(requested, [], `the module loads before the ${name}`);
       const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
       await trigger(page);

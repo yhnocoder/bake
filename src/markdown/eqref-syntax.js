@@ -1,4 +1,4 @@
-import { markdownLineEndingOrSpace } from 'micromark-util-character';
+import { markdownLineEnding } from 'micromark-util-character';
 
 const BACKSLASH = 92;
 const LEFT_BRACE = 123;
@@ -69,7 +69,7 @@ function tokenizeEqref(effects, ok, nok) {
       effects.exit('eqref');
       return ok;
     }
-    if (code === null || code === LEFT_BRACE || code === RIGHT_BRACE || markdownLineEndingOrSpace(code) || size > 999) return nok(code);
+    if (code === null || code === LEFT_BRACE || code === RIGHT_BRACE || markdownLineEnding(code) || size > 999) return nok(code);
     effects.consume(code);
     size++;
     return label;

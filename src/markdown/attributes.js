@@ -5,6 +5,9 @@ const SHORTHAND_VALUE = new RegExp(`^${BARE}$`);
 const BARE_VALUE = /^[\w.%/-]+$/;
 const SHORTHANDS = { id: '#', class: '.' };
 
+export const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
+export const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
+
 export function attributeTokens(text) {
   const inner = text.slice(1, -1);
   const tokens = [];
@@ -39,7 +42,12 @@ export function parseAttributes(text) {
 export function writeAttributes(attributes) {
   const entries = Object.entries(attributes);
   if (entries.length === 0) return '';
-  return `{${entries.map(([name, value]) => writeAttribute(name, value)).join(' ')}}`;
+  const written = entries.map(([name, value]) => {
+    const text = writeAttribute(name, value);
+    if (text === null) throw new Error(`the attribute ${name} cannot be written, because its value contains both quote characters`);
+    return text;
+  });
+  return `{${written.join(' ')}}`;
 }
 
 export function writeAttribute(name, value) {

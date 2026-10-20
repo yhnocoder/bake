@@ -27,7 +27,7 @@ describe('bake.config.js', () => {
       language: 'en',
       theme: 'essay',
       toc: 'notes',
-      themes: { essay: {}, bento: { columns: 4 } },
+      themes: { essay: {}, bento: { columns: 6, rowHeight: 24 } },
       home: { columns: 3, groupBy: 'month' },
       categories: [],
       chat: { pet: 'crt-monitor' },
@@ -55,6 +55,19 @@ describe('bake.config.js', () => {
   test('reports a JavaScript syntax error at its position', async (t) => {
     const { lines } = await load(t, { 'bake.config.js': 'export default {\n  title: ,\n};\n' });
     assert.deepEqual(lines, ['bake.config.js:2:10 Unexpected token']);
+  });
+
+  test('reports a package.json that makes Node read bake.config.js as CommonJS at 1:1', async (t) => {
+    const { config, lines } = await load(t, { 'package.json': '{ "type": "commonjs" }\n', 'bake.config.js': `export default { ${base} };\n` });
+    assert.equal(config, null);
+    assert.deepEqual(lines, ['bake.config.js:1:1 bake.config.js is an ES module, but package.json sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there or remove the field']);
+  });
+
+  test('reads bake.config.js next to a package.json with "type": "module" or without a type', async (t) => {
+    for (const packageJson of ['{ "type": "module" }\n', '{ "private": true }\n']) {
+      const { lines } = await load(t, { 'package.json': packageJson, 'bake.config.js': `export default { ${base} };\n` });
+      assert.deepEqual(lines, []);
+    }
   });
 
   test('reports an error thrown while importing at 1:1', async (t) => {
@@ -163,7 +176,7 @@ describe('bake.config.js', () => {
     const options = "export const options = { density: { label: 'Density', type: 'enum', options: ['loose', 'tight'], default: 'loose' }, rule: { label: 'Rule', type: 'boolean', default: true } };\n";
     const { config, lines } = await load(t, { 'bake.config.js': `export default { ${base}, themes: { mine: { density: 'tight' } } };\n`, 'themes/mine/options.js': options });
     assert.deepEqual(lines, []);
-    assert.deepEqual(config.themes, { essay: {}, bento: { columns: 4 }, mine: { density: 'tight', rule: true } });
+    assert.deepEqual(config.themes, { essay: {}, bento: { columns: 6, rowHeight: 24 }, mine: { density: 'tight', rule: true } });
   });
 
   test('reports a wrong option value of a blog theme with the field and the allowed values', async (t) => {

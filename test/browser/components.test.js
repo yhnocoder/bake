@@ -574,8 +574,17 @@ test('the example components run on the syntax page', async (t) => {
     await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state === 'ready'));
     await page.evaluate(async () => {
       await document.fonts.ready;
-      await new Promise((done) => setTimeout(done, 500));
+      const count = () => [...document.querySelectorAll('.component-box svg')].filter((svg) => svg.querySelector(':scope > g > g[data-mml-node="math"]') !== null).length;
+      let last = -1;
+      let still = 0;
+      while (still < 10) {
+        const now = count();
+        still = now === last ? still + 1 : 0;
+        last = now;
+        await new Promise((done) => requestAnimationFrame(done));
+      }
     });
+    await page.waitForFunction(() => [...document.querySelectorAll('.bk-kit-tex, .bk-kit-svg-tex')].every((label) => label.querySelector('svg, text') !== null || label.textContent !== ''));
     return { page, problems };
   };
 

@@ -7,6 +7,7 @@ describe('kit helpers', () => {
     assert.equal(formatNumber(1.23456, 2), '1.23');
     assert.equal(formatNumber(-0.5, 1), '−0.5');
     assert.equal(formatNumber(3, 0), '3');
+    assert.equal(formatNumber(-0.0001, 3), '0.000');
   });
 
   test('stepDigits gives the decimals that a step needs', () => {
@@ -35,6 +36,7 @@ describe('kit helpers', () => {
       ['0', '500', '1000'],
     );
     assert.equal(niceTicks(-0.3, 0.3, 3).find((tick) => Math.abs(tick.value) < 1e-9).label, '0.0');
+    assert.equal(niceTicks(-1e-12, 1e-12, 4).length, 5);
   });
 
   test('linearScale maps a domain onto a range and back, also when the range is reversed', () => {

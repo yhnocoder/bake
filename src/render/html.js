@@ -164,10 +164,11 @@ function blockElement(state, node, context) {
 }
 
 function componentElement(state, node, context) {
-  const { frame, frameWidth, height, narrowHeight } = node.component;
+  const { frame, frameWidth, height, narrowHeight, autoHeight } = node.component;
   const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
   if (context.excerpt === undefined) properties.dataLine = node.position.start.line;
   if (!frame) properties.dataFrame = 'none';
+  if (autoHeight) properties.dataHeight = 'auto';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
   const boxStyle = [
     `--component-height:${height.height}`,

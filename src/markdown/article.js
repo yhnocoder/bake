@@ -14,14 +14,14 @@ import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, addGlyphs, typesetMath } from '../render/math.js';
-import { parseAttributes } from './attributes.js';
+import { HEADING_ATTRIBUTE_SUFFIX, PARAGRAPH_ANCHOR_SUFFIX, parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
 import { citationsAndMissingFootnotes } from './bracket-syntax.js';
 import { equationReferences } from './eqref-syntax.js';
 import { highlight } from './highlight-syntax.js';
 import { readRawHtml } from './raw-html.js';
 import { REMARK_PLUGINS } from './remark-plugins.js';
-import { protectPipesInMath, restorePipesInMath } from './table-math.js';
+import { parseWithPipesInMath } from './table-math.js';
 
 const processor = unified()
   .use(remarkParse)
@@ -50,7 +50,11 @@ const HEADING_ATTRIBUTES = {
   id: { text: 'an anchor name, for example {#intro}' },
   toc: { text: 'a short title in quotes, for example toc="Short title"' },
   width: WIDTH,
+  cols: { count: 'a whole number of card columns from 1 to 6, for example cols=2', most: 6 },
+  rows: { count: 'a whole number of card rows from 1 to 200, for example rows=12', most: 200 },
 };
+const SECTION_ATTRIBUTES = ['width', 'cols', 'rows'];
+const COUNT = /^[1-9]\d*$/;
 const IMAGE_FLOATS = ['left', 'right'];
 const IMAGE_ATTRIBUTES = {
   width: { size: 'image width' },
@@ -58,9 +62,7 @@ const IMAGE_ATTRIBUTES = {
   float: { choices: IMAGE_FLOATS },
 };
 const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
-const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
 const STRAY_CLOSING_LINE = /^([\s>]*):{3,}\s*$/;
-const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
 const IMAGE_ATTRIBUTE_TEXT = /^\{[^{}\n]*\}/;
 const MATH_MIN_WIDTH = /min-width: ([\d.]+ex)/;
 const MATH_WIDTH = /<svg [^>]*?width="([\d.]+ex)"/;
@@ -68,6 +70,7 @@ const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const HAN_CHARACTER = /\p{Script=Han}/gu;
 const WORD = /[\p{L}\p{N}]+/gu;
 const PREVIEW_BLOCKS = 3;
+const WHITESPACE = /\s/;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
 const UNREAD_TABLE_MATH = '| inside $…$ cannot be read on this line, because the article uses every private-use character from U+E000 to U+F8FF and Bake needs one that it does not use';
@@ -121,9 +124,8 @@ class ArticleParser {
   }
 
   async parse() {
-    const pipes = protectPipesInMath(this.source);
-    if (pipes.unreadLine !== undefined) this.report({ line: pipes.unreadLine, column: 1 }, UNREAD_TABLE_MATH);
-    const tree = restorePipesInMath(processor.parse(pipes.text), pipes.sentinel);
+    const { tree, unreadLine } = parseWithPipesInMath(processor, this.source);
+    if (unreadLine !== undefined) this.report({ line: unreadLine, column: 1 }, UNREAD_TABLE_MATH);
     tree.children = tree.children.filter((node) => node.type !== 'yaml');
     walk(tree, (node) => {
       if (node.type === 'bakeBlock') this.readBlock(node);
@@ -459,8 +461,8 @@ class ArticleParser {
     node.attributes = {};
     const last = node.children.at(-1);
     const match = last?.type === 'text' ? HEADING_ATTRIBUTE_SUFFIX.exec(last.value) : null;
-    if (match) {
-      const raw = this.source.slice(last.position.start.offset, last.position.end.offset);
+    const raw = match ? this.source.slice(last.position.start.offset, last.position.end.offset) : '';
+    if (match && !isEscaped(raw, raw.lastIndexOf('{'))) {
       const position = this.positionAt(last.position.start.offset + raw.lastIndexOf('{'));
       last.value = last.value.slice(0, match.index);
       if (last.value === '') node.children.pop();
@@ -468,7 +470,7 @@ class ArticleParser {
       if (parsed.error) this.report(position, parsed.error);
       const attributes = this.checkAttributes(parsed.attributes, HEADING_ATTRIBUTES, 'heading', position);
       node.attributes = attributes;
-      if (attributes.width !== undefined && node.depth !== 2) this.report(position, 'width only applies to ## headings');
+      for (const name of SECTION_ATTRIBUTES) if (attributes[name] !== undefined && node.depth !== 2) this.report(position, `${name} only applies to ## headings`);
       if (attributes.id !== undefined) this.addAnchor(attributes.id, position);
     }
   }
@@ -488,6 +490,7 @@ class ArticleParser {
     const match = last?.type === 'text' ? PARAGRAPH_ANCHOR_SUFFIX.exec(last.value) : null;
     if (!match) return;
     const raw = this.source.slice(last.position.start.offset, last.position.end.offset);
+    if (isEscaped(raw, raw.lastIndexOf('^'))) return;
     const position = this.positionAt(last.position.start.offset + raw.lastIndexOf('^'));
     last.value = last.value.slice(0, match.index).trimEnd();
     if (last.value === '') node.children.pop();
@@ -592,9 +595,11 @@ class ArticleParser {
       node.ids = result.ids;
       const position = node.position.start;
       if (result.error !== undefined) this.report(position, `MathJax cannot typeset this formula: ${result.error}`);
-      for (const label of result.labels) {
+      for (const { name: label, afterEnvironment } of result.labels) {
         if (label.trim() === '') this.report(position, '\\label{} needs a name, for example \\label{eq:ffn}');
+        else if (WHITESPACE.test(label)) this.report(position, `\\label{${label}} has a space; a label name has no spaces, for example \\label{eq:ffn}`);
         else if (node.type === 'inlineMath') this.report(position, `\\label{${label}} only works in a display formula between $$ lines`);
+        else if (labels.get(label)?.tag === '???' && afterEnvironment) this.report(position, `\\label{${label}} is outside the environment of its equation; write it inside \\begin{…} and \\end{…}, on the line it labels`);
         else if (labels.get(label)?.tag === '???') this.report(position, `\\label{${label}} is not on a numbered equation; it is inside a starred environment or on a \\notag line`);
       }
       for (const reference of result.references) {
@@ -607,7 +612,8 @@ class ArticleParser {
     });
     this.equationIds = equationIds;
     for (const node of references) {
-      if (!labels.has(node.label)) this.report(node.position.start, `${node.value} refers to an unknown \\label`);
+      if (WHITESPACE.test(node.label)) this.report(node.position.start, `${node.value} has a space; a label name has no spaces, for example \\eqref{eq:ffn}`);
+      else if (!labels.has(node.label)) this.report(node.position.start, `${node.value} refers to an unknown \\label`);
     }
   }
 
@@ -859,6 +865,8 @@ class ArticleParser {
           ...this.headingFields(node),
           number: String(sections.length + 1).padStart(2, '0'),
           width: node.attributes.width,
+          cols: count(node.attributes.cols),
+          rows: count(node.attributes.rows),
           line: node.position.start.line,
           endLine: node.position.end.line,
           titleSidenotes: this.referencedSidenotes(node),
@@ -988,7 +996,12 @@ class ArticleParser {
 function attributeProblem(name, rule, value) {
   if (rule.choices !== undefined) return choiceProblem(name, rule.choices, value);
   if (rule.size !== undefined) return sizeProblem(rule.size, value, 'image');
+  if (rule.count !== undefined) return typeof value === 'string' && COUNT.test(value) && Number(value) <= rule.most ? null : `${name} must be ${rule.count}`;
   return typeof value === 'string' ? null : `${name} must be ${rule.text}`;
+}
+
+function count(value) {
+  return value === undefined ? undefined : Number(value);
 }
 
 function blockType(node) {
@@ -1053,4 +1066,10 @@ function imageProperties(attributes, published) {
 function walk(node, visit, parent = null) {
   if (visit(node, parent) === false) return;
   for (const child of [...(node.children ?? [])]) walk(child, visit, node);
+}
+
+function isEscaped(text, index) {
+  let backslashes = 0;
+  while (text[index - 1 - backslashes] === '\\') backslashes++;
+  return backslashes % 2 === 1;
 }

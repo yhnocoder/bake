@@ -20,6 +20,8 @@ const markdownFixtures = [
   'undefined-footnote.md',
   'missing-citation.md',
   'unknown-eqref.md',
+  'label-space.md',
+  'label-outside-environment.md',
   'list-table-cell-count.md',
   'image-width-tier.md',
   'unknown-component-parameter.md',
@@ -133,6 +135,18 @@ describe('headings and anchors', () => {
     ]);
   });
 
+  test('gives a ## section the card columns and rows written on its heading', async () => {
+    const article = await parsed('## First {cols=2 rows=23}\n\nA.\n\n## Second {cols=3}\n\nB.\n\n## Third\n\nC.\n');
+    assert.deepEqual(
+      article.sections.map(({ cols, rows }) => ({ cols, rows })),
+      [
+        { cols: 2, rows: 23 },
+        { cols: 3, rows: undefined },
+        { cols: undefined, rows: undefined },
+      ],
+    );
+  });
+
   test('keeps the source text and the lines of each heading, counted from the first line of the file', async () => {
     const body = 'Intro.\n\n## First\n\nA.\n\nSecond\n------\n\n### Inner\n';
     const article = await parsed(body);
@@ -191,6 +205,12 @@ describe('headings and anchors', () => {
   const headingErrors = [
     ['## A {width=full}', 'index.md:7:6 width must be body, wide or page, got "full"'],
     ['### A {width=wide}', 'index.md:7:7 width only applies to ## headings'],
+    ['## A {cols=0}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
+    ['## A {cols=1.5}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
+    ['## A {rows}', 'index.md:7:6 rows must be a whole number of card rows from 1 to 200, for example rows=12'],
+    ['## A {cols=7}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
+    ['## A {rows=201}', 'index.md:7:6 rows must be a whole number of card rows from 1 to 200, for example rows=12'],
+    ['### A {cols=2 rows=3}', 'index.md:7:7 cols only applies to ## headings', 'index.md:7:7 rows only applies to ## headings'],
     ['## A {toc}', 'index.md:7:6 toc must be a short title in quotes, for example toc="Short title"'],
     ['## A {id}', 'index.md:7:6 id must be an anchor name, for example {#intro}'],
     ['## A {.red}', 'index.md:7:6 unknown attribute "class" on heading'],
@@ -198,9 +218,9 @@ describe('headings and anchors', () => {
     ['## A {toc="unclosed}', 'index.md:7:6 cannot read the attributes {toc="unclosed}; write them as {#id key=value key="text with spaces"}'],
     ['# Title', 'index.md:7:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##'],
   ];
-  for (const [line, message] of headingErrors) {
-    test(`reports ${message.slice(message.indexOf(' ') + 1)}`, async () => {
-      assert.deepEqual((await parse(`${line}\n`)).errors, [message]);
+  for (const [line, ...messages] of headingErrors) {
+    test(`reports ${messages[0].slice(messages[0].indexOf(' ') + 1)} for ${line}`, async () => {
+      assert.deepEqual((await parse(`${line}\n`)).errors, messages);
     });
   }
 });
@@ -225,6 +245,10 @@ describe('attributes', () => {
     }
     assert.equal(writeAttributes({ range: 6 }), '{range=6}');
     assert.equal(writeAttributes({}), '');
+  });
+
+  test('refuses to write a value that holds both quote characters, which the attribute syntax cannot hold', () => {
+    assert.throws(() => writeAttributes({ title: `say "it's"` }), /the attribute title cannot be written/);
   });
 });
 
@@ -295,6 +319,27 @@ describe('writing Markdown', () => {
     assert.deepEqual(article.sections[0].blocks.map((block) => block.type), ['paragraph', 'paragraph', 'paragraph', 'fold', 'list-table', 'references', 'math']);
     assert.equal(outline(article.sections[0].blocks[1].html), '<p>a ==b== \\eqref{x} [@key] a * b *c*</p>');
     assert.equal(outline(article.sections[0].blocks[2].html), '<p>:::fold</p>');
+  });
+
+  test('escapes a paragraph that ends like a paragraph anchor and a heading that ends like attributes, so the text renders unchanged', async () => {
+    const tree = {
+      type: 'root',
+      children: [
+        { type: 'heading', depth: 2, children: [text('Title {x}')] },
+        paragraph(text('see note ^b')),
+        { type: 'heading', depth: 3, children: [text('Kept {y}')], attributes: { id: 'kept' } },
+        paragraph(text('a ^b c')),
+      ],
+    };
+    const markdown = serializeMarkdown(tree);
+    assert.equal(markdown, '## Title \\{x}\n\nsee note \\^b\n\n### Kept {y} {#kept}\n\na ^b c\n');
+    const { article, errors } = await parse(markdown);
+    assert.deepEqual(errors, []);
+    assert.equal(article.sections[0].title, 'Title {x}');
+    assert.deepEqual(
+      article.sections[0].blocks.map((block) => outline(block.html)),
+      ['<p>see note ^b</p>', '<h3 id="kept" data-attributes="{&#x22;id&#x22;:&#x22;kept&#x22;}">Kept {y}</h3>', '<p>a ^b c</p>'],
+    );
   });
 
   test('escapes every asterisk of a run next to text, also in strong text, next to an escaped character and in a table cell, so the text renders unchanged', async () => {
@@ -390,6 +435,18 @@ describe('aside and fold', () => {
     const article = await parsed(':::aside\n```markdown\n:::\n```\n~~~~\n:::\n~~~\n:::\n~~~~\n:::\n\n## After\n');
     assert.equal(outline(article.intro[0].html), '<aside class="aside">\n```markdown\n:::\n```\n```\n:::\n~~~\n:::\n```\n</aside>');
     assert.deepEqual(article.sections.map((section) => section.id), ['after']);
+  });
+
+  test('closes a block after a code fence that a list item or an HTML block ends', async () => {
+    const article = await parsed(':::aside\n- a\n\n  ```\n  code\n- b\n:::\n\n:::fold{title=x}\n<div>\n```\n</div>\n:::\n\nAfter.\n');
+    assert.deepEqual(
+      article.intro.map((block) => [block.type, block.line, block.endLine]),
+      [
+        ['aside', 7, 13],
+        ['fold', 15, 19],
+        ['paragraph', 21, 21],
+      ],
+    );
   });
 
   test('reads a code fence inside a block only with up to three spaces of indentation, so indented code does not hide the closing line', async () => {

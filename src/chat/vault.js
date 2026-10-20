@@ -1,4 +1,10 @@
 export const STORAGE_KEY = 'bk-chat-key';
+export const REMEMBER_DAYS = 30;
+
+const DATABASE = 'bake-chat';
+const STORE = 'keys';
+const REMEMBERED = 'key';
+const DAY = 24 * 60 * 60 * 1000;
 
 const KEY_INFO = new TextEncoder().encode('bake chat api key');
 const SALT_BYTES = 32;
@@ -64,23 +70,87 @@ export async function saveKey(apiKey, { site }) {
   const sealed = await sealKey(secret, apiKey);
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ credential: id, salt: encode(salt), ...sealed }));
   if (previous !== null && previous.credential !== id) forgetCredential(previous.credential);
+  await remember(secret, id);
 }
 
 export async function unlockKey() {
   const record = storedKey();
   if (record === null) throw new VaultError('missing');
   const secret = await evaluate(record.credential, decode(record.salt));
+  let apiKey;
   try {
-    return await openKey(secret, record);
+    apiKey = await openKey(secret, record);
   } catch (error) {
     throw new VaultError('corrupt', error);
   }
+  await remember(secret, record.credential);
+  return apiKey;
+}
+
+export async function rememberedKey() {
+  let remembered;
+  try {
+    remembered = await keyStore('readonly', (store) => store.get(REMEMBERED));
+  } catch {
+    return null;
+  }
+  if (remembered === undefined) return null;
+  const record = storedKey();
+  const left = remembered.until - Date.now();
+  if (record !== null && remembered.credential === record.credential && left > 0 && left <= REMEMBER_DAYS * DAY) {
+    try {
+      return await decryptWith(remembered.key, record);
+    } catch {}
+  }
+  await forgetRemembered(remembered);
+  return null;
 }
 
 export function clearKey() {
   const record = storedKey();
   localStorage.removeItem(STORAGE_KEY);
   if (record !== null) forgetCredential(record.credential);
+  return forgetRemembered();
+}
+
+async function remember(secret, credential) {
+  try {
+    const key = await aesKey(secret, ['decrypt']);
+    await keyStore('readwrite', (store) => store.put({ key, credential, until: Date.now() + REMEMBER_DAYS * DAY }, REMEMBERED));
+  } catch {}
+}
+
+async function forgetRemembered(expected) {
+  try {
+    await keyStore('readwrite', (store) => {
+      const request = store.get(REMEMBERED);
+      request.onsuccess = () => {
+        const current = request.result;
+        if (expected === undefined || (current?.credential === expected.credential && current?.until === expected.until)) store.delete(REMEMBERED);
+      };
+      return request;
+    });
+  } catch {}
+}
+
+async function keyStore(mode, action) {
+  const database = await new Promise((resolve, reject) => {
+    const request = indexedDB.open(DATABASE, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE, mode);
+      const request = action(transaction.objectStore(STORE));
+      transaction.oncomplete = () => resolve(request.result);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    database.close();
+  }
 }
 
 function forgetCredential(id) {
@@ -94,9 +164,12 @@ export async function sealKey(secret, apiKey) {
   return { iv: encode(iv), data: encode(data) };
 }
 
-export async function openKey(secret, { iv, data }) {
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(iv) }, await aesKey(secret, ['decrypt']), decode(data));
-  return new TextDecoder().decode(plain);
+export async function openKey(secret, sealed) {
+  return decryptWith(await aesKey(secret, ['decrypt']), sealed);
+}
+
+async function decryptWith(key, { iv, data }) {
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(iv) }, key, decode(data)));
 }
 
 async function evaluate(id, salt) {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
@@ -126,7 +126,7 @@ describe('reading components', () => {
       'components/empty-enum.js': `export const params = { fn: { label: 'F', type: 'enum', default: 'a' } };\n${height}${component}`,
       'components/bad-default.js': `export const params = { n: { label: 'N', type: 'number', min: 1, max: 10, default: 20 }, on: { label: 'On', type: 'boolean', default: 'yes' }, fn: { label: 'F', type: 'enum', options: ['a', 'b'], default: 'c' }, t: { label: 'T', type: 'text', default: 3 } };\n${height}${component}`,
       'components/bad-field.js': `export const params = { n: { label: 'N', type: 'text', default: '', optons: [] }, m: { type: 'number', default: 1 }, k: { label: 'K', type: 'number' } };\n${height}${component}`,
-      'components/bad-layout.js': `export const layout = { width: 'full', height: '300px', narrowHeight: { ratio: -1 }, frame: 'no', heigth: 3 };\n${component}`,
+      'components/bad-layout.js': `export const layout = { width: 'full', height: '300px', narrowHeight: { ratio: -1 }, frame: 'no', autoHeight: 1, heigth: 3 };\n${component}`,
       'components/no-height.js': `export const layout = { width: '120%' };\n${component}`,
       'components/no-default-export.js': height,
       'components/Plot_Name.js': component,
@@ -141,10 +141,11 @@ describe('reading components', () => {
       'components/bad-field.js:1:1 bad-field: parameter "n" has the unknown field "optons"; the fields of a text parameter are label, type and default',
       'components/bad-field.js:1:1 bad-field: parameter "m" needs a label, the text shown next to its control',
       'components/bad-field.js:1:1 bad-field: parameter "k" needs a default, the value used when the article does not set it',
-      'components/bad-layout.js:1:1 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight and frame',
+      'components/bad-layout.js:1:1 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight, autoHeight and frame',
       'components/bad-layout.js:1:1 bad-layout: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "full"',
       'components/bad-layout.js:1:1 bad-layout: layout.height must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got "300px"',
       'components/bad-layout.js:1:1 bad-layout: layout.narrowHeight must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got an object',
+      'components/bad-layout.js:1:1 bad-layout: layout.autoHeight must be true or false, got 1',
       'components/bad-layout.js:1:1 bad-layout: layout.frame must be true or false, got "no"',
       'components/bad-type.js:1:1 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
       "components/empty-enum.js:1:1 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
@@ -252,6 +253,14 @@ describe('component blocks', () => {
     assert.deepEqual(article.components, ['act-fn-plot', 'glu-heatmap']);
   });
 
+  test('marks the frame of a component with autoHeight unless the article sets its height', async () => {
+    const growing = { ...heatmap, name: 'grow-view', layout: { height: 300, narrowHeight: 500, autoHeight: true } };
+    const article = await parsed(':::grow-view\n:::\n\n:::grow-view{height=420}\n:::\n', { components: new Map([['grow-view', growing]]) });
+    const [auto, fixed] = article.intro;
+    assert.match(auto.html, /^<figure class="component" data-component="grow-view" data-params="\{\}" data-line="7" data-height="auto"><div class="component-box" style="--component-height:300px;--component-ratio:auto;--component-narrow-height:500px;--component-narrow-ratio:auto"><\/div><\/figure>$/);
+    assert.doesNotMatch(fixed.html, /data-height/);
+  });
+
   test('gives a component the URL-encoded path of a file parameter whose name holds #, ? or %', async () => {
     const options = { components, folder: { path: '/blog/post', files: ['data#1.json', 'a?b.json', 'tables/100%.json'] } };
     const article = await parsed(':::act-fn-plot{data=data#1.json}\n:::\n\n:::act-fn-plot{data="a?b.json"}\n:::\n\n:::act-fn-plot{data=tables/100%.json}\n:::\n', options);
@@ -345,6 +354,20 @@ describe('building components', () => {
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);
     assert.match(readFileSync(join(dir, 'dist/assets', assets.find((name) => /^line-plot-[\w-]+\.css$/.test(name))), 'utf8'), /\.bk-kit-slider/);
     assert.ok(!assets.some((name) => name.startsWith('tick-list') && name.endsWith('.css')), assets.join(', '));
+  });
+
+  test('builds formulas after reading a component library that replaces the module loader of MathJax, also with an empty preamble.sty', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'preamble.sty': '',
+      'components/lib/tex.js': "import { mathjax } from '@mathjax/src/js/mathjax.js';\n\nmathjax.asyncLoad = (name) => import(name);\n\nexport const ready = 'ready';\n",
+      'components/tex-box.js': `import { ready } from './lib/tex.js';\n\n${height}export default class TexBox extends HTMLElement {\n  connectedCallback() {\n    this.textContent = ready;\n  }\n}\n`,
+      'content/posts/rope/index.md': article({ body: '$$\nx \\in \\mathbb{R}\n$$\n\n:::tex-box\n:::\n' }),
+    });
+    symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), join(dir, 'node_modules'), 'dir');
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\mathbb{R}">/);
   });
 
   test('marks the frames of the article itself with their line and the frames of embedded content without one', (t) => {
