@@ -1,3 +1,4 @@
+import { formatNumber } from 'bake/kit'
 import { fn, swish, normalPdf, SWISH_MIN_AT_BETA_1, GELU_MIN_X } from './functions.js'
 
 const LN9 = Math.log(9)
@@ -171,7 +172,7 @@ function curveGuides(kind, derivative, { beta, range, mainColor, referenceColor 
     const b = kind === 'swish' ? beta : 1
     const w = kind === 'gelu' ? 2 : LN9 / b
     const bandLabel =
-      kind === 'gelu' ? '主要变化范围 $\\approx[-2,2]$' : (kind === 'softplus' ? '斜率' : 'gate') + ' 10%–90%，宽 ' + (2 * w).toFixed(2)
+      kind === 'gelu' ? '主要变化范围 $\\approx[-2,2]$' : (kind === 'softplus' ? '斜率' : 'gate') + ' 10%–90%，宽 ' + formatNumber(2 * w, 2)
     result.bands = [band(-w, w, bandLabel)]
     zero()
     linear()
@@ -181,7 +182,7 @@ function curveGuides(kind, derivative, { beta, range, mainColor, referenceColor 
     if (!derivative && kind !== 'softplus') {
       const x = kind === 'gelu' ? GELU_MIN_X : SWISH_MIN_AT_BETA_1 / b
       const y = kind === 'gelu' ? fn.gelu.f(x) : swish(b).f(x)
-      result.points.push(point(x, y, '最低点 $(' + x.toFixed(2) + ',\\ ' + y.toFixed(2) + ')$', { dx: -70, dy: 22 }))
+      result.points.push(point(x, y, '最低点 (' + formatNumber(x, 2) + ', ' + formatNumber(y, 2) + ')', { dx: -70, dy: 22 }))
     }
   }
   result.points = result.points.map((p) => ({ color: mainColor, ...p }))
@@ -213,4 +214,20 @@ export function guidesFor(preset, derivative, { series, beta, range }) {
     references: (raw.references ?? []).map((r) => ({ ...r, color: resolve(r.color) })),
     points: (raw.points ?? []).map((p) => ({ ...p, color: resolve(p.color) })),
   }
+}
+
+const CURVE_KINDS = ['relu', 'relu2', 'sigmoid', 'tanh', 'normal', 'silu', 'swish', 'gelu', 'softplus']
+const PRESET_RANGE = [-4, 4]
+
+const labelsOf = (guides) => [
+  guides.left,
+  guides.right,
+  ...[...(guides.bands ?? []), ...(guides.references ?? []), ...(guides.verticals ?? []), ...(guides.points ?? [])].map((item) => item.label ?? ''),
+]
+
+export function guideLabelSources() {
+  return [false, true].flatMap((derivative) => [
+    ...Object.values(presets).flatMap((preset) => labelsOf(preset(derivative))),
+    ...CURVE_KINDS.flatMap((kind) => labelsOf(curveGuides(kind, derivative, { beta: 1, range: PRESET_RANGE }))),
+  ])
 }

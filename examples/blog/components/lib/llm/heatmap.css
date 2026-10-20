@@ -18,6 +18,12 @@
   min-width: 0;
   padding-left: 32px;
 }
+.llm-heat-axis-title,
+.llm-heat-x-label,
+.llm-heat-bar-title {
+  min-height: 18px;
+  line-height: 18px;
+}
 .llm-heat-axis-title {
   margin-bottom: 6px;
   font-size: 12px;

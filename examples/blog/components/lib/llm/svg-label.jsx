@@ -1,6 +1,5 @@
-import { segments, texBox, texFailed } from './tex.js'
-
-const HALO_WIDTH = 3
+import { createMemo } from 'solid-js'
+import { segments, texBox } from './tex.js'
 
 let measureContext
 let uiFont
@@ -12,53 +11,57 @@ function textWidth(text, size) {
   return measureContext.measureText(text).width
 }
 
+function layoutParts(source, size) {
+  return segments(source).map((part) => {
+    const box = part.math ? texBox(part.text, size * 1.1) : null
+    if (box !== null) return { box }
+    return { text: part.text, width: textWidth(part.text, size) }
+  })
+}
+
+function labelContent(source, size, fill, halo) {
+  const parts = layoutParts(source, size)
+  let x = 0
+  const nodes = parts.map((part) => {
+    const left = x
+    if (part.text) {
+      x += part.width
+      return (
+        <text
+          x={left}
+          y={0}
+          font-size={size}
+          font-weight="500"
+          fill={fill}
+          class="llm-label-text"
+          stroke={halo ? 'var(--surface)' : undefined}
+          stroke-width={halo ? 3 : undefined}
+          paint-order={halo ? 'stroke' : undefined}
+        >
+          {part.text}
+        </text>
+      )
+    }
+    const { svg, width, height, ascent } = part.box
+    x += width
+    svg.setAttribute('x', left)
+    svg.setAttribute('y', -ascent)
+    svg.setAttribute('width', width)
+    svg.setAttribute('height', height)
+    svg.setAttribute('overflow', 'visible')
+    svg.style.color = fill
+    if (halo) svg.classList.add('llm-halo')
+    return svg
+  })
+  return { nodes, width: x }
+}
+
 export function SvgLabel(props) {
-  const size = props.size ?? 10.5
-  const fill = props.fill ?? 'var(--ink)'
-  const halo = props.halo !== false
-  const nodes = () => {
-    const parts = segments(props.text).map((part) =>
-      part.math && !texFailed(part.text)
-        ? { box: texBox(part.text, size * 1.1) }
-        : { text: part.text, width: textWidth(part.text, size) },
-    )
-    if (parts.some((part) => part.box === null)) return []
-    const total = parts.reduce((sum, part) => sum + (part.box ? part.box.width : part.width), 0)
-    let x = props.anchor === 'middle' ? props.x - total / 2 : props.anchor === 'end' ? props.x - total : props.x
-    return parts.map((part) => {
-      const left = x
-      if (part.text) {
-        x += part.width
-        return (
-          <text
-            x={left}
-            y={props.y}
-            font-size={size}
-            font-weight="500"
-            fill={fill}
-            class="llm-label-text"
-            stroke={halo ? 'var(--surface)' : undefined}
-            stroke-width={halo ? HALO_WIDTH : undefined}
-            paint-order={halo ? 'stroke' : undefined}
-          >
-            {part.text}
-          </text>
-        )
-      }
-      const { svg, width, height, ascent } = part.box
-      x += width
-      svg.setAttribute('x', left)
-      svg.setAttribute('y', props.y - ascent)
-      svg.setAttribute('width', width)
-      svg.setAttribute('height', height)
-      svg.setAttribute('overflow', 'visible')
-      svg.style.color = fill
-      if (halo) {
-        svg.classList.add('llm-halo')
-        svg.style.setProperty('--llm-halo-width', `${HALO_WIDTH / part.box.scale}px`)
-      }
-      return svg
-    })
-  }
-  return <g pointer-events={props.interactive === false ? 'none' : undefined}>{nodes()}</g>
+  const content = createMemo(() => labelContent(props.text, props.size ?? 10.5, props.fill ?? 'var(--ink)', props.halo !== false))
+  const shift = () => (props.anchor === 'middle' ? content().width / 2 : props.anchor === 'end' ? content().width : 0)
+  return (
+    <g transform={`translate(${props.x - shift()} ${props.y})`} pointer-events={props.interactive === false ? 'none' : undefined}>
+      {content().nodes}
+    </g>
+  )
 }
