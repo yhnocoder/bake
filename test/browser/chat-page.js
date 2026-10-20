@@ -102,3 +102,84 @@ export async function scrollPage(page, delta) {
     await nextFrame(page);
   }
 }
+
+const PET_ROWS = {
+  idle: [0, 6, 'still'],
+  greet: [3, 4, 'once'],
+  open: [0, 6, 'once'],
+  unlocking: [6, 6, 'loop'],
+  answering: [7, 6, 'loop'],
+  reading: [8, 6, 'loop'],
+  answered: [4, 5, 'once'],
+  failed: [5, 8, 'hold'],
+};
+
+export function petEntry(state, { reduced = false } = {}) {
+  const [row, frames, play] = PET_ROWS[state];
+  if (reduced || play === 'still') return { row, frames: null, play: 'still' };
+  return { row, frames, play: play === 'loop' ? 'loop' : 'once' };
+}
+
+export async function watchPet(page) {
+  await page.locator('.bk-chat-launcher .bk-chat-pet').waitFor();
+  await page.evaluate(() => {
+    const pet = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet');
+    const sheet = pet.querySelector('.bk-chat-pet-sheet');
+    const shown = () => {
+      const box = pet.getBoundingClientRect();
+      const style = getComputedStyle(sheet);
+      const [animation] = sheet.getAnimations();
+      const moves = animation !== undefined && animation.effect.getKeyframes().some((keyframe) => keyframe.transform !== undefined && keyframe.transform !== 'none');
+      const row = Math.round((box.top - sheet.getBoundingClientRect().top) / box.height);
+      if (!moves) return { row, frames: null, play: 'still' };
+      return { row, frames: Number(/steps\((\d+)/.exec(style.animationTimingFunction)[1]), play: style.animationIterationCount === 'infinite' ? 'loop' : 'once' };
+    };
+    window.bakeTest.pet = [];
+    let last = '';
+    const record = () => {
+      const entry = shown();
+      if (JSON.stringify(entry) !== last) window.bakeTest.pet.push(entry);
+      last = JSON.stringify(entry);
+    };
+    const watch = () => {
+      record();
+      requestAnimationFrame(watch);
+    };
+    watch();
+    // why: a state can last shorter than a frame under load, so every change of the pet is recorded as well
+    new MutationObserver(record).observe(pet, { attributes: true });
+  });
+}
+
+export async function petSeen(page, state, options) {
+  const entry = petEntry(state, options);
+  await page.waitForFunction((entry) => window.bakeTest.pet.some((seen) => JSON.stringify(seen) === JSON.stringify(entry)), entry);
+}
+
+export function shadow(page, script, argument) {
+  return page.evaluate(({ script, argument }) => new Function('root', 'argument', script)(document.querySelector('[data-bake-chat]').shadowRoot, argument), { script, argument });
+}
+
+export async function openSettings(page) {
+  if ((await page.locator('.bk-chat-launcher').getAttribute('aria-expanded')) !== 'true') await page.locator('.bk-chat-launcher').click();
+  await page.locator('.bk-chat-composer button[aria-label="对话设置"]').click();
+  await page.locator('.bk-chat-menu').waitFor();
+}
+
+export function backdropRoots(chat) {
+  const roots = [];
+  for (let node = chat; node !== null; node = node.parentNode instanceof ShadowRoot ? node.parentNode.host : node.parentElement) {
+    const style = getComputedStyle(node);
+    const reasons = [
+      Number(style.opacity) < 1 && 'opacity',
+      style.filter !== 'none' && 'filter',
+      style.maskImage !== 'none' && 'mask',
+      style.clipPath !== 'none' && 'clip-path',
+      style.mixBlendMode !== 'normal' && 'mix-blend-mode',
+      style.backdropFilter !== 'none' && 'backdrop-filter',
+      /opacity|filter|mask|clip-path|mix-blend-mode/.test(style.willChange) && 'will-change',
+    ].filter(Boolean);
+    if (reasons.length > 0) roots.push(`${node.localName}.${node.classList[0] ?? ''} ${reasons.join(' ')}`);
+  }
+  return roots;
+}

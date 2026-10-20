@@ -49,7 +49,7 @@ const NOTE = [
   '- 中文标题的锚点怎么生成。',
 ].join('\n');
 
-test('the history, the notes and the instructions of the AI chat', async (t) => {
+test('the history of the AI chat', async (t) => {
   const base = await serveExample(t, { localhost: true });
 
   await t.test('conversations are saved in this browser as they go, listed per article on article pages and grouped by article on the homepage, and can be opened, continued and deleted', async (t) => {
@@ -153,6 +153,10 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await page.locator('.bk-chat-history-row .bk-chat-history-title').textContent(), '旧问题');
     assert.equal(await page.locator('.bk-chat-history-row small').textContent(), '03-01 · 1 轮');
   });
+});
+
+test('the notes of the AI chat', async (t) => {
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('a conversation becomes a note with checked links, which is copied, rewritten on request, kept in versions and saved with its conversation', async (t) => {
     const { page, api, problems } = await openBrowser(t, base);
@@ -328,6 +332,10 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await card.locator('.bk-chat-note-source').isVisible(), true);
     assert.equal(await page.evaluate(() => getSelection().toString().trimEnd()), (await card.locator('.bk-chat-note-source').textContent()).trimEnd());
   });
+});
+
+test('the instructions and the prompts of the AI chat', async (t) => {
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('the tabs of the prompt form fit the form in Chinese and in English at 320 and 375 pixels and break only between words', async (t) => {
     for (const width of [320, 375]) {
