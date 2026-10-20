@@ -5,11 +5,11 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { errorAt, fileStart } from '../report.js';
-import { contentType } from './content-types.js';
+import { contentType } from '../content-types.js';
 import { DIST_DIR } from './dist.js';
 import { cardHtml } from './share-card.js';
 import { THEME_STYLES_PATH } from './theme.js';
-import { encodePath } from './urls.js';
+import { encodePath } from '../urls.js';
 
 export const SHARE_IMAGE_DIR = 'og';
 export const SHARE_IMAGE_WIDTH = 1200;

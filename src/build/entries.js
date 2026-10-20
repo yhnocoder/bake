@@ -1,6 +1,6 @@
 import { compareText } from '../report.js';
 import { absoluteLink } from './site-files.js';
-import { encodePath } from './urls.js';
+import { encodePath } from '../urls.js';
 
 export function articleEntry(article, config) {
   const { fields, content, url } = article;

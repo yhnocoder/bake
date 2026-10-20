@@ -2,7 +2,7 @@ import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { CONFIG_FILE } from '../config/bake-config.js';
 import { POSTS_DIR } from './articles.js';
-import { articleUrl } from './urls.js';
+import { articleUrl } from '../urls.js';
 
 const EXAMPLE_SLUG = 'hello';
 

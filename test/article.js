@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { indexPages } from '../src/build/links.js';
-import { parseArticle, readArticle } from '../src/markdown/article.js';
+import { readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
 
 export const frontMatter = '---\ntitle: T\nslug: t\ndate: 2026-10-19\n---\n\n';
+
+export async function parseArticle(file, source, errors, options = {}) {
+  const article = await readArticle(file, source, errors, options);
+  article.link(indexPages([{ url: article.url, title: '', draft: false, article }]), errors);
+  return article.structure();
+}
 
 export async function parse(body, options) {
   const errors = [];

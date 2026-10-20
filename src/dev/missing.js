@@ -1,4 +1,4 @@
-import { escapeMarkup } from '../build/escape.js';
+import { escapeMarkup } from '../escape.js';
 import { compareText } from '../report.js';
 
 const STYLE = `
