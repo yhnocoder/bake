@@ -293,6 +293,13 @@ describe(':::embed', () => {
     assert.match(article.intro[0].html, /<p class="note">Set id=5 here<\/p>/);
   });
 
+  test('points a link with an invalid percent-encoding in embedded content into the source article and reports it only there', async () => {
+    const source = { url: '/2026-10/bad/', title: 'Bad', body: '## Part {#part}\n\nSee [this](#%ZZ).\n' };
+    const { articles, errors } = await site(':::embed\n/2026-10/bad/#part\n:::\n', [source]);
+    assert.deepEqual(errors.map((error) => error.split(':')[0]), ['bad.md']);
+    assert.match(articles['/2026-10/host/'].intro[0].html, /<a href="\.\.\/\.\.\/2026-10\/bad\/#%ZZ">this<\/a>/);
+  });
+
   test('reports an embed of an equation, a sidenote or a reference', async () => {
     const { errors } = await site(':::embed\n/2026-10/target/#eq:chain\n/2026-10/target/#sidenote-1\n/2026-10/target/#reference-griewank\n:::\n');
     assert.deepEqual(errors, [

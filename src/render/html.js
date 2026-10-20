@@ -54,7 +54,8 @@ function handlers(context) {
     html: (state, node) => raw(excerpt === undefined ? node.value : node.rawHtml.withoutIds),
     link(state, node) {
       const result = defaultHandlers.link(state, node);
-      const target = node.target ?? (excerpt !== undefined && node.url.startsWith('#') ? excerpt.target(percentDecode(node.url.slice(1))) : undefined);
+      const anchor = excerpt !== undefined && node.url.startsWith('#') ? percentDecode(node.url.slice(1)) : null;
+      const target = node.target ?? (anchor === null ? undefined : excerpt.target(anchor));
       if (target !== undefined) {
         const { address, page } = target;
         result.properties = { className: ['internal-link'], ...result.properties, href: addressHref(context.root, address.path, address.anchor, address.query) };
