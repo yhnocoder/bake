@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
+import { chromium } from 'playwright';
 import { article, bake, createBlog, validConfig } from './blog.js';
+import { serve } from './browser/server.js';
 
 const plainPage = `import { For } from 'solid-js';
 
@@ -20,6 +22,8 @@ export default function Page(props) {
   );
 }
 `;
+
+const scriptPage = plainPage.replace('<For each={props.assets.styles}>', '<For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>\n        <For each={props.assets.styles}>');
 
 describe('themes', () => {
   test("a file in the blog's themes/essay/ replaces the built-in file of the same name", (t) => {
@@ -61,13 +65,58 @@ describe('themes', () => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
-      'themes/plain/page.jsx': plainPage.replace('<For each={props.assets.styles}>', '<For each={props.assets.scripts}>{(src) => <script defer src={src} />}</For>\n        <For each={props.assets.styles}>'),
+      'themes/plain/page.jsx': scriptPage,
       'themes/plain/client.jsx': "import { startCopy } from 'bake/copy';\n\nstartCopy(document.querySelector('main'), { copied: () => {} });\n",
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     const script = readdirSync(join(dir, 'dist/assets')).find((name) => /^plain-[\w-]+\.js$/.test(name));
     assert.match(readFileSync(join(dir, 'dist/assets', script), 'utf8'), /text\/plain/);
+  });
+
+  test('a module that the page script imports dynamically is a separate chunk with its own stylesheet, which the page loads when the import runs', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: 'Plain text.\n' }),
+      'themes/plain/page.jsx': scriptPage,
+      'themes/plain/client.jsx': "import './plain.css';\n\nconst main = document.querySelector('main');\nmain.dataset.entry = 'started';\nimport('./lazy.js').then(({ mark }) => mark(main));\n",
+      'themes/plain/plain.css': 'main {\n  color: rgb(1, 2, 3);\n}\n',
+      'themes/plain/lazy.js': "import './lazy.css';\n\nexport function mark(main) {\n  main.dataset.lazy = 'loaded-on-demand';\n}\n",
+      'themes/plain/lazy.css': 'main {\n  background-color: rgb(4, 5, 6);\n}\n',
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const assets = readdirSync(join(dir, 'dist/assets'));
+    const named = (pattern) => assets.filter((name) => pattern.test(name));
+    assert.equal(named(/^plain-[\w-]+\.js$/).length, 1);
+    assert.equal(named(/^lazy-[\w-]+\.js$/).length, 1);
+    assert.equal(named(/^lazy-[\w-]+\.css$/).length, 1);
+    const [entry] = named(/^plain-[\w-]+\.js$/);
+    const [chunk] = named(/^lazy-[\w-]+\.js$/);
+    assert.doesNotMatch(readFileSync(join(dir, 'dist/assets', entry), 'utf8'), /loaded-on-demand/);
+    assert.match(readFileSync(join(dir, 'dist/assets', chunk), 'utf8'), /loaded-on-demand/);
+    const html = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const scripts = [...html.matchAll(/<script[^>]*>/g)].map(([tag]) => tag);
+    assert.deepEqual(scripts.slice(0, 1), [`<script type="module" src="../../assets/${entry}">`]);
+    assert.deepEqual([...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(([, href]) => href), [`../../assets/${named(/^plain-[\w-]+\.css$/)[0]}`]);
+
+    const origin = await serve(t, join(dir, 'dist'));
+    const browser = await chromium.launch();
+    t.after(() => browser.close());
+    const page = await browser.newPage();
+    const errors = [];
+    const requested = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('request', (request) => requested.push(new URL(request.url()).pathname));
+    await page.goto(`${origin}/2026-10/rope/`);
+    await page.waitForSelector('main[data-lazy="loaded-on-demand"]');
+    assert.deepEqual(errors, []);
+    assert.ok(requested.includes(`/assets/${chunk}`), requested.join('\n'));
+    const styles = await page.evaluate(() => {
+      const main = getComputedStyle(document.querySelector('main'));
+      return { entry: document.querySelector('main').dataset.entry, color: main.color, background: main.backgroundColor };
+    });
+    assert.deepEqual(styles, { entry: 'started', color: 'rgb(1, 2, 3)', background: 'rgb(4, 5, 6)' });
   });
 
   test('an @import url() without ./ in a theme folder finds the file in the blog folder first and in the built-in folder second', (t) => {

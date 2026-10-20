@@ -3,7 +3,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { build } from 'vite';
 import solid from 'vite-plugin-solid';
 import { publicModules } from '../bundle/modules.js';
-import { assetFileName, browserBuild, compileProblem, outputOf, viteConfig } from '../bundle/vite.js';
+import { browserBuild, compileProblem, outputOf, viteConfig } from '../bundle/vite.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
 import { errorAt, fileStart } from '../report.js';
 
@@ -34,18 +34,17 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   try {
     const [server, client, styles] = await Promise.all([
       build(serverConfig(alias, locate, siteTheme)),
-      browserBuild({ input: locate(CLIENT_FILE), plugins: [solid()], alias, format: 'iife', names: { entry: assetFileName(name, '.js'), stylesheet: assetFileName(name, '.css') } }),
-      siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, format: 'es', names: { stylesheet: THEME_STYLES_PATH } }) : null,
+      browserBuild({ input: { [name]: locate(CLIENT_FILE) }, plugins: [solid()], alias }),
+      siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
-    const { files } = client;
     return {
       render: module.render,
       renderHome: module.renderHome,
       renderNotFound: module.renderNotFound,
-      files: styles === null ? files : [...files, ...styles.files],
-      styles: files.filter((file) => file.path.endsWith('.css')).map((file) => file.path),
-      scripts: files.filter((file) => file.path.endsWith('.js')).map((file) => file.path),
+      files: styles === null ? client.files : [...client.files, ...styles.files],
+      styles: client.stylesheets,
+      script: client.entry,
     };
   } catch (error) {
     errors.push(compileError(root, name, error));

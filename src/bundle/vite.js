@@ -7,8 +7,8 @@ export const BAKE_ROOT = join(import.meta.dirname, '../..');
 
 const SHARED_PACKAGES = ['solid-js'];
 const LOCATION_SUFFIX = / \(\d+:\d+\)$/;
-const SCRIPT_FILE_NAME = assetFileName('[name]', '.js');
-const ASSET_FILE_NAME = assetFileName('[name]', '[extname]');
+const SCRIPT_FILE_NAME = 'assets/[name]-[hash].js';
+const ASSET_FILE_NAME = 'assets/[name]-[hash][extname]';
 
 export function viteConfig({ plugins = [], alias = [] }) {
   return {
@@ -22,37 +22,34 @@ export function viteConfig({ plugins = [], alias = [] }) {
   };
 }
 
-export function assetFileName(name, extension) {
-  return `assets/${name}-[hash]${extension}`;
-}
-
-export async function browserBuild({ input, plugins = [], alias = [], format, names = {} }) {
-  const single = format === 'iife';
+export async function browserBuild({ input, plugins = [], alias = [], stylesheet }) {
   const result = await build({
     ...viteConfig({ plugins, alias }),
     base: './',
     build: {
       write: false,
-      cssCodeSplit: !single,
       assetsInlineLimit: 0,
-      modulePreload: single ? false : { polyfill: false },
+      modulePreload: { polyfill: false },
       rolldownOptions: {
         input,
         output: {
-          format,
-          entryFileNames: names.entry ?? SCRIPT_FILE_NAME,
+          format: 'es',
+          entryFileNames: SCRIPT_FILE_NAME,
           chunkFileNames: SCRIPT_FILE_NAME,
-          assetFileNames: (asset) => (names.stylesheet !== undefined && isStylesheet(asset) ? names.stylesheet : ASSET_FILE_NAME),
-          codeSplitting: single ? false : { groups: [{ name: 'mathjax', test: isMathJaxModule }] },
+          assetFileNames: (asset) => (stylesheet !== undefined && isStylesheet(asset) ? stylesheet : ASSET_FILE_NAME),
+          codeSplitting: { groups: [{ name: 'mathjax', test: isMathJaxModule }] },
         },
       },
     },
   });
   const outputs = outputOf(result);
+  const chunks = new Map(outputs.filter((output) => output.type === 'chunk').map((chunk) => [chunk.fileName, chunk]));
+  const entry = [...chunks.values()].find((chunk) => chunk.isEntry);
   return {
-    entry: outputs.find((output) => output.type === 'chunk' && output.isEntry)?.fileName,
+    entry: entry?.fileName,
+    stylesheets: entry === undefined ? [] : staticStylesheets(entry, chunks),
     files: outputs.map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source })),
-    modules: outputs.flatMap((output) => (output.type === 'chunk' ? output.moduleIds : [])),
+    modules: [...chunks.values()].flatMap((chunk) => chunk.moduleIds),
   };
 }
 
@@ -78,6 +75,13 @@ export function compileProblem(root, error) {
   if (!isInBlog(root, file)) return { message, file: null, position: fileStart };
   const position = cause.loc?.line === undefined ? fileStart : { line: cause.loc.line, column: cause.loc.column + 1 };
   return { message, file: blogPath(root, file), position };
+}
+
+function staticStylesheets(chunk, chunks, visited = new Set()) {
+  if (visited.has(chunk.fileName)) return [];
+  visited.add(chunk.fileName);
+  const imported = chunk.imports.flatMap((file) => staticStylesheets(chunks.get(file), chunks, visited));
+  return [...new Set([...imported, ...chunk.viteMetadata.importedCss])];
 }
 
 function isStylesheet(asset) {

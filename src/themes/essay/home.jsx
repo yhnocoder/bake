@@ -30,9 +30,6 @@ export default function Home(props) {
           <link rel="stylesheet" href={href} />
         ))}
         {assets.scripts.map((src) => (
-          <script defer src={src} />
-        ))}
-        {assets.modules.map((src) => (
           <script type="module" src={src} />
         ))}
       </head>
