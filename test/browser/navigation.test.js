@@ -125,4 +125,18 @@ test('links, folds and citation previews', async (t) => {
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-preview')).visibility === 'hidden');
     await page.close();
   });
+
+  await t.test('printing hides the preview card, the settings and the toast while they are shown', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto(url);
+    await page.hover('a.citation');
+    await page.waitForFunction(() => document.querySelector('.bk-preview').classList.contains('is-on'));
+    await page.evaluate(() => document.querySelector('.bk-toast').classList.add('is-on'));
+    const shown = ['.bk-preview', '.bk-settings', '.bk-toast'];
+    const displays = () => page.evaluate((selectors) => selectors.map((selector) => getComputedStyle(document.querySelector(selector)).display), shown);
+    assert.ok((await displays()).every((display) => display !== 'none'));
+    await page.emulateMedia({ media: 'print' });
+    assert.deepEqual(await displays(), ['none', 'none', 'none']);
+    await page.close();
+  });
 });
