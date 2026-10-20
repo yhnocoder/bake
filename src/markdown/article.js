@@ -1,4 +1,4 @@
-import { join, posix } from 'node:path';
+import { join } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
 import remarkCjkFriendly from 'remark-cjk-friendly';
@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { resolveComponent } from '../components/declarations.js';
-import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
+import { WIDTHS, choiceProblem, folderFile, parseSize, sizeProblem } from '../config/rules.js';
 import { indexPages } from '../build/links.js';
 import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress, percentDecode } from '../build/urls.js';
 import { errorAt } from '../report.js';
@@ -644,7 +644,7 @@ class ArticleParser {
     for (const node of nodes) {
       node.published = { src: node.url };
       if (node.attributes.float !== undefined && !node.inFigure) this.report(node.attributesPosition, 'float only applies to an image that starts a paragraph');
-      const source = this.imageSource(node.url);
+      const source = this.addressFile(node.url);
       if (source === null) {
         this.report(node.position.start, `image ${node.url} is not a file in the article folder`);
         continue;
@@ -678,21 +678,21 @@ class ArticleParser {
   }
 
   linkedFiles(tree) {
-    const addresses = [];
+    const files = new Set();
+    if (this.folder === null) return files;
     this.walkWithSidenotes(tree, (node) => {
-      if (node.type === 'link') addresses.push(node.url);
-      if (node.type === 'html') addresses.push(...node.rawHtml.addresses);
-      if (node.component !== undefined) addresses.push(...Object.values(node.component.params).filter((value) => typeof value === 'string'));
+      if (node.type === 'link') files.add(this.addressFile(node.url));
+      if (node.type === 'html') for (const address of node.rawHtml.addresses) files.add(this.addressFile(address));
+      if (node.component === undefined) return;
+      for (const value of Object.values(node.component.params)) if (typeof value === 'string') files.add(folderFile(value, this.folder.files));
     });
-    return new Set(addresses.map((address) => this.imageSource(address)));
+    return files;
   }
 
-  imageSource(url) {
-    if (this.folder === null || URL_SCHEME.test(url) || url.startsWith('/')) return null;
-    const decoded = percentDecode(url.split(/[?#]/)[0]);
-    if (decoded === null) return null;
-    const path = posix.normalize(decoded);
-    return this.folder.files.includes(path) ? path : null;
+  addressFile(address) {
+    if (this.folder === null || URL_SCHEME.test(address)) return null;
+    const path = percentDecode(address.split(/[?#]/)[0]);
+    return path === null ? null : folderFile(path, this.folder.files);
   }
 
   checkGeneratedIds() {

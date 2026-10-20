@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
+import { fromHtml } from 'hast-util-from-html';
 import sharp from 'sharp';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 
@@ -323,5 +324,83 @@ describe('bake build', () => {
       'linked.txt',
     ].sort());
     assert.equal(readFileSync(join(dir, 'dist/linked.txt'), 'utf8'), 'outside\n');
+  });
+
+  test('gives every address of a file whose name holds #, ?, % or a space a target that exists in dist/', async (t) => {
+    const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
+    const vector = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="#985b57"/></svg>\n';
+    const files = [
+      '## Files',
+      '',
+      '![Photo](a%231.png) and ![Vector](d%20e.svg)',
+      '',
+      '[Data](b%3F1.json) and [the preview](c%251.js).',
+      '',
+      ':::x-plot{points="a#1.png"}',
+      ':::',
+      '',
+      ':::x-plot{points="b?1.json"}',
+      ':::',
+      '',
+      '## Raw HTML',
+      '',
+      '<p><img src="d%20e.svg" srcset="d%20e.svg 1x, a%231.webp 2x" alt=""> <a href="b%3F1.json">data</a></p>',
+      '',
+    ].join('\n');
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/x-plot.js': "export const params = { points: { label: 'Points', type: 'file', default: '' } };\nexport const layout = { height: 100 };\nexport default class extends HTMLElement {}\n",
+      'content/posts/files/index.md': article({ title: 'Files', slug: 'files', extra: 'preview: c%1.js\n', body: files }),
+      'content/posts/files/a#1.png': photo,
+      'content/posts/files/b?1.json': '[1, 2]\n',
+      'content/posts/files/c%1.js': 'export default function draw(element) {\n  element.textContent = "preview";\n  return { start() {}, stop() {} };\n}\n',
+      'content/posts/files/d e.svg': vector,
+      'content/posts/host/index.md': article({ title: 'Host', slug: 'host', date: '2026-10-18', extra: 'cover: d e.svg\n', body: '![Cover](d%20e.svg)\n\n:::embed\n/2026-10/files/#files\n:::\n' }),
+      'content/posts/host/d e.svg': vector,
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const site = 'https://example.com/';
+    const tree = readTree(join(dir, 'dist'));
+    const missing = [];
+    const addresses = [];
+    for (const path of Object.keys(tree).filter((file) => file.endsWith('.html'))) {
+      const check = (kind, address) => {
+        const url = new URL(address, new URL(path, site));
+        if (url.origin !== new URL(site).origin) return;
+        const file = decodeURIComponent(url.pathname.slice(1));
+        const target = file === '' || file.endsWith('/') ? `${file}index.html` : file;
+        addresses.push(`${path} ${kind} ${address}`);
+        if (!Object.hasOwn(tree, target)) missing.push(`${path} ${kind} ${address}`);
+      };
+      const visit = (node) => {
+        const properties = node.properties ?? {};
+        if (typeof properties.src === 'string') check('src', properties.src);
+        if (typeof properties.href === 'string') check('href', properties.href);
+        if (typeof properties.srcSet === 'string') for (const candidate of properties.srcSet.split(',')) check('srcset', candidate.trim().split(/\s+/)[0]);
+        if (typeof properties.dataPreview === 'string') check('data-preview', properties.dataPreview);
+        if (properties.dataComponent === 'x-plot' && JSON.parse(properties.dataParams).points !== '') check('data-params', JSON.parse(properties.dataParams).points);
+        for (const child of [...(node.children ?? []), ...(node.content?.children ?? [])]) visit(child);
+      };
+      visit(fromHtml(tree[path].toString()));
+    }
+    assert.deepEqual(missing, []);
+    for (const expected of [
+      '2026-10/files/index.html src a%231.webp',
+      '2026-10/files/index.html src d%20e.svg',
+      '2026-10/files/index.html srcset a%231.webp',
+      '2026-10/files/index.html href b%3F1.json',
+      '2026-10/files/index.html href c%251.js',
+      '2026-10/files/index.html data-params a%231.png',
+      '2026-10/files/index.html data-params b%3F1.json',
+      '2026-10/host/index.html src d%20e.svg',
+      '2026-10/host/index.html src ../../2026-10/files/a%231.webp',
+      '2026-10/host/index.html href ../../2026-10/files/b%3F1.json',
+      '2026-10/host/index.html data-params ../../2026-10/files/a%231.png',
+      'index.html data-preview 2026-10/files/c%251.js',
+      'index.html src 2026-10/host/d%20e.svg',
+    ]) {
+      assert.ok(addresses.includes(expected), `${expected} is not among the addresses ${addresses.join(', ')}`);
+    }
   });
 });
