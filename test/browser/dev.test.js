@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -306,6 +307,67 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Added'));
     assert.deepEqual(await titles(), ['Added', 'Live on the homepage', 'Sketch']);
   });
+});
+
+function startConnectionProxy(target) {
+  const sockets = new Set();
+  let refusing = false;
+  const proxy = createServer((socket) => {
+    if (refusing) return socket.destroy();
+    const upstream = createConnection({ host: target.hostname, port: Number(target.port) });
+    sockets.add(socket).add(upstream);
+    socket.pipe(upstream).pipe(socket);
+    for (const end of [socket, upstream]) {
+      end.on('error', () => {});
+      end.on('close', () => {
+        socket.destroy();
+        upstream.destroy();
+        sockets.delete(end);
+      });
+    }
+  });
+  return new Promise((done) =>
+    proxy.listen(0, '127.0.0.1', () =>
+      done({
+        url: `http://127.0.0.1:${proxy.address().port}/`,
+        cut() {
+          refusing = true;
+          for (const socket of sockets) socket.destroy();
+        },
+        restore() {
+          refusing = false;
+        },
+        close: () => new Promise((closed) => proxy.close(closed)),
+      }),
+    ),
+  );
+}
+
+test('bake dev updates a page with a save that it made while the event stream was disconnected', async (t) => {
+  const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
+  const file = join(dir, ARTICLE);
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const proxy = await startConnectionProxy(new URL(server.url));
+  t.after(() => proxy.close());
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.goto(`${proxy.url}2026-10/live/`);
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  await page.evaluate(() => {
+    window.reloaded = false;
+    window.addEventListener('beforeunload', () => {
+      window.reloaded = true;
+    });
+  });
+  proxy.cut();
+  writeFileSync(file, readFileSync(file, 'utf8').replace('The edited paragraph says hello.', 'The edited paragraph was saved while the stream was down.'));
+  await new Promise((done) => setTimeout(done, 1000));
+  assert.equal(await page.evaluate(() => document.querySelector('.bk-article').textContent.includes('saved while the stream was down')), false);
+  proxy.restore();
+  await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('saved while the stream was down'));
+  assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
 test('bake dev starts the components of an article that it updates in place', async (t) => {
