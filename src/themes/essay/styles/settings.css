@@ -147,6 +147,8 @@
 }
 
 .bk-settings-options button {
+  position: relative;
+  isolation: isolate;
   flex: 1;
   padding: 4px 0;
   border: 0;
@@ -155,9 +157,21 @@
   color: var(--ink-2);
   font-size: 12.5px;
   white-space: nowrap;
-  transition:
-    background-color 0.12s,
-    color 0.12s;
+  transition: color 0.12s;
+}
+
+.bk-settings-options button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px var(--hair),
+    var(--segment-shadow);
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 
 .bk-settings-options button:hover {
@@ -165,11 +179,11 @@
 }
 
 .bk-settings-options button[aria-pressed='true'] {
-  background: var(--surface);
   color: var(--ink);
-  box-shadow:
-    0 0 0 0.5px var(--hair),
-    var(--segment-shadow);
+}
+
+.bk-settings-options button[aria-pressed='true']::before {
+  opacity: 1;
 }
 
 .bk-settings-switch {
@@ -506,7 +520,9 @@
   }
 
   .bk-preview,
-  .bk-preview.is-on {
+  .bk-preview.is-on,
+  .bk-settings-options button,
+  .bk-settings-options button::before {
     transition: none;
   }
 
