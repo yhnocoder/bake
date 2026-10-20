@@ -90,7 +90,7 @@ button:focus-visible {
 .bar {
   position: fixed;
   right: var(--chat-right, 16px);
-  bottom: calc(var(--chat-bottom, 16px) + 46px);
+  bottom: calc(var(--chat-bottom, 16px) + 90px);
   left: 16px;
   z-index: 2147483647;
   display: flex;
