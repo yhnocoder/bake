@@ -157,8 +157,7 @@
   white-space: nowrap;
   transition:
     background-color 0.12s,
-    color 0.12s,
-    box-shadow 0.12s;
+    color 0.12s;
 }
 
 .bk-settings-options button:hover {
@@ -284,12 +283,11 @@
   left: 0;
   z-index: var(--layer-preview-card);
   display: flex;
-  gap: 8px;
+  gap: 10px;
   width: max-content;
   max-width: min(420px, calc(100vw - 24px));
   padding: 12px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--surface);
   box-shadow: var(--card-shadow);
   color: var(--ink);
@@ -316,7 +314,7 @@
 
 .bk-preview-number {
   flex: none;
-  padding-top: 1px;
+  padding-top: 2px;
   font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--ink-3);
@@ -334,6 +332,7 @@
   display: block;
   width: 360px;
   max-width: calc(100vw - 24px);
+  padding: 14px 18px 12px;
   font-size: 13.5px;
   line-height: 1.75;
   cursor: pointer;
@@ -348,7 +347,7 @@
 }
 
 .bk-preview-title {
-  margin: 2px 0 4px;
+  margin: 2px 0 6px;
   font-family: var(--font-heading);
   font-size: 15.5px;
   font-weight: 700;
@@ -450,7 +449,21 @@
 }
 
 .bk-preview .bk-preview-hint {
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px -18px 0;
+  padding: 8px 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.bk-preview .bk-preview-hint::after {
+  content: '→';
+  transition: transform 0.2s var(--ease-out);
+}
+
+.bk-preview:hover .bk-preview-hint::after {
+  transform: translateX(3px);
 }
 
 @media (max-width: 999.98px) {
@@ -495,5 +508,9 @@
   .bk-preview,
   .bk-preview.is-on {
     transition: none;
+  }
+
+  .bk-preview:hover .bk-preview-hint::after {
+    transform: none;
   }
 }

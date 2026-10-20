@@ -55,28 +55,34 @@ test('links, folds and citation previews', async (t) => {
   const browser = await chromium.launch();
   t.after(() => browser.close());
 
-  await t.test('a fold opens with an animation and ends fully open, then closes', async () => {
+  await t.test('a fold fades its content in and out without animating its height, and ends fully open, then closed', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.goto(url);
     const fold = page.locator('details.fold');
     const closedHeight = (await fold.boundingBox()).height;
+    const content = () => fold.evaluate((element) => {
+      const style = getComputedStyle(element, '::details-content');
+      return { open: element.open, opacity: Number(style.opacity), transform: style.transform, height: element.getBoundingClientRect().height, style: element.getAttribute('style') ?? '' };
+    });
     await page.click('details.fold > summary');
-    assert.ok(await fold.evaluate((element) => element.getAnimations().length > 0), 'opening the fold does not animate');
-    await page.waitForFunction(() => document.querySelector('details.fold').getAnimations().length === 0);
-    const opened = await fold.evaluate((element) => ({
-      open: element.open,
-      style: element.getAttribute('style') ?? '',
-      opacity: [...element.children].map((child) => getComputedStyle(child).opacity),
-      height: element.getBoundingClientRect().height,
-    }));
-    assert.equal(opened.open, true);
-    assert.equal(opened.style, '');
-    assert.ok(opened.opacity.every((value) => value === '1'), `opacities ${opened.opacity}`);
+    const opening = await content();
+    await page.waitForTimeout(400);
+    const opened = await content();
+    assert.equal(opening.open, true);
+    assert.ok(opening.opacity < 1, `the content starts at opacity ${opening.opacity}`);
+    assert.ok(Math.abs(opening.height - opened.height) < 1, `the fold is ${opening.height}px high while it opens and ${opened.height}px when open`);
+    assert.deepEqual([opened.open, opened.opacity, opened.transform, opened.style], [true, 1, 'none', '']);
     assert.ok(opened.height > closedHeight + 200, `the open fold is ${opened.height}px high`);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').getAnimations().length === 0);
-    assert.equal(await fold.evaluate((element) => element.open), false);
+    const closing = await content();
+    assert.ok(closing.open && Math.abs(closing.height - opened.height) < 1, `the fold is ${closing.height}px high while it closes`);
+    await page.waitForFunction(() => !document.querySelector('details.fold').open);
     assert.ok(Math.abs((await fold.boundingBox()).height - closedHeight) < 1);
+    await page.click('details.fold > summary');
+    await page.click('details.fold > summary');
+    await page.click('details.fold > summary');
+    await page.waitForTimeout(400);
+    assert.deepEqual(await content().then(({ open, opacity }) => [open, opacity]), [true, 1]);
     await page.close();
   });
 
