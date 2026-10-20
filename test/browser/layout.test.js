@@ -52,6 +52,12 @@ ${wideTable('Example cell', 8)}
 `,
 });
 
+const manyBlocksBody = Array.from(
+  { length: 30 },
+  (_, section) =>
+    `## Section ${section + 1}\n\n${Array.from({ length: 10 }, (_, index) => `$$\nx_{${section}} + y_{${index}} = ${section * 10 + index}\n$$\n\n\`\`\`text\nline ${index}\n\`\`\``).join('\n\n')}\n`,
+).join('\n');
+
 const tocBody = '## First\n\nText.\n\n## Second\n\nText.\n';
 
 const widthsArticle = article({
@@ -97,6 +103,8 @@ test('the essay theme lays out articles', async (t) => {
     'content/posts/widths/index.md': widthsArticle,
     'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\ncategory: writing\n', body: tocBody }),
     'content/posts/tabs/index.md': article({ title: 'Tabs', slug: 'tabs', extra: 'toc: tabs\ncategory: writing\n', body: tocBody }),
+    'content/posts/many-blocks/index.md': article({ title: 'Many blocks', slug: 'many-blocks', extra: 'category: writing\n', body: manyBlocksBody }),
+    'content/posts/many-cards/index.md': article({ title: 'Many cards', slug: 'many-cards', extra: 'category: writing\ntheme: bento\n', body: manyBlocksBody }),
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
@@ -344,6 +352,23 @@ test('the essay theme lays out articles', async (t) => {
     };
     assert.deepEqual(await labels('stress'), []);
     assert.deepEqual(await labels('widths'), ['参考文献']);
+  });
+
+  await t.test('placing blocks and cards forces a fixed number of layouts however many blocks an article has', async () => {
+    const layoutsOnResize = async (path) => {
+      const page = await open(path);
+      const session = await page.context().newCDPSession(page);
+      await session.send('Performance.enable');
+      const count = async () => (await session.send('Performance.getMetrics')).metrics.find((metric) => metric.name === 'LayoutCount').value;
+      const before = await count();
+      await page.setViewportSize({ width: 1400, height: 900 });
+      await settle(page);
+      const layouts = (await count()) - before;
+      await page.close();
+      return layouts;
+    };
+    const layouts = { 'many-blocks': await layoutsOnResize('many-blocks'), 'many-cards': await layoutsOnResize('many-cards') };
+    assert.deepEqual(Object.entries(layouts).filter(([, count]) => count > 30), []);
   });
 });
 
