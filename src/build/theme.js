@@ -56,6 +56,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
       renderNotFound: module.renderNotFound,
       files: styles === null ? client.files : [...client.files, ...styles.files],
       styles: client.stylesheets,
+      lazyStyles: client.lazyStylesheets,
       script: client.entry,
     };
   } catch (error) {

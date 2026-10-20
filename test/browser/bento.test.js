@@ -227,6 +227,11 @@ test('the bento theme lays out sections as cards', async (t) => {
         return box.left >= card.left && box.right <= card.right && element.height > 100;
       });
       assert.ok(fits, `${width}px`);
+      const typography = await frame.evaluate((figure) => {
+        const box = getComputedStyle(figure.querySelector('.component-box'));
+        return [box.fontSize, box.lineHeight];
+      });
+      assert.deepEqual(typography, ['15.5px', '27.9px'], `${width}px`);
       await page.close();
     }
   });

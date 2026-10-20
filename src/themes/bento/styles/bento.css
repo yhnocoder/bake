@@ -54,6 +54,11 @@
   line-height: calc(1.8 + var(--leading-shift));
 }
 
+.bk-article .bt-card .component-box {
+  font-size: calc(var(--body-size) - 1px);
+  line-height: 1.8;
+}
+
 .bt-card[data-span='page'] {
   grid-column: 1 / -1;
 }

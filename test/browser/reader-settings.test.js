@@ -255,18 +255,24 @@ test('reader settings', async (t) => {
     await choose(page, '粗', 'weight', 'bold');
     const wenkaiBold = await read();
     assert.deepEqual([wenkaiBold.paragraph[1], wenkaiBold.strong[0], wenkaiBold.strong[1] === wenkaiBold.ink], ['700', '700', false]);
+
+    await page.evaluate(() => localStorage.setItem('bk-weight', 'light'));
+    await page.route(/\/assets\/essay-[^/]*\.js$/, (route) => route.abort());
+    await page.reload();
+    assert.ok((await lightFaces()) > 0, 'a stored light weight with LXGW WenKai declares the light faces without the page script');
+    assert.equal((await read()).paragraph[1], '300');
     await context.close();
   });
 
   await t.test('the settings panel with every row stays inside a short phone screen', async () => {
-    const context = await browser.newContext({ viewport: { width: 375, height: 640 }, hasTouch: true, isMobile: true });
+    const context = await browser.newContext({ viewport: { width: 375, height: 450 }, hasTouch: true, isMobile: true });
     const page = await context.newPage();
     await page.goto(url);
     await page.getByRole('button', { name: '设置' }).click();
     const panel = page.locator('.bk-settings-panel');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).opacity === '1');
     const box = await panel.boundingBox();
-    assert.ok(box.y >= 0 && box.y + box.height <= 640, `the panel spans ${box.y} to ${box.y + box.height}`);
+    assert.ok(box.y >= 0 && box.y + box.height <= 450, `the panel spans ${box.y} to ${box.y + box.height}`);
     await panel.locator('.bk-settings-row[data-setting="buttons"]').scrollIntoViewIfNeeded();
     await panel.getByRole('switch').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.buttons), 'always');

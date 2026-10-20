@@ -31,6 +31,11 @@ export function prepaintScript(pageSteps = '') {
   return `if(${JSON.stringify(MODULE_SCRIPT_SCHEMES)}.indexOf(location.protocol)>=0){document.documentElement.dataset.script='on';${settingSteps}${schemeSteps}${pageSteps}}`;
 }
 
+export function lightWenkaiSteps(href) {
+  if (href === undefined) return '';
+  return `var w=document.documentElement.dataset;if(w.font==='wenkai'&&w.weight==='light'){var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(href)};l.setAttribute('blocking','render');document.head.appendChild(l)}`;
+}
+
 export function homePrepaintSteps(groups) {
   const choices = JSON.stringify({ group: groups, columns: HOME_COLUMNS.map(String) });
   return `try{var h=${choices},e=document.documentElement.dataset;for(var n in h){var c=localStorage.getItem('${storageKey('')}'+n);var i=h[n].indexOf(c);if(i>=0){e[n]=c;document.documentElement.style.setProperty('--'+n+'-index',i)}}}catch(x){}`;

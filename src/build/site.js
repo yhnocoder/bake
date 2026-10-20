@@ -330,6 +330,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
     assets: {
       root,
       styles: assetLinks(root, theme.styles),
+      lazyStyles: Object.fromEntries(Object.entries(theme.lazyStyles).map(([name, path]) => [name, assetLinks(root, [path])[0]])),
       scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
