@@ -24,15 +24,23 @@ export function markdownHtml(tree, { root, base, handlers = {} }) {
     handlers: {
       math: (state, node) => mathElement('div', node.value, true),
       inlineMath: (state, node) => mathElement('span', node.value, node.data?.display === true),
-      paragraph: (state, node) => (node.children.length === 1 && node.children[0].data?.display === true ? mathElement('div', node.children[0].value, true) : defaultHandlers.paragraph(state, node)),
+      paragraph: paragraphElement,
       ...handlers,
     },
   });
   return toHtml(clean(hast, root, base));
 }
 
+export function paragraphElement(state, node) {
+  return node.children.length === 1 && node.children[0].data?.display === true ? mathElement('div', node.children[0].value, true) : defaultHandlers.paragraph(state, node);
+}
+
 export function linkTarget(href, root, base) {
-  if (href.startsWith('#')) return base === undefined ? { href, external: false } : { href: new URL(`${base.replace(/^\/+/, '')}${href}`, root).href, external: false };
+  if (href.startsWith('#')) {
+    if (base === undefined) return { href, external: false };
+    const resolved = new URL(`${base.replace(/^\/+/, '')}${href}`, root).href;
+    return resolved.startsWith(root) ? { href: resolved, external: false } : null;
+  }
   const scheme = SCHEME.exec(href)?.[1].toLowerCase();
   if (scheme !== undefined) return OPEN_SCHEMES.has(scheme) ? { href, external: true } : null;
   if (href.startsWith('//')) return null;

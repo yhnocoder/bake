@@ -4,7 +4,7 @@ import { escapeMarkup } from '../escape.js';
 import { fragmentOf, percentDecode } from '../fragments.js';
 import { catalogEntry, catalogLines } from './context.js';
 import { instructionLines } from './instructions.js';
-import { markdownHtml, markdownTree } from './reply.js';
+import { markdownHtml, markdownTree, paragraphElement } from './reply.js';
 
 export const MAX_NOTE_SOURCES = 4;
 
@@ -17,7 +17,7 @@ export function citedEntries(root, catalog, rounds, own) {
   const urls = [];
   const add = (url) => url !== null && url !== undefined && url !== own && !urls.includes(url) && urls.push(url);
   for (const round of rounds) {
-    for (const scope of round.ask.scopes ?? []) if (scope.kind === 'article') scope.urls.forEach(add);
+    for (const scope of round.ask.scopes) if (scope.kind === 'article') scope.urls.forEach(add);
     for (const read of round.reads) if (!read.failed) add(read.url);
     for (const link of links(markdownTree(round.content))) add(blogLink(link.url, { root, catalog })?.entry.url);
   }
@@ -74,8 +74,8 @@ export function noteHtml(markdown, { root, citedFrom, intro }) {
     handlers: {
       heading: (state, node) => ({ type: 'element', tagName: node.depth === 1 ? 'h4' : 'h5', properties: {}, children: state.all(node) }),
       paragraph: (state, node) => {
-        const element = defaultHandlers.paragraph(state, node);
-        if (inIntro(node)) element.properties.className = ['bk-chat-note-intro'];
+        const element = paragraphElement(state, node);
+        if (element.tagName === 'p' && inIntro(node)) element.properties.className = ['bk-chat-note-intro'];
         return element;
       },
       blockquote: (state, node) => {

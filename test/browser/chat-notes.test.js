@@ -247,6 +247,14 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     await page.keyboard.press('Escape');
     await card.locator('.bk-chat-redo:not([data-open])').waitFor();
     assert.equal(await card.isVisible(), true);
+    const focused = () => page.evaluate(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.textContent ?? null);
+    assert.equal(await focused(), '重新整理');
+    await card.locator('.bk-chat-note-foot').getByRole('button', { name: '重新整理' }).click();
+    await card.locator('.bk-chat-redo-chip', { hasText: '加自测题' }).focus();
+    await page.keyboard.press('Escape');
+    await card.locator('.bk-chat-redo:not([data-open])').waitFor();
+    assert.equal(await focused(), '重新整理');
+    assert.equal(await card.isVisible(), true);
     await card.locator('.bk-chat-note-foot').getByRole('button', { name: '重新整理' }).click();
     await redo.fill('只留锚点');
     await page.keyboard.press('Shift+Enter');
@@ -269,7 +277,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await link.textContent(), '查看笔记');
     const [saved] = savedHistory(await storage(page));
     assert.equal(saved.note.versions.length, 2);
-    assert.equal(saved.note.index, 0);
+    assert.equal(saved.note.index, 1);
     assert.equal(saved.note.versions[1].request, '只留锚点\n写短一点');
     await openMenu(page);
     assert.equal(await page.locator('.bk-chat-menu-item', { hasText: '查看笔记' }).count(), 1);
@@ -278,7 +286,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.equal(await page.locator('.bk-chat-history-row .bk-chat-badge').textContent(), '笔记');
     await page.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
-    assert.equal(await card.locator('h4').textContent(), '标题与锚点的写法');
+    assert.equal(await card.locator('h4').textContent(), '锚点');
     await page.keyboard.press('Escape');
     await card.waitFor({ state: 'detached' });
     await page.keyboard.press('Escape');

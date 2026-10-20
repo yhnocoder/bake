@@ -28,7 +28,7 @@ export function currentPage(root) {
   const source = articleSource();
   const article = document.querySelector(ARTICLE_REGION);
   return {
-    address: `/${decodeURI(location.pathname).slice(new URL(root).pathname.length)}`,
+    address: `/${decodeURI(location.pathname).slice(new URL(root).pathname.length).replace(/index\.html$/, '')}`,
     site: meta('og:site_name') ?? location.hostname,
     title: meta('og:title') ?? document.title,
     article: source === null ? null : { source, element: article, outline: article === null ? [] : outlineOf(article) },

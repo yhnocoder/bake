@@ -124,7 +124,20 @@ export function NoteCard(props) {
         </button>
         <span class="bk-chat-note-hint">{props.hint}</span>
       </div>
-      <form class="bk-chat-redo" role="dialog" aria-label={labels.resummarize} data-open={props.redo ? '' : undefined} inert={!props.redo} onSubmit={submit}>
+      <form
+        class="bk-chat-redo"
+        role="dialog"
+        aria-label={labels.resummarize}
+        data-open={props.redo ? '' : undefined}
+        inert={!props.redo}
+        onSubmit={submit}
+        on:keydown={(event) => {
+          if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
+          event.preventDefault();
+          event.stopPropagation();
+          closeRedo();
+        }}
+      >
         <label for="bk-chat-redo-request">{labels.redoTitle}</label>
         <textarea
           id="bk-chat-redo-request"
@@ -132,12 +145,7 @@ export function NoteCard(props) {
           placeholder={labels.redoPlaceholder}
           ref={request}
           on:keydown={(event) => {
-            if (event.isComposing || event.keyCode === 229) return;
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              closeRedo();
-            } else if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
               event.preventDefault();
               event.currentTarget.form.requestSubmit();
             }
