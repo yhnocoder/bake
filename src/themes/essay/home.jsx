@@ -11,7 +11,13 @@ export default function Home(props) {
   const groupBy = groups.includes(home.groupBy) ? home.groupBy : 'month';
   const tags = [...new Set(articles.flatMap((article) => article.tags))];
   return (
-    <html lang={site.language} data-group={groupBy} data-columns={String(home.columns)} {...settingAttributes('home')}>
+    <html
+      lang={site.language}
+      data-group={groupBy}
+      data-columns={String(home.columns)}
+      style={`--group-index:${groups.indexOf(groupBy)};--columns-index:${HOME_COLUMNS.indexOf(String(home.columns))}`}
+      {...settingAttributes('home')}
+    >
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -120,7 +126,7 @@ function Switch(props) {
   return (
     <div class="bk-switch" data-control={name} role="group" aria-label={label}>
       <span class="bk-switch-label">{label}</span>
-      <div class="bk-switch-options">
+      <div class="bk-switch-options" style={`--n:${values.length};--i:var(--${name}-index)`}>
         {values.map((value) => (
           <button type="button" data-value={value} aria-pressed={String(value === current)}>
             {text(value)}

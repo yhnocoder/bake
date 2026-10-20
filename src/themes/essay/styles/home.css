@@ -183,8 +183,6 @@ html:has(.bk-home) {
 }
 
 .bk-home .bk-switch-options {
-  --n: 2;
-  --i: 0;
   position: relative;
   isolation: isolate;
   display: inline-grid;
@@ -211,19 +209,6 @@ html:has(.bk-home) {
     var(--segment-shadow);
   transform: translateX(calc(var(--i) * (100% + 2px)));
   transition: transform 0.24s var(--ease-out);
-}
-
-.bk-home .bk-switch[data-control='columns'] .bk-switch-options {
-  --n: 3;
-}
-
-:root[data-group='month'] .bk-home [data-control='group'] .bk-switch-options,
-:root[data-columns='4'] .bk-home [data-control='columns'] .bk-switch-options {
-  --i: 1;
-}
-
-:root[data-columns='5'] .bk-home [data-control='columns'] .bk-switch-options {
-  --i: 2;
 }
 
 .bk-home .bk-switch-options button {
