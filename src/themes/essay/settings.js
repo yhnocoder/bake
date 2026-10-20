@@ -21,7 +21,7 @@ export function settingAttributes(page, article) {
 
 export const prepaintScript = `document.documentElement.dataset.script='on';try{var s=${JSON.stringify(
   Object.fromEntries(Object.entries(SETTINGS).map(([name, setting]) => [name, setting.values])),
-)},d=document.documentElement.dataset;for(var k in s){var v=localStorage.getItem('${storageKey('')}'+k);if(d[k]!==undefined&&s[k].indexOf(v)>=0)d[k]=v}}catch(e){}`;
+)},d=document.documentElement.dataset;for(var k in s){var v=localStorage.getItem('${storageKey('')}'+k);if(d[k]!==undefined&&s[k].indexOf(v)>=0)d[k]=v}}catch(e){}var t=document.documentElement.dataset.theme;if(t!==undefined)document.documentElement.dataset.scheme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;`;
 
 export function homePrepaintScript(groups) {
   const choices = JSON.stringify({ group: groups, columns: HOME_COLUMNS });

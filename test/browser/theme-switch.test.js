@@ -83,7 +83,7 @@ test('switching the theme restyles the page once and fades on the compositor in 
 const fading = () => document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 const notFading = () => !document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 
-test('a change of the system colour scheme fades, and a click during the fade reaches its target and keeps the settings open', async (t) => {
+test('a change of the system colour scheme fades without showing the new colours first, and a press during the fade ends it and keeps the settings open', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bake-theme-fade-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
@@ -95,19 +95,26 @@ test('a change of the system colour scheme fades, and a click during the fade re
   await page.goto(`${origin}/2026-10/syntax/`);
   await page.evaluate(() => document.fonts.ready);
   const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.scheme), 'light');
 
   await page.evaluate(() => {
+    window.framesBeforeFade = [];
     window.sawFade = false;
     const watch = () => {
       if (document.getAnimations().some((animation) => String(animation.effect?.pseudoElement).startsWith('::view-transition'))) window.sawFade = true;
-      else requestAnimationFrame(watch);
+      else {
+        window.framesBeforeFade.push(getComputedStyle(document.body).backgroundColor);
+        requestAnimationFrame(watch);
+      }
     };
     requestAnimationFrame(watch);
   });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForFunction(() => window.sawFade);
+  assert.deepEqual([...new Set(await page.evaluate(() => window.framesBeforeFade))], [light]);
   await page.waitForFunction(notFading);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'system');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.scheme), 'dark');
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), light);
 
   await page.getByRole('button', { name: '设置' }).click();
@@ -117,7 +124,9 @@ test('a change of the system colour scheme fades, and a click during the fade re
   await option('浅').click();
   await page.waitForFunction(fading);
   await page.mouse.click(dark.x + dark.width / 2, dark.y + dark.height / 2);
+  assert.equal(await page.evaluate(fading), false);
   assert.equal(await page.evaluate(() => document.querySelector('.bk-settings').classList.contains('is-open')), true);
-  assert.equal(await page.evaluate(() => localStorage.getItem('bk-theme')), 'dark');
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+  await option('深').click();
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark' && document.documentElement.dataset.scheme === 'dark');
 });

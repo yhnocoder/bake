@@ -35,9 +35,12 @@ export function chooseSetting(name, value) {
   if (settingRows.find((row) => row.name === name)?.changesLayout) layoutChanged();
 }
 
+const darkScheme = matchMedia('(prefers-color-scheme: dark)');
+
 function switchTheme(value) {
   fadeColours(() => {
     document.documentElement.dataset.theme = value;
+    document.documentElement.dataset.scheme = value === 'system' ? systemScheme() : value;
     document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name: 'theme', value } }));
     document.dispatchEvent(new CustomEvent(THEME_EVENT));
   });
@@ -48,7 +51,6 @@ function coloursFade() {
 }
 
 let fade = null;
-let clickTarget = null;
 
 function fadeColours(apply) {
   if (!coloursFade()) {
@@ -62,36 +64,26 @@ function fadeColours(apply) {
   });
 }
 
-function forwardClicksDuringFade() {
+function systemScheme() {
+  return darkScheme.matches ? 'dark' : 'light';
+}
+
+function endFadeOnPress() {
   addEventListener(
     'pointerdown',
     (event) => {
       if (fade === null || event.target !== document.documentElement) return;
       event.stopImmediatePropagation();
       fade.skipTransition();
-      clickTarget = document.elementFromPoint(event.clientX, event.clientY);
-    },
-    true,
-  );
-  addEventListener(
-    'click',
-    (event) => {
-      const target = clickTarget;
-      clickTarget = null;
-      if (target === null || event.target !== document.documentElement || target === document.documentElement) return;
-      event.stopImmediatePropagation();
-      target.click();
     },
     true,
   );
 }
 
-function followSystemScheme(event) {
+function followSystemScheme() {
   if (settingValue('theme') !== 'system') return;
-  const root = document.documentElement;
-  if (coloursFade()) root.dataset.theme = event.matches ? 'light' : 'dark';
   fadeColours(() => {
-    root.dataset.theme = 'system';
+    document.documentElement.dataset.scheme = systemScheme();
     document.dispatchEvent(new CustomEvent(THEME_EVENT));
   });
 }
@@ -101,8 +93,8 @@ export function startSettings() {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <Settings labels={labels} />, host);
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', followSystemScheme);
-  forwardClicksDuringFade();
+  darkScheme.addEventListener('change', followSystemScheme);
+  endFadeOnPress();
 }
 
 function Settings(props) {
