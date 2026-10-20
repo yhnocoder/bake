@@ -121,12 +121,13 @@ describe('the parameter endpoint of bake dev', () => {
     t.after(() => server.close());
     const page = await (await fetch(new URL('2026-10/live/', server.url))).text();
     const version = /data-version="([0-9a-f]+)"/.exec(page)[1];
+    const token = /<script src="\/__bake\/client.js" data-bake-dev [^>]*data-token="([^"]+)"/.exec(page)[1];
     const post = async (body, headers = {}) => {
-      const response = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+      const response = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token, ...headers }, body: JSON.stringify(body) });
       return [response.status, await response.json()];
     };
     const request = (fields, headers) => post({ file: FILE, version, line: 9, name: 'label-view', params: { text: 'first', size: 2 }, write: false, ...fields }, headers);
-    return { dir, server, page, version, post, request, read: () => readFileSync(join(dir, FILE), 'utf8') };
+    return { dir, server, page, version, token, post, request, read: () => readFileSync(join(dir, FILE), 'utf8') };
   }
 
   test('gives the page the version of its source and the declarations of its components', async (t) => {
@@ -161,7 +162,7 @@ describe('the parameter endpoint of bake dev', () => {
   });
 
   test('refuses files that are not articles of the preview, unknown components, invalid values and other methods', async (t) => {
-    const { server, request } = await start(t);
+    const { server, token, request } = await start(t);
     assert.deepEqual(await request({ file: 'bake.config.js' }), [404, { error: '"bake.config.js" is not an article that bake dev serves' }]);
     assert.deepEqual(await request({ file: '../../etc/passwd' }), [404, { error: '"../../etc/passwd" is not an article that bake dev serves' }]);
     assert.deepEqual(await request({ name: 'other-view' }), [400, { error: 'unknown component "other-view"' }]);
@@ -169,8 +170,33 @@ describe('the parameter endpoint of bake dev', () => {
     assert.deepEqual(await request({ line: 7 }), [400, { error: `${FILE}:7 the line does not start a :::label-view block: Before.` }]);
     const response = await fetch(new URL('/__bake/params', server.url));
     assert.deepEqual([response.status, await response.json()], [405, { error: 'send the parameters with POST' }]);
-    const broken = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' });
+    const broken = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token }, body: '{' });
     assert.equal(broken.status, 400);
+  });
+
+  test('refuses requests without the token of the run, with or without an Origin header, and writes nothing', async (t) => {
+    const { server, token, read, post, version } = await start(t);
+    const before = read();
+    const body = { file: FILE, version, line: 9, name: 'label-view', params: { text: 'first', size: 5 }, write: true };
+    const refused = [403, { error: 'the request does not carry the token of this bake dev run; reload the page' }];
+    const response = await fetch(new URL('/__bake/params', server.url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.deepEqual([response.status, await response.json()], refused);
+    assert.deepEqual(await post(body, { 'x-bake-token': '' }), refused);
+    assert.deepEqual(await post(body, { 'x-bake-token': '', origin: new URL(server.url).origin }), refused);
+    assert.deepEqual(await post(body, { 'x-bake-token': 'wrong' }), refused);
+    assert.deepEqual(await post(body, { 'x-bake-token': `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}` }), refused);
+    assert.equal(read(), before);
+    assert.equal((await post(body))[0], 200);
+    assert.notEqual(read(), before);
+  });
+
+  test('gives every run its own token', async (t) => {
+    const first = await start(t);
+    const second = await start(t);
+    assert.notEqual(first.token, second.token);
+    const body = { file: FILE, version: first.version, line: 9, name: 'label-view', params: { text: 'first', size: 5 }, write: true };
+    assert.equal((await first.post(body, { 'x-bake-token': second.token }))[0], 403);
+    assert.equal(first.read(), article({ title: 'Live', slug: 'live', body: 'Before.\n\n:::label-view{text=first size=2}\nCaption.\n:::\n' }));
   });
 
   test('refuses requests from another origin and requests that are not JSON', async (t) => {

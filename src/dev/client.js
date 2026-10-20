@@ -1,6 +1,6 @@
 (() => {
   const script = document.currentScript;
-  const { source, missing, file } = script.dataset;
+  const { source, missing, file, token } = script.dataset;
   const scrollKey = `bake-dev-scroll:${location.pathname}`;
   const pagePath = location.pathname.replace(/index\.html$/, '');
   const BLOCKS = '[data-region] [data-line]';
@@ -64,6 +64,7 @@
     return import('/__bake/param-bar.js').then((module) =>
       module.startParamBars({
         file,
+        token,
         version: () => version,
         setVersion: (next) => {
           version = next;
@@ -410,7 +411,7 @@
     host.dataset.bakeDev = '';
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.innerHTML = [
-      '<link rel="stylesheet" href="/__bake/client.css">',
+      '<link rel="stylesheet" href="/__bake/client.css"><link rel="stylesheet" href="/__bake/switch.css">',
       '<div class="bar">',
       '<button type="button" class="notice" hidden></button>',
       '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',

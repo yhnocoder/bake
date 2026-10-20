@@ -12,6 +12,9 @@
   --dev-notice-text: #ffffff;
   --dev-accent: #0969da;
   --dev-shift: 0 8px;
+  --switch-off: var(--dev-line);
+  --switch-on: var(--dev-accent);
+  --switch-focus: var(--dev-accent);
   font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--dev-text);
 }
@@ -101,43 +104,6 @@ header {
 
 .bars[hidden] {
   display: none;
-}
-
-.switch {
-  appearance: none;
-  position: relative;
-  width: 30px;
-  height: 18px;
-  margin: 0;
-  border-radius: 999px;
-  background: var(--dev-line);
-  cursor: pointer;
-  transition: background-color 150ms ease-out;
-}
-
-.switch::before {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ffffff;
-  transition: translate 150ms ease-out;
-}
-
-.switch:checked {
-  background: var(--dev-accent);
-}
-
-.switch:checked::before {
-  translate: 12px 0;
-}
-
-.switch:focus-visible {
-  outline: 2px solid var(--dev-accent);
-  outline-offset: 1px;
 }
 
 .close {
@@ -263,9 +229,5 @@ header {
   .dot,
   .problems {
     transition-property: opacity, background-color, color, display;
-  }
-
-  .switch::before {
-    transition: none;
   }
 }

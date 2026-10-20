@@ -1,23 +1,26 @@
 const FRAMES = '[data-region] figure.component[data-line]';
 const BAR = 'bake-param-bar';
 const MESSAGE_DURATION = 8000;
+const SAVED_KEY = 'bake-dev-param-values';
 
-export async function startParamBars({ file, version, setVersion, components, copyText, shown }) {
-  const styles = new CSSStyleSheet();
-  styles.replaceSync(await (await fetch('/__bake/param-bar.css', { cache: 'no-store' })).text());
-  const server = { file, version, setVersion, copyText, styles };
-  const states = new Map();
+export async function startParamBars({ file, token, version, setVersion, components, copyText, shown }) {
+  const styles = await Promise.all(['param-bar.css', 'switch.css'].map(loadSheet));
+  const server = { file, token, version, setVersion, copyText, styles };
+  const states = createStates();
   const bars = new Map();
   const controllers = new WeakMap();
   let visible = shown;
 
   function scan() {
     const declared = components();
+    const seen = new Map();
     for (const frame of document.querySelectorAll(FRAMES)) {
+      const index = seen.get(frame.dataset.component) ?? 0;
+      seen.set(frame.dataset.component, index + 1);
       const box = frame.querySelector(':scope > .component-box');
       const params = declared[frame.dataset.component];
       if (box === null || frame.querySelector(`:scope > ${BAR}`) !== null || params === undefined || Object.keys(params).length === 0) continue;
-      const controller = createBar(frame, params, server, { states, bars });
+      const controller = createBar(frame, index, params, server, { states, bars });
       controllers.set(frame, controller);
       controller.host.hidden = !visible;
       box.before(controller.host);
@@ -36,13 +39,46 @@ export async function startParamBars({ file, version, setVersion, components, co
   };
 }
 
-function createBar(frame, declarations, server, { states, bars }) {
+async function loadSheet(name) {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(await (await fetch(`/__bake/${name}`, { cache: 'no-store' })).text());
+  return sheet;
+}
+
+function createStates() {
+  const states = new Map();
+  const read = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem(SAVED_KEY) ?? '{}');
+    } catch {
+      return {};
+    }
+  };
+  const saved = read();
+  return {
+    get(key) {
+      if (!states.has(key)) states.set(key, { changes: saved[key] ?? {}, message: null });
+      return states.get(key);
+    },
+    save(key, changes) {
+      this.get(key).changes = changes;
+      const all = read();
+      if (Object.keys(changes).length === 0) delete all[key];
+      else all[key] = changes;
+      try {
+        sessionStorage.setItem(SAVED_KEY, JSON.stringify(all));
+      } catch {}
+    },
+  };
+}
+
+function createBar(frame, index, declarations, server, { states, bars }) {
   const name = frame.dataset.component;
-  const key = `${frame.dataset.line} ${name}`;
+  const key = `${server.file} ${name} ${index}`;
   const host = document.createElement(BAR);
   host.dataset.bakeDev = '';
   const shadow = host.attachShadow({ mode: 'open' });
-  shadow.adoptedStyleSheets = [server.styles];
+  shadow.adoptedStyleSheets = server.styles;
   const bar = element('div', 'bar');
   const message = element('p', 'message');
   message.hidden = true;
@@ -50,7 +86,9 @@ function createBar(frame, declarations, server, { states, bars }) {
   shadow.append(bar);
 
   const markdown = JSON.parse(frame.dataset.params);
-  const current = { ...markdown, ...(states.get(key)?.changes ?? {}) };
+  const saved = states.get(key).changes;
+  const current = { ...markdown };
+  for (const param of Object.keys(declarations)) if (param in saved && typeof saved[param] === typeof markdown[param]) current[param] = saved[param];
   let waiting = false;
   let messageTimer;
 
@@ -69,7 +107,11 @@ function createBar(frame, declarations, server, { states, bars }) {
   actions.append(reset, copy, write);
   const title = element('code', 'name');
   title.textContent = name;
-  bar.append(title, ...controls.map((control) => control.element), actions, message);
+  const head = element('div', 'head');
+  head.append(title, actions);
+  const fields = element('div', 'fields');
+  fields.append(...controls.map((control) => control.element));
+  bar.append(head, fields, message);
 
   const controller = {
     host,
@@ -134,16 +176,11 @@ function createBar(frame, declarations, server, { states, bars }) {
     const changed = Object.keys(changes).length > 0;
     write.disabled = !changed;
     reset.disabled = !changed;
-    state().changes = changes;
-  }
-
-  function state() {
-    if (!states.has(key)) states.set(key, { changes: {}, message: null });
-    return states.get(key);
+    states.save(key, changes);
   }
 
   function report(next) {
-    state().message = next === null ? null : { ...next, until: next.kind === 'done' ? Date.now() + MESSAGE_DURATION : Infinity };
+    states.get(key).message = next === null ? null : { ...next, until: next.kind === 'done' ? Date.now() + MESSAGE_DURATION : Infinity };
     bars.get(key)?.showMessage();
   }
 
@@ -152,7 +189,7 @@ function createBar(frame, declarations, server, { states, bars }) {
     try {
       const response = await fetch('/__bake/params', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-bake-token': server.token },
         body: JSON.stringify({ file: server.file, version: server.version(), line: Number(frame.dataset.line), name, params: values, write: writeFile }),
       });
       const data = await response.json();
@@ -165,7 +202,7 @@ function createBar(frame, declarations, server, { states, bars }) {
 
   function showMessage() {
     clearTimeout(messageTimer);
-    const shown = state().message;
+    const shown = states.get(key).message;
     const left = shown === null ? 0 : shown.until - Date.now();
     message.hidden = left <= 0;
     if (left <= 0) return;
@@ -183,12 +220,13 @@ function createControl(param, declaration, value, change) {
   wrapper.dataset.type = declaration.type;
   const label = element('span', 'label');
   label.textContent = declaration.label;
-  wrapper.append(label);
+  const row = element('div', 'row');
+  wrapper.append(label, row);
   const input = (type, className) => {
     const field = element(type === 'select' ? 'select' : 'input', className);
     if (type !== 'select') field.type = type;
     field.setAttribute('aria-label', declaration.label);
-    wrapper.append(field);
+    row.append(field);
     return field;
   };
   const control = { param, element: wrapper };

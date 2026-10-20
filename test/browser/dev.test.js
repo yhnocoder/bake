@@ -465,7 +465,21 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('实线是精确的 GELU'), otherSelector);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 7, otherSelector);
     assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+  });
+
+  await t.test('unsaved values stay after a reload and after a save that adds lines above the component', async () => {
+    await open();
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 7, otherSelector);
+    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+    const otherLine = Number(otherSelector.match(/\d+/)[0]);
+    const moved = `figure.component[data-line="${otherLine + 2}"]`;
+    edit('这篇文章列出 Bake 的全部写法', '新加的一段。\n\n这篇文章列出 Bake 的全部写法');
+    await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.range === 7, moved);
+    assert.deepEqual(await page.locator(`${moved} bake-param-bar .control[data-param="range"]`).evaluate((item) => [item.querySelector('.number').value, item.hasAttribute('data-changed')]), ['7', true]);
+    edit('新加的一段。\n\n', '');
+    await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.range === 7, otherSelector);
     await page.locator(`${otherSelector} bake-param-bar .reset`).click();
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('bake-dev-param-values')), '{}');
   });
 
   await t.test('a parameter changed in the editor restarts the component and highlights its block once', async () => {

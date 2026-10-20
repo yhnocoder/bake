@@ -20,7 +20,7 @@ Run every command from the blog root, the folder that contains `bake.config.js`.
 
 ### bake dev
 
-You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, and serves it at http://localhost:4321/. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. The terminal shows the local address and the addresses of the computer on the local network, so a phone on the same network can open the pages too. `bake dev` writes into the blog folder only when you press Write to file in a parameter bar, and it stops when you press Ctrl+C.
+You write Markdown in the text editor of your choice, and `bake dev` shows each page as `bake build` would publish it. It builds the blog in memory, drafts included, and serves it at http://localhost:4321/. When port 4321 is in use, it tries 4322, 4323 and so on; `--port <number>` starts from another port. `bake dev` listens only on this computer, at `127.0.0.1`, because Write to file in a parameter bar changes files in the blog folder. `--host 0.0.0.0` makes it listen on every network interface, so a phone on the same network can open the pages too, and the terminal then also shows the addresses of the computer on the local network. Only use it on a network you trust: the pages and their parameter bars are then open to everyone on that network. `bake dev` writes into the blog folder only when you press Write to file in a parameter bar, and it stops when you press Ctrl+C.
 
 Bake watches the blog folder and rebuilds what changed each time you save a file:
 

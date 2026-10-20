@@ -2,7 +2,7 @@
 import { build } from './build/build.js';
 import { newArticle } from './build/new-article.js';
 import { configNotFoundError, hasConfig } from './config/bake-config.js';
-import { DEFAULT_PORT, startDevServer } from './dev/server.js';
+import { DEFAULT_HOST, DEFAULT_PORT, startDevServer } from './dev/server.js';
 import { errorCountLine, formatError } from './report.js';
 
 const usage = `Usage: bake <command>
@@ -14,6 +14,7 @@ Commands:
 
 Options:
   --port <number>    Port for bake dev; when it is in use, the next free port is used
+  --host <address>   Address that bake dev listens on, 127.0.0.1 by default; 0.0.0.0 serves the local network
   -h, --help         Show this help`;
 
 const [command, ...args] = process.argv.slice(2);
@@ -47,12 +48,12 @@ async function runBuild(args) {
 }
 
 async function runDev(args) {
-  const port = devPort(args);
-  if (port === null) return fail('Usage: bake dev [--port <number>]');
+  const options = devOptions(args);
+  if (options === null) return fail('Usage: bake dev [--port <number>] [--host <address>]');
   if (!hasConfig(process.cwd())) return fail(formatError(configNotFoundError()));
   let server;
   try {
-    server = await startDevServer(process.cwd(), { port });
+    server = await startDevServer(process.cwd(), options);
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error));
   }
@@ -60,10 +61,17 @@ async function runDev(args) {
   server.stopped.then(fail);
 }
 
-function devPort(args) {
-  if (args.length === 0) return DEFAULT_PORT;
-  if (args.length !== 2 || args[0] !== '--port' || !/^\d+$/.test(args[1]) || Number(args[1]) > 65535) return null;
-  return Number(args[1]);
+function devOptions(args) {
+  const values = {};
+  for (let index = 0; index < args.length; index += 2) {
+    const [name, value] = [args[index], args[index + 1]];
+    if ((name !== '--port' && name !== '--host') || Object.hasOwn(values, name) || value === undefined) return null;
+    values[name] = value;
+  }
+  const port = values['--port'] ?? String(DEFAULT_PORT);
+  const host = values['--host'] ?? DEFAULT_HOST;
+  if (!/^\d+$/.test(port) || Number(port) > 65535 || host === '' || host.startsWith('-')) return null;
+  return { port: Number(port), host };
 }
 
 function fail(message) {
