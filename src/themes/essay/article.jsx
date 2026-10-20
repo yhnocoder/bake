@@ -26,7 +26,7 @@ export function Article(props) {
   );
 }
 
-export function arrange(content) {
+export function arrange(content, { recaps = false } = {}) {
   const notes = new Map(content.sidenotes.map((note) => [note.number, note]));
   const placed = new Set();
   const take = (html) => {
@@ -39,16 +39,21 @@ export function arrange(content) {
     }
     return found;
   };
-  const entries = (blocks, startsSection) =>
+  const shownRecap = (html) => (recaps && html !== undefined ? html : '');
+  const entries = (blocks, section) =>
     blocks.map((block, index) => ({
       block,
-      afterHeading: index === 0 ? startsSection : blocks[index - 1].type === 'heading',
-      notes: take(block.html),
+      afterHeading: index === 0 ? section !== undefined : blocks[index - 1].type === 'heading',
+      notes: take(block.html + shownRecap(block.type === 'heading' ? subsectionRecap(section, block.id) : undefined)),
     }));
-  const intro = entries(content.intro, false);
-  const sections = content.sections.map((section) => ({ section, notes: take(section.title), entries: entries(section.blocks, true) }));
+  const intro = entries(content.intro);
+  const sections = content.sections.map((section) => ({ section, notes: take(section.title + shownRecap(section.recap)), entries: entries(section.blocks, section) }));
   const rest = content.sidenotes.filter((note) => !placed.has(note.number));
   return { intro, sections, rest };
+}
+
+export function subsectionRecap(section, id) {
+  return section?.subsections.find((subsection) => subsection.id === id)?.recap;
 }
 
 function Flow(props) {

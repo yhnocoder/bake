@@ -140,7 +140,7 @@
   border-top: 1px solid var(--line-2);
 }
 
-.sidenote-ref {
+.bt-article .sidenote-ref {
   font-family: var(--font-mono);
   font-size: 11px;
   font-style: normal;
@@ -150,7 +150,7 @@
   margin: 0 1px;
 }
 
-.sidenote-ref a {
+.bt-article .sidenote-ref a {
   color: var(--accent);
   text-decoration: none;
   border-radius: 3px;
@@ -158,7 +158,7 @@
   transition: background-color 0.3s ease-out;
 }
 
-.sidenote-ref.is-active a {
+.bt-article .sidenote-ref.is-active a {
   background-color: var(--mark);
   transition-duration: 0.15s;
 }
@@ -184,7 +184,7 @@
   transition-duration: 0.15s;
 }
 
-.bk-sidenote-number {
+.bt-article .bk-sidenote-number {
   margin-right: 6px;
   border-radius: 3px;
   padding: 0 2px;
@@ -194,21 +194,21 @@
   transition: background-color 0.3s ease-out;
 }
 
-.bk-sidenote.is-active .bk-sidenote-number {
+.bt-article .bk-sidenote.is-active .bk-sidenote-number {
   background-color: var(--mark);
   transition-duration: 0.15s;
 }
 
-.bk-sidenote-body,
-.bk-sidenote-body > :first-child {
+.bt-article .bk-sidenote-body,
+.bt-article .bk-sidenote-body > :first-child {
   display: inline;
 }
 
-.bk-sidenote-body p {
+.bt-article .bk-sidenote-body p {
   margin: 0 0 6px;
 }
 
-.bk-sidenote-body > :last-child {
+.bt-article .bk-sidenote-body > :last-child {
   margin-bottom: 0;
 }
 
