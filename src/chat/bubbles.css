@@ -13,20 +13,47 @@
   box-sizing: border-box;
   flex-direction: column;
   gap: 8px;
+  padding: 10px;
   width: min(var(--bk-chat-width), calc(100vw - var(--chat-right, 16px) - 76px - var(--bk-chat-gap) - 12px));
   color: var(--ink);
   font-size: 13.5px;
   line-height: 1.6;
   pointer-events: none;
-  opacity: 0;
   translate: 0 6px;
-  transition:
-    opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out);
+  transition: translate 0.24s var(--ease-out, ease-out);
 }
 
 .bk-chat * {
   box-sizing: border-box;
+}
+
+.bk-chat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 12px 32px -12px color-mix(in srgb, var(--ink) 25%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  transition: opacity 0.2s var(--ease-out, ease-out);
+}
+
+.bk-chat::before,
+.bk-chat > :is(.bk-chat-bubbles, .bk-chat-note-card, .bk-chat-composer) {
+  opacity: 0;
+}
+
+.bk-chat[data-open]::before,
+.bk-chat[data-open] > :is(.bk-chat-bubbles, .bk-chat-note-card, .bk-chat-composer) {
+  opacity: calc(1 - var(--chat-hidden, 0));
+}
+
+.bk-chat[data-open]::before {
+  pointer-events: auto;
 }
 
 @media (min-width: 1000px) {
@@ -54,7 +81,6 @@
 }
 
 .bk-chat[data-open] {
-  opacity: calc(1 - var(--chat-hidden, 0));
   translate: none;
 }
 
@@ -63,6 +89,8 @@
 .bk-chat-composer {
   pointer-events: auto;
   transition:
+    opacity 0.2s var(--ease-out, ease-out),
+    translate 0.24s var(--ease-out, ease-out),
     visibility 0s,
     content-visibility 0s allow-discrete;
 }
@@ -70,6 +98,8 @@
 .bk-chat:not([data-open]) > :is(.bk-chat-bubbles, .bk-chat-note-card, .bk-chat-composer) {
   pointer-events: none;
   transition:
+    opacity 0.2s var(--ease-out, ease-out),
+    translate 0.24s var(--ease-out, ease-out),
     visibility 0s 0.2s,
     content-visibility 0s 0.2s allow-discrete;
 }
@@ -83,9 +113,15 @@
 }
 
 @container style(--chat-visibility: hidden) {
+  .bk-chat[data-open]::before {
+    pointer-events: none;
+  }
+
   .bk-chat > :is(.bk-chat-bubbles, .bk-chat-note-card, .bk-chat-composer) {
     pointer-events: none;
     transition:
+      opacity 0.2s var(--ease-out, ease-out),
+      translate 0.24s var(--ease-out, ease-out),
       visibility 0s 0.2s,
       content-visibility 0s 0.2s allow-discrete;
   }
@@ -103,7 +139,7 @@
   contain-intrinsic-block-size: auto 0px;
   display: flex;
   flex-direction: column-reverse;
-  max-height: min(var(--bk-chat-height), calc(100vh - var(--chat-bottom, 16px) - 140px));
+  max-height: min(var(--bk-chat-height), calc(100vh - var(--chat-bottom, 16px) - 160px));
   margin: 0 calc(0px - var(--bk-chat-gap)) -8px -6px;
   padding: 4px var(--bk-chat-gap) 8px 6px;
   overflow-y: auto;
@@ -950,15 +986,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  max-height: min(var(--bk-chat-note-height), calc(100vh - var(--chat-bottom, 16px) - 72px));
+  max-height: min(var(--bk-chat-note-height), calc(100vh - var(--chat-bottom, 16px) - 92px));
   overflow: hidden;
   border-radius: 12px;
   background: var(--surface);
   box-shadow: var(--card-shadow);
   color: var(--ink);
-  transition:
-    opacity 0.2s var(--ease-out, ease-out),
-    translate 0.24s var(--ease-out, ease-out);
 }
 
 .bk-chat-note-card:focus {
@@ -966,7 +999,7 @@
 }
 
 @starting-style {
-  .bk-chat-note-card {
+  .bk-chat[data-open] > .bk-chat-note-card {
     opacity: 0;
     translate: 0 8px;
   }
@@ -1368,7 +1401,7 @@
   }
 
   @starting-style {
-    .bk-chat-note-card {
+    .bk-chat[data-open] > .bk-chat-note-card {
       translate: none;
     }
   }

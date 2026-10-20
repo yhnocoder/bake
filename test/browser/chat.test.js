@@ -700,7 +700,14 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat[data-open]').waitFor();
     assert.deepEqual(await petSeen(page, 'open'), petEntry('open'));
     assert.equal(await launcher.getAttribute('aria-expanded'), 'true');
-    assert.match(await chat.evaluate((element) => getComputedStyle(element).transitionProperty), /opacity/);
+    assert.deepEqual(
+      await chat.evaluate((element) => {
+        const glass = getComputedStyle(element, '::before');
+        return { slide: getComputedStyle(element).transitionProperty, opacity: getComputedStyle(element).opacity, fade: glass.transitionProperty, blur: glass.backdropFilter.startsWith('blur(') };
+      }),
+      { slide: 'translate', opacity: '1', fade: 'opacity', blur: true },
+      'the chat slides as one element and its layers fade, so no ancestor of the frosted glass has an opacity below 1 that would stop its blur',
+    );
     const box = await chat.boundingBox();
     const pet = await launcher.boundingBox();
     assert.ok(box.x + box.width <= pet.x && box.width === 400, JSON.stringify({ box, pet }));
