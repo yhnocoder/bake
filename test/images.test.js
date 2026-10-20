@@ -116,13 +116,16 @@ describe('images', () => {
     );
   });
 
-  test('keeps the original of an image when a link or a src, href or srcset address in raw HTML names its whole path', async (t) => {
+  test('keeps the original of an image when a link, a URL attribute such as src, href or poster, or a srcset address in raw HTML names its whole path', async (t) => {
     const options = { folder: await imageFolder(t, { 'a.png': png(40, 20) }) };
     const keepSource = async (body) => (await parsed(`![](a.png)\n\n${body}\n`, options)).images[0].keepSource;
     assert.equal(await keepSource('[original](./a.png)'), true);
     assert.equal(await keepSource('<a href="a.png">original</a>'), true);
     assert.equal(await keepSource('<IMG SRC=a.png>'), true);
     assert.equal(await keepSource('<img srcset="small.png 1x, a.png 2x">'), true);
+    assert.equal(await keepSource('<video src="clip.mp4" poster="a.png"></video>'), true);
+    assert.equal(await keepSource('<object data="a.png"></object>'), true);
+    assert.equal(await keepSource('<picture><source srcset="a.png"></picture>'), true);
     assert.equal(await keepSource('<img src="banana.png">'), false);
     assert.equal(await keepSource('<img src="x.png" alt="a.png">'), false);
     assert.equal(await keepSource('<!-- a.png -->'), false);
