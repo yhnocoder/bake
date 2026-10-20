@@ -4,11 +4,16 @@ const TICK_STEPS = [
   [7.5, 5],
 ];
 const EPSILON = 1e-9;
+const MAX_DIGITS = 20;
 
 export const formatNumber = (value, digits) => value.toFixed(digits).replace('-', '−');
 
 export function stepDigits(step) {
-  return Math.max(0, -Math.floor(Math.log10(step) + EPSILON));
+  for (let digits = 0; digits < MAX_DIGITS; digits++) {
+    const scaled = Math.abs(step) * 10 ** digits;
+    if (Math.abs(scaled - Math.round(scaled)) <= scaled * EPSILON) return digits;
+  }
+  return MAX_DIGITS;
 }
 
 export function niceTicks(low, high, count) {
