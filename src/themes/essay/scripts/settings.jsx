@@ -36,13 +36,64 @@ export function chooseSetting(name, value) {
 }
 
 function switchTheme(value) {
-  const apply = () => {
+  fadeColours(() => {
     document.documentElement.dataset.theme = value;
     document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name: 'theme', value } }));
     document.dispatchEvent(new CustomEvent(THEME_EVENT));
-  };
-  if (document.startViewTransition === undefined || reducedMotion.matches || document.visibilityState !== 'visible') apply();
-  else document.startViewTransition(apply);
+  });
+}
+
+function coloursFade() {
+  return document.startViewTransition !== undefined && !reducedMotion.matches && document.visibilityState === 'visible';
+}
+
+let fade = null;
+let clickTarget = null;
+
+function fadeColours(apply) {
+  if (!coloursFade()) {
+    apply();
+    return;
+  }
+  const transition = document.startViewTransition(apply);
+  fade = transition;
+  transition.finished.finally(() => {
+    if (fade === transition) fade = null;
+  });
+}
+
+function forwardClicksDuringFade() {
+  addEventListener(
+    'pointerdown',
+    (event) => {
+      if (fade === null || event.target !== document.documentElement) return;
+      event.stopImmediatePropagation();
+      fade.skipTransition();
+      clickTarget = document.elementFromPoint(event.clientX, event.clientY);
+    },
+    true,
+  );
+  addEventListener(
+    'click',
+    (event) => {
+      const target = clickTarget;
+      clickTarget = null;
+      if (target === null || event.target !== document.documentElement || target === document.documentElement) return;
+      event.stopImmediatePropagation();
+      target.click();
+    },
+    true,
+  );
+}
+
+function followSystemScheme(event) {
+  if (settingValue('theme') !== 'system') return;
+  const root = document.documentElement;
+  if (coloursFade()) root.dataset.theme = event.matches ? 'light' : 'dark';
+  fadeColours(() => {
+    root.dataset.theme = 'system';
+    document.dispatchEvent(new CustomEvent(THEME_EVENT));
+  });
 }
 
 export function startSettings() {
@@ -50,9 +101,8 @@ export function startSettings() {
   const host = document.createElement('div');
   document.body.append(host);
   render(() => <Settings labels={labels} />, host);
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (settingValue('theme') === 'system') document.dispatchEvent(new CustomEvent(THEME_EVENT));
-  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', followSystemScheme);
+  forwardClicksDuringFade();
 }
 
 function Settings(props) {
