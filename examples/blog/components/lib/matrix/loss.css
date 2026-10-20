@@ -1,0 +1,49 @@
+.matrix-loss-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin:4px 0}
+.matrix-loss-toolbar label{display:flex;align-items:center;gap:8px;font-size:13px}
+.matrix-loss select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);border-radius:6px;padding:4px 9px;cursor:pointer}
+.matrix-loss :is(input,button,select,.matrix-loss-scroll):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.matrix-loss-actions{display:flex;gap:8px}
+.matrix-loss-actions button{font:inherit;font-size:13px;padding:5px 14px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface-2);color:var(--ink-2);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.matrix-loss-actions button:hover{background:var(--mark);border-color:var(--accent);color:var(--accent)}
+.matrix-loss-actions button:active{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.matrix-loss-scroll{overflow-x:auto;padding:4px}
+.matrix-loss-charts{min-width:max(540px,calc(var(--count) * 84px))}
+.matrix-loss-title{font-size:14px;margin:6px 0 4px}
+.matrix-loss-columns{display:grid;grid-template-columns:repeat(var(--count),minmax(0,1fr));gap:6px}
+.matrix-loss-cell{--cell-color:var(--ink-3);background:var(--surface-2);border-radius:6px;padding:8px 5px;text-align:center;min-width:0}
+.matrix-loss-cell.target{background:color-mix(in srgb,var(--series-1) 8%,var(--surface))}
+.matrix-loss output{display:block;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.matrix-loss-logits{margin:4px 0 10px}
+.matrix-loss-logits .matrix-loss-cell,.matrix-loss-logits .matrix-loss-cell.target{background:transparent;border-radius:0}
+.matrix-loss-logits .matrix-loss-cell.target{--cell-color:var(--accent)}
+.matrix-loss-logits button{font:inherit;font-size:12px;min-width:64px;padding:4px 0;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--ink-2);cursor:pointer}
+.matrix-loss-logits button:hover{background:var(--surface-2);color:var(--ink)}
+.matrix-loss-logits button[aria-pressed=true]{color:var(--accent);background:var(--mark)}
+.matrix-loss-slider{display:block;position:relative;width:64px;height:92px;margin:12px auto 8px}
+.matrix-loss-slider:focus-within{outline:2px solid var(--accent);outline-offset:5px;border-radius:4px}
+.matrix-loss-track{position:absolute;left:31px;top:0;width:2px;height:92px;background:var(--line)}
+.matrix-loss-track::after{content:"";position:absolute;left:-7px;right:-7px;bottom:50%;border-top:1px solid var(--axis)}
+.matrix-loss-track>.matrix-loss-bar{left:0;width:2px;border-radius:0;background:var(--cell-color)}
+.matrix-loss-handle{position:absolute;left:-5px;width:12px;height:12px;margin-bottom:-6px;box-sizing:border-box;border:2px solid var(--cell-color);border-radius:50%;background:var(--surface);box-shadow:0 1px 3px color-mix(in srgb,var(--ink) 12%,transparent);z-index:1}
+.matrix-loss-slider input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;z-index:2;writing-mode:vertical-lr;direction:rtl;cursor:ns-resize}
+.matrix-loss-limit{position:absolute;left:4px;font:10px var(--font-mono);color:var(--ink-3);line-height:1}
+.matrix-loss-limit.top{top:-4px}
+.matrix-loss-limit.bottom{bottom:-4px}
+.matrix-loss-z{font-size:14px;color:var(--cell-color)}
+.matrix-loss-legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:12px;margin:4px 0 8px}
+.matrix-loss-legend>span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;background:currentColor;margin-right:6px}
+.matrix-loss-probability{color:var(--series-1)}
+.matrix-loss-gradient{color:var(--series-2)}
+.matrix-loss-values{display:grid;grid-template-columns:1fr 1fr;gap:2px}
+.matrix-loss-values output{font-size:11px;margin:4px 0}
+.matrix-loss-pair{position:relative;height:100px;width:100%}
+.matrix-loss-pair::after{content:"";position:absolute;left:0;right:0;bottom:50%;border-top:1px solid var(--ink-3)}
+.matrix-loss-bar{position:absolute;bottom:0;border-radius:3px}
+.matrix-loss-pair>.matrix-loss-bar{width:20px}
+.matrix-loss-pair>.matrix-loss-probability{left:calc(50% - 23px);background:var(--series-1)}
+.matrix-loss-pair>.matrix-loss-gradient{left:calc(50% + 3px);background:var(--series-2)}
+.matrix-loss-caption{font-size:11px;color:var(--ink-3)}
+.matrix-loss-total{display:flex;align-items:center;gap:10px;margin:10px 0 4px;padding-top:8px;border-top:1px solid var(--line);font-size:14px}
+.matrix-loss-total output{font-size:24px;color:var(--accent)}
+.matrix-loss-sums{font-size:13px;color:var(--ink-2);margin:0}
+.matrix-loss-sums output{display:inline}
