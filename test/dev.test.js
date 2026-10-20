@@ -266,11 +266,11 @@ describe('bake dev', () => {
 });
 
 describe('preview updates', () => {
-  test('rereads only the changed article and compiles a theme again only when a theme file changes', async (t) => {
+  test('rereads only the changed article, and a theme file change compiles only that theme again and parses no article again', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article(),
-      'content/posts/gelu/index.md': article({ slug: 'gelu' }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
     });
     const site = createSite(dir);
     const first = await updateSite(site);
@@ -282,9 +282,53 @@ describe('preview updates', () => {
     assert.notEqual(byFile(second).get('content/posts/rope/index.md'), byFile(first).get('content/posts/rope/index.md'));
     assert.equal(site.themes.get('essay'), theme);
     writeFiles(dir, { 'themes/essay/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' });
+    const bento = site.themes.get('bento');
     const third = await updateSite(site, ['themes/essay/header.jsx']);
     assert.notEqual(site.themes.get('essay'), theme);
-    assert.match(third.pages[0].outputs[0].render(), /<header class="custom-header">/);
+    assert.equal(site.themes.get('bento'), bento);
+    assert.equal(byFile(third).get('content/posts/gelu/index.md'), byFile(second).get('content/posts/gelu/index.md'));
+    assert.match(third.pages.find((page) => page.entry.url === '/2026-10/rope/').outputs[0].render(), /<header class="custom-header">/);
+    writeFiles(dir, { 'themes/plain/page.jsx': 'export default function Page() {\n  return <html />;\n}\n', 'themes/plain/client.jsx': '' });
+    const fourth = await updateSite(site, ['themes/plain/page.jsx', 'themes/plain/client.jsx']);
+    assert.notEqual(byFile(fourth).get('content/posts/gelu/index.md'), byFile(third).get('content/posts/gelu/index.md'));
+    assert.deepEqual(fourth.errors, []);
+  });
+
+  test('compiles a theme again when a file that it imports from another folder under themes/ changes', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
+      'themes/plain/page.jsx': "import { word } from '../common/word.js';\nexport default function Page() {\n  return <html><body><p class=\"word\">{word}</p></body></html>;\n}\n",
+      'themes/plain/client.jsx': "import '../common/look.css';\n",
+      'themes/common/word.js': "export const word = 'first';\n",
+      'themes/common/look.css': '.word { color: red; }\n',
+    });
+    const site = createSite(dir);
+    const render = (result) => result.pages.find((page) => page.entry.url === '/2026-10/rope/').outputs[0].render();
+    const stylesheet = (result) => result.assetFiles.filter((file) => file.path.endsWith('.css')).map((file) => String(file.render())).join('\n');
+    const first = await updateSite(site);
+    assert.deepEqual(first.errors, []);
+    assert.match(render(first), /first/);
+    writeFiles(dir, { 'themes/common/word.js': "export const word = 'second';\n" });
+    assert.match(render(await updateSite(site, ['themes/common/word.js'])), /second/);
+    writeFiles(dir, { 'themes/common/look.css': '.word { color: blue; }\n' });
+    assert.match(stylesheet(await updateSite(site, ['themes/common/look.css'])), /color:\s*#?(blue|00f)/);
+  });
+
+  test('reads the theme options again when the folder of a theme is removed or added as a whole', async (t) => {
+    const options = "export const options = { extra: { label: 'Extra', type: 'number', default: 1 } };\n";
+    const dir = createBlog(t, {
+      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', themes: { bento: { extra: 2 } } };\n",
+      'content/posts/rope/index.md': article(),
+      'themes/bento/options.js': options,
+    });
+    const site = createSite(dir);
+    assert.deepEqual((await updateSite(site)).errors, []);
+    rmSync(join(dir, 'themes/bento'), { recursive: true });
+    const removed = await updateSite(site, ['themes/bento']);
+    assert.deepEqual(removed.errors.map(formatError), ['bake.config.js:1:101 unknown config field "themes.bento.extra"']);
+    writeFiles(dir, { 'themes/bento/options.js': options });
+    assert.deepEqual((await updateSite(site, ['themes/bento'])).errors, []);
   });
 
   test('compiles the site theme again with the site files when an article theme becomes the site theme', async (t) => {
