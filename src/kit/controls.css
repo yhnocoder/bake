@@ -137,8 +137,7 @@
   white-space: nowrap;
   transition:
     background-color 0.15s var(--ease-out),
-    color 0.15s var(--ease-out),
-    box-shadow 0.15s var(--ease-out);
+    color 0.15s var(--ease-out);
 }
 
 .bk-kit-segment:hover span {
