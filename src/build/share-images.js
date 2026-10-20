@@ -1,6 +1,7 @@
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { errorAt, fileStart } from '../report.js';
@@ -21,6 +22,7 @@ const CARD_FILE = 'card.html';
 const PAGE_COUNT = 4;
 const DRAW_TIMEOUT = 10000;
 const HASH_LENGTH = 12;
+const CACHE_DIR = 'bake-share-images';
 const DRAWING_CODE = ['share-card.js', 'share-images.js'].map((file) => readFileSync(join(import.meta.dirname, file)));
 const PLAYWRIGHT_VERSION = createRequire(import.meta.url)('playwright/package.json').version;
 const PNG = { extension: '.png', type: 'image/png' };
@@ -54,8 +56,10 @@ export function shareImageOf(root, { article, entry }, config, assets) {
   if (fields.preview !== undefined) {
     for (const file of article.files) inputs.push(file, readFileSync(join(root, article.dir, file)));
   }
+  const key = digest(inputs);
   return {
-    path: `${name}-${digest(inputs)}.png`,
+    path: `${name}-${key}.png`,
+    key,
     owner: article.file,
     type: PNG.type,
     width: SHARE_IMAGE_WIDTH,
@@ -74,7 +78,11 @@ export async function shareImageOutputs(root, images, assets, errors) {
     if (image.from !== undefined) outputs.push({ path: image.path, from: image.from, owner: image.owner });
     else if (image.render !== undefined) outputs.push({ path: image.path, render: image.render, owner: image.owner });
     else if (existsSync(published)) outputs.push({ path: image.path, from: published, owner: image.owner });
-    else pending.push(image);
+    else {
+      const png = cachedCard(image.key);
+      if (png === null) pending.push(image);
+      else outputs.push({ path: image.path, render: () => png, owner: image.owner });
+    }
   }
   if (pending.length === 0) return outputs;
   return [...outputs, ...(await drawCards(pending, assets, errors))];
@@ -106,6 +114,7 @@ async function drawCards(images, assets, errors) {
       for (const [index, image] of queue) {
         const result = await drawCard(page, index, image);
         if (result.problem === undefined) {
+          storeCard(image.key, result.png);
           outputs.push({ path: image.path, render: () => result.png, owner: image.owner });
           continue;
         }
@@ -182,6 +191,22 @@ function requestedFile(path, images, assets) {
   const prefix = `${ARTICLE_DIR}/`;
   if (!file.startsWith(prefix) || !image.folder.files.includes(file.slice(prefix.length))) return null;
   return readFileSync(join(image.folder.path, file.slice(prefix.length)));
+}
+
+function cachedCard(key) {
+  try {
+    return readFileSync(join(tmpdir(), CACHE_DIR, `${key}.png`));
+  } catch {
+    return null;
+  }
+}
+
+function storeCard(key, png) {
+  const dir = join(tmpdir(), CACHE_DIR);
+  mkdirSync(dir, { recursive: true });
+  const staging = join(dir, `${key}.${randomUUID()}`);
+  writeFileSync(staging, png);
+  renameSync(staging, join(dir, `${key}.png`));
 }
 
 function digest(inputs) {

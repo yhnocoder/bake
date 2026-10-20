@@ -45,7 +45,8 @@ function emptyBrowsers(t) {
 }
 
 function bakeWithoutChromium(t, dir) {
-  return spawnSync(process.execPath, [cli, 'build'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: emptyBrowsers(t) } });
+  const empty = emptyBrowsers(t);
+  return spawnSync(process.execPath, [cli, 'build'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: empty, TMPDIR: empty } });
 }
 
 function pixel(png, x, y) {
