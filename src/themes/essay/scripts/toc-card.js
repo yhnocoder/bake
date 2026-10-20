@@ -126,9 +126,9 @@ export function hoverIntent(delay) {
       clearTimeout(hideTimer);
       shown = false;
     },
-    dismiss(entry) {
+    dismiss(entry, elements) {
       this.stop();
-      dismissed = entry;
+      dismissed = elements.some((element) => element?.matches(':hover')) ? entry : null;
     },
   };
 }

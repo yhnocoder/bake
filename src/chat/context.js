@@ -1,4 +1,4 @@
-import { escapeMarkup } from '../build/escape.js';
+import { escapeMarkup } from '../escape.js';
 import { articleSource } from '../copy/copy.js';
 
 export const CATALOG_PATH = '_bake/articles.json';

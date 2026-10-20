@@ -79,7 +79,7 @@ export function dotsView(context) {
     intent.leave(hide);
   }
   function close() {
-    intent.dismiss(hovered);
+    intent.dismiss(hovered, [items[hovered]?.item, card]);
     hide();
   }
   function measure() {

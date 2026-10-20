@@ -270,9 +270,9 @@ function Chat(props) {
     unlock();
   };
 
-  const ask = (range) => {
+  const ask = async (range) => {
     const article = page.article?.element;
-    const selected = article === null || article === undefined ? null : selectionMarkdown(range, article);
+    const selected = article === null || article === undefined ? null : await selectionMarkdown(range, article);
     if (selected !== null) setQuote(selected.markdown);
     show();
   };

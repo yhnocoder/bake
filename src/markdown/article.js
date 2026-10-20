@@ -2,17 +2,12 @@ import { join } from 'node:path';
 import { eastAsianWidth } from 'get-east-asian-width';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
-import remarkCjkFriendly from 'remark-cjk-friendly';
-import remarkCjkFriendlyStrikethrough from 'remark-cjk-friendly-gfm-strikethrough';
 import remarkFrontmatter from 'remark-frontmatter';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, folderFile, parseSize, sizeProblem } from '../config/rules.js';
-import { indexPages } from '../build/links.js';
-import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress } from '../build/urls.js';
+import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress } from '../urls.js';
 import { idOfFragment, percentDecode, referenceId, sidenoteId } from '../fragments.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
@@ -25,15 +20,13 @@ import { citationsAndMissingFootnotes } from './bracket-syntax.js';
 import { equationReferences } from './eqref-syntax.js';
 import { highlight } from './highlight-syntax.js';
 import { readRawHtml } from './raw-html.js';
+import { REMARK_PLUGINS } from './remark-plugins.js';
 import { protectPipesInMath, restorePipesInMath } from './table-math.js';
 
 const processor = unified()
   .use(remarkParse)
   .use(remarkFrontmatter)
-  .use(remarkGfm, { singleTilde: false })
-  .use(remarkMath)
-  .use(remarkCjkFriendly)
-  .use(remarkCjkFriendlyStrikethrough, { singleTilde: false })
+  .use(REMARK_PLUGINS)
   .use(highlight)
   .use(citationsAndMissingFootnotes)
   .use(equationReferences)
@@ -77,17 +70,12 @@ const WORD = /[\p{L}\p{N}]+/gu;
 const PREVIEW_BLOCKS = 3;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
+const UNREAD_TABLE_MATH = '| inside $…$ cannot be read on this line, because the article uses every private-use character from U+E000 to U+F8FF and Bake needs one that it does not use';
 
 export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null, components = new Map() } = {}) {
   const article = new ArticleParser(file, source, errors, folder, preamble, url, components);
   await article.parse();
   return article;
-}
-
-export async function parseArticle(file, source, errors, options = {}) {
-  const article = await readArticle(file, source, errors, options);
-  article.link(indexPages([{ url: article.url, title: '', draft: false, article }]), errors);
-  return article.structure();
 }
 
 class ArticleParser {
@@ -133,8 +121,9 @@ class ArticleParser {
   }
 
   async parse() {
-    const tree = processor.parse(protectPipesInMath(this.source));
-    restorePipesInMath(tree);
+    const pipes = protectPipesInMath(this.source);
+    if (pipes.unreadLine !== undefined) this.report({ line: pipes.unreadLine, column: 1 }, UNREAD_TABLE_MATH);
+    const tree = restorePipesInMath(processor.parse(pipes.text), pipes.sentinel);
     tree.children = tree.children.filter((node) => node.type !== 'yaml');
     walk(tree, (node) => {
       if (node.type === 'bakeBlock') this.readBlock(node);

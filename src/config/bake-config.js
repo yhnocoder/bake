@@ -3,7 +3,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
-import { DEFAULT_PET, petSourceProblem } from '../chat/pet-files.js';
+import { DEFAULT_PET, petSourceProblem } from './pet.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
 import { TOC_STYLES, choiceProblem, slugProblem } from './rules.js';
 

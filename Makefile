@@ -1,4 +1,4 @@
-.PHONY: check browser example dev screenshots
+.PHONY: check browser example dev screenshots perf
 
 BASE ?= origin/main
 
@@ -21,3 +21,9 @@ dev: node_modules
 
 screenshots: node_modules
 	scripts/screenshots.sh $(BASE)
+
+perf: node_modules
+	cd examples/blog && node ../../src/cli.js build
+	mkdir -p test-out/perf
+	node scripts/measure-pages.js examples/blog/dist --out test-out/perf/report.json
+	node scripts/check-budgets.js test-out/perf/report.json

@@ -1,16 +1,13 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
-import remarkCjkFriendly from 'remark-cjk-friendly';
-import remarkCjkFriendlyStrikethrough from 'remark-cjk-friendly-gfm-strikethrough';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { REMARK_PLUGINS } from '../markdown/remark-plugins.js';
 import { texDelimiters } from './tex-delimiters.js';
 
 export const MATH_CLASS = 'bk-chat-math';
 
-const processor = unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkCjkFriendly).use(remarkCjkFriendlyStrikethrough, { singleTilde: false }).use(texDelimiters);
+const processor = unified().use(remarkParse).use(REMARK_PLUGINS).use(texDelimiters);
 const SCHEME = /^([a-z][a-z\d+.-]*):/i;
 const OPEN_SCHEMES = new Set(['http', 'https', 'mailto']);
 

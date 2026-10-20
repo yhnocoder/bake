@@ -27,11 +27,30 @@ describe('math', () => {
     assert.equal(article.intro[1].html, '<p><a class="eqref" href="#eq%3Ab">(2)</a></p>');
   });
 
+  test('numbers a labeled display formula like an equation environment, where \\tag replaces the number and \\notag removes it', async () => {
+    const source = '\\eqref{eq:a} \\eqref{eq:b}\n\n$$\nx \\label{eq:a}\n$$\n\n$$\ny \\label{eq:b} \\tag{B}\n$$\n\n$$\nz \\label{eq:c} \\notag\n$$\n';
+    const { article, errors } = await parse(source);
+    assert.deepEqual(errors, ['index.md:17:1 \\label{eq:c} is not on a numbered equation; it is inside a starred environment or on a \\notag line']);
+    assert.equal(outline(article.intro[0].html), '<p><a class="eqref" href="#eq%3Aa">(1)</a> <a class="eqref" href="#eq%3Ab">(B)</a></p>');
+    assert.doesNotMatch(article.intro[3].html, /mlabeledtr/);
+  });
+
   test('reports \\eqref to an unknown label in text and in a formula', async () => {
     assert.deepEqual((await parse('$$\nx \\label{eq:ffn}\n$$\n\nSee \\eqref{eq:fnn} and $\\eqref{eq:fn}$.\n')).errors, [
       'index.md:11:5 \\eqref{eq:fnn} refers to an unknown \\label',
       'index.md:11:24 \\eqref{eq:fn} refers to an unknown \\label',
     ]);
+  });
+
+  test('ignores \\label inside a TeX comment and leaves the formula unnumbered', async () => {
+    const article = await parsed('$$\na = b % see \\label{x} later\n$$\n\n$$\nc \\label{y} % numbered\n$$\n');
+    assert.doesNotMatch(article.intro[0].html, /mlabeledtr| id="/);
+    assert.match(article.intro[1].html, /data-mml-node="mlabeledtr"/);
+    assert.match(article.intro[1].html, / id="y"/);
+  });
+
+  test('does not report \\eqref and \\ref inside a TeX comment', async () => {
+    assert.deepEqual((await parse('$$\na = b % \\eqref{nowhere} and \\ref{elsewhere}\n$$\n')).errors, []);
   });
 
   test('reports formulas that MathJax cannot typeset at their position', async () => {
@@ -93,5 +112,25 @@ describe('math', () => {
       outline(table.html),
       '<div class="table-scroll"><table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>$|x|_1$</td>\n<td><code>c</code></td>\n</tr>\n<tr>\n<td>$|y|$</td>\n<td>$</td>\n</tr>\n</tbody>\n</table></div>',
     );
+  });
+
+  test('publishes a private-use character of the article unchanged next to | inside $…$ on a table line', async () => {
+    assert.equal(
+      await html('Icon  here.\n\n| a | b |\n|---|---|\n|  | $|x|$ |\n'),
+      '<p>Icon  here.</p>\n<div class="table-scroll"><table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td></td>\n<td>$|x|$</td>\n</tr>\n</tbody>\n</table></div>',
+    );
+  });
+
+  test('keeps | inside $…$ in the attributes of a block', async () => {
+    const article = await parsed(':::fold{title="$|x|$ fold"}\nbody\n:::\n\n:::act-fn-plot{fn="$|x|$"}\n:::\n', { components: new Map([['act-fn-plot', { valid: false }]]) });
+    assert.match(article.intro[0].html, /<summary>\$\|x\|\$ fold<\/summary>/);
+    assert.deepEqual(article.intro[1].attributes, { fn: '$|x|$' });
+  });
+
+  test('reports | inside $…$ on a table line of an article that uses every private-use character', async () => {
+    const every = Array.from({ length: 0xf8ff - 0xe000 + 1 }, (_, index) => String.fromCharCode(0xe000 + index)).join('');
+    assert.deepEqual((await parse(`${every}\n\n| a |\n|---|\n| $|x|$ |\n`)).errors, [
+      'index.md:11:1 | inside $…$ cannot be read on this line, because the article uses every private-use character from U+E000 to U+F8FF and Bake needs one that it does not use',
+    ]);
   });
 });

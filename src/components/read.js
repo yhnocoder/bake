@@ -3,10 +3,11 @@ import { join, posix, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import solid from 'vite-plugin-solid';
-import { blogPath, compileProblem, isInBlog, viteConfig } from '../build/vite.js';
+import { publicModules } from '../bundle/modules.js';
+import { blogPath, compileProblem, isInBlog, viteConfig } from '../bundle/vite.js';
 import { errorAt, fileStart } from '../report.js';
 import { checkDeclarations } from './declarations.js';
-import { nodeModules } from './modules.js';
+import { NODE_MATH_FILE } from './modules.js';
 
 export const COMPONENTS_DIR = 'components';
 export const BROWSER_GLOBALS = Object.freeze([
@@ -28,6 +29,8 @@ const COMPONENT_EXTENSIONS = ['.js', '.jsx'];
 const COMPONENT_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/;
 const RESERVED_NAMES = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
 const UNDEFINED_NAME = /^(\S+) is not defined$/;
+// why: modules that ssrLoadModule cached from an earlier component extend the HTMLElement of that load, so every load uses the same class
+const NODE_HTML_ELEMENT = class HTMLElement {};
 const STACK_LOCATION = /\(?((?:file:\/\/)?[^\s()]+):(\d+):(\d+)\)?$/;
 
 export async function readComponents(root, { builtInBlocks }, errors) {
@@ -37,7 +40,7 @@ export async function readComponents(root, { builtInBlocks }, errors) {
   // why: the Vite dev server sets NODE_ENV to development, and later builds in this process would then bundle Solid's development build
   const environment = process.env.NODE_ENV;
   const server = await createServer({
-    ...viteConfig([nodeModules(), solid({ ssr: true })]),
+    ...viteConfig({ plugins: [solid({ ssr: true })], alias: publicModules('components', { 'bake/math': NODE_MATH_FILE }) }),
     appType: 'custom',
     server: { middlewareMode: true, hmr: false, watch: null, ws: false },
   });
@@ -52,7 +55,7 @@ export async function readComponents(root, { builtInBlocks }, errors) {
       }
       const { params, layout, problems } = checkDeclarations(module.exports);
       for (const problem of problems) errors.push(errorAt(file, fileStart, `${name}: ${problem}`));
-      components.set(name, { name, file, path, params, layout, valid: problems.length === 0 });
+      components.set(name, { name, file, path, params, layout, solid: !module.customElement, valid: problems.length === 0 });
     }
   } finally {
     await server.close();
@@ -90,9 +93,10 @@ async function loadModule(server, path) {
   const hidden = BROWSER_GLOBALS.filter((name) => Object.hasOwn(globalThis, name)).map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
   const stubbed = !Object.hasOwn(globalThis, 'HTMLElement');
   for (const [name] of hidden) delete globalThis[name];
-  if (stubbed) globalThis.HTMLElement = class HTMLElement {};
+  if (stubbed) globalThis.HTMLElement = NODE_HTML_ELEMENT;
   try {
-    return { exports: await server.ssrLoadModule(path) };
+    const exports = await server.ssrLoadModule(path);
+    return { exports, customElement: exports.default?.prototype instanceof HTMLElement };
   } catch (error) {
     return { error };
   } finally {

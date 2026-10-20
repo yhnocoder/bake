@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { bake, createBlog } from '../blog.js';
+import { isSelectionChunk } from './selection-module.js';
 import { serve } from './server.js';
 
 const exampleBlog = join(import.meta.dirname, '../../examples/blog');
@@ -320,6 +321,25 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(api.requests.at(-1).body.messages.at(-1).content, `> ${quote}\n\n这段是什么意思？`);
     assert.equal(await page.locator('.bk-chat-user blockquote').textContent(), quote);
     assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
+  });
+
+  await t.test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the chat without a quote', async (t) => {
+    const { page, problems } = await openBrowser(t, base);
+    await page.route((url) => isSelectionChunk(url.href), (route) => route.abort());
+    await page.goto(`${base}/2026-10/syntax/`);
+    await setUpKey(page);
+    await page.keyboard.press('Escape');
+    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
+    await page.evaluate(() => {
+      const range = document.createRange();
+      range.selectNodeContents(document.querySelector('.bk-article > .bk-block[data-type="paragraph"] p'));
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+    await page.locator('.bk-chat-ask').click();
+    await page.locator('.bk-chat[data-open]').waitFor({ timeout: 5000 });
+    assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
+    assert.deepEqual(problems, []);
   });
 
   await t.test('DeepSeek errors are explained with a retry, and a cleared key leaves nothing in storage', async (t) => {
@@ -813,17 +833,20 @@ test('the AI chat on published pages', async (t) => {
     assert.deepEqual(await chips(), ['@数学']);
     assert.equal(await input.inputValue(), '');
     assert.equal(await input.getAttribute('placeholder'), '问这些内容…');
+    const choose = async (label) => {
+      await list.locator('[role="option"] span', { hasText: label }).first().waitFor();
+      const labels = await list.locator('[role="option"] span').allTextContents();
+      for (let step = 0; step < labels.indexOf(label); step += 1) await input.press('ArrowDown');
+    };
     await input.pressSequentially('@2026-09');
-    await list.locator('[role="option"]').first().waitFor();
-    await input.press('ArrowDown');
+    await choose('2026-09');
     assert.equal(await list.locator('[aria-selected="true"] span').textContent(), '2026-09');
     await input.press('Tab');
     assert.deepEqual(await chips(), ['@数学', '@2026-09']);
     await input.press('Backspace');
     assert.deepEqual(await chips(), ['@数学']);
     await input.pressSequentially('@雅可');
-    await list.locator('[role="option"]').first().waitFor();
-    await input.press('ArrowDown');
+    await choose('雅可比矩阵');
     await input.press('Enter');
     assert.deepEqual(await chips(), ['@数学', '@雅可比矩阵']);
     await input.pressSequentially('@没有这一项');
