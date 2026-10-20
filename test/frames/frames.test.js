@@ -19,11 +19,11 @@ const WHEEL_STEP = 120;
 const WHEEL_INTERVAL = 50;
 
 const knownFailures = [
-  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'the longest frame takes 50 ms in one of five runs', task: 'toc-writes' },
+  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'the longest frame takes 50 ms in one of five runs', task: 'content-paint' },
   { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: '8 to 16 percent of the frames are slower than the budget and 10 to 19 percent are dropped in five of five runs', task: 'perf-fixes' },
   { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'the longest frame takes 50 to 100 ms in five of five runs', task: 'perf-fixes' },
-  { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 67 to 100 ms in five of five runs', task: 'toc-writes' },
-  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 83 to 117 ms in five of five runs', task: 'toc-writes' },
+  { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 67 to 100 ms in five of five runs', task: 'content-paint' },
+  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 83 to 117 ms in five of five runs', task: 'content-paint' },
   { name: 'resizing the bento article at 1440 pixels', reason: '8 to 14 percent of the frames are dropped and the longest frame takes 67 to 100 ms in five of five runs', task: 'bento-redesign' },
 ];
 

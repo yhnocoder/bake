@@ -1,0 +1,9 @@
+@import 'lxgw-wenkai-webfont/lxgwwenkai-light.css';
+
+@font-face {
+  font-family: 'LXGW WenKai';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: local('LXGW WenKai Light'), local('LXGWWenKai-Light');
+}

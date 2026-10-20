@@ -54,11 +54,16 @@
 }
 
 .bk-settings-panel {
+  --panel-bottom: calc(var(--ui-button-height) + var(--ui-stack-gap));
   position: absolute;
-  bottom: calc(100% + var(--ui-stack-gap));
+  bottom: var(--panel-bottom);
   left: 0;
   width: 252px;
   max-width: calc(100vw - 20px);
+  max-height: calc(100dvh - var(--ui-bottom) - var(--panel-bottom) - 12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   padding: 12px;
   border-radius: 12px;
   background: var(--surface);
@@ -184,6 +189,26 @@
 
 .bk-settings-options button[aria-pressed='true']::before {
   opacity: 1;
+}
+
+.bk-settings-row[data-setting='size'] button {
+  line-height: 18.75px;
+}
+
+.bk-settings-row[data-setting='size'] button:nth-child(1) {
+  font-size: 11px;
+}
+
+.bk-settings-row[data-setting='size'] button:nth-child(2) {
+  font-size: 13px;
+}
+
+.bk-settings-row[data-setting='size'] button:nth-child(3) {
+  font-size: 15px;
+}
+
+.bk-settings-row[data-setting='size'] button:nth-child(4) {
+  font-size: 17px;
 }
 
 .bk-settings-switch {
@@ -505,7 +530,7 @@
   }
 
   .bk-toc-ui:has(> .bk-toc-handle) ~ * .bk-settings-panel {
-    bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
+    --panel-bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
   }
 }
 

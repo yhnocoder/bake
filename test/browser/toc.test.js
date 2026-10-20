@@ -538,6 +538,45 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
+  await t.test('while the reader scrolls, the table of contents writes an attribute only when its value changes and fills the phone capsule with a transform', async () => {
+    const cases = [...STYLES.map((style) => [style, { width: 1440, height: 900 }]), ['notes', { width: 1100, height: 900 }], ['tabs', { width: 375, height: 760 }], ['dots', { width: 375, height: 760 }]];
+    for (const [style, viewport] of cases) {
+      const { page, context } = await open({ style, path: 'long', viewport });
+      await scrollToHeading(page, 'chapter-3');
+      await page.evaluate(() => {
+        window.unchanged = [];
+        const observer = new MutationObserver((records) => {
+          for (const record of records) {
+            if (record.target.closest('.bk-toc, .bk-toc-ui') === null) continue;
+            if (record.oldValue === record.target.getAttribute(record.attributeName)) window.unchanged.push(`${record.target.className} ${record.attributeName}`);
+          }
+        });
+        observer.observe(document.body, { subtree: true, attributes: true, attributeOldValue: true });
+        window.stopObserving = () => observer.takeRecords().length + observer.disconnect();
+      });
+      for (let step = 0; step < 40; step += 1) {
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done(scrollBy(0, 60)))));
+      }
+      await settle(page);
+      const unchanged = await page.evaluate(() => {
+        window.stopObserving();
+        return [...new Set(window.unchanged)];
+      });
+      assert.deepEqual(unchanged, [], `${style} at ${viewport.width} pixels writes attributes without changing them`);
+      if (style === 'dots' && viewport.width === 375) {
+        const fill = await page.evaluate(() => {
+          const capsule = document.querySelector('.bk-toc-handle-capsule');
+          const inner = capsule.querySelector('i');
+          return { height: inner.offsetHeight, capsule: capsule.offsetHeight, transform: getComputedStyle(inner).transform, filled: inner.getBoundingClientRect().height };
+        });
+        assert.equal(fill.height, fill.capsule, `the capsule fill changes its layout height: ${JSON.stringify(fill)}`);
+        assert.notEqual(fill.transform, 'none');
+        assert.ok(fill.filled > 0 && fill.filled < fill.capsule, `the capsule fill does not show the progress: ${JSON.stringify(fill)}`);
+      }
+      await context.close();
+    }
+  });
+
   await t.test('the notes panel opens from the tick rail between 1000 and 1340 pixels and closes when the pointer leaves', async () => {
     const { page, context } = await open({ style: 'notes', viewport: { width: 1100, height: 700 } });
     await scrollToHeading(page, 'chapter-2');
@@ -748,7 +787,7 @@ test('the table of contents', async (t) => {
         left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
       }));
     assert.deepEqual(await read(), { toc: 'dots', stored: null, views: ['.bk-toc-dots'], left: 198 });
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '按钮']);
+    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '字号', '字重', '间距', '按钮']);
     await page.click('.bk-settings-toggle');
     await page.getByRole('radio', { name: /书签索引/ }).click();
     await settle(page);

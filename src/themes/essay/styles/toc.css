@@ -966,11 +966,10 @@ html[data-script] .bk-toc-chapters {
 
 .bk-toc-handle-capsule i {
   position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: calc(var(--progress, 0) * 100%);
+  inset: 0;
   background: var(--capsule-fill);
+  transform: scaleY(var(--progress, 0));
+  transform-origin: top;
 }
 
 .bk-toc-drawer-scrim {

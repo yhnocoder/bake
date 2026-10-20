@@ -60,6 +60,7 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
       renderNotFound: module.renderNotFound,
       files: [client, styles, fonts].flatMap((output) => output?.files ?? []),
       styles: client.stylesheets,
+      lazyStyles: client.lazyStylesheets,
       fonts: fonts?.files.filter((file) => STYLESHEET.test(file.path)).map((file) => file.path) ?? [],
       script: client.entry,
       sources: new Set([...sources, ...[client, styles, fonts].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]),
