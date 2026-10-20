@@ -232,8 +232,8 @@ test('interactions draw every frame within the 60 fps budget on a CPU twice as s
           assert.deepEqual(errors, []);
           assert.deepEqual(blank, [], 'components that were not ready when they entered the viewport');
           const problem = frameProblem(stats);
-          if (known && !problem) subtest.diagnostic(`the known failure passed this time; Issue Board task ${known.task}`);
-          if (known && problem) subtest.todo(`${known.reason}; Issue Board task ${known.task}`);
+          if (known && !problem) subtest.diagnostic(`the known failure passed this time; task ${known.task}`);
+          if (known && problem) subtest.todo(`${known.reason}; task ${known.task}`);
           else assert.equal(problem, null, describe(stats));
         } finally {
           await context.close();
