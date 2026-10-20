@@ -212,7 +212,7 @@ test('the history, the notes and the instructions of the AI chat', async (t) => 
     assert.deepEqual(await card.locator('.bk-chat-note-body li').nth(3).textContent(), '这一条指向不存在的小节。缺的小节');
     assert.equal(await card.locator('blockquote cite').textContent(), '出自《Bake 写法一览》§02');
     assert.equal(await page.locator('.bk-chat-bubbles').isVisible(), false);
-    assert.ok((await page.locator('.bk-chat').boundingBox()).width > 300, 'the chat widens for the note');
+    assert.equal((await page.locator('.bk-chat').boundingBox()).width, 500, 'the chat widens for the note');
 
     await card.getByRole('button', { name: 'Markdown', exact: true }).click();
     const markdown = await card.locator('.bk-chat-note-source').textContent();

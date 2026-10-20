@@ -629,7 +629,7 @@ test('the AI chat on published pages', async (t) => {
     assert.match(await chat.evaluate((element) => getComputedStyle(element).transitionProperty), /opacity/);
     const box = await chat.boundingBox();
     const pet = await launcher.boundingBox();
-    assert.ok(box.x + box.width <= pet.x && box.width <= 290, JSON.stringify({ box, pet }));
+    assert.ok(box.x + box.width <= pet.x && box.width === 400, JSON.stringify({ box, pet }));
     await page.keyboard.press('Escape');
     await closed();
 
@@ -773,7 +773,7 @@ test('the AI chat on published pages', async (t) => {
     assert.deepEqual(api.requests.at(-1).body.messages.slice(1), [{ role: 'user', content: '讲了什么？' }]);
   });
 
-  await t.test('older bubbles scroll inside a box of at most 230 pixels without a scrollbar and fade at the top', async (t) => {
+  await t.test('older bubbles scroll inside a box of at most 480 pixels at 1440 pixels and 230 pixels on a phone without a scrollbar and fade at the top', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
@@ -781,7 +781,11 @@ test('the AI chat on published pages', async (t) => {
     await ask(page, '写长一点');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
     const bubbles = page.locator('.bk-chat-bubbles');
-    assert.ok((await bubbles.boundingBox()).height <= 230);
+    const height = async () => (await bubbles.boundingBox()).height;
+    assert.ok((await height()) > 400 && (await height()) <= 480, String(await height()));
+    await page.setViewportSize({ width: 375, height: 812 });
+    assert.ok((await height()) <= 230, String(await height()));
+    await page.setViewportSize({ width: 1440, height: 900 });
     assert.equal(await bubbles.evaluate((element) => getComputedStyle(element).scrollbarWidth), 'none');
     const room = await bubbles.evaluate(async (element) => {
       await Promise.all(element.closest('.bk-chat').getAnimations({ subtree: true }).map((animation) => animation.finished));

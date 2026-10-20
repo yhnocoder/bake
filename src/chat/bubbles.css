@@ -1,5 +1,10 @@
 .bk-chat {
   --bk-chat-gap: 2px;
+  --bk-chat-width: 290px;
+  --bk-chat-note-width: 360px;
+  --bk-chat-height: 230px;
+  --bk-chat-note-height: 400px;
+  --bk-chat-list-height: 300px;
   position: fixed;
   right: calc(var(--chat-right, 16px) + 76px + var(--bk-chat-gap));
   bottom: calc(var(--chat-bottom, 16px) + 8px);
@@ -8,7 +13,7 @@
   box-sizing: border-box;
   flex-direction: column;
   gap: 8px;
-  width: min(290px, calc(100vw - var(--chat-right, 16px) - 76px - var(--bk-chat-gap) - 12px));
+  width: min(var(--bk-chat-width), calc(100vw - var(--chat-right, 16px) - 76px - var(--bk-chat-gap) - 12px));
   color: var(--ink);
   font-size: 13.5px;
   line-height: 1.6;
@@ -24,8 +29,28 @@
   box-sizing: border-box;
 }
 
+@media (min-width: 1000px) {
+  .bk-chat {
+    --bk-chat-width: 360px;
+    --bk-chat-note-width: 440px;
+    --bk-chat-height: 380px;
+    --bk-chat-note-height: 560px;
+    --bk-chat-list-height: 400px;
+  }
+}
+
+@media (min-width: 1340px) {
+  .bk-chat {
+    --bk-chat-width: 400px;
+    --bk-chat-note-width: 500px;
+    --bk-chat-height: 480px;
+    --bk-chat-note-height: 660px;
+    --bk-chat-list-height: 480px;
+  }
+}
+
 .bk-chat[data-note] {
-  width: min(360px, calc(100vw - var(--chat-right, 16px) - 76px - var(--bk-chat-gap) - 12px));
+  width: min(var(--bk-chat-note-width), calc(100vw - var(--chat-right, 16px) - 76px - var(--bk-chat-gap) - 12px));
 }
 
 .bk-chat[data-open] {
@@ -78,7 +103,7 @@
   contain-intrinsic-block-size: auto 0px;
   display: flex;
   flex-direction: column-reverse;
-  max-height: 230px;
+  max-height: min(var(--bk-chat-height), calc(100vh - var(--chat-bottom, 16px) - 140px));
   margin: 0 calc(0px - var(--bk-chat-gap)) -8px -6px;
   padding: 4px var(--bk-chat-gap) 8px 6px;
   overflow-y: auto;
@@ -683,7 +708,7 @@
 }
 
 .bk-chat-history {
-  max-height: 300px;
+  max-height: min(var(--bk-chat-list-height), calc(100vh - var(--chat-bottom, 16px) - 110px));
   user-select: none;
   -webkit-user-select: none;
 }
@@ -925,7 +950,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  max-height: min(400px, calc(100vh - var(--chat-bottom, 16px) - 72px));
+  max-height: min(var(--bk-chat-note-height), calc(100vh - var(--chat-bottom, 16px) - 72px));
   overflow: hidden;
   border-radius: 12px;
   background: var(--surface);
