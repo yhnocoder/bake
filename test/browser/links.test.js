@@ -51,19 +51,19 @@ const target = [
 function recordCard() {
   window.cardLog = [];
   const card = document.querySelector('.bk-preview');
-  new MutationObserver(() => cardLog.push({ on: card.classList.contains('is-on'), text: card.textContent, time: performance.now() })).observe(card, {
+  new MutationObserver(() => cardLog.push({ on: card.getAttribute('aria-hidden') === 'false', text: card.textContent, time: performance.now() })).observe(card, {
     attributes: true,
-    attributeFilter: ['class'],
+    attributeFilter: ['aria-hidden'],
     childList: true,
     subtree: true,
   });
   window.pointerLog = [];
   for (const type of ['pointerover', 'pointerout']) {
-    document.addEventListener(type, (event) => pointerLog.push({ type, target: event.target.closest('a')?.dataset.target ?? null, inCard: event.target.closest('.bk-preview') !== null, time: event.timeStamp }), true);
+    document.addEventListener(type, (event) => pointerLog.push({ type, target: event.target.closest('a')?.textContent ?? null, inCard: event.target.closest('.bk-preview') !== null, time: event.timeStamp }), true);
   }
 }
 
-const isOn = () => document.querySelector('.bk-preview')?.classList.contains('is-on') === true;
+const isOn = () => document.querySelector('.bk-preview')?.getAttribute('aria-hidden') === 'false';
 
 test('internal links, preview cards and embeds', async (t) => {
   const dir = createBlog(t, {
@@ -89,11 +89,11 @@ test('internal links, preview cards and embeds', async (t) => {
   await t.test('a card appears 300 ms after the pointer rests on a link, below the link and inside the viewport', async () => {
     const page = await desktop();
     await page.evaluate(recordCard);
-    const link = page.locator('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
+    const link = page.getByRole('link', { name: 'chain rule', exact: true });
     await link.hover();
     await page.waitForFunction(isOn);
     const delay = await page.evaluate(() => {
-      const over = pointerLog.find((entry) => entry.type === 'pointerover' && entry.target === '/2026-10/target/#chain-rule');
+      const over = pointerLog.find((entry) => entry.type === 'pointerover' && entry.target === 'chain rule');
       return cardLog.find((entry) => entry.on).time - over.time;
     });
     assert.ok(delay >= 290, `the card showed ${delay} ms after the pointer reached the link`);
@@ -120,20 +120,20 @@ test('internal links, preview cards and embeds', async (t) => {
 
   await t.test('the card switches to another link at once and hides 200 ms after the pointer leaves', async () => {
     const page = await desktop();
-    await page.hover('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
+    await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.waitForFunction(isOn);
     await page.evaluate(recordCard);
-    await page.hover('a.internal-link[data-target="/2026-10/target/#local-grad"]');
+    await page.getByRole('link', { name: 'the local gradient' }).hover();
     await page.waitForFunction(() => /Each layer multiplies/.test(document.querySelector('.bk-preview-body')?.textContent));
     const switched = await page.evaluate(() => {
-      const over = pointerLog.find((entry) => entry.type === 'pointerover' && entry.target === '/2026-10/target/#local-grad');
+      const over = pointerLog.find((entry) => entry.type === 'pointerover' && entry.target === 'the local gradient');
       return cardLog.find((entry) => /Each layer multiplies/.test(entry.text)).time - over.time;
     });
     assert.ok(switched < 300, `the card switched ${switched} ms after the pointer reached the second link`);
     const box = await page.locator('.bk-preview').boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
     await page.mouse.move(5, 450);
-    await page.waitForFunction(() => !document.querySelector('.bk-preview').classList.contains('is-on'));
+    await page.waitForFunction(() => document.querySelector('.bk-preview').getAttribute('aria-hidden') === 'true');
     const hidden = await page.evaluate(() => {
       const left = pointerLog.findLast((entry) => entry.type === 'pointerout' && entry.inCard);
       return cardLog.findLast((entry) => !entry.on).time - left.time;
@@ -144,7 +144,7 @@ test('internal links, preview cards and embeds', async (t) => {
 
   await t.test('the card stays while the pointer is in it, and an external link shows no card', async () => {
     const page = await desktop({ clock: true });
-    await page.hover('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
+    await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.clock.runFor(400);
     await page.waitForFunction(isOn);
     const box = await page.locator('.bk-preview').boundingBox();
@@ -163,12 +163,12 @@ test('internal links, preview cards and embeds', async (t) => {
   await t.test('a citation shows the entry of its own article, also inside an embed', async () => {
     const page = await desktop();
     const entries = [];
-    for (const selector of ['.bk-block[data-type="paragraph"] a.citation', '.embed a.citation']) {
-      await page.locator(selector).evaluate(async (element) => {
+    for (const citation of [page.locator('a.citation').first(), page.locator('.embed a.citation')]) {
+      await citation.evaluate(async (element) => {
         element.scrollIntoView({ block: 'center' });
         for (let frame = 0; frame < 2; frame += 1) await new Promise((done) => requestAnimationFrame(done));
       });
-      await page.hover(selector);
+      await citation.hover();
       await page.waitForFunction(isOn);
       entries.push(await page.locator('.bk-preview').textContent());
       await page.mouse.move(5, 450);
@@ -182,19 +182,19 @@ test('internal links, preview cards and embeds', async (t) => {
     const page = await desktop();
     await page.locator('#links .bk-heading-link').focus();
     await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.dataset.target), '/2026-10/target/#chain-rule');
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'chain rule');
     await page.waitForFunction(isOn);
     assert.equal(await page.locator('.bk-preview-title').textContent(), 'Chain rule');
     await page.keyboard.press('Tab');
     await page.waitForFunction(() => /Each layer multiplies/.test(document.querySelector('.bk-preview-body')?.textContent));
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('.bk-preview').classList.contains('is-on'));
+    await page.waitForFunction(() => document.querySelector('.bk-preview').getAttribute('aria-hidden') === 'true');
     await page.close();
   });
 
   await t.test('a click on the card opens the target', async () => {
     const page = await desktop();
-    await page.hover('a.internal-link[data-target="/2026-10/target/#chain-rule"]');
+    await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.waitForFunction(isOn);
     await page.locator('.bk-preview-hint').click();
     await page.waitForURL(`${base}/dist/2026-10/target/#chain-rule`);
@@ -205,11 +205,11 @@ test('internal links, preview cards and embeds', async (t) => {
     const page = await browser.newPage({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
     await page.clock.install();
     await page.goto(url);
-    await page.locator('a.internal-link[data-target="/2026-10/target/#local-grad"]').tap();
+    await page.getByRole('link', { name: 'the local gradient' }).tap();
     await page.waitForURL(`${base}/dist/2026-10/target/#local-grad`);
     assert.equal(await page.evaluate(() => document.querySelector('#local-grad').textContent), 'Each layer multiplies the gradient by its local derivative.');
     await page.goBack();
-    await page.locator('a.internal-link[data-target="/2026-10/target/#chain-rule"]').hover();
+    await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.clock.runFor(1000);
     assert.equal(await page.evaluate(isOn), false);
     await page.close();
@@ -218,7 +218,7 @@ test('internal links, preview cards and embeds', async (t) => {
   await t.test('an embed shows each part with its formulas and a source line that links to the original', async () => {
     const page = await desktop();
     const report = await page.evaluate(() => {
-      const embed = document.querySelector('.bk-block[data-type="embed"] .embed');
+      const embed = document.querySelector('.embed');
       const ids = [...document.querySelectorAll('[id]')].map((element) => element.id);
       return {
         parts: [...embed.querySelectorAll('.embed-part')].map((part) => part.querySelector('h2').textContent),
@@ -233,7 +233,7 @@ test('internal links, preview cards and embeds', async (t) => {
         citations: [...embed.querySelectorAll('a.citation')].map((link) => link.getAttribute('href')),
         missingGlyphs: [...embed.querySelectorAll('use')].map((use) => use.getAttribute('xlink:href')).filter((href) => document.getElementById(href.slice(1)) === null),
         duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
-        toc: [...document.querySelectorAll('.bk-toc [data-target]')].map((entry) => entry.dataset.target),
+        toc: document.querySelector('.bk-toc').textContent,
       };
     });
     assert.deepEqual(report.parts, ['Chain rule', 'Order']);
@@ -244,7 +244,8 @@ test('internal links, preview cards and embeds', async (t) => {
     assert.equal(report.border, '2px');
     assert.deepEqual(report.missingGlyphs, []);
     assert.deepEqual(report.duplicateIds, []);
-    assert.deepEqual(report.toc, ['links']);
+    assert.match(report.toc, /Links/);
+    assert.doesNotMatch(report.toc, /Chain rule|Order/);
     await page.close();
   });
 });

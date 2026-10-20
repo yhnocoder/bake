@@ -23,10 +23,10 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
         })
         .map((container) => container.dataset.tex),
       notesWithMath: hiddenNotes.map((note) => note.dataset.sidenote),
-      notesWithoutCopy: hiddenNotes
+      notesNotShown: hiddenNotes
         .filter((note) => {
-          const copy = document.querySelector(`.bk-notes-layer .bk-sidenote[data-sidenote="${note.dataset.sidenote}"]`);
-          return copy === null || !copy.checkVisibility() || copy.querySelectorAll('mjx-container').length !== note.querySelectorAll('mjx-container').length;
+          const shown = [...document.querySelectorAll(`.bk-sidenote[data-sidenote="${note.dataset.sidenote}"]`)].find((other) => other.checkVisibility());
+          return shown === undefined || shown.querySelectorAll('mjx-container').length !== note.querySelectorAll('mjx-container').length;
         })
         .map((note) => note.dataset.sidenote),
       missingGlyphs: [...document.querySelectorAll('mjx-container use')]
@@ -40,16 +40,16 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   assert.deepEqual(report.errors, []);
   assert.deepEqual(report.empty, []);
   assert.ok(report.notesWithMath.length > 0, 'expected a sidenote with a formula in the syntax article');
-  assert.deepEqual(report.notesWithoutCopy, []);
+  assert.deepEqual(report.notesNotShown, []);
   assert.deepEqual(report.missingGlyphs, []);
   assert.ok(report.embedded > 0, 'expected an embed with formulas in the syntax article');
   assert.deepEqual(report.duplicateIds, []);
 
-  const link = page.locator('a.internal-link[data-target="/2026-10/syntax-linked/#chain-rule"]').first();
+  const link = page.locator('.bk-article p a[href="../../2026-10/syntax-linked/#chain-rule"]').first();
   await link.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await settle(page);
   await link.hover();
-  await page.waitForFunction(() => document.querySelector('.bk-preview').classList.contains('is-on'));
+  await page.waitForFunction(() => document.querySelector('.bk-preview').getAttribute('aria-hidden') === 'false');
   const card = await page.evaluate(() => {
     const containers = [...document.querySelectorAll('.bk-preview mjx-container')];
     const ids = [...document.querySelectorAll('[id]')].map((element) => element.id);
@@ -69,14 +69,14 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   await phone.goto(`${origin}/2026-10/syntax/`);
   const opened = [];
   for (const number of report.notesWithMath) {
-    await phone.locator(`.sidenote-ref[data-sidenote="${number}"] a`).first().tap();
+    await phone.locator(`a[href="#sidenote-${number}"]`).first().tap();
     await phone.waitForFunction((value) => {
-      const note = document.querySelector(`.bk-article .bk-sidenote[data-sidenote="${value}"]:not(.bk-notes-layer *)`);
-      return note.checkVisibility() && note.getAnimations().length === 0;
+      const note = [...document.querySelectorAll(`.bk-sidenote[data-sidenote="${value}"]`)].find((element) => element.checkVisibility());
+      return note !== undefined && note.getAnimations().length === 0;
     }, number);
     opened.push(
       await phone.evaluate((value) => {
-        const note = document.querySelector(`.bk-article .bk-sidenote[data-sidenote="${value}"]:not(.bk-notes-layer *)`);
+        const note = [...document.querySelectorAll(`.bk-sidenote[data-sidenote="${value}"]`)].find((element) => element.checkVisibility());
         const boxes = [...note.querySelectorAll('mjx-container svg')].map((svg) => svg.getBoundingClientRect());
         return { number: value, formulas: boxes.length, empty: boxes.filter((box) => box.width === 0 || box.height === 0).length };
       }, number),

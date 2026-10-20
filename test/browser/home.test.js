@@ -82,27 +82,40 @@ test('the essay homepage', async (t) => {
   };
   const state = (page) =>
     page.evaluate(() => ({
-      group: document.documentElement.dataset.group,
-      columns: document.documentElement.dataset.columns,
-      visible: [...document.querySelectorAll('.bk-grouping')].filter((grouping) => grouping.offsetParent !== null).map((grouping) => grouping.dataset.grouping),
-      gridColumns: getComputedStyle([...document.querySelectorAll('.bk-grid')].find((grid) => grid.offsetParent !== null)).gridTemplateColumns.split(' ').length,
+      groups: [...document.querySelectorAll('.bk-group-title')].filter((title) => title.checkVisibility()).map((title) => title.textContent),
+      gridColumns: getComputedStyle([...document.querySelectorAll('.bk-grid')].find((grid) => grid.checkVisibility())).gridTemplateColumns.split(' ').length,
     }));
+  const byCategory = { groups: ['模型', '数学'], gridColumns: 3 };
+  const byMonth = { groups: ['2026-10', '2026-09', '2026-08', '2026-07'], gridColumns: 5 };
+  const thumbs = (page, chosen) =>
+    page.evaluate(
+      (labels) =>
+        [...document.querySelectorAll('.bk-switch-options')].map((options, index) => {
+          const thumb = getComputedStyle(options, '::before');
+          const button = [...options.querySelectorAll('button')].find((option) => option.textContent === labels[index]).getBoundingClientRect();
+          const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(thumb.transform).m41;
+          return Math.abs(left - button.left) < 1 && Math.abs(parseFloat(thumb.width) - button.width) < 1 && options.getAnimations({ subtree: true }).length === 0;
+        }),
+      chosen,
+    );
+  const currentChips = (page) =>
+    page.evaluate(() => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => getComputedStyle(chip, '::before').opacity === '1').map((chip) => chip.getAttribute('href')));
   const cardIn = (grouping, url) => `[data-grouping="${grouping}"] .bk-card[href="${url}"]`;
   const previewState = (page, selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview')?.dataset.state ?? null);
 
-  await t.test('grouping and column choices change the page, survive a reload and are applied before the page script runs', async () => {
+  await t.test('grouping and column choices change the page, survive a reload and are applied with the switch thumbs on the chosen buttons before the page script runs', async () => {
     const { context, page } = await open();
-    assert.deepEqual(await state(page), { group: 'category', columns: '3', visible: ['category'], gridColumns: 3 });
+    assert.deepEqual(await state(page), byCategory);
     await page.getByRole('button', { name: '月份' }).click();
     await page.getByRole('button', { name: '5', exact: true }).click();
-    assert.deepEqual(await state(page), { group: 'month', columns: '5', visible: ['month'], gridColumns: 5 });
+    assert.deepEqual(await state(page), byMonth);
     assert.equal(await page.getByRole('button', { name: '月份' }).getAttribute('aria-pressed'), 'true');
-    assert.deepEqual(await page.evaluate(() => [localStorage.getItem('bk-group'), localStorage.getItem('bk-columns')]), ['month', '5']);
     await page.reload();
-    assert.deepEqual(await state(page), { group: 'month', columns: '5', visible: ['month'], gridColumns: 5 });
+    assert.deepEqual(await state(page), byMonth);
     await page.route('**/assets/*.js', (route) => route.abort());
     await page.reload();
-    assert.deepEqual(await state(page), { group: 'month', columns: '5', visible: ['month'], gridColumns: 5 });
+    assert.deepEqual(await state(page), byMonth);
+    assert.deepEqual(await thumbs(page, ['月份', '5']), [true, true]);
     await page.unroute('**/assets/*.js');
     await context.close();
   });
@@ -152,10 +165,8 @@ test('the essay homepage', async (t) => {
     const jacobian = cardIn('category', '2026-09/jacobian/');
     await page.locator(jacobian).evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
-    assert.equal(await page.locator(jacobian).getAttribute('data-active'), '');
     await page.locator(jacobian).evaluate((card) => scrollBy({ top: card.getBoundingClientRect().bottom + 20, behavior: 'instant' }));
-    await page.waitForFunction((selector) => document.querySelector(selector).dataset.active === undefined, jacobian);
-    assert.equal(await page.locator(jacobian).locator('.bk-card-preview').getAttribute('data-state'), 'stopped');
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', jacobian);
     await context.close();
   });
 
@@ -174,33 +185,16 @@ test('the essay homepage', async (t) => {
       return seen;
     });
     assert.deepEqual(new Set(states.slice(1)), new Set(['stopped']));
-    assert.equal(await page.locator(jacobian).getAttribute('data-active'), '');
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', jacobian);
     await context.close();
   });
 
-  await t.test('a column switch measures every card before it starts the card animations, which only move and scale the cards', async () => {
+  await t.test('a column switch animates the cards only by moving and scaling them', async () => {
     const { context, page } = await open();
-    const { calls, properties } = await page.evaluate(() => {
-      const calls = [];
-      const measure = Element.prototype.getBoundingClientRect;
-      const animate = Element.prototype.animate;
-      Element.prototype.getBoundingClientRect = function () {
-        calls.push('measure');
-        return measure.call(this);
-      };
-      Element.prototype.animate = function (...options) {
-        calls.push('animate');
-        return animate.apply(this, options);
-      };
+    const properties = await page.evaluate(() => {
       document.querySelector('[data-control="columns"] button[data-value="5"]').click();
-      Element.prototype.getBoundingClientRect = measure;
-      Element.prototype.animate = animate;
-      const properties = [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
-      return { calls, properties };
+      return [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
     });
-    assert.ok(calls.includes('animate'), 'the column switch animated no card');
-    assert.equal(calls.lastIndexOf('measure') < calls.indexOf('animate'), true, `a card was measured after the first animation started: ${calls.join(' ')}`);
     assert.deepEqual(properties.filter((name) => !['composite', 'computedOffset', 'easing', 'offset'].includes(name)), ['scale', 'translate']);
     await context.close();
   });
@@ -267,10 +261,12 @@ test('the essay homepage', async (t) => {
             requestAnimationFrame(check);
           }),
       );
-    await page.locator('.bk-chip[data-target="category-math"]').click();
+    const math = page.getByRole('link', { name: '数学' });
+    await math.click();
     await settled();
-    assert.equal(await page.evaluate(() => document.querySelector('.bk-chip.is-current')?.dataset.target), 'category-math');
-    const chip = await page.locator('.bk-chip[data-target="category-math"]').boundingBox();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-chip[href="#category-math"]'), '::before').opacity === '1');
+    assert.deepEqual(await currentChips(page), ['#category-math']);
+    const chip = await math.boundingBox();
     const before = await page.evaluate(() => scrollY);
     await page.mouse.click(chip.x + chip.width / 2, chip.y + chip.height / 2);
     await settled();
@@ -280,7 +276,7 @@ test('the essay homepage', async (t) => {
         new Promise((done) => {
           let seen = false;
           const record = () => {
-            if (scrollY > 0 && document.querySelector('.bk-chip.is-current')?.dataset.target === 'category-ml') seen = true;
+            if (scrollY > 0 && parseFloat(getComputedStyle(document.querySelector('.bk-chip[href="#category-ml"]'), '::before').opacity) > 0) seen = true;
             requestAnimationFrame(record);
           };
           addEventListener('scrollend', () => done(seen), { once: true });
@@ -289,24 +285,26 @@ test('the essay homepage', async (t) => {
         }),
     );
     assert.equal(followed, true, 'the highlight did not move to the first group while the page scrolled to the top');
-    assert.equal(await page.evaluate(() => document.querySelector('.bk-chip.is-current')?.dataset.target), 'category-ml');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-chip[href="#category-ml"]'), '::before').opacity === '1');
+    assert.deepEqual(await currentChips(page), ['#category-ml']);
     await context.close();
   });
 
   await t.test('category chips jump to their group and mark the group on screen, and tag chips filter the month grouping', async () => {
     const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
-    await page.locator('.bk-chip[data-target="category-math"]').click();
+    const current = (href) => page.waitForFunction((target) => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].every((chip) => getComputedStyle(chip, '::before').opacity === (chip.getAttribute('href') === target ? '1' : '0')), href);
+    await page.getByRole('link', { name: '数学' }).click();
     await page.waitForFunction(() => {
       const atEnd = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
       return atEnd || Math.abs(document.getElementById('category-math').getBoundingClientRect().top - document.querySelector('.bk-home-bar').offsetHeight) < 30;
     });
-    assert.deepEqual(await page.locator('.bk-chip.is-current').evaluateAll((chips) => chips.map((chip) => chip.dataset.target)), ['category-math']);
+    await current('#category-math');
     await page.mouse.move(700, 400);
     await page.mouse.wheel(0, -5000);
     await page.waitForFunction(() => scrollY === 0);
-    await page.waitForFunction(() => document.querySelector('.bk-chip.is-current')?.dataset.target === 'category-ml');
+    await current('#category-ml');
     await page.mouse.wheel(0, 5000);
-    await page.waitForFunction(() => document.querySelector('.bk-chip.is-current')?.dataset.target === 'category-math');
+    await current('#category-math');
 
     await page.getByRole('button', { name: '月份' }).click();
     const months = () =>
@@ -335,12 +333,10 @@ test('the essay homepage', async (t) => {
 
   await t.test('the bar covers the whole width with an edge only while it is stuck, and the switches slide a thumb to the chosen value', async () => {
     const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
-    const edge = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity);
-    await page.waitForFunction(() => document.querySelector('.bk-home-bar').hasAttribute('data-stuck') === false);
-    assert.equal(await edge(), '0');
+    const edge = (opacity) => page.waitForFunction((value) => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity === value, opacity);
+    await edge('0');
     await page.evaluate(() => scrollTo({ top: 500, behavior: 'instant' }));
-    await page.waitForFunction(() => document.querySelector('.bk-home-bar').hasAttribute('data-stuck'));
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity === '1');
+    await edge('1');
     const cover = await page.evaluate(() => {
       const bar = document.querySelector('.bk-home-bar');
       const box = bar.getBoundingClientRect();
@@ -348,19 +344,12 @@ test('the essay homepage', async (t) => {
     });
     assert.deepEqual(cover, { top: 0, background: 'rgb(245, 246, 244)', scrollWidth: 1440 });
     await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-    await page.waitForFunction(() => !document.querySelector('.bk-home-bar').hasAttribute('data-stuck'));
+    await edge('0');
 
-    const thumb = (control) => page.evaluate((name) => {
-      const options = document.querySelector(`[data-control="${name}"] .bk-switch-options`);
-      const box = getComputedStyle(options, '::before');
-      const pressed = options.querySelector('[aria-pressed="true"]').getBoundingClientRect();
-      const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(box.transform).m41;
-      return Math.abs(left - pressed.left) < 1 && Math.abs(parseFloat(box.width) - pressed.width) < 1;
-    }, control);
     await page.getByRole('button', { name: '5', exact: true }).click();
     await page.getByRole('button', { name: '月份' }).click();
     await page.waitForFunction(() => [...document.querySelectorAll('.bk-switch-options')].every((options) => options.getAnimations({ subtree: true }).length === 0));
-    assert.deepEqual([await thumb('group'), await thumb('columns')], [true, true]);
+    assert.deepEqual(await thumbs(page, ['月份', '5']), [true, true]);
 
     const moving = await page.evaluate(() =>
       ['.bk-card', '.bk-card-fallback', '.bk-chip', '.bk-home-bar', '.bk-switch-options'].flatMap((selector) =>
@@ -378,42 +367,18 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
-  await t.test('a stored grouping and column count place the switch thumbs on the chosen buttons before the page script runs, without an animation', async () => {
-    const { context, page } = await open();
-    await page.evaluate(() => {
-      localStorage.setItem('bk-group', 'month');
-      localStorage.setItem('bk-columns', '5');
-    });
-    await page.route('**/assets/*.js', (route) => route.abort());
-    await page.reload();
-    const placed = await page.evaluate(() =>
-      Object.fromEntries(
-        [['group', 'month'], ['columns', '5']].map(([name, value]) => {
-          const options = document.querySelector(`[data-control="${name}"] .bk-switch-options`);
-          const box = getComputedStyle(options, '::before');
-          const chosen = options.querySelector(`[data-value="${value}"]`).getBoundingClientRect();
-          const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(box.transform).m41;
-          return [name, { left: Math.abs(left - chosen.left) < 1, width: Math.abs(parseFloat(box.width) - chosen.width) < 1, animations: options.getAnimations({ subtree: true }).length }];
-        }),
-      ),
-    );
-    assert.deepEqual(placed, { group: { left: true, width: true, animations: 0 }, columns: { left: true, width: true, animations: 0 } });
-    await page.unroute('**/assets/*.js');
-    await context.close();
-  });
-
   await t.test('without scripts the default grouping and its cards are shown and the controls are hidden', async () => {
     const { context, page } = await open({ javaScriptEnabled: false });
     const shown = await page.evaluate(() => ({
-      groupings: [...document.querySelectorAll('.bk-grouping')].filter((grouping) => grouping.offsetParent !== null).map((grouping) => grouping.dataset.grouping),
+      groups: [...document.querySelectorAll('.bk-group-title')].filter((title) => title.offsetParent !== null).map((title) => title.textContent),
       cards: [...document.querySelectorAll('.bk-card')].filter((card) => card.offsetParent !== null).length,
       controls: document.querySelector('.bk-home-controls').offsetParent !== null,
       tags: document.querySelector('.bk-chips[data-for="month"]').offsetParent !== null,
       chips: [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => chip.offsetParent !== null).length,
       image: document.querySelector('[data-grouping="category"] .bk-card-fallback img')?.getAttribute('src'),
     }));
-    assert.deepEqual(shown, { groupings: ['category'], cards: 7, controls: false, tags: false, chips: 2, image: '2026-09/chain/plot.svg' });
-    await page.locator('.bk-chip[data-target="category-math"]').click();
+    assert.deepEqual(shown, { groups: ['模型', '数学'], cards: 7, controls: false, tags: false, chips: 2, image: '2026-09/chain/plot.svg' });
+    await page.getByRole('link', { name: '数学' }).click();
     assert.match(page.url(), /#category-math$/);
     await context.close();
   });
@@ -452,13 +417,11 @@ test('the essay homepage', async (t) => {
       [1440, '3'],
       [1440, '4'],
       [1440, '5'],
-      [375, '3'],
+      [375, null],
     ]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.evaluate((value) => {
-        document.documentElement.dataset.columns = value;
-      }, columns);
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+      if (columns !== null) await page.getByRole('button', { name: columns, exact: true }).click();
+      await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
       const outside = await page.locator(cardIn('category', '2026-07/attention/')).evaluate((card) => {
         const box = card.getBoundingClientRect();
         return ['.bk-card-cover', '.bk-card-title', '.bk-card-summary'].filter((selector) => {

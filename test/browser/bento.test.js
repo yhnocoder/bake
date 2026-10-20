@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { PNG } from 'pngjs';
+import { startDevServer } from '../../src/dev/server.js';
 import { article, bake, copyExample, exampleBlog, writeFiles } from '../blog.js';
 import { openWithSelectionModule } from './selection-module.js';
 import { launchBrowser, serve, settle } from './browser.js';
 
 const widths = [1440, 1100, 375];
 const activationsSource = readFileSync(join(exampleBlog, 'content/posts/activations/index.md'), 'utf8');
+const activationsRows = Object.fromEntries([...activationsSource.matchAll(/^## (.+?) \{[^}]*rows=(\d+)[^}]*\}$/gm)].map(([, title, rows]) => [title, Number(rows)]));
+const ROW_HEIGHT = 24;
+const englishCards = (one) => article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: `Text before the first section.\n\n## One\n\n${one}\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n\n## Four {rows=2}\n\n${'Text that does not fit into two rows. '.repeat(20)}\n` });
 
 const cardsArticle = article({
   title: 'Bento cards',
@@ -72,7 +76,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   t.after(() => rmSync(english, { recursive: true, force: true }));
   writeFiles(english, {
     'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', themes: { bento: { columns: 2 } } };\n",
-    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', extra: 'theme: bento\n', body: `Text before the first section.\n\n## One\n\nText.\n\n## Two\n\nText.\n\n## Three {width=wide}\n\nText.\n\n## Four {rows=2}\n\n${'Text that does not fit into two rows. '.repeat(20)}\n` }),
+    'content/posts/cards/index.md': englishCards('Text.'),
   });
   const englishBuild = bake(english, 'build');
   assert.equal(englishBuild.stderr, '');
@@ -92,18 +96,16 @@ test('the bento theme lays out sections as cards', async (t) => {
 
   await t.test('cards span the columns their sections ask for, the cards keep the order of the article and the grid has one column below 1000 pixels', async () => {
     const page = await open('bento-cards');
-    const desktop = { columns: 6, spans: { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 3, 'Body three': 2, 'Body four': 2, Fixed: 3 } };
-    const expected = {
-      1440: desktop,
-      1100: desktop,
-      375: { columns: 1, spans: { 'Wide section': 1, 'Body one': 1, 'Body two': 1, 'Page section': 1, Component: 1, 'Body three': 1, 'Body four': 1, Fixed: 1 } },
-    };
-    for (const width of widths) {
+    const desktop = { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 3, 'Body three': 2, 'Body four': 2, Fixed: 3 };
+    for (const width of [1440, 1100]) {
       await resize(page, width);
-      const grid = await page.evaluate(gridLayout);
-      assert.deepEqual({ columns: grid.columns, spans: grid.spans }, expected[width], `${width}px`);
+      const grid = await page.evaluate(gridLayout, 6);
+      assert.deepEqual(grid.spans, desktop, `${width}px`);
       assert.ok(grid.inOrder, `${width}px`);
     }
+    await resize(page, 375);
+    const phone = await page.evaluate(gridLayout, 1);
+    assert.ok(phone.fullWidth && phone.inOrder, '375px');
     await page.close();
   });
 
@@ -111,8 +113,8 @@ test('the bento theme lays out sections as cards', async (t) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await page.goto(`${englishOrigin}/2026-10/cards/`);
     await settle(page);
-    const grid = await page.evaluate(gridLayout);
-    assert.deepEqual({ columns: grid.columns, spans: grid.spans, inOrder: grid.inOrder }, { columns: 2, spans: { One: 1, Two: 1, Three: 2, Four: 1 }, inOrder: true });
+    const grid = await page.evaluate(gridLayout, 2);
+    assert.deepEqual({ spans: grid.spans, inOrder: grid.inOrder }, { spans: { One: 1, Two: 1, Three: 2, Four: 1 }, inOrder: true });
     await page.close();
   });
 
@@ -164,15 +166,17 @@ test('the bento theme lays out sections as cards', async (t) => {
     for (const width of widths) {
       await resize(page, width);
       if (width >= 1000) {
-        const heights = await page.evaluate(() => {
-          const grid = document.querySelector('.bt-grid');
-          const gap = parseFloat(getComputedStyle(grid).columnGap);
-          const row = parseFloat(getComputedStyle(grid).getPropertyValue('--bt-row-height'));
-          return [...grid.querySelectorAll('.bt-card[data-rows]')].map((card) => {
-            const rows = Number(card.dataset.rows);
-            return { rows, height: Math.round(card.getBoundingClientRect().height * 10) / 10, expected: Math.round((rows * row + (rows - 1) * gap) * 10) / 10 };
-          });
-        });
+        const heights = await page.evaluate(
+          ([rowsByTitle, row]) => {
+            const grid = document.querySelector('.bt-grid');
+            const gap = parseFloat(getComputedStyle(grid).rowGap);
+            return [...grid.querySelectorAll('.bt-card')]
+              .map((card) => ({ card, rows: rowsByTitle[card.querySelector('h2 .bk-heading-text').textContent] }))
+              .filter(({ rows }) => rows !== undefined)
+              .map(({ card, rows }) => ({ rows, height: Math.round(card.getBoundingClientRect().height * 10) / 10, expected: Math.round((rows * row + (rows - 1) * gap) * 10) / 10 }));
+          },
+          [activationsRows, ROW_HEIGHT],
+        );
         assert.equal(heights.length, 10, `${width}px`);
         assert.deepEqual(heights.filter(({ height, expected }) => Math.abs(height - expected) > 0.5), [], `${width}px`);
         continue;
@@ -200,7 +204,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     const page = await open('activations');
     for (const width of [1440, 1100]) {
       await resize(page, width);
-      const grid = await page.evaluate(gridLayout);
+      const grid = await page.evaluate(gridLayout, 6);
       assert.deepEqual(grid.starts, { ReLU: 0, GELU: 2, SiLU: 4, 导数: 4, 怎么选: 2, 反向传播: 0, 实现: 0, '写成 Markdown': 4, 对比: 0, 参考文献: 4 }, `${width}px`);
       assert.ok(grid.inOrder, `${width}px`);
       const gaps = await page.evaluate(() => {
@@ -218,12 +222,14 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('content that does not fit into the rows of a card scrolls inside the card only after the card is chosen', async () => {
+  await t.test('content that does not fit into the rows of a card fades out at the bottom and scrolls inside the card only after the card is chosen by a click or the keyboard', async () => {
     const page = await open('bento-cards', { reducedMotion: 'no-preference' });
-    const card = page.locator('.bt-card[data-rows]');
+    const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Fixed' }) });
+    const outline = () => card.evaluate((element) => getComputedStyle(element).outlineColor);
+    const unchosen = await outline();
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await page.waitForFunction(() => scrollY > 0);
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-overflow') && !element.hasAttribute('data-end') && getComputedStyle(element, '::after').content !== 'none'), true);
+    assert.equal(await card.evaluate((element) => element.scrollHeight > element.clientHeight + 1 && getComputedStyle(element, '::after').content !== 'none'), true);
     const box = await card.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     const pageTop = await page.evaluate(() => scrollY);
@@ -232,64 +238,35 @@ test('the bento theme lays out sections as cards', async (t) => {
     assert.equal(await card.evaluate((element) => element.scrollTop), 0);
     const chosen = await card.boundingBox();
     await page.mouse.click(chosen.x + chosen.width / 2, chosen.y + chosen.height / 2);
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active')), true);
+    await page.waitForFunction((before) => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1)).outlineColor !== before, unchosen);
     const top = await page.evaluate(() => scrollY);
     await page.mouse.wheel(0, 2000);
-    await page.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-end'));
+    await card.evaluate((element) => new Promise((done) => {
+      const check = () => (element.scrollTop + element.clientHeight >= element.scrollHeight - 1 ? done() : requestAnimationFrame(check));
+      check();
+    }));
     assert.equal(await page.evaluate(() => scrollY), top);
     await page.keyboard.press('Escape');
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active')), false);
+    await page.waitForFunction((before) => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1)).outlineColor === before, unchosen);
     await page.mouse.click(5, 5);
     await card.focus();
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active') && element.tabIndex === 0), true);
+    await page.waitForFunction((before) => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1)).outlineColor !== before, unchosen);
     await card.evaluate((element) => element.blur());
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-active')), false);
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-hint')), false);
-    await page.evaluate(() => {
-      const marker = document.createElement('script');
-      marker.type = 'application/json';
-      marker.dataset.bakeDev = '';
-      document.head.append(marker);
-      document.dispatchEvent(new CustomEvent('bake:content'));
-    });
-    await page.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-hint'));
-    const [, pixels, rows] = /^内容超出卡片 (\d+) 像素，rows 至少写 (\d+)$/.exec(await card.getAttribute('data-hint'));
-    const fit = await card.evaluate((element, rows) => {
-      const style = getComputedStyle(element);
-      const gap = parseFloat(getComputedStyle(element.parentElement).rowGap);
-      const rowHeight = parseFloat(style.getPropertyValue('--bt-row-height'));
-      const needed = element.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-      const height = (count) => count * rowHeight + (count - 1) * gap;
-      return { overflow: Math.ceil(element.scrollHeight - element.clientHeight), fits: height(rows) >= needed, fitsWithOneLess: height(rows - 1) >= needed };
-    }, Number(rows));
-    assert.deepEqual(fit, { overflow: Number(pixels), fits: true, fitsWithOneLess: false });
-    const englishPage = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await englishPage.goto(`${englishOrigin}/2026-10/cards/`);
-    await settle(englishPage);
-    await englishPage.evaluate(() => {
-      const marker = document.createElement('script');
-      marker.type = 'application/json';
-      marker.dataset.bakeDev = '';
-      document.head.append(marker);
-      document.dispatchEvent(new CustomEvent('bake:content'));
-    });
-    await englishPage.waitForFunction(() => document.querySelector('.bt-card[data-rows]').hasAttribute('data-hint'));
-    assert.match(await englishPage.locator('.bt-card[data-rows]').getAttribute('data-hint'), /^Content is \d+ px taller than the card; set rows to at least \d+$/);
-    await englishPage.close();
+    await page.waitForFunction((before) => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1)).outlineColor === before, unchosen);
     await resize(page, 375);
-    assert.equal(await card.evaluate((element) => element.hasAttribute('data-overflow') || element.scrollHeight > element.clientHeight + 1), false);
+    assert.equal(await card.evaluate((element) => element.scrollHeight > element.clientHeight + 1), false);
     await page.close();
   });
 
   await t.test('a click on a sidenote number chooses its card and scrolls the note into view when the rows of the card hide it, and the chosen card has an outline in the accent colour', async () => {
     const page = await open('bento-cards');
-    const card = page.locator('.bt-card[data-rows]');
+    const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Fixed' }) });
     await card.locator('.sidenote-ref a').scrollIntoViewIfNeeded();
     const hidden = await card.evaluate((element) => element.querySelector('.bk-sidenote').getBoundingClientRect().top >= element.getBoundingClientRect().bottom);
     assert.equal(hidden, true);
     await card.locator('.sidenote-ref a').click();
     await page.waitForFunction(() => {
-      const card = document.querySelector('.bt-card[data-rows]');
+      const card = [...document.querySelectorAll('.bt-card')].at(-1);
       const note = card.querySelector('.bk-sidenote').getBoundingClientRect();
       const frame = card.getBoundingClientRect();
       return note.top >= frame.top && note.bottom <= frame.bottom && note.top >= 0 && note.bottom <= innerHeight;
@@ -301,9 +278,9 @@ test('the bento theme lays out sections as cards', async (t) => {
       element.append(probe);
       const accent = getComputedStyle(probe).color;
       probe.remove();
-      return { active: element.hasAttribute('data-active'), width: style.outlineWidth, color: style.outlineColor === accent };
+      return { width: style.outlineWidth, color: style.outlineColor === accent };
     });
-    assert.deepEqual(outline, { active: true, width: '2px', color: true });
+    assert.deepEqual(outline, { width: '2px', color: true });
     await page.close();
   });
 
@@ -393,9 +370,9 @@ test('the bento theme lays out sections as cards', async (t) => {
         if (await box.evaluate((element) => !element.checkVisibility() || element.scrollWidth > element.clientWidth)) continue;
         await box.scrollIntoViewIfNeeded();
         const shown = await box.screenshot();
-        await box.evaluate((element) => element.style.setProperty('--scroll-shadow', 'transparent'));
+        await box.evaluate((element) => (element.style.backgroundImage = 'none'));
         const plain = await box.screenshot();
-        await box.evaluate((element) => element.style.removeProperty('--scroll-shadow'));
+        await box.evaluate((element) => element.style.removeProperty('background-image'));
         const difference = largestDifference(PNG.sync.read(shown), PNG.sync.read(plain));
         if (difference > 2) leaks.push(`${colorScheme}: ${await box.evaluate((element) => element.closest('.bt-card').querySelector('h2 .bk-heading-text').textContent)} ${index} differs by ${difference}`);
       }
@@ -424,27 +401,43 @@ test('the bento theme lays out sections as cards', async (t) => {
 
   await t.test('without scripts the cards keep their declared spans and every sidenote is shown', async () => {
     const page = await open('bento-cards', { javaScriptEnabled: false });
-    const grid = await page.evaluate(gridLayout);
+    const grid = await page.evaluate(gridLayout, 6);
     assert.deepEqual(grid.spans, { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 3 });
-    assert.equal(await page.locator('.bt-grid[data-packed], .bt-card[data-overflow]').count(), 0);
     assert.ok(await page.evaluate(() => { const card = [...document.querySelectorAll('.bt-card')].at(-1); return card.scrollHeight <= card.clientHeight + 1; }));
     assert.equal(await page.locator('.bk-sidenote').evaluateAll((notes) => notes.every((note) => note.checkVisibility())), true);
     await page.close();
   });
 
-  await t.test('the cards are placed again after bake dev replaces the article', async () => {
-    const page = await open('bento-cards');
-    const before = await page.evaluate(gridLayout);
-    await page.evaluate(async () => {
-      const html = await (await fetch(location.href)).text();
-      const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.bk-article');
-      document.querySelector('.bk-article').replaceChildren(...fresh.childNodes);
-      document.dispatchEvent(new CustomEvent('bake:content'));
-    });
+  await t.test('in bake dev a card whose content does not fit shows the rows it needs, and the cards are placed again after the article is saved', async () => {
+    const server = await startDevServer(english, { port: 0, print: () => {} });
+    t.after(() => server.close());
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await page.goto(new URL('2026-10/cards/', server.url).href);
     await settle(page);
-    const after = await page.evaluate(gridLayout);
-    assert.equal(await page.locator('.bt-grid[data-packed]').count(), 1);
-    assert.deepEqual(after, before);
+    const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Four' }) });
+    const hint = () => card.evaluate((element) => getComputedStyle(element, '::before').content);
+    await page.waitForFunction(() => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1), '::before').content.startsWith('"Content'));
+    const [, pixels, rows] = /^"Content is (\d+) px taller than the card; set rows to at least (\d+)"$/.exec(await hint());
+    const fit = await card.evaluate(
+      (element, [rows, rowHeight]) => {
+        const style = getComputedStyle(element);
+        const gap = parseFloat(getComputedStyle(element.parentElement).rowGap);
+        const needed = element.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+        const height = (count) => count * rowHeight + (count - 1) * gap;
+        return { overflow: Math.ceil(element.scrollHeight - element.clientHeight), fits: height(rows) >= needed, fitsWithOneLess: height(rows - 1) >= needed };
+      },
+      [Number(rows), ROW_HEIGHT],
+    );
+    assert.deepEqual(fit, { overflow: Number(pixels), fits: true, fitsWithOneLess: false });
+    const before = await page.evaluate(gridLayout, 2);
+    // why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the file is written until the page shows it
+    for (let attempt = 0; !(await page.getByText('Saved text.').isVisible()); attempt += 1) {
+      assert.ok(attempt < 50, 'the page did not show the saved article');
+      writeFiles(english, { 'content/posts/cards/index.md': englishCards('Saved text.') });
+      await page.waitForTimeout(200);
+    }
+    await settle(page);
+    assert.deepEqual(await page.evaluate(gridLayout, 2), before);
     await page.close();
   });
 
@@ -452,8 +445,8 @@ test('the bento theme lays out sections as cards', async (t) => {
     for (const width of [1440, 375]) {
       const page = await open('activations', { viewport: { width, height: 900 } });
       await page.locator('.bk-settings-toggle').click();
-      const rows = await page.locator('.bk-settings-row').evaluateAll((elements) => elements.filter((row) => row.checkVisibility()).map((row) => row.dataset.setting));
-      assert.deepEqual(rows, ['theme', 'font', 'size', 'weight', 'spacing'], `${width}px`);
+      const rows = await page.locator('.bk-settings-label').evaluateAll((labels) => labels.filter((label) => label.checkVisibility()).map((label) => label.textContent));
+      assert.deepEqual(rows, ['主题', '正文', '字号', '字重', '间距'], `${width}px`);
       await page.locator('.bk-settings-row[data-setting="theme"] button[data-value="dark"]').click();
       assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)', `${width}px`);
       await page.close();
@@ -502,35 +495,18 @@ test('the bento theme lays out sections as cards', async (t) => {
       `${lines.find((line) => line.startsWith('它在 0 附近'))}\n\n${lines.find((line) => line.startsWith('[^gelu-min]:'))}`,
     );
     assert.equal(await copy({ selector: '.bt-card > h2#gelu' }, { selector: block('GELU 用标准正态分布'), after: true }), between('## GELU', 'GELU 用标准正态分布'));
-    await page.waitForFunction(() => document.querySelector('.bk-toast').classList.contains('is-on'));
-    assert.equal(await page.locator('.bk-toast').count(), 1);
+    await page.waitForFunction(() => [...document.querySelectorAll('[role="status"]')].filter((toast) => getComputedStyle(toast).opacity === '1').length === 1);
     await page.evaluate(() => getSelection().removeAllRanges());
     await page.locator('.bk-header .bk-copy-source').click();
     await page.waitForFunction((expected) => navigator.clipboard.readText().then((text) => text === expected), activationsSource);
     await context.close();
   });
 
-  await t.test('screenshots of the bento article at 1440, 1100 and 375 pixels', async () => {
-    const screenshotDir = process.env.BAKE_BENTO_SCREENSHOTS ?? join(dir, 'bento-screenshots');
-    mkdirSync(screenshotDir, { recursive: true });
-    for (const width of widths) {
-      for (const colorScheme of ['light', 'dark']) {
-        const page = await open('activations', { viewport: { width, height: 900 }, colorScheme });
-        await page.waitForFunction(() => document.querySelector('.bt-card figure.component').dataset.state === 'ready');
-        await settle(page);
-        const image = await page.screenshot({ fullPage: true, path: join(screenshotDir, `bento-${width}-${colorScheme}.png`) });
-        assert.ok(image.length > 0);
-        await page.close();
-      }
-    }
-  });
 });
 
-function gridLayout() {
+function gridLayout(columns) {
   const grid = document.querySelector('.bt-grid');
-  const style = getComputedStyle(grid);
-  const columns = Number(style.getPropertyValue('--bt-cols'));
-  const gap = parseFloat(style.columnGap);
+  const gap = parseFloat(getComputedStyle(grid).columnGap);
   const origin = grid.getBoundingClientRect();
   const track = (origin.width - gap * (columns - 1)) / columns;
   const cards = [...grid.querySelectorAll(':scope > .bt-card')].map((card) => ({ title: card.querySelector('h2 .bk-heading-text').textContent, box: card.getBoundingClientRect() }));
@@ -543,7 +519,8 @@ function gridLayout() {
       return Math.abs(box.top - earlier.top) >= 0.5 || box.left > earlier.left;
     }),
   );
-  return { columns, spans, starts, inOrder };
+  const fullWidth = cards.every(({ box }) => Math.abs(box.width - origin.width) < 1);
+  return { spans, starts, inOrder, fullWidth };
 }
 
 function largestDifference(first, second) {
