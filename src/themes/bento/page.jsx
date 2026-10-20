@@ -1,3 +1,4 @@
+import { FontLinks } from '../essay/font-links.jsx';
 import { Header } from '../essay/header.jsx';
 import { labelsFor } from '../essay/labels.js';
 import { PageMeta } from '../essay/meta.jsx';
@@ -23,6 +24,7 @@ export default function Page(props) {
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
+        <FontLinks hrefs={assets.fonts} />
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
           <script type="module" src={src} />

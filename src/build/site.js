@@ -140,7 +140,7 @@ function homeOutput(entries, { config, themes, chat }, errors) {
       site: siteProps(config),
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
-      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', [theme.script, chat.entry]) },
+      assets: { root: './', styles: assetLinks('', theme.styles), fonts: assetLinks('', theme.fonts), scripts: assetLinks('', [theme.script, chat.entry]) },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -151,7 +151,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
     theme.renderNotFound({
       site: siteProps(config),
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
-      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, [theme.script]) },
+      assets: { root: base, styles: assetLinks(base, theme.styles), fonts: assetLinks(base, theme.fonts), scripts: assetLinks(base, [theme.script]) },
     }),
   );
   return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
@@ -324,6 +324,7 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
     assets: {
       root,
       styles: assetLinks(root, theme.styles),
+      fonts: assetLinks(root, theme.fonts),
       scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },

@@ -1,4 +1,5 @@
 import { Article } from './article.jsx';
+import { FontLinks } from './font-links.jsx';
 import { Header } from './header.jsx';
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
@@ -21,6 +22,7 @@ export default function Page(props) {
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
+        <FontLinks hrefs={assets.fonts} />
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
           <script type="module" src={src} />

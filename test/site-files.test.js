@@ -150,7 +150,7 @@ describe('site files', () => {
         { title: "Rope & <'angles'>", url: '2026-10/rope/' },
         { title: 'Demo', url: '2026-09/demo/' },
       ],
-      assets: { root: '/bake/', styles, scripts },
+      assets: { root: '/bake/', styles, fonts: [], scripts },
     });
     assert.equal(probed(read('2026-10/rope/index.html')), 'https://x.github.io/bake/2026-10/rope/');
   });
@@ -161,6 +161,7 @@ describe('site files', () => {
     assert.match(html, /^<!doctype html>\n<html lang="en" data-theme="system" data-font="sans">/);
     assert.match(html, /<meta name="robots" content="noindex"><title>This page does not exist · Notes &amp; &lt;Models><\/title>/);
     assert.match(html, /<link rel="stylesheet" href="\/bake\/assets\/essay-[\w-]+\.css">/);
+    assert.match(html, /<link rel="preload" as="style" href="\/bake\/assets\/essay-fonts-[\w-]+\.css" onload="this.rel='stylesheet'"><noscript><link rel="stylesheet" href="\/bake\/assets\/essay-fonts-[\w-]+\.css"><\/noscript>/);
     assert.match(html, /<script type="module" src="\/bake\/assets\/essay-[\w-]+\.js"><\/script>/);
     assert.match(html, /<main class="bk-not-found" data-root="\/bake\/"><a class="bk-site" href="\/bake\/">Notes &amp; &lt;Models><\/a><h1 class="bk-not-found-title">This page does not exist<\/h1><p class="bk-not-found-path" hidden>/);
     assert.match(html, /<section class="bk-not-found-matches" hidden><h2>You may be looking for:<\/h2><ul><li data-url="2026-10\/alpha\/" hidden><a href="\/bake\/2026-10\/alpha\/">Alpha<\/a>/);

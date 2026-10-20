@@ -13,6 +13,7 @@ const CLIENT_FILE = 'client.jsx';
 const HOME_FILE = 'home.jsx';
 const NOT_FOUND_FILE = 'not-found.jsx';
 const THEME_STYLES_FILE = 'theme.css';
+const FONTS_FILE = 'fonts.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
@@ -32,18 +33,21 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   if (errors.length > count) return null;
   const alias = [...publicModules('themes'), themeFileAlias(folders, locate)];
   try {
-    const [server, client, styles] = await Promise.all([
+    const fontsFile = locate(FONTS_FILE);
+    const [server, client, styles, fonts] = await Promise.all([
       build(serverConfig(alias, locate, siteTheme)),
       browserBuild({ input: { [name]: locate(CLIENT_FILE) }, plugins: [solid()], alias }),
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
+      fontsFile === null ? null : browserBuild({ input: { [`${name}-fonts`]: fontsFile }, alias }),
     ]);
     const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
     return {
       render: module.render,
       renderHome: module.renderHome,
       renderNotFound: module.renderNotFound,
-      files: styles === null ? client.files : [...client.files, ...styles.files],
+      files: [client, styles, fonts].flatMap((output) => output?.files ?? []),
       styles: client.stylesheets,
+      fonts: fonts?.files.filter((file) => STYLESHEET.test(file.path)).map((file) => file.path) ?? [],
       script: client.entry,
     };
   } catch (error) {
