@@ -12,12 +12,13 @@ import { IMAGE_FORMATS, convertImage, readImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
 import { findArticles } from './articles.js';
+import { articleEntry, newestFirst } from './entries.js';
 import { listFiles } from './files.js';
 import { indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
+import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
 
 const PUBLIC_DIR = 'public';
 
@@ -49,24 +50,28 @@ export async function updateSite(site, changedPaths = null) {
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
   linkArticles(articles, errors);
-  const isPublished = (article) => article.url !== null && (site.drafts || article.fields.draft !== true);
-  const published = articles.filter(isPublished);
-  const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, settings.config, errors), compileComponents(site, published, errors), chatBundle()]);
   const { config } = settings;
+  const isPublished = (article) => article.url !== null && (site.drafts || !article.draft);
+  const published = articles.filter(isPublished);
+  const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), chatBundle()]);
   const assetFiles = assetOutputs(themes, bundle, chat);
-  const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, published, config, assetFiles, errors) : new Map();
+  const current = published.map((article) => ({ article, entry: articleEntry(article, config) }));
+  const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, current, config, assetFiles, errors) : new Map();
   const pageSettings = { config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
-  const pages = published.map((article) => ({ article, outputs: articleOutputs(root, article, pageSettings, errors) }));
-  const shown = lastGoodArticles(site, articles, errors).filter(isPublished);
-  const entries = shown.map((article) => homeEntry(article, config)).sort(newestFirst);
-  const listed = entries.filter((entry) => !entry.draft);
-  const home = homeOutput(entries, pageSettings, errors);
+  const pages = current.map(({ article, entry }) => ({ article, entry, outputs: articleOutputs(root, article, entry, pageSettings, errors) }));
+  const listing = lastGoodArticles(site, articles, errors)
+    .filter(isPublished)
+    .map((article) => ({ article, entry: articleEntry(article, config) }))
+    .sort((a, b) => newestFirst(a.entry, b.entry));
+  const listed = listing.filter(({ entry }) => !entry.draft);
+  const entries = listed.map(({ entry }) => entry);
+  const home = homeOutput(listing.map(({ entry }) => entry), pageSettings, errors);
   const siteFiles = [
-    { path: FEED_PATH, render: () => feedXml(config, listed), owner: 'the RSS feed' },
-    { path: SITEMAP_PATH, render: () => sitemapXml(config, listed), owner: 'the sitemap' },
-    { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, catalogEntries(shown)), owner: 'the AI chat' },
+    { path: FEED_PATH, render: () => feedXml(config, entries), owner: 'the RSS feed' },
+    { path: SITEMAP_PATH, render: () => sitemapXml(config, entries), owner: 'the sitemap' },
+    { path: CHAT_CATALOG_PATH, render: () => chatCatalogJson(config, listed), owner: 'the AI chat' },
     { path: CHAT_PREAMBLE_PATH, render: () => `${JSON.stringify(settings.preamble.map((definition) => definition.tex))}\n`, owner: 'the AI chat' },
-    notFoundOutput(listed, site.base ?? sitePath(config.url), pageSettings, errors),
+    notFoundOutput(entries, site.base ?? sitePath(config.url), pageSettings, errors),
   ];
   const generated = [...pages.flatMap((page) => page.outputs), home, ...siteFiles, ...assetFiles, ...shareImages.values()];
   const publicFiles = publicOutputs(root, generated, errors);
@@ -111,23 +116,15 @@ async function compileThemes(site, published, config, errors) {
   return themes;
 }
 
-function shareImagesOf(root, published, config, assetFiles, errors) {
+function shareImagesOf(root, pages, config, assetFiles, errors) {
   const sources = new Map(assetFiles.map((file) => [file.path, file.render()]));
   const failed = new Set(errors.map((error) => error.file));
-  const listed = published.filter((article) => article.fields.draft !== true && article.fields.page === undefined && !failed.has(article.file));
-  return new Map(listed.map((article) => [article.file, shareImageOf(root, article, config, sources)]));
+  const listed = pages.filter(({ article, entry }) => !entry.draft && article.fields.page === undefined && !failed.has(article.file));
+  return new Map(listed.map((page) => [page.article.file, shareImageOf(root, page, config, sources)]));
 }
 
 function siteProps(config) {
   return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url), bento: { columns: config.bento.columns } };
-}
-
-function catalogEntries(published) {
-  return published
-    .filter((article) => article.fields.draft !== true)
-    .map((article) => ({ article, title: article.fields.title, date: article.fields.date }))
-    .sort(newestFirst)
-    .map(({ article }) => article);
 }
 
 function homeOutput(entries, { config, themes, chat }, errors) {
@@ -135,7 +132,7 @@ function homeOutput(entries, { config, themes, chat }, errors) {
     theme.renderHome({
       site: siteProps(config),
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
-      articles: entries,
+      articles: entries.map(homeArticle),
       assets: { root: './', styles: theme.styles, scripts: theme.scripts, modules: [chat.entry] },
     }),
   );
@@ -146,7 +143,7 @@ function notFoundOutput(entries, base, { config, themes }, errors) {
   const html = renderSitePage(config, themes, 'the 404 page', errors, (theme) =>
     theme.renderNotFound({
       site: siteProps(config),
-      articles: entries.map((entry) => ({ title: entry.title, url: entry.url })),
+      articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
       assets: { root: base, styles: theme.styles.map((path) => `${base}${path}`), scripts: theme.scripts.map((path) => `${base}${path}`) },
     }),
   );
@@ -165,26 +162,8 @@ function renderSitePage(config, themes, label, errors, render) {
   }
 }
 
-function homeEntry(article, config) {
-  const base = article.url.slice(1);
-  const { fields, content } = article;
-  return {
-    title: fields.title,
-    summary: fields.summary,
-    date: fields.date,
-    tags: fields.tags ?? [],
-    category: config.categories.find((category) => category.id === fields.category),
-    draft: fields.draft === true,
-    url: base,
-    preview: fields.preview === undefined ? undefined : `${base}${encodePath(fields.preview)}`,
-    image: content?.image === undefined ? undefined : `${base}${encodePath(content.image)}`,
-  };
-}
-
-function newestFirst(a, b) {
-  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-  if (a.title === b.title) return 0;
-  return a.title < b.title ? -1 : 1;
+function homeArticle({ title, summary, date, tags, category, draft, path, preview, image }) {
+  return { title, summary, date, tags, category, draft, url: path, preview, image };
 }
 
 function themeOf(article, config) {
@@ -230,7 +209,7 @@ async function readMathPreamble(root, errors) {
 
 function linkArticles(articles, errors) {
   const index = indexPages(
-    articles.map(({ url, fields, document }) => ({ url, title: fields?.title ?? '', draft: fields?.draft === true, article: document })),
+    articles.map(({ url, fields, draft, document }) => ({ url, title: fields?.title ?? '', draft, article: document })),
   );
   for (const article of articles) article.document?.link(index, errors);
   for (const article of articles) article.content = article.document?.structure() ?? null;
@@ -246,7 +225,7 @@ async function loadArticle(root, article, { rules, preamble, components }) {
   const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
   const positions = frontMatter?.positions ?? {};
   const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);
-  return { ...article, fields, positions, url, document, content: null, cover, errors };
+  return { ...article, fields, positions, url, draft: fields?.draft === true, document, content: null, cover, errors };
 }
 
 async function readCover(path, cover, file, position, errors) {
@@ -257,24 +236,23 @@ async function readCover(path, cover, file, position, errors) {
   return undefined;
 }
 
-function articleOutputs(root, article, pageSettings, errors) {
-  const base = article.url.slice(1);
-  const copy = (file, path) => ({ path: `${base}${path}`, from: join(root, article.dir, file), owner: article.file });
+function articleOutputs(root, article, entry, pageSettings, errors) {
+  const copy = (file, path) => ({ path: `${entry.path}${path}`, from: join(root, article.dir, file), owner: article.file });
   const { page } = article.fields;
   if (page === undefined) {
     if (article.files.includes('index.html')) {
       errors.push(errorAt(article.file, fileStart, 'index.html in the article folder conflicts with the page generated from index.md'));
     }
-    const html = renderArticle(article, pageSettings, errors);
-    const source = { path: `${base}index.md`, render: () => article.content.source, owner: article.file };
+    const html = renderArticle(article, entry, pageSettings, errors);
+    const source = { path: `${entry.path}index.md`, render: () => article.content.source, owner: article.file };
     const images = article.content.images.map((image) => ({
-      path: `${base}${image.path}`,
+      path: `${entry.path}${image.path}`,
       render: () => convertedImage(join(root, article.dir, image.source), image),
       owner: article.file,
     }));
     const converted = new Set(article.content.images.flatMap((image) => (image.keepSource ? [image.path] : [image.path, image.source])));
     const copies = article.files.filter((file) => !converted.has(file)).map((file) => copy(file, file));
-    return [{ path: `${base}index.html`, render: () => html, owner: article.file }, source, ...images, ...copies];
+    return [{ path: `${entry.path}index.html`, render: () => html, owner: article.file }, source, ...images, ...copies];
   }
   if (page !== 'index.html' && article.files.includes('index.html')) {
     errors.push(errorAt(article.file, article.positions.page, `page "${page}" is published as index.html, which conflicts with index.html in the article folder`));
@@ -287,24 +265,24 @@ function convertedImage(file, image) {
   return convertedImages.get(image);
 }
 
-function renderArticle(article, { config, themes, bundle, chat, shareImages, mathStyles }, errors) {
+function renderArticle(article, entry, { config, themes, bundle, chat, shareImages, mathStyles }, errors) {
   const name = themeOf(article, config);
   const theme = themes.get(name);
   if (theme === null) return '';
   const { fields, content } = article;
-  const root = pageRoot(article.url);
+  const root = pageRoot(entry.url);
   const props = {
     site: siteProps(config),
     article: {
-      title: fields.title,
-      summary: fields.summary,
-      date: fields.date,
-      tags: fields.tags ?? [],
-      category: fields.category,
-      draft: fields.draft === true,
+      title: entry.title,
+      summary: entry.summary,
+      date: entry.date,
+      tags: entry.tags,
+      category: entry.category,
+      draft: entry.draft,
       toc: fields.toc ?? config.toc,
-      url: article.url,
-      link: absoluteLink(config, article.url.slice(1)),
+      url: entry.url,
+      link: entry.link,
       shareImage: shareImageProps(config, shareImages.get(article.file)),
       words: content.words,
       content,
