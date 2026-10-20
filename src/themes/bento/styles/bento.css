@@ -82,7 +82,7 @@
 .bt-grid[data-packed] > .bt-card[data-overflow]::after {
   content: '';
   position: sticky;
-  bottom: 0;
+  bottom: calc(-1 * var(--bt-padding-bottom));
   display: block;
   height: var(--bt-fade);
   margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
