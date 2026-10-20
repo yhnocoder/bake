@@ -14,7 +14,7 @@ import { MAX_NOTE_SOURCES, checkNote, citedEntries, notePrompt } from './note.js
 import { PetError, chooseReaderPet, forgetReaderPet, storedReaderPet } from './reader-pet.js';
 import { MATH_CLASS, replyHtml } from './reply.js';
 import { typesetMath } from './typeset.js';
-import { VaultError, clearKey, saveKey, storedKey, unlockKey } from './vault.js';
+import { VaultError, clearKey, rememberedKey, saveKey, storedKey, unlockKey } from './vault.js';
 
 const THINKING_KEY = 'bk-chat-thinking';
 const SCOPE_QUERY = /@([^\s@]*)$/;
@@ -119,7 +119,7 @@ function Chat(props) {
     if (messages.length === 0) greet();
     pet.setState(busy() || pending() !== null ? activity : 'open');
     focusInput();
-    if (view() === 'locked' && !unlockTried) unlock();
+    if (view() === 'locked' && !unlockTried) unlockRemembered();
   };
   const hide = ({ focus = true } = {}) => {
     if (!open()) return;
@@ -139,8 +139,17 @@ function Chat(props) {
     else note(labels.greeting[page.article === null ? 'blog' : 'article']);
   }
 
-  async function unlock() {
+  async function unlockRemembered() {
     unlockTried = true;
+    const key = await rememberedKey();
+    if (key === null || view() !== 'locked') return false;
+    apiKey = key;
+    setView('chat');
+    return true;
+  }
+
+  async function unlock() {
+    if (await unlockRemembered()) return true;
     setPending('unlock');
     setPet('unlocking');
     note(labels.unlocking);

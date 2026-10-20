@@ -137,21 +137,76 @@ test('the AI chat on published pages', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('a reload unlocks the key with the passkey once when the chat opens and keeps the conversation going', async (t) => {
+  await t.test('the passkey unlocks the key for 30 days in this browser, and only when a question is sent after that', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
+    const remembered = () =>
+      page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const request = indexedDB.open('bake-chat', 1);
+            request.onsuccess = () => {
+              const get = request.result.transaction('keys').objectStore('keys').get('key');
+              get.onsuccess = () => {
+                request.result.close();
+                resolve(get.result === undefined ? null : { extractable: get.result.key.extractable, usages: get.result.key.usages, days: (get.result.until - Date.now()) / 86400000 });
+              };
+            };
+          }),
+      );
+    const kept = await remembered();
+    assert.deepEqual({ ...kept, days: Math.round(kept.days) }, { extractable: false, usages: ['decrypt'], days: 30 });
+    const local = JSON.stringify((await storage(page)).local);
+    assert.ok(!local.includes(API_KEY), 'the key is never stored in plain text');
+
     await page.reload();
-    await watchPet(page);
     await page.locator('.bk-chat-launcher').click();
-    await page.locator('.bk-chat-note').filter({ hasText: '已解锁' }).waitFor();
     await page.locator(QUESTION).waitFor();
-    assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
     api.answers.push({ body: text('好的。') });
     await ask(page, '再说一次');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
     assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
+    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0);
+
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const request = indexedDB.open('bake-chat', 1);
+          request.onsuccess = () => {
+            const store = request.result.transaction('keys', 'readwrite').objectStore('keys');
+            store.get('key').onsuccess = (event) => {
+              store.put({ ...event.target.result, until: Date.now() - 1 }, 'key').onsuccess = () => {
+                request.result.close();
+                resolve();
+              };
+            };
+          };
+        }),
+    );
+    await page.reload();
+    await watchPet(page);
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator(QUESTION).waitFor();
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0, 'opening the chat asks for no passkey');
+    assert.equal(await remembered(), null, 'an expired key is forgotten');
+    api.answers.push({ body: text('再说一次。') });
+    await ask(page, '还有吗');
+    await page.locator('.bk-chat-note').filter({ hasText: '已解锁' }).waitFor();
+    await page.locator('.bk-chat-reply[data-done]').waitFor();
+    assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
+    assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
     assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 1);
+    assert.equal(Math.round((await remembered()).days), 30);
+
+    await openSettings(page);
+    await page.locator('.bk-chat-menu-item[data-action="clear-key"]').click();
+    await page.locator('.bk-chat-note').filter({ hasText: 'key 已清除' }).waitFor();
+    for (let tries = 0; (await remembered()) !== null; tries += 1) {
+      assert.ok(tries < 50, 'clearing the key forgets the remembered key');
+      await page.waitForTimeout(20);
+    }
   });
 
   await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {
