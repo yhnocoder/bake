@@ -211,7 +211,7 @@ test('every known failure names a measured case', () => {
   assert.deepEqual(knownFailures.map((entry) => entry.name).filter((name) => !names.includes(name)), []);
 });
 
-test('interactions draw every frame within the 60 fps budget on a CPU four times slower', async (t) => {
+test('interactions draw every frame within the 60 fps budget on a CPU twice as slow', async (t) => {
   const blog = mkdtempSync(join(tmpdir(), 'bake-frames-'));
   t.after(() => rmSync(blog, { recursive: true, force: true }));
   cpSync(exampleBlog, blog, { recursive: true, filter: (path) => !/[/\\](dist|node_modules)$/.test(path) });
