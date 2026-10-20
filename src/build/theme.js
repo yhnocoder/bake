@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { build } from 'vite';
 import solid from 'vite-plugin-solid';
+import { buildCache, filesIn } from '../bundle/cache.js';
 import { publicModules } from '../bundle/modules.js';
-import { blogPath, browserBuild, compileProblem, isInBlog, outputOf, viteConfig } from '../bundle/vite.js';
+import { BAKE_ROOT, blogPath, browserBuild, compileProblem, isInBlog, outputOf, viteConfig } from '../bundle/vite.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
 import { errorAt, fileStart } from '../report.js';
 
@@ -20,6 +21,7 @@ const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const SHARED_DIR = join(import.meta.dirname, '../theme');
 const SHARED_MODULE = 'bake/theme';
 const SHARED_INDEX = join(SHARED_DIR, 'index.jsx');
+const BUILD_FILES = [SHARED_DIR, join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
 const RE_EXPORT = /export \{([^}]*)\} from '([^']+)'/g;
 const MISSING_BINDING = /"([^"]+)" is not exported/;
 const SHARED_EXPORTS = new Map([
@@ -43,8 +45,14 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
     if (fileLocator(own)(file) === null) errors.push(errorAt(join(THEMES_DIR, name).split(sep).join('/'), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
+  const cache = buildCache('theme', `${BAKE_ROOT}\0${name}\0${siteTheme}`, resolve(root));
+  const required = filesIn([...own, ...BUILD_FILES].map((path) => resolve(path)));
+  const cached = cache.read(required);
+  if (cached !== null) return loadTheme(cached.data, cached.files, new Set(cached.inputs));
   const sources = new Set();
   const alias = [...publicModules('themes'), themeFileAlias(folders, locate, locateShared, sources)];
+  let data;
+  let theme;
   try {
     const fontsFile = locate(FONTS_FILE);
     const [server, client, styles, fonts] = await Promise.all([
@@ -53,22 +61,26 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
       fontsFile === null ? null : browserBuild({ input: { fonts: fontsFile }, alias }),
     ]);
-    const module = await import(`data:text/javascript;base64,${Buffer.from(outputOf(server)[0].code).toString('base64')}`);
-    return {
-      render: module.render,
-      renderHome: module.renderHome,
-      renderNotFound: module.renderNotFound,
-      files: [client, styles, fonts].flatMap((output) => output?.files ?? []),
+    data = {
+      server: outputOf(server)[0].code,
       styles: client.stylesheets,
       lazyStyles: client.lazyStylesheets,
       fonts: fonts?.files.filter((file) => STYLESHEET.test(file.path)).map((file) => file.path) ?? [],
       script: client.entry,
-      sources: new Set([...sources, ...[client, styles, fonts].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]),
     };
+    const files = [client, styles, fonts].flatMap((output) => output?.files ?? []);
+    theme = await loadTheme(data, files, new Set([...sources, ...[client, styles, fonts].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]));
   } catch (error) {
     errors.push(missingExport(root, error, locateShared) ?? compileError(root, name, error));
     return null;
   }
+  cache.write(data, theme.files, [...required, ...theme.sources]);
+  return theme;
+}
+
+async function loadTheme({ server, ...data }, files, sources) {
+  const module = await import(`data:text/javascript;base64,${Buffer.from(server).toString('base64')}`);
+  return { render: module.render, renderHome: module.renderHome, renderNotFound: module.renderNotFound, files, ...data, sources };
 }
 
 function themeFolders(root, name) {

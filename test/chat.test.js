@@ -100,7 +100,7 @@ describe('AI chat build output', () => {
     const index = JSON.parse(readFileSync(join(cache, `${cacheName}.json`), 'utf8'));
     assert.ok(index.inputs.some(([file]) => file.endsWith('/src/chat/entry.js')));
     assert.ok(index.inputs.some(([file]) => file.endsWith('/src/components/math.js')));
-    assert.equal(readFileSync(join(dir, 'dist', index.entry), 'utf8'), readFileSync(join(cache, index.dir, index.entry), 'utf8'));
+    assert.equal(readFileSync(join(dir, 'dist', index.data.entry), 'utf8'), readFileSync(join(cache, index.dir, index.data.entry), 'utf8'));
   });
 
   test('writes an empty catalog for a blog without articles', (t) => {
