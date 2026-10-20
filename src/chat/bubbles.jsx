@@ -43,6 +43,7 @@ function Chat(props) {
   const [menu, setMenu] = createSignal(false);
   const [thinking, setThinking] = createSignal(readThinking());
   const [faded, setFaded] = createSignal(false);
+  const [announcement, setAnnouncement] = createSignal('');
   let apiKey = null;
   let abort = null;
   let lastId = 0;
@@ -72,7 +73,10 @@ function Chat(props) {
       ),
     );
   const present = (id) => messages.some((message) => message.id === id);
-  const note = (text, extra = {}) => add({ role: 'note', text, ...extra });
+  const note = (text, extra = {}) => {
+    setAnnouncement(text);
+    return add({ role: 'note', text, ...extra });
+  };
   const problem = (text, retry = null) => add({ role: 'problem', text, retry });
   const conversation = () =>
     messages.flatMap((message) =>
@@ -247,6 +251,7 @@ function Chat(props) {
     if (!present(id)) return;
     if (latest !== null) commit();
     update(id, { sent, error: failure === null ? null : requestProblem(failure, labels), done: true });
+    if (failure === null && latest !== null) setAnnouncement(replyText(latest.content, root));
     setPet(failure !== null ? 'failed' : controller.signal.aborted ? 'idle' : 'answered');
     setBusy(false);
   }
@@ -283,6 +288,12 @@ function Chat(props) {
     }
   };
   const visibleScopes = () => (query() === null || options() === null ? [] : matchingScopes(options(), query(), scopes()));
+  const activeScope = () => Math.min(active(), visibleScopes().length - 1);
+  const scopeGroups = () => {
+    const shown = visibleScopes().map((scope, index) => ({ scope, index }));
+    return [...new Set(shown.map(({ scope }) => scope.kind))].map((kind) => ({ kind, items: shown.filter(({ scope }) => scope.kind === kind) }));
+  };
+  const listing = () => query() !== null && options() !== null;
   const pick = (scope) => {
     const caret = input.selectionStart ?? input.value.length;
     const start = input.value.slice(0, caret).lastIndexOf('@');
@@ -381,7 +392,10 @@ function Chat(props) {
 
   return (
     <section class="bk-chat" data-open={open() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} onKeyDown={containerKeydown}>
-      <div class="bk-chat-bubbles" data-faded={faded() ? '' : undefined} ref={list} aria-live="polite" onScroll={updateFade}>
+      <p class="bk-chat-status" role="status">
+        {announcement()}
+      </p>
+      <div class="bk-chat-bubbles" data-faded={faded() ? '' : undefined} ref={list} onScroll={updateFade}>
         <div class="bk-chat-thread" ref={(element) => resize.observe(element)}>
           <For each={messages}>
             {(message) =>
@@ -415,29 +429,34 @@ function Chat(props) {
         </div>
       </div>
       <form class="bk-chat-composer" onSubmit={submit}>
-        <Show when={query() !== null && options() !== null}>
-          <div class="bk-chat-scopes" role="listbox" aria-label={labels.scopes}>
+        <Show when={listing()}>
+          <div class="bk-chat-scopes" id="bk-chat-scopes" role="listbox" aria-label={labels.scopes}>
             <Show when={visibleScopes().length > 0} fallback={<p class="bk-chat-scopes-none">{labels.noScope}</p>}>
-              <For each={visibleScopes()}>
-                {(scope, index) => (
-                  <>
-                    <Show when={index() === 0 || visibleScopes()[index() - 1].kind !== scope.kind}>
-                      <p class="bk-chat-scopes-group">{labels.kinds[scope.kind]}</p>
-                    </Show>
-                    <div
-                      class="bk-chat-scope"
-                      role="option"
-                      aria-selected={String(index() === Math.min(active(), visibleScopes().length - 1))}
-                      ref={(element) => createEffect(() => index() === active() && element.scrollIntoView({ block: 'nearest' }))}
-                      onPointerDown={(event) => {
-                        event.preventDefault();
-                        pick(scope);
-                      }}
-                    >
-                      <span>{scope.label}</span>
-                      <small>{scope.meta}</small>
-                    </div>
-                  </>
+              <For each={scopeGroups()}>
+                {(group) => (
+                  <div class="bk-chat-scopes-kind" role="group" aria-labelledby={`bk-chat-kind-${group.kind}`}>
+                    <p class="bk-chat-scopes-group" id={`bk-chat-kind-${group.kind}`}>
+                      {labels.kinds[group.kind]}
+                    </p>
+                    <For each={group.items}>
+                      {({ scope, index }) => (
+                        <div
+                          class="bk-chat-scope"
+                          id={`bk-chat-scope-${index}`}
+                          role="option"
+                          aria-selected={String(index === activeScope())}
+                          ref={(element) => createEffect(() => index === active() && element.scrollIntoView({ block: 'nearest' }))}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            pick(scope);
+                          }}
+                        >
+                          <span>{scope.label}</span>
+                          <small>{scope.meta}</small>
+                        </div>
+                      )}
+                    </For>
+                  </div>
                 )}
               </For>
             </Show>
@@ -472,6 +491,11 @@ function Chat(props) {
           value={draft()}
           placeholder={placeholder()}
           aria-label={view() === 'setup' ? labels.placeholder.key : labels.question}
+          role={view() === 'setup' ? undefined : 'combobox'}
+          aria-autocomplete={view() === 'setup' ? undefined : 'list'}
+          aria-expanded={view() === 'setup' ? undefined : String(listing())}
+          aria-controls={view() === 'setup' || !listing() ? undefined : 'bk-chat-scopes'}
+          aria-activedescendant={listing() && visibleScopes().length > 0 ? `bk-chat-scope-${activeScope()}` : undefined}
           onInput={(event) => {
             setDraft(event.currentTarget.value);
             setActive(0);
@@ -655,6 +679,13 @@ function Reply(props) {
       </Show>
     </div>
   );
+}
+
+function replyText(content, root) {
+  const element = document.createElement('div');
+  element.innerHTML = replyHtml(content, { root });
+  for (const math of element.querySelectorAll(`.${MATH_CLASS}`)) math.textContent = math.dataset.tex;
+  return element.textContent.trim();
 }
 
 function typesetMath(container) {

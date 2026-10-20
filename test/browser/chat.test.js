@@ -352,13 +352,16 @@ test('the AI chat on published pages', async (t) => {
     assert.equal((await storage(page)).local['bk-chat-key'], undefined);
   });
 
-  await t.test('stopping an answer keeps the text written so far and sends it with the next question', async (t) => {
+  await t.test('stopping an answer keeps the text written so far and sends it with the next question, and screen readers hear a reply only when it is done', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
     await page.evaluate(() => (window.bakeTest.hold = true));
     await ask(page, '慢慢说');
     await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
+    const status = page.locator('.bk-chat-status[role="status"]');
+    assert.equal(await page.locator('[aria-live]').count(), 0);
+    assert.doesNotMatch(await status.textContent(), /前半句/);
     const stop = page.locator('.bk-chat-send[data-action="stop"]');
     await stop.click();
     await page.locator('.bk-chat-reply[data-done]').waitFor();
@@ -369,6 +372,7 @@ test('the AI chat on published pages', async (t) => {
     api.answers.push({ body: text('继续。') });
     await ask(page, '接着说');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '继续。' }).waitFor();
+    assert.equal(await status.textContent(), '继续。');
     assert.deepEqual(
       api.requests
         .at(-1)
@@ -664,11 +668,25 @@ test('the AI chat on published pages', async (t) => {
     const input = page.locator(QUESTION);
     const list = page.locator('.bk-chat-scopes[role="listbox"]');
     const chips = () => page.locator('.bk-chat-composer .bk-chat-chip > span').allTextContents();
+    const combobox = () => input.evaluate((element) => ['role', 'aria-autocomplete', 'aria-expanded', 'aria-controls', 'aria-activedescendant'].map((name) => element.getAttribute(name)));
+    assert.deepEqual(await combobox(), ['combobox', 'list', 'false', null, null]);
     await input.pressSequentially('@');
     await list.waitFor();
     assert.deepEqual(await list.locator('.bk-chat-scopes-group').allTextContents(), ['文章', '月份', '主题（分类和标签）']);
+    assert.deepEqual(await combobox(), ['combobox', 'list', 'true', 'bk-chat-scopes', 'bk-chat-scope-0']);
+    assert.equal(await list.getAttribute('id'), 'bk-chat-scopes');
+    assert.equal(await list.locator('#bk-chat-scope-0').getAttribute('aria-selected'), 'true');
+    assert.deepEqual(
+      await list.locator('[role="group"]').evaluateAll((groups) => groups.map((group) => group.getRootNode().getElementById(group.getAttribute('aria-labelledby')).textContent)),
+      ['文章', '月份', '主题（分类和标签）'],
+    );
+    await input.press('ArrowDown');
+    assert.equal((await combobox())[4], 'bk-chat-scope-1');
+    assert.equal(await list.locator('#bk-chat-scope-1').getAttribute('aria-selected'), 'true');
+    await input.press('ArrowUp');
     await input.pressSequentially('数学');
     assert.equal(await list.locator('[aria-selected="true"] span').textContent(), '数学');
+    assert.equal(await list.locator(`#${(await combobox())[4]} span`).textContent(), '数学');
     assert.deepEqual(await list.locator('.bk-chat-scopes-group').allTextContents(), ['主题（分类和标签）']);
     await input.press('Enter');
     assert.deepEqual(await chips(), ['@数学']);
@@ -691,6 +709,7 @@ test('the AI chat on published pages', async (t) => {
     await list.waitFor();
     await input.press('Escape');
     await list.waitFor({ state: 'detached' });
+    assert.deepEqual(await combobox(), ['combobox', 'list', 'false', null, null]);
     assert.equal(await page.locator('.bk-chat[data-open]').count(), 1);
     await input.press('Backspace');
 

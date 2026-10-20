@@ -461,6 +461,21 @@
   animation: bk-chat-pop 0.16s var(--ease-out, ease-out);
 }
 
+.bk-chat-scopes-kind {
+  display: contents;
+}
+
+.bk-chat-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .bk-chat-scopes-group {
   margin: 0;
   padding: 4px 8px 2px;
