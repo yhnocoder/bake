@@ -335,6 +335,7 @@ html:has(.bk-home) {
   box-shadow: var(--shadow);
   color: var(--ink);
   text-decoration: none;
+  transform-origin: top left;
   transition: translate 0.2s var(--ease-out);
 }
 
@@ -386,6 +387,10 @@ html:has(.bk-home) {
 .bk-home .bk-card-preview {
   position: absolute;
   inset: 0;
+}
+
+.bk-home .bk-card-preview {
+  contain: strict;
 }
 
 .bk-home .bk-card-fallback {
