@@ -1,20 +1,20 @@
 import { reducedMotion } from './motion.js';
-import { cardKeyboard, chapterCard, clamp, el, floorFor, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
+import { cardKeyboard, chapterCard, clamp, createElement, floorFor, hoverIntent, keepVisible, stateKey, tocLink } from './toc-card.js';
 
 const SHOW_DELAY = 70;
 const MARGIN = 140;
 const CHAPTER_GAP = 6;
 const PITCH = [6, 10];
 
-export function ticksColumn(ctx, { rail = false, hover, leave, click } = {}) {
-  const { outline } = ctx;
-  const element = el('nav', rail ? 'bk-ticks is-rail' : 'bk-ticks');
-  element.setAttribute('aria-label', ctx.labels.toc);
+export function ticksColumn(context, { rail = false, hover, leave, click } = {}) {
+  const { outline } = context;
+  const element = createElement('nav', rail ? 'bk-ticks is-rail' : 'bk-ticks');
+  element.setAttribute('aria-label', context.labels.toc);
   const rows = outline.entries.map((entry, index) => {
     const chapter = outline.chapters[entry.chapter];
     const row = tocLink(entry.id, entry.level === 2 ? 'bk-tick is-chapter' : 'bk-tick');
     row.setAttribute('aria-label', entry.level === 2 ? `${chapter.number} ${chapter.title}` : chapter.sections[entry.section].title);
-    row.append(el('span', 'bk-tick-line'));
+    row.append(createElement('span', 'bk-tick-line'));
     row.addEventListener('pointerenter', () => hover?.(index));
     row.addEventListener('focus', () => hover?.(index, row.matches(':focus-visible')));
     if (click !== undefined) {
@@ -34,7 +34,7 @@ export function ticksColumn(ctx, { rail = false, hover, leave, click } = {}) {
     const pitch = Math.min(clamp(fitting, ...PITCH), Math.max(1, fitting));
     element.style.setProperty('--pitch', `${pitch}px`);
     element.style.setProperty('--chapter-gap', `${pitch < 8 ? 3 : CHAPTER_GAP}px`);
-    if (!rail) element.style.left = `${Math.max(10, ctx.article.getBoundingClientRect().left - 78)}px`;
+    if (!rail) element.style.left = `${Math.max(10, context.article.getBoundingClientRect().left - 78)}px`;
   };
   relayout();
   return {
@@ -53,13 +53,13 @@ export function ticksColumn(ctx, { rail = false, hover, leave, click } = {}) {
   };
 }
 
-export function ticksView(ctx) {
-  const card = el('div', 'bk-popover is-ticks');
+export function ticksView(context) {
+  const card = createElement('div', 'bk-popover is-ticks');
   const intent = hoverIntent(SHOW_DELAY);
   let shownChapter = -1;
   let shownState = '';
   let pointed = -1;
-  const ticks = ticksColumn(ctx, {
+  const ticks = ticksColumn(context, {
     hover: (index, now) => point(index, true, now),
     leave(event) {
       if (!card.contains(event.relatedTarget)) leave();
@@ -73,9 +73,9 @@ export function ticksView(ctx) {
     const row = event.target.closest('[data-index]');
     if (row !== null) point(Number(row.dataset.index), false);
   });
-  ctx.host.append(ticks.element, card);
+  context.host.append(ticks.element, card);
   cardKeyboard({
-    groups: ctx.outline.chapters.map((chapter, chapterIndex) => ticks.rows.filter((row, index) => ctx.outline.entries[index].chapter === chapterIndex)),
+    groups: context.outline.chapters.map((chapter, chapterIndex) => ticks.rows.filter((row, index) => context.outline.entries[index].chapter === chapterIndex)),
     card,
     shown: () => (card.classList.contains('is-on') ? shownChapter : -1),
     leave: () => leave(),
@@ -83,14 +83,14 @@ export function ticksView(ctx) {
 
   function render(chapterIndex) {
     const scrollTop = chapterIndex === shownChapter ? card.scrollTop : 0;
-    card.replaceChildren(chapterCard(ctx, chapterIndex, ctx.state()));
+    card.replaceChildren(chapterCard(context, chapterIndex, context.state()));
     card.scrollTop = scrollTop;
     shownChapter = chapterIndex;
-    shownState = stateKey(ctx.state());
+    shownState = stateKey(context.state());
   }
   function place() {
     const column = ticks.element.getBoundingClientRect();
-    const first = ticks.rows[ctx.outline.chapters[shownChapter].index].getBoundingClientRect();
+    const first = ticks.rows[context.outline.chapters[shownChapter].index].getBoundingClientRect();
     const left = column.right + 8;
     const floor = floorFor(left);
     card.style.maxHeight = `${floor - 12}px`;
@@ -110,7 +110,7 @@ export function ticksView(ctx) {
     ticks.hover(index);
     intent.enter(() => {
       const wasOn = card.classList.contains('is-on');
-      const chapterIndex = ctx.outline.entries[index].chapter;
+      const chapterIndex = context.outline.entries[index].chapter;
       if (chapterIndex !== shownChapter || !wasOn) render(chapterIndex);
       card.classList.toggle('is-snap', !wasOn);
       place();

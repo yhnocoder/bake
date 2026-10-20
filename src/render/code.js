@@ -1,7 +1,6 @@
-import { bundledLanguages, createCssVariablesTheme, createHighlighter } from 'shiki';
+import { bundledLanguages, createCssVariablesTheme, createHighlighter, isPlainLang } from 'shiki';
 
 const THEME = createCssVariablesTheme({ name: 'bake', variablePrefix: '--code-', fontStyle: true });
-const PLAIN_LANGUAGES = ['text', 'txt', 'plain', 'plaintext'];
 
 let highlighterPromise = null;
 
@@ -11,12 +10,12 @@ function highlighter() {
 }
 
 export function isKnownLanguage(language) {
-  return PLAIN_LANGUAGES.includes(language) || Object.hasOwn(bundledLanguages, language);
+  return isPlainLang(language) || Object.hasOwn(bundledLanguages, language);
 }
 
 export async function loadLanguages(languages) {
   const instance = await highlighter();
-  const missing = [...new Set(languages)].filter((language) => !PLAIN_LANGUAGES.includes(language) && !instance.getLoadedLanguages().includes(language));
+  const missing = [...new Set(languages)].filter((language) => !isPlainLang(language) && !instance.getLoadedLanguages().includes(language));
   if (missing.length > 0) await instance.loadLanguage(...missing);
   return instance;
 }

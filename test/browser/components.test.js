@@ -340,6 +340,24 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
+  await t.test('controls show the pointer cursor inside and outside a component, and disabled controls do not', async () => {
+    const page = await open('text');
+    await waitForReady(page);
+    const cursors = await page.evaluate(() => {
+      const controls = '<button>b</button><button disabled>d</button><label>l</label><input type="range"><input type="checkbox"><select><option>s</option></select><select disabled><option>s</option></select><a href="#top">a</a>';
+      const read = (parent) => {
+        const host = document.createElement('div');
+        host.innerHTML = controls;
+        parent.append(host);
+        return [...host.children].map((element) => `${element.localName}${element.disabled ? ' disabled' : ''} ${getComputedStyle(element).cursor}`);
+      };
+      return { component: read(document.querySelector('text-view')), article: read(document.querySelector('.bk-article')) };
+    });
+    const expected = ['button pointer', 'button disabled default', 'label pointer', 'input pointer', 'input pointer', 'select pointer', 'select disabled default', 'a pointer'];
+    assert.deepEqual(cursors, { component: expected, article: expected });
+    await page.close();
+  });
+
   await t.test('the theme setting and the system color scheme dispatch bake:theme', async () => {
     const page = await open('rope');
     await waitForReady(page, 1);

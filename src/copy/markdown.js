@@ -1,6 +1,6 @@
 export const UI = '[data-ui]';
 
-const NOTE = '[data-sidenote][data-line]';
+export const NOTE = '[data-sidenote][data-line]';
 const UNIT = '[data-line][data-end-line]';
 const ATOMIC = 'mjx-container, img, svg, input, .component-box';
 const INLINE_LEAF = 'p, h1, h2, h3, h4, h5, h6, td, th, figcaption, summary, li, dt, dd';
@@ -16,6 +16,10 @@ const ALWAYS_ESCAPED = new Set(['\\', '`', '[', ']', '$']);
 const ASCII_WORD = /[A-Za-z0-9]/;
 const HTML_START = /[A-Za-z/!?]/;
 const CHARACTER_REFERENCE = /^&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/i;
+
+export function sidenoteElement(article, number) {
+  return [...article.querySelectorAll(NOTE)].find((note) => note.dataset.sidenote === String(number) && note.closest(UI) === null) ?? null;
+}
 
 export function isUi(element, article) {
   const ui = element.closest(UI);
@@ -56,7 +60,6 @@ export class MarkdownWriter {
   }
 
   isWhole(unit) {
-    if (this.lines === null) return false;
     const component = unit.querySelector('figure.component');
     if (component !== null && this.leaves(unit).every((leaf) => component.contains(leaf))) return this.hasSelection(unit);
     return this.covers(unit);
@@ -169,7 +172,7 @@ export class MarkdownWriter {
   }
 
   block(element) {
-    if (element.matches(UNIT) && (this.isWhole(element) || (this.lines !== null && element.matches(HEADING)))) return this.unitSource(element);
+    if (element.matches(UNIT) && (this.isWhole(element) || element.matches(HEADING))) return this.unitSource(element);
     if (element.matches('summary, .aside-title, .embed-source')) return '';
     if (element.matches('p')) return this.inline(element).trim();
     if (element.matches(HEADING)) return [`${'#'.repeat(Number(element.tagName[1]))} ${this.inline(element).trim()}`, attributeText(writtenAttributes(element))].filter(Boolean).join(' ');
@@ -205,7 +208,7 @@ export class MarkdownWriter {
     if (element.matches('mjx-container[data-tex]')) return element.getAttribute('display') === 'true' ? `$$${element.dataset.tex.trim()}$$` : `$${element.dataset.tex.trim()}$`;
     if (element.matches('sup.sidenote-ref[data-sidenote]')) return `[^${this.addNote(element.dataset.sidenote)}]`;
     if (element.matches('a.citation')) return `[@${anchorOf(element.getAttribute('href')).replace(/^reference-/, '')}]`;
-    if (element.matches('a.eqref')) return `\\eqref{${anchorOf(element.getAttribute('href'))}}`;
+    if (element.matches('a.eqref')) return `\\eqref{${decodeURIComponent(anchorOf(element.getAttribute('href')))}}`;
     if (element.matches('br')) return '\\\n';
     if (element.matches('img')) return `![${element.getAttribute('alt') ?? ''}](${element.getAttribute('src')})${attributeText(element.style.width === '' ? {} : { width: element.style.width })}`;
     if (element.matches('input[type="checkbox"]')) return element.checked ? '[x] ' : '[ ] ';
@@ -324,38 +327,19 @@ export class MarkdownWriter {
 
   addNote(number) {
     if (!this.notes.includes(number)) this.notes.push(number);
-    const note = this.note(number);
-    return note?.dataset.label ?? number;
-  }
-
-  noteElements() {
-    return [...this.article.querySelectorAll(NOTE)].filter((note) => note.closest(UI) === null || !this.article.contains(note.closest(UI)));
-  }
-
-  note(number) {
-    return this.noteElements().find((note) => note.dataset.sidenote === String(number)) ?? null;
-  }
-
-  noteLines(note) {
-    if (this.lines === null || note.dataset.endLine === undefined) return null;
-    return this.lines.slice(Number(note.dataset.line) - 1, Number(note.dataset.endLine));
+    return sidenoteElement(this.article, number)?.dataset.label ?? number;
   }
 
   footnotes() {
     const definitions = [];
     for (let index = 0; index < this.notes.length; index += 1) {
       const number = this.notes[index];
-      const note = this.note(number);
+      const note = sidenoteElement(this.article, number);
       if (note === null) continue;
       const line = Number(note.dataset.line);
       if (this.copied.some(([start, end]) => line >= start && line <= end)) continue;
       for (const reference of note.querySelectorAll('sup.sidenote-ref[data-sidenote]')) this.addNote(reference.dataset.sidenote);
-      const lines = this.noteLines(note);
-      if (lines === null) {
-        definitions.push(`[^${number}]: ${indent(this.whole(note, () => this.blocks(note)), '    ').trimStart()}`);
-        continue;
-      }
-      definitions.push(dedentDefinition(lines));
+      definitions.push(dedentDefinition(this.lines.slice(line - 1, Number(note.dataset.endLine))));
     }
     return definitions;
   }
@@ -366,12 +350,7 @@ function indexOf(node) {
 }
 
 function anchorOf(href) {
-  const anchor = href.slice(href.indexOf('#') + 1);
-  try {
-    return decodeURIComponent(anchor);
-  } catch {
-    return anchor;
-  }
+  return href.slice(href.indexOf('#') + 1);
 }
 
 function escapeText(text, inCell, mark) {

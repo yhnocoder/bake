@@ -18,6 +18,18 @@
   margin: 14px 0 18px;
 }
 
+.bk-article {
+  --scroll-cover: var(--bg);
+}
+
+.bk-article :is(.aside, .quote, blockquote):where(:not(.component-box *)) {
+  --scroll-cover: var(--surface-2);
+}
+
+.bk-article :is(.table-scroll, .example-result, .figure):where(:not(.component-box *)) {
+  --scroll-cover: var(--surface);
+}
+
 .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
   overflow-x: auto;
   overflow-y: hidden;
@@ -31,16 +43,16 @@
   scrollbar-color: color-mix(in srgb, var(--ink) 25%, transparent) transparent;
 }
 
-.bk-article [data-fade-left]:where(:not(.component-box *)) {
-  mask-image: linear-gradient(to right, transparent, #000 36px);
-}
-
-.bk-article [data-fade-right]:where(:not(.component-box *)) {
-  mask-image: linear-gradient(to left, transparent, #000 36px);
-}
-
-.bk-article [data-fade-left][data-fade-right]:where(:not(.component-box *)) {
-  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+.bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
+  background-image:
+    linear-gradient(to right, var(--scroll-cover) 40%, transparent),
+    linear-gradient(to left, var(--scroll-cover) 40%, transparent),
+    linear-gradient(to right, var(--scroll-shadow), transparent),
+    linear-gradient(to left, var(--scroll-shadow), transparent);
+  background-position: left, right, left, right;
+  background-size: 40px 100%, 40px 100%, 16px 100%, 16px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .bk-article mjx-container[display]:where(:not(.component-box *)) {
@@ -70,6 +82,7 @@
 }
 
 .bk-article pre.shiki:where(:not(.component-box *)) {
+  --scroll-cover: var(--code-background);
   margin: 0;
   padding: 14px 18px;
   border-radius: 8px;
@@ -127,13 +140,16 @@
 .bk-article th:where(:not(.component-box *)) {
   font-weight: 700;
   color: var(--ink-2);
-  background: color-mix(in srgb, var(--surface-2) 45%, var(--surface));
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
 }
 
 .bk-article table.list-table :is(th, td):where(:not(.component-box *)) {
-  min-width: 6em;
   white-space: normal;
   overflow-wrap: break-word;
+}
+
+.bk-article table.list-table td:not(:has(> :is(img, mjx-container):only-child)):where(:not(.component-box *)) {
+  min-width: 9em;
 }
 
 .bk-article table.list-table th:where(:not(.component-box *)) {
@@ -162,7 +178,7 @@
   vertical-align: middle;
 }
 
-.bk-article .figure:where(:not(.component-box *)) {
+.bk-article :is(.figure, .component):where(:not(.component-box *)) {
   position: relative;
   clear: both;
   width: 100%;
@@ -175,7 +191,7 @@
   box-shadow: var(--shadow);
 }
 
-.bk-article :not(.bk-block) > .figure:where(:not(.component-box *)) {
+.bk-article :not(.bk-block) > :is(.figure, .component):where(:not(.component-box *)) {
   margin: 22px auto 26px;
 }
 
@@ -191,23 +207,6 @@
   font-size: 14px;
   line-height: 1.7;
   color: var(--ink-2);
-}
-
-.bk-article .component {
-  position: relative;
-  clear: both;
-  width: 100%;
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 18px 18px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.bk-article :not(.bk-block) > .component {
-  margin: 22px auto 26px;
 }
 
 .bk-article .component[data-frame='none'] {
@@ -256,10 +255,6 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article .component-box > * {
   display: block;
   height: 100%;
-}
-
-.bk-article .component :is(button, summary, select, label, [role='button'], input:is([type='checkbox'], [type='radio'], [type='range'])):not(:disabled) {
-  cursor: pointer;
 }
 
 .bk-article .figure[data-float]:where(:not(.component-box *)) {
@@ -550,7 +545,7 @@ h4 + .bk-references {
   margin: 0 0 16px;
   padding-left: 12px;
   border-left: 2px solid var(--line-2);
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--ink-2);
 }
@@ -573,22 +568,62 @@ h4 + .bk-references {
   overflow: hidden;
 }
 
+.bk-article .example-source:where(:not(.component-box *)) {
+  --code-background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+  min-width: 0;
+}
+
 .bk-article .example-source > pre.shiki:where(:not(.component-box *)) {
   height: 100%;
   margin: 0;
+  padding: 18px 20px;
   border-radius: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  text-box: trim-both cap alphabetic;
 }
 
 .bk-article .example-result:where(:not(.component-box *)) {
   display: flow-root;
   min-width: 0;
-  padding: 16px 20px;
+  padding: 18px 20px;
+  border-top: 1px solid var(--line);
 }
 
 .bk-article .example-result > :first-child:where(:not(.component-box *)) {
   margin-top: 0;
+}
+
+.bk-article .example-result > :is(p, h2, h3, h4, h5, h6, ul, ol, .recap):where(:not(.component-box *)) {
+  text-box-edge: cap alphabetic;
+}
+
+.bk-article .example-result > :is(p, h2, h3, h4, h5, h6, ul, ol, .recap):first-child:where(:not(.component-box *)) {
+  text-box-trim: trim-start;
+}
+
+.bk-article .example-result > :is(p, h2, h3, h4, h5, h6, ul, ol, .recap):last-child:where(:not(.component-box *)) {
+  text-box-trim: trim-end;
+}
+
+.bk-article .example-result > :is(p, h2, h3, h4, h5, h6, ul, ol, .recap):only-child:where(:not(.component-box *)) {
+  text-box-trim: trim-both;
+}
+
+.bk-article .example-result > .recap:where(:not(.component-box *)) {
+  padding-block: 0.3em;
+}
+
+.bk-article .example-result > .recap:first-child:where(:not(.component-box *)) {
+  margin-top: -0.3em;
+}
+
+.bk-article .example-result > .recap:last-child:where(:not(.component-box *)) {
+  margin-bottom: -0.3em;
+}
+
+.bk-article .example-result mjx-container[display]:where(:not(.component-box *)) {
+  font-size: 1em;
 }
 
 .bk-article .example-result :is(.figure, .component):where(:not(.component-box *)) {
@@ -598,6 +633,11 @@ h4 + .bk-references {
 @container example (min-width: 880px) {
   .bk-article .example:not([data-result-widths]):where(:not(.component-box *)) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .bk-article .example:not([data-result-widths]) > .example-result:where(:not(.component-box *)) {
+    border-top: 0;
+    border-left: 1px solid var(--line);
   }
 }
 
@@ -628,7 +668,7 @@ h4 + .bk-references {
     padding: 14px 18px;
   }
 
-  .bk-article .example-result:where(:not(.component-box *)) {
+  .bk-article :is(.example-result, .example-source > pre.shiki):where(:not(.component-box *)) {
     padding: 14px 16px;
   }
 }

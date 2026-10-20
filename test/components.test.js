@@ -204,9 +204,11 @@ describe('component blocks', () => {
       'index.md:13:16 parameter "data" of act-fn-plot must be a file in the article folder, got "../grid.json"',
     ]);
     const image = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
-    const dir = createBlog(t, { 'plot.png': image });
-    const linked = await parsed('![](plot.png)\n\n:::act-fn-plot{data=plot.png}\n:::\n', { components: options.components, folder: folder(dir) });
+    const dir = createBlog(t, { 'plot.png': image, 'scatterplot.png': image });
+    const linked = await parsed('![](plot.png)\n\n:::act-fn-plot{data=./plot.png}\n:::\n', { components: options.components, folder: folder(dir) });
     assert.deepEqual(linked.images.map((entry) => [entry.source, entry.keepSource]), [['plot.png', true]]);
+    const longer = await parsed('![](plot.png)\n\n:::act-fn-plot{data=scatterplot.png}\n:::\n', { components: options.components, folder: folder(dir) });
+    assert.deepEqual(longer.images.map((entry) => [entry.source, entry.keepSource]), [['plot.png', false]]);
   });
 
   test('reports layout height functions that throw or return an invalid height at the block', async () => {

@@ -187,6 +187,68 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal(await page.locator('.bk-toast').textContent(), '已复制为 Markdown');
   });
 
+  await t.test('the toast takes the colours of the light and the dark scheme and does not cover the settings button', async () => {
+    const luminance = (color) => {
+      const values = color.match(/[\d.]+/g).map(Number);
+      const [r, g, b] = color.startsWith('color(') ? values.slice(0, 3).map((value) => value * 255) : values;
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    };
+    for (const width of [1440, 375]) {
+      for (const colorScheme of ['light', 'dark']) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ colorScheme });
+        await page.waitForFunction(() => !document.querySelector('.bk-toast').classList.contains('is-on'));
+        await page.locator('.bk-header .bk-copy-source').evaluate((button) => button.click());
+        await page.waitForFunction(() => document.querySelector('.bk-toast').classList.contains('is-on') && getComputedStyle(document.querySelector('.bk-toast')).opacity === '1');
+        const { toast, background, own, settings } = await page.evaluate(() => ({
+          toast: getComputedStyle(document.querySelector('.bk-toast')).backgroundColor,
+          background: getComputedStyle(document.body).backgroundColor,
+          own: document.querySelector('.bk-toast').getBoundingClientRect().toJSON(),
+          settings: document.querySelector('.bk-settings-toggle').getBoundingClientRect().toJSON(),
+        }));
+        const at = `${colorScheme} at ${width}px`;
+        assert.ok(Math.abs(luminance(toast) - luminance(background)) < 0.2, `${at}: the toast ${toast} on the page ${background}`);
+        assert.ok(own.right <= settings.left || own.left >= settings.right || own.bottom <= settings.top || own.top >= settings.bottom, `${at}: the toast ${JSON.stringify(own)} covers the settings button ${JSON.stringify(settings)}`);
+        assert.ok(own.left >= 0 && own.right <= width, `${at}: the toast ${JSON.stringify(own)} leaves the screen`);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'light' });
+  });
+
+  await t.test('starting the copy module on a page without the source script is an error', async () => {
+    const stripped = await context.newPage();
+    const errors = [];
+    stripped.on('pageerror', (error) => errors.push(error.message));
+    await stripped.route(`${base}/2026-10/syntax/`, async (route) => {
+      const response = await route.fetch();
+      const html = await response.text();
+      const withoutSource = html.replace(/<script type="application\/json" class="bk-source"[^>]*>[\s\S]*?<\/script>/, '');
+      assert.notEqual(withoutSource, html);
+      await route.fulfill({ response, body: withoutSource });
+    });
+    await stripped.goto(`${base}/2026-10/syntax/`, { waitUntil: 'load' });
+    assert.deepEqual(errors, ['bake/copy needs the source of the article in script.bk-source']);
+    await stripped.close();
+  });
+
+  await context.close();
+});
+
+test('a converted citation keeps its key as written, also when the key contains a percent sign', async (t) => {
+  const body = 'Gates help [@a%zz] and [@b%20c] here.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n';
+  const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/rope/`);
+  const paragraph = '.bk-article p';
+  await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' here', after: true });
+  assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here');
   await context.close();
 });
 

@@ -11,7 +11,7 @@ import { unified } from 'unified';
 import { resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, parseSize, sizeProblem } from '../config/rules.js';
 import { indexPages } from '../build/links.js';
-import { addressHref, encodePath, pageRoot, parseAddress } from '../build/urls.js';
+import { INVALID_PERCENT_ENCODING, addressHref, encodePath, pageRoot, parseAddress, percentDecode } from '../build/urls.js';
 import { errorAt } from '../report.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { renderChildrenHtml, renderHast, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
@@ -22,6 +22,7 @@ import { bakeBlocks } from './block-syntax.js';
 import { citationsAndMissingFootnotes } from './bracket-syntax.js';
 import { equationReferences } from './eqref-syntax.js';
 import { highlight } from './highlight-syntax.js';
+import { readRawHtml } from './raw-html.js';
 import { protectPipesInMath, restorePipesInMath } from './table-math.js';
 
 const processor = unified()
@@ -37,30 +38,41 @@ const processor = unified()
   .use(bakeBlocks)
   .freeze();
 
+const TITLE = { text: 'text in quotes, for example title="Notes"' };
+const WIDTH = { choices: WIDTHS };
 const BUILT_IN_BLOCKS = {
-  aside: ['title'],
-  fold: ['title'],
-  recap: [],
-  references: [],
-  example: [],
-  'list-table': [],
-  embed: [],
+  aside: { title: TITLE },
+  fold: { title: TITLE },
+  recap: {},
+  references: {},
+  example: {},
+  'list-table': {},
+  embed: {},
 };
 export const BUILT_IN_BLOCK_NAMES = Object.freeze(Object.keys(BUILT_IN_BLOCKS));
-const HEADING_ATTRIBUTES = ['id', 'toc', 'width'];
+const WIDTH_BLOCK_ATTRIBUTES = { width: WIDTH };
+const HEADING_ATTRIBUTES = {
+  id: { text: 'an anchor name, for example {#intro}' },
+  toc: { text: 'a short title in quotes, for example toc="Short title"' },
+  width: WIDTH,
+};
+const IMAGE_FLOATS = ['left', 'right'];
+const IMAGE_ATTRIBUTES = {
+  width: { size: 'image width' },
+  height: { size: 'image height' },
+  float: { choices: IMAGE_FLOATS },
+};
 const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
 const HEADING_ATTRIBUTE_SUFFIX = /\s*(\{[^{}]*\})\s*$/;
 const STRAY_CLOSING_LINE = /^([\s>]*):{3,}\s*$/;
 const PARAGRAPH_ANCHOR_SUFFIX = /(?<![\p{L}\p{N}_])\^([A-Za-z0-9][\w-]*)\s*$/u;
-const IMAGE_ATTRIBUTES = /^\{[^{}\n]*\}/;
-const IMAGE_FLOATS = ['left', 'right'];
+const IMAGE_ATTRIBUTE_TEXT = /^\{[^{}\n]*\}/;
 const MATH_MIN_WIDTH = /min-width: ([\d.]+ex)/;
 const MATH_WIDTH = /<svg [^>]*?width="([\d.]+ex)"/;
 const WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/u;
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const HAN_CHARACTER = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
 const WORD = /[\p{L}\p{N}]+/gu;
-const HTML_ID = /\sid=["']([^"']+)["']/g;
 const PREVIEW_BLOCKS = 3;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
@@ -137,6 +149,7 @@ class ArticleParser {
     this.readCitations(tree);
     this.readListTables(tree);
     this.readExamples(tree);
+    this.readRawHtml(tree);
     await this.renderMath(tree);
     this.checkGeneratedIds();
     this.assignHeadingIds(tree);
@@ -193,8 +206,8 @@ class ArticleParser {
 
   pageIds() {
     const ids = new Set([...this.targets.keys(), ...this.generatedIds().keys()]);
-    walk(this.tree, (node) => {
-      if (node.type === 'html') for (const [, id] of node.value.matchAll(HTML_ID)) ids.add(id);
+    this.walkWithSidenotes(this.tree, (node) => {
+      if (node.type === 'html') for (const id of node.rawHtml.ids) ids.add(id);
     });
     return ids;
   }
@@ -219,17 +232,17 @@ class ArticleParser {
   checkLink(node, site, ids) {
     if (node.url.startsWith('#')) {
       if (node.url === '#') return;
-      let id;
-      try {
-        id = decodeURIComponent(node.url.slice(1));
-      } catch {
-        id = node.url.slice(1);
-      }
-      if (!ids.has(id)) this.report(node.position.start, `link target #${id} does not exist`);
+      const id = percentDecode(node.url.slice(1));
+      if (id === null) this.report(node.position.start, `link target ${node.url} ${INVALID_PERCENT_ENCODING}`);
+      else if (!ids.has(id)) this.report(node.position.start, `link target #${id} does not exist`);
       return;
     }
     const address = parseAddress(node.url);
     if (address === null) return;
+    if (address.problem !== undefined) {
+      this.report(node.position.start, `link target ${address.written} ${address.problem}`);
+      return;
+    }
     const found = site.find(address, this);
     if (found.problem !== undefined) this.report(node.position.start, `link target ${address.written} ${found.problem}`);
     else node.target = { address, page: found.page };
@@ -245,6 +258,10 @@ class ArticleParser {
       const address = parseAddress(text);
       if (address === null) {
         this.report(position, `:::embed line "${text}" is not a site address ${EMBED_EXAMPLE}`);
+        continue;
+      }
+      if (address.problem !== undefined) {
+        this.report(position, `:::embed address ${address.written} ${address.problem}`);
         continue;
       }
       if (address.path === this.url) {
@@ -414,9 +431,9 @@ class ArticleParser {
     const label = node.name === '' ? ':::{width=…}' : `:::${node.name}`;
     if (!node.closed) this.report(start, `${label} is not closed; end it with a line of ${node.colons} or more colons`);
     if (node.name === '') {
-      this.checkKnownAttributes(node.attributes, ['width'], label, start);
-      if (node.attributes.width === undefined) this.report(start, 'a block without a name must set width, for example :::{width=wide}');
-      else this.checkWidth(node.attributes.width, start);
+      const written = node.attributes;
+      node.attributes = this.checkAttributes(written, WIDTH_BLOCK_ATTRIBUTES, label, start);
+      if (written.width === undefined) this.report(start, 'a block without a name must set width, for example :::{width=wide}');
       if (node.children.length !== 1) this.report(start, ':::{width=…} must contain exactly one block');
       const [child] = node.children;
       const childName = child?.type === 'bakeBlock' ? BLOCK_LINE.exec(child.info)?.[1] : undefined;
@@ -424,8 +441,9 @@ class ArticleParser {
         this.report(start, `write the width of a component in its own braces, such as :::${childName}{width=wide}, instead of :::{width=…} around it`);
       }
     } else if (Object.hasOwn(BUILT_IN_BLOCKS, node.name)) {
-      this.checkKnownAttributes(node.attributes, BUILT_IN_BLOCKS[node.name], label, start);
-      if (node.name === 'fold' && typeof node.attributes.title !== 'string') this.report(start, ':::fold is missing "title"');
+      const written = node.attributes;
+      node.attributes = this.checkAttributes(written, BUILT_IN_BLOCKS[node.name], label, start);
+      if (node.name === 'fold' && written.title === undefined) this.report(start, ':::fold is missing "title"');
     } else if (!node.name.includes('-')) {
       this.report(start, `unknown block ":::${node.name}"`);
     } else {
@@ -456,16 +474,12 @@ class ArticleParser {
       const position = this.positionAt(last.position.start.offset + raw.lastIndexOf('{'));
       last.value = last.value.slice(0, match.index);
       if (last.value === '') node.children.pop();
-      const { attributes, error } = parseAttributes(match[1]);
+      const parsed = parseAttributes(match[1]);
+      if (parsed.error) this.report(position, parsed.error);
+      const attributes = this.checkAttributes(parsed.attributes, HEADING_ATTRIBUTES, 'heading', position);
       node.attributes = attributes;
-      if (error) this.report(position, error);
-      this.checkKnownAttributes(attributes, HEADING_ATTRIBUTES, 'heading', position);
-      if (attributes.toc !== undefined && typeof attributes.toc !== 'string') this.report(position, 'toc must be a short title in quotes, for example toc="Short title"');
-      if (attributes.width !== undefined) {
-        if (node.depth !== 2) this.report(position, 'width only applies to ## headings');
-        else this.checkWidth(attributes.width, position);
-      }
-      if (attributes.id !== undefined) this.addAnchor(String(attributes.id), position);
+      if (attributes.width !== undefined && node.depth !== 2) this.report(position, 'width only applies to ## headings');
+      if (attributes.id !== undefined) this.addAnchor(attributes.id, position);
     }
   }
 
@@ -492,15 +506,16 @@ class ArticleParser {
     this.addAnchor(match[1], position);
   }
 
-  checkKnownAttributes(attributes, known, label, position) {
-    for (const name of Object.keys(attributes)) {
-      if (!known.includes(name)) this.report(position, `unknown attribute "${name}" on ${label}`);
+  checkAttributes(attributes, rules, label, position) {
+    const names = Object.keys(attributes);
+    for (const name of names.filter((name) => !Object.hasOwn(rules, name))) this.report(position, `unknown attribute "${name}" on ${label}`);
+    const valid = {};
+    for (const name of names.filter((name) => Object.hasOwn(rules, name))) {
+      const problem = attributeProblem(name, rules[name], attributes[name]);
+      if (problem) this.report(position, problem);
+      else valid[name] = attributes[name];
     }
-  }
-
-  checkWidth(value, position) {
-    const problem = choiceProblem('width', WIDTHS, value);
-    if (problem) this.report(position, problem);
+    return valid;
   }
 
   addAnchor(id, position) {
@@ -539,6 +554,12 @@ class ArticleParser {
         if (cells.length !== rows[0].length) this.report(list.children[index].position.start, `list-table row ${index + 1} has ${cells.length} ${cells.length === 1 ? 'cell' : 'cells'}, the header row has ${rows[0].length}`);
       });
       node.rows = rows;
+    });
+  }
+
+  readRawHtml(tree) {
+    this.walkWithSidenotes(tree, (node) => {
+      if (node.type === 'html') node.rawHtml = readRawHtml(node.value);
     });
   }
 
@@ -647,7 +668,7 @@ class ArticleParser {
         this.report(position, `images ${owners.get(published.path)} and ${source} are both published as ${published.path}`);
       }
       owners.set(published.path, source);
-      if (published.convert !== null) this.images.set(source, { source, path: published.path, ...published.convert, keepSource: linked(source) });
+      if (published.convert !== null) this.images.set(source, { source, path: published.path, ...published.convert, keepSource: linked.has(source) });
       for (const node of uses) {
         node.published = imageProperties(node.attributes, published);
         publishedPaths.set(node, published.path);
@@ -657,24 +678,20 @@ class ArticleParser {
   }
 
   linkedFiles(tree) {
-    const links = new Set();
-    const texts = [];
+    const addresses = [];
     this.walkWithSidenotes(tree, (node) => {
-      if (node.type === 'link') links.add(this.imageSource(node.url));
-      if (node.type === 'html') texts.push(node.value);
-      if (node.type === 'bakeBlock') texts.push(...[...Object.values(node.attributes), ...Object.values(node.component?.params ?? {})].filter((value) => typeof value === 'string'));
+      if (node.type === 'link') addresses.push(node.url);
+      if (node.type === 'html') addresses.push(...node.rawHtml.addresses);
+      if (node.component !== undefined) addresses.push(...Object.values(node.component.params).filter((value) => typeof value === 'string'));
     });
-    return (source) => links.has(source) || texts.some((text) => text.includes(source));
+    return new Set(addresses.map((address) => this.imageSource(address)));
   }
 
   imageSource(url) {
     if (this.folder === null || URL_SCHEME.test(url) || url.startsWith('/')) return null;
-    let path;
-    try {
-      path = posix.normalize(decodeURIComponent(url.split(/[?#]/)[0]));
-    } catch {
-      return null;
-    }
+    const decoded = percentDecode(url.split(/[?#]/)[0]);
+    if (decoded === null) return null;
+    const path = posix.normalize(decoded);
     return this.folder.files.includes(path) ? path : null;
   }
 
@@ -691,7 +708,7 @@ class ArticleParser {
     const slugger = new GithubSlugger();
     walk(tree, (node) => {
       if (node.type !== 'heading') return;
-      let id = node.attributes.id === undefined ? undefined : String(node.attributes.id);
+      let id = node.attributes.id;
       while (id === undefined || (node.attributes.id === undefined && taken(id))) id = slugger.slug(toString(node));
       node.id = id;
       node.data = { hProperties: { id } };
@@ -719,7 +736,7 @@ class ArticleParser {
       if (node.type !== 'image') return;
       node.attributes = {};
       const next = parent.children[parent.children.indexOf(node) + 1];
-      const match = next?.type === 'text' ? IMAGE_ATTRIBUTES.exec(next.value) : null;
+      const match = next?.type === 'text' ? IMAGE_ATTRIBUTE_TEXT.exec(next.value) : null;
       if (!match) return;
       const position = next.position.start;
       next.value = next.value.slice(match[0].length);
@@ -727,26 +744,13 @@ class ArticleParser {
       if (next.value === '') parent.children.splice(parent.children.indexOf(next), 1);
       const { attributes, error } = parseAttributes(match[0]);
       if (error) this.report(position, error);
-      node.attributes = attributes;
+      node.attributes = this.checkAttributes(attributes, IMAGE_ATTRIBUTES, 'image', position);
       node.attributesPosition = position;
-      this.checkImageAttributes(attributes, position);
+      const width = parseSize(node.attributes.width);
+      const height = parseSize(node.attributes.height);
+      if (width !== null && height !== null && width.unit !== height.unit) this.report(position, 'image width and height must use the same unit');
     });
     for (const { paragraph, parent } of paragraphs) this.splitFigure(paragraph, parent);
-  }
-
-  checkImageAttributes(attributes, position) {
-    this.checkKnownAttributes(attributes, ['width', 'height', 'float'], 'image', position);
-    for (const name of ['width', 'height']) {
-      const problem = attributes[name] === undefined ? null : sizeProblem(`image ${name}`, attributes[name], 'image');
-      if (problem) this.report(position, problem);
-    }
-    const width = parseSize(attributes.width);
-    const height = parseSize(attributes.height);
-    if (width !== null && height !== null && width.unit !== height.unit) this.report(position, 'image width and height must use the same unit');
-    if (attributes.float !== undefined) {
-      const problem = choiceProblem('float', IMAGE_FLOATS, attributes.float);
-      if (problem) this.report(position, problem);
-    }
   }
 
   splitFigure(paragraph, parent) {
@@ -930,7 +934,7 @@ class ArticleParser {
 
   headingFields(node) {
     const text = toString(node);
-    return { id: node.id, title: renderInlineHtml(node.children, this.context), text, toc: typeof node.attributes.toc === 'string' ? node.attributes.toc : text };
+    return { id: node.id, title: renderInlineHtml(node.children, this.context), text, toc: node.attributes.toc ?? text };
   }
 
   attachRecap(node, target) {
@@ -969,6 +973,12 @@ class ArticleParser {
     const lineStart = before.lastIndexOf('\n') + 1;
     return { line: before.split('\n').length, column: offset - lineStart + 1, offset };
   }
+}
+
+function attributeProblem(name, rule, value) {
+  if (rule.choices !== undefined) return choiceProblem(name, rule.choices, value);
+  if (rule.size !== undefined) return sizeProblem(rule.size, value, 'image');
+  return typeof value === 'string' ? null : `${name} must be ${rule.text}`;
 }
 
 function blockType(node) {

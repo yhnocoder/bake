@@ -190,6 +190,7 @@ describe('headings and anchors', () => {
     ['## A {width=full}', 'index.md:7:6 width must be body, wide or page, got "full"'],
     ['### A {width=wide}', 'index.md:7:7 width only applies to ## headings'],
     ['## A {toc}', 'index.md:7:6 toc must be a short title in quotes, for example toc="Short title"'],
+    ['## A {id}', 'index.md:7:6 id must be an anchor name, for example {#intro}'],
     ['## A {.red}', 'index.md:7:6 unknown attribute "class" on heading'],
     ['## A {toc="a" toc="b"}', 'index.md:7:6 attribute "toc" is written twice'],
     ['## A {toc="unclosed}', 'index.md:7:6 cannot read the attributes {toc="unclosed}; write them as {#id key=value key="text with spaces"}'],
@@ -279,6 +280,8 @@ describe('aside and fold', () => {
     [':::fold\nText.\n:::', 'index.md:9:1 :::fold is missing "title"'],
     [':::aside{color=red}\nText.\n:::', 'index.md:9:1 unknown attribute "color" on :::aside'],
     [':::recap{x=1}\nText.\n:::', 'index.md:9:1 unknown attribute "x" on :::recap'],
+    [':::aside{title}\nText.\n:::', 'index.md:9:1 title must be text in quotes, for example title="Notes"'],
+    [':::fold{title}\nText.\n:::', 'index.md:9:1 title must be text in quotes, for example title="Notes"'],
   ];
   for (const [source, message] of blockErrors) {
     test(`reports ${message.slice(message.indexOf(' ') + 1)}`, async () => {
