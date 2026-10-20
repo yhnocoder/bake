@@ -11,11 +11,14 @@ function bake(...args) {
 }
 
 describe('bake cli', () => {
-  test('--help lists init, new, dev and build and exits 0', () => {
+  test('--help lists the commands and the options of dev, says why bake dev is opened at localhost and exits 0', () => {
     const result = bake('--help');
     assert.equal(result.status, 0);
     assert.match(result.stdout, /^Usage: bake <command>/);
     for (const command of ['init \\[folder\\]', 'new <path>', 'dev', 'build']) assert.match(result.stdout, new RegExp(`^  ${command} `, 'm'));
+    assert.match(result.stdout, /^  --no-open {10}Do not open the browser when bake dev starts$/m);
+    assert.match(result.stdout, /^  --host <address> {3}Address that bake dev listens on, 127\.0\.0\.1 by default/m);
+    assert.match(result.stdout, /^Open bake dev at localhost rather than 127\.0\.0\.1: the AI chat stores its key with a passkey,\nand browsers do not create passkeys for an IP address\.$/m);
   });
 
   test('dev outside a blog root reports the missing bake.config.js and exits 1', (t) => {
@@ -33,17 +36,7 @@ describe('bake cli', () => {
     }
   });
 
-  test('--help names the --no-open option of dev and says why bake dev is opened at localhost', () => {
-    const { stdout } = bake('--help');
-    assert.match(stdout, /^  --no-open {10}Do not open the browser when bake dev starts$/m);
-    assert.match(stdout, /^Open bake dev at localhost rather than 127\.0\.0\.1: the AI chat stores its key with a passkey,\nand browsers do not create passkeys for an IP address\.$/m);
-  });
-
-  test('--help names the --host option of dev', () => {
-    assert.match(bake('--help').stdout, /^  --host <address> {3}Address that bake dev listens on, 127\.0\.0\.1 by default/m);
-  });
-
-  test('dev accepts --host and --port in either order and prints the network addresses only for a wildcard host', { timeout: 30000 }, async (t) => {
+  test('dev accepts --host and --port in either order, prints the address it serves and the network addresses only for a wildcard host, and stops on an interrupt', { timeout: 30000 }, async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const serve = async (args) => {
       const child = spawn(process.execPath, [cli, 'dev', ...args], { cwd: dir });
@@ -62,20 +55,6 @@ describe('bake cli', () => {
     assert.doesNotMatch(local, /On the local network/);
     const wildcard = await serve(['--port', '0', '--host', '0.0.0.0']);
     assert.match(wildcard, /^Serving the blog at http:\/\/localhost:(\d+)\/\n(On the local network: http:\/\/[\d.]+:\1\/\n)*/);
-  });
-
-  test('dev prints the address it serves and stops on an interrupt', { timeout: 30000 }, async (t) => {
-    const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const child = spawn(process.execPath, [cli, 'dev', '--port', '0'], { cwd: dir });
-    t.after(() => child.kill());
-    let output = '';
-    child.stdout.on('data', (chunk) => {
-      output += chunk;
-      if (/Serving the blog at http:\/\/localhost:\d+\/\n/.test(output)) child.kill('SIGINT');
-    });
-    const [code] = await once(child, 'exit');
-    assert.match(output, /^Serving the blog at http:\/\/localhost:\d+\/\n/);
-    assert.equal(code, 0);
   });
 
   async function removeWhileServing(t, remove) {
