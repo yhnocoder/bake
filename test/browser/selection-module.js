@@ -5,8 +5,9 @@ export function isSelectionChunk(url) {
 }
 
 export async function openWithSelectionModule(page, url) {
-  const loaded = page.waitForResponse((response) => isSelectionChunk(response.url()));
   await page.goto(url);
+  const loaded = page.waitForResponse((response) => isSelectionChunk(response.url()));
+  await page.keyboard.press('Control');
   await selectionModuleReady(page, (await loaded).url());
 }
 

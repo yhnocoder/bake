@@ -324,7 +324,7 @@ test('a partly selected paragraph escapes the text that Markdown would read as s
   await context.close();
 });
 
-test('the module that writes a selection as Markdown loads after the page, and a copy before it arrives is the browser copy', async (t) => {
+test('the module that writes a selection as Markdown loads when the reader selects, opens a context menu or holds a shortcut key, and a copy before it arrives still writes Markdown', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': validConfig,
     'content/posts/rope/index.md': article({ body: 'Some **bold** text and ==marked== words.\n' }),
@@ -344,37 +344,45 @@ test('the module that writes a selection as Markdown loads after the page, and a
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
     await page.mouse.up();
   };
-  const withoutIdleCallbacks = () => {
-    window.idleCallbacks = [];
-    window.requestIdleCallback = (callback) => window.idleCallbacks.push(callback);
+  const copiedLater = async (page) => {
+    await page.evaluate(() => navigator.clipboard.writeText(''));
+    await page.keyboard.press('Control+C');
+    return page.evaluate(async () => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const value = await navigator.clipboard.readText();
+        if (value !== '') return value;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return '';
+    });
+  };
+  const opened = async (url) => {
+    const page = await context.newPage();
+    const requested = [];
+    page.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
+    return { page, requested };
   };
 
-  await t.test('a copy before the module arrives is the browser copy without a toast, and a copy after it is Markdown', async () => {
+  await t.test('a copy before the module arrives writes the Markdown once it arrives and shows the toast', async () => {
     const page = await context.newPage();
-    let release;
-    const held = new Promise((resolve) => (release = resolve));
-    t.after(release);
     await page.route(
       (url) => isSelectionChunk(url.href),
       async (route) => {
-        await held;
+        await new Promise((resolve) => setTimeout(resolve, 800));
         await route.continue();
       },
     );
-    const requested = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
     await page.goto(`${base}/2026-10/rope/`);
-    const request = await requested;
+    await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
     await selectWords(page);
-    assert.equal((await copied(page)).text, 'bold text and marked');
-    assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
-    release();
-    await selectionModuleReady(page, request.url());
-    await selectWords(page);
-    assert.equal((await copied(page)).text, '**bold** text and ==marked==');
+    assert.equal(await copiedLater(page), '**bold** text and ==marked==');
+    await page.locator('.bk-toast.is-on').waitFor({ state: 'attached', timeout: 5000 });
     await page.close();
   });
 
-  await t.test('when the module cannot be loaded, a copy is the browser copy without a toast, the masthead button still copies the source and the page reports no error', async () => {
+  await t.test('when the module cannot be loaded, a copy is the plain text without a toast, the masthead button still copies the source and the page reports no error', async () => {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -388,13 +396,15 @@ test('the module that writes a selection as Markdown loads after the page, and a
     );
     await page.goto(`${base}/2026-10/rope/`);
     await page.waitForFunction(() => document.documentElement.dataset.script === 'on');
+    await selectWords(page);
+    assert.equal(await copiedLater(page), 'bold text and marked');
     await page.waitForTimeout(1500);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await dragAcross(page);
       await selectWords(page);
       assert.equal((await copied(page)).text, 'bold text and marked');
-      assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
     }
+    assert.equal(await page.locator('.bk-toast.is-on').count(), 0);
     assert.equal(requested.length, 1);
     await page.evaluate(() => getSelection().removeAllRanges());
     await page.locator('.bk-copy-source').click();
@@ -403,34 +413,23 @@ test('the module that writes a selection as Markdown loads after the page, and a
     await page.close();
   });
 
-  await t.test('the first selectstart in the article loads the module before the browser is idle', async () => {
-    const page = await context.newPage();
-    await page.addInitScript(withoutIdleCallbacks);
-    const requested = [];
-    page.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
-    await page.goto(`${base}/2026-10/rope/`);
-    await page.waitForFunction(() => window.idleCallbacks.length === 1);
-    assert.deepEqual(requested, []);
-    const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
-    await dragAcross(page);
-    await selectionModuleReady(page, (await loading).url());
-    await selectWords(page);
-    assert.equal((await copied(page)).text, '**bold** text and ==marked==');
-    await page.close();
-  });
-
-  await t.test('without a selection the module loads when the browser is idle after the page has loaded', async () => {
-    const page = await context.newPage();
-    await page.addInitScript(withoutIdleCallbacks);
-    const requested = [];
-    page.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
-    await page.goto(`${base}/2026-10/rope/`);
-    await page.waitForFunction(() => window.idleCallbacks.length === 1);
-    assert.deepEqual(requested, []);
-    const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
-    await page.evaluate(() => window.idleCallbacks[0]());
-    await selectionModuleReady(page, (await loading).url());
-    await page.close();
+  await t.test('a page where nobody selects requests no module, and a selection, a context menu or a shortcut key loads it', async () => {
+    const triggers = {
+      selection: dragAcross,
+      'context menu': (page) => page.locator(paragraph).click({ button: 'right' }),
+      'shortcut key': (page) => page.keyboard.press('Control'),
+    };
+    for (const [name, trigger] of Object.entries(triggers)) {
+      const { page, requested } = await opened(`${base}/2026-10/rope/`);
+      await page.waitForTimeout(1500);
+      assert.deepEqual(requested, [], `the module loads before the ${name}`);
+      const loading = page.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
+      await trigger(page);
+      await selectionModuleReady(page, (await loading).url());
+      await selectWords(page);
+      assert.equal((await copied(page)).text, '**bold** text and ==marked==', name);
+      await page.close();
+    }
   });
 
   await context.close();
