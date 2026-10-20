@@ -39,7 +39,7 @@ export function shareImageOf(root, article, config, assets) {
     const from = join(root, article.dir, fields.cover);
     const { format, width, height } = article.cover;
     const published = PUBLISHED_COVERS[format];
-    const image = { path: `${name}-${digest([readFileSync(from)])}${(published ?? PNG).extension}`, owner: article.file, type: (published ?? PNG).type, width, height };
+    const image = { path: `${name}-${hashOf(readFileSync(from))}${(published ?? PNG).extension}`, owner: article.file, type: (published ?? PNG).type, width, height };
     return published === undefined ? { ...image, render: () => sharp(from).png().toBuffer() } : { ...image, from };
   }
   const category = config.categories.find((entry) => entry.id === fields.category);
@@ -193,4 +193,8 @@ function digest(inputs) {
     hash.update(data);
   }
   return hash.digest('hex').slice(0, HASH_LENGTH);
+}
+
+function hashOf(data) {
+  return createHash('sha256').update(data).digest('hex').slice(0, HASH_LENGTH);
 }

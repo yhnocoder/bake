@@ -1,11 +1,10 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
-import { addressHref, encodePath } from '../build/urls.js';
+import { addressHref, encodePath, percentDecode } from '../build/urls.js';
 import { highlightCode } from './code.js';
 import { equationHref, relocateMath } from './math.js';
 
 const ATTRIBUTION_PREFIX = '— ';
-const ID_ATTRIBUTE = /\sid\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const RELATIVE_URL = /^(?![A-Za-z][A-Za-z0-9+.-]*:|\/|\?)/;
 
 export function resultWidths(example) {
@@ -52,10 +51,11 @@ function handlers(context) {
       if (excerpt === undefined) return defaultHandlers.paragraph(state, node);
       return element('p', {}, state.all(node));
     },
-    html: (state, node) => raw(excerpt === undefined ? node.value : node.value.replace(ID_ATTRIBUTE, '')),
+    html: (state, node) => raw(excerpt === undefined ? node.value : node.rawHtml.withoutIds),
     link(state, node) {
       const result = defaultHandlers.link(state, node);
-      const target = node.target ?? (excerpt !== undefined && node.url.startsWith('#') ? excerpt.target(decodeAnchor(node.url.slice(1))) : undefined);
+      const anchor = excerpt !== undefined && node.url.startsWith('#') ? percentDecode(node.url.slice(1)) : null;
+      const target = node.target ?? (anchor === null ? undefined : excerpt.target(anchor));
       if (target !== undefined) {
         const { address, page } = target;
         result.properties = { className: ['internal-link'], ...result.properties, href: addressHref(context.root, address.path, address.anchor, address.query) };
@@ -233,12 +233,4 @@ function text(value) {
 
 function raw(value) {
   return { type: 'raw', value };
-}
-
-function decodeAnchor(anchor) {
-  try {
-    return decodeURIComponent(anchor);
-  } catch {
-    return anchor;
-  }
 }

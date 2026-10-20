@@ -1,10 +1,7 @@
 html:has(.bk-home) {
+  --home-bar-height: 72px;
   scroll-behavior: smooth;
   scroll-padding-top: var(--home-bar-height);
-}
-
-:root {
-  --home-bar-height: 72px;
 }
 
 .bk-home {
@@ -16,11 +13,11 @@ html:has(.bk-home) {
   padding: 0 var(--home-gutter) 120px;
 }
 
-.bk-home-header {
+.bk-home .bk-home-header {
   padding: 56px 0 24px;
 }
 
-.bk-home-title {
+.bk-home .bk-home-title {
   margin: 0 0 6px;
   font-family: var(--font-heading);
   font-weight: 700;
@@ -29,7 +26,7 @@ html:has(.bk-home) {
   letter-spacing: 0.01em;
 }
 
-.bk-home-description {
+.bk-home .bk-home-description {
   max-width: 60ch;
   margin: 0;
   font-size: 15px;
@@ -37,7 +34,7 @@ html:has(.bk-home) {
   color: var(--ink-2);
 }
 
-.bk-home-bar {
+.bk-home .bk-home-bar {
   position: sticky;
   top: 0;
   z-index: 20;
@@ -64,8 +61,8 @@ html:has(.bk-home) {
 :root:not([data-group='category']) .bk-home .bk-chips[data-for='category'],
 :root:not([data-group='month']) .bk-home .bk-chips[data-for='month'],
 :root:not([data-script]) .bk-home .bk-chips[data-for='month'],
-:root:not([data-script]) .bk-home-controls,
-:root:not([data-script])[data-group='month'] .bk-home-bar {
+:root:not([data-script]) .bk-home .bk-home-controls,
+:root:not([data-script])[data-group='month'] .bk-home .bk-home-bar {
   display: none;
 }
 
@@ -132,7 +129,7 @@ html:has(.bk-home) {
   color: var(--accent);
 }
 
-.bk-home-controls {
+.bk-home .bk-home-controls {
   display: flex;
   flex: none;
   align-items: center;
@@ -195,7 +192,7 @@ html:has(.bk-home) {
   color: var(--accent);
   box-shadow:
     0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent),
-    0 1px 2px rgba(0, 0, 0, 0.08);
+    var(--segment-shadow);
 }
 
 :root:not([data-group='category']) .bk-home .bk-grouping[data-grouping='category'],
@@ -203,7 +200,7 @@ html:has(.bk-home) {
   display: none;
 }
 
-.bk-home-empty {
+.bk-home .bk-home-empty {
   margin: 0;
   padding: 36px 0;
   border-top: 1px solid var(--line);
@@ -415,7 +412,7 @@ html:has(.bk-home) {
 }
 
 @media (max-width: 599.98px) {
-  :root {
+  html:has(.bk-home) {
     --home-bar-height: 64px;
   }
 
@@ -423,15 +420,15 @@ html:has(.bk-home) {
     --home-gutter: 16px;
   }
 
-  .bk-home-header {
+  .bk-home .bk-home-header {
     padding-top: 40px;
   }
 
-  .bk-home-title {
+  .bk-home .bk-home-title {
     font-size: 32px;
   }
 
-  .bk-home-bar {
+  .bk-home .bk-home-bar {
     flex-wrap: wrap;
     gap: 8px 12px;
     padding: 10px 0;
@@ -462,7 +459,7 @@ html:has(.bk-home) {
 }
 
 @media print {
-  .bk-home-bar {
+  .bk-home .bk-home-bar {
     display: none;
   }
 

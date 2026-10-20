@@ -1,5 +1,5 @@
-export const sectionStart = '<!-- screenshots:start -->';
-export const sectionEnd = '<!-- screenshots:end -->';
+const sectionStart = '<!-- screenshots:start -->';
+const sectionEnd = '<!-- screenshots:end -->';
 
 const markedSection = /<!-- screenshots:start -->[\s\S]*<!-- screenshots:end -->/;
 

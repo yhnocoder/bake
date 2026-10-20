@@ -216,6 +216,39 @@ test('copying from an article gives the Markdown source of the selection', async
     await page.emulateMedia({ colorScheme: 'light' });
   });
 
+  await t.test('starting the copy module on a page without the source script is an error', async () => {
+    const stripped = await context.newPage();
+    const errors = [];
+    stripped.on('pageerror', (error) => errors.push(error.message));
+    await stripped.route(`${base}/2026-10/syntax/`, async (route) => {
+      const response = await route.fetch();
+      const html = await response.text();
+      const withoutSource = html.replace(/<script type="application\/json" class="bk-source"[^>]*>[\s\S]*?<\/script>/, '');
+      assert.notEqual(withoutSource, html);
+      await route.fulfill({ response, body: withoutSource });
+    });
+    await stripped.goto(`${base}/2026-10/syntax/`, { waitUntil: 'load' });
+    assert.deepEqual(errors, ['bake/copy needs the source of the article in script.bk-source']);
+    await stripped.close();
+  });
+
+  await context.close();
+});
+
+test('a converted citation keeps its key as written, also when the key contains a percent sign', async (t) => {
+  const body = 'Gates help [@a%zz] and [@b%20c] here.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n';
+  const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }) });
+  const result = bake(dir, 'build');
+  assert.equal(result.stderr, '');
+  const base = await serve(t, join(dir, 'dist'));
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  await page.goto(`${base}/2026-10/rope/`);
+  const paragraph = '.bk-article p';
+  await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' here', after: true });
+  assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here');
   await context.close();
 });
 

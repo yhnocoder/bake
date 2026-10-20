@@ -5,7 +5,7 @@ import { SETTINGS, storageKey } from '../settings.js';
 import { layoutChanged } from './motion.js';
 
 export const SETTING_EVENT = 'bk:setting';
-export const THEME_EVENT = 'bake:theme';
+const THEME_EVENT = 'bake:theme';
 
 export const settingRows = [
   { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], list: true, changesLayout: true },
@@ -16,7 +16,7 @@ export const settingRows = [
 
 const values = Object.fromEntries(Object.keys(SETTINGS).map((name) => [name, createSignal(document.documentElement.dataset[name])]));
 
-export function settingValue(name) {
+function settingValue(name) {
   return values[name][0]();
 }
 
