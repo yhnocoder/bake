@@ -4,7 +4,7 @@
 
 | Command | What it runs |
 |---|---|
-| `make check` | Comment check, shellcheck on shell scripts (when installed), unit tests |
+| `make check` | `scripts/lint.sh` (comment check, shellcheck on shell scripts when installed), then the unit tests |
 | `npm test` | Unit tests only (`node --test` on the files in `test/` that end in `.test.js`) |
 | `npm run test:browser` | Browser tests (`node --test` on the files in `test/browser/` that end in `.test.js`), each test with a time limit of 120 seconds, so a test that never ends fails with its name |
 | `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests; use it on macOS |
@@ -23,7 +23,17 @@
 
 During development, run the unit tests plus the tests the change affects. CI runs the full PR tier; watch it and fix it when it turns red. Run the full suite locally only for large or risky changes, or for what CI cannot cover, such as performance measurements or screenshot comparisons at a milestone. Small gaps between tiers are acceptable; a large regression, and whatever is being fixed right now, must be tested in every tier.
 
-Today CI installs Playwright's Chromium, runs `make check` and then `npm run test:browser`. The unit tests need Chromium too, because `bake build` draws share images with it. On pull requests it also runs the two screenshots jobs described below. Nightly jobs are added by the tasks that need them. Performance jobs run alone, never in parallel with other heavy jobs.
+`.github/workflows/test.yml` runs on every pull request, on every push to `main` and when started by hand. A push to another branch runs nothing until the branch has a pull request. A new push cancels the run of the same pull request or branch that is still going. The jobs run in parallel, each on its own runner with a time limit of 5 minutes:
+
+| Job | What it runs |
+|---|---|
+| `lint` | `scripts/lint.sh`: the comment check and shellcheck |
+| `unit` | The unit tests in two shards, `node --test --test-shard=1/2` and `2/2` |
+| `browser` | The browser tests in three shards, `--test-shard=1/3` to `3/3` |
+| `test` | Passes when `lint`, every `unit` shard and every `browser` shard passed; this is the check to read for the result of a run |
+| `screenshots`, `publish-screenshots` | The screenshots in the pull request description, described below; pull requests only |
+
+`node --test --test-shard=i/n` sorts the test files and gives shard `i` every `n`-th file, so a test file always runs whole on one runner and the slowest test file sets the shortest time its shard can take. The unit tests need Chromium too, because `bake build` draws share images with it. Every job except `lint` and `publish-screenshots` uses the composite action `.github/actions/setup`, which installs Node 24 with the npm cache, runs `npm ci` and installs Playwright's Chromium headless shell with its system libraries, keeping the browser in the Actions cache under the Playwright version. When a shard comes close to 5 minutes, add a shard in the matrix of its job and in the command. Nightly jobs are added by the tasks that need them. Performance jobs run alone, never in parallel with other heavy jobs.
 
 ## Rules for tests
 
