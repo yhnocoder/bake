@@ -440,8 +440,7 @@ html[data-script] .bk-toc-chapters {
   transition:
     width 0.2s var(--ease-out),
     background-color 0.2s,
-    color 0.2s,
-    box-shadow 0.2s;
+    color 0.2s;
 }
 
 .bk-toc-ui .bk-tab.is-read {
@@ -1075,7 +1074,6 @@ html[data-script] .bk-toc-chapters {
   height: 8px;
   border-radius: 4px;
   background: var(--line-2);
-  transition: box-shadow 0.15s;
 }
 
 .bk-drawer-dot.is-read i {
