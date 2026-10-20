@@ -66,7 +66,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.equal(result.status, 0);
-  const origin = await serve(t, join(dir, 'dist'), { localhost: true });
+  const origin = await serve(t, join(dir, 'dist'));
 
   const english = mkdtempSync(join(tmpdir(), 'bake-bento-english-'));
   t.after(() => rmSync(english, { recursive: true, force: true }));
@@ -76,7 +76,7 @@ test('the bento theme lays out sections as cards', async (t) => {
   });
   const englishBuild = bake(english, 'build');
   assert.equal(englishBuild.stderr, '');
-  const englishOrigin = await serve(t, join(english, 'dist'), { localhost: true });
+  const englishOrigin = await serve(t, join(english, 'dist'));
 
   const browser = await launchBrowser();
   const open = async (path, options = {}) => {
@@ -135,7 +135,9 @@ test('the bento theme lays out sections as cards', async (t) => {
         const covers = (button) => boxes.some((box) => box.left < button.right && box.right > button.left);
         return { settingsGap: left - settings.right, chatGap: chat.left - right, covered: covers(settings) || covers(chat), gutters: [left, document.documentElement.clientWidth - right], bottoms: [settings.bottom, chat.bottom] };
       });
-    for (const url of [`${origin}/2026-10/bento-cards/`, `${englishOrigin}/2026-10/cards/`]) {
+    const chatOrigin = await serve(t, join(dir, 'dist'), { localhost: true });
+    const englishChatOrigin = await serve(t, join(english, 'dist'), { localhost: true });
+    for (const url of [`${chatOrigin}/2026-10/bento-cards/`, `${englishChatOrigin}/2026-10/cards/`]) {
       await page.goto(url);
       await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
       for (const width of [1440, 1340, 1339, 1100, 1000, 999, 375]) {
@@ -150,7 +152,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         if (Math.abs(chatGap - 12) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
       }
     }
-    await page.goto(`${englishOrigin}/`);
+    await page.goto(`${englishChatOrigin}/`);
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
     assert.equal(await page.locator('.bk-home').count(), 1);
     assert.deepEqual(problems, []);

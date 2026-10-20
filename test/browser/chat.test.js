@@ -1034,10 +1034,10 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
       const box = await launcher.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.locator('.bk-chat[data-open]').waitFor({ state: 'attached' });
-      await settle(page);
+      await settle(page.locator('.bk-chat'));
       await page.keyboard.press('Escape');
       await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      await settle(page);
+      await settle(page.locator('.bk-chat'));
     };
     const measure = async () => {
       await page.keyboard.press('Escape');
@@ -1046,7 +1046,7 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
       const longest = {};
       for (const width of [1440, 375]) {
         await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
-        await settle(page);
+        await settle(page.locator('.bk-chat'));
         await cycle();
         await cdp.send('HeapProfiler.collectGarbage');
         const cycles = [];
