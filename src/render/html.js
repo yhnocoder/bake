@@ -1,6 +1,6 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
-import { addressHref } from '../build/urls.js';
+import { addressHref, encodePath } from '../build/urls.js';
 import { highlightCode } from './code.js';
 import { equationHref, relocateMath } from './math.js';
 
@@ -182,8 +182,8 @@ function writtenAttributes(attributes) {
 }
 
 function componentParams({ params, fileParams }, excerpt) {
-  if (excerpt === undefined) return params;
-  return Object.fromEntries(Object.entries(params).map(([name, value]) => [name, fileParams.includes(name) && value !== '' ? `${excerpt.base}${value}` : value]));
+  const base = excerpt === undefined ? '' : excerpt.base;
+  return Object.fromEntries(Object.entries(params).map(([name, value]) => [name, fileParams.includes(name) && value !== '' ? `${base}${encodePath(value)}` : value]));
 }
 
 function embedElement(parts) {

@@ -17,7 +17,7 @@ import { indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, CHAT_PREAMBLE_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, absoluteLink, chatCatalogJson, feedXml, siteLink, sitePath, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
-import { articleUrl, checkDuplicateUrls, pageRoot } from './urls.js';
+import { articleUrl, checkDuplicateUrls, encodePath, pageRoot } from './urls.js';
 
 export const PUBLIC_DIR = 'public';
 
@@ -163,8 +163,8 @@ function homeEntry(article, config) {
     category: config.categories.find((category) => category.id === fields.category),
     draft: fields.draft === true,
     url: base,
-    preview: fields.preview === undefined ? undefined : `${base}${fields.preview}`,
-    image: content?.image === undefined ? undefined : `${base}${content.image}`,
+    preview: fields.preview === undefined ? undefined : `${base}${encodePath(fields.preview)}`,
+    image: content?.image === undefined ? undefined : `${base}${encodePath(content.image)}`,
   };
 }
 

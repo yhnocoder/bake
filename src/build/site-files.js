@@ -1,3 +1,5 @@
+import { encodePath } from './urls.js';
+
 export const FEED_PATH = 'feed.xml';
 export const SITEMAP_PATH = 'sitemap.xml';
 export const NOT_FOUND_PATH = '404.html';
@@ -14,7 +16,7 @@ export function sitePath(url) {
 }
 
 export function absoluteLink(config, path) {
-  return `${siteLink(config.url)}${encodeURI(path)}`;
+  return `${siteLink(config.url)}${encodePath(path)}`;
 }
 
 export function feedXml(config, entries) {

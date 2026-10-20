@@ -25,6 +25,10 @@ export function parseAddress(url) {
   return { path, anchor, query, canonical: ending === '/', text: `${path}${fragment}`, written: `${base}${ending}${query}${fragment}` };
 }
 
+export function encodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
 export function addressHref(root, path, anchor, query = '') {
   return `${root}${path.slice(1)}${query}${anchor === undefined ? '' : `#${encodeURIComponent(anchor)}`}`;
 }

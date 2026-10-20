@@ -240,6 +240,14 @@ describe('component blocks', () => {
     assert.deepEqual(article.components, ['act-fn-plot', 'glu-heatmap']);
   });
 
+  test('gives a component the URL-encoded path of a file parameter whose name holds #, ? or %', async () => {
+    const options = { components, folder: { path: '/blog/post', files: ['data#1.json', 'a?b.json', 'tables/100%.json'] } };
+    const article = await parsed(':::act-fn-plot{data=data#1.json}\n:::\n\n:::act-fn-plot{data="a?b.json"}\n:::\n\n:::act-fn-plot{data=tables/100%.json}\n:::\n', options);
+    const files = article.intro.map((block) => JSON.parse(/data-params="([^"]*)"/.exec(block.html)[1].replaceAll('&#x22;', '"')).data);
+    assert.deepEqual(files, ['data%231.json', 'a%3Fb.json', 'tables/100%25.json']);
+    assert.deepEqual(article.intro.map((block) => block.params.data), ['data#1.json', 'a?b.json', 'tables/100%.json']);
+  });
+
   test('marks an example whose result holds a component or a figure with a pixel width with those widths', async () => {
     const options = { components, folder: folder(join(import.meta.dirname, 'fixtures/syntax-errors')) };
     const article = await parsed(

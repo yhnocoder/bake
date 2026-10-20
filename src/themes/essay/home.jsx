@@ -154,10 +154,10 @@ function Card(props) {
   return (
     <a
       class="bk-card"
-      href={encodeURI(article.url)}
+      href={article.url}
       style={`--c:${article.category?.color ?? 'var(--accent)'}`}
       data-tags={JSON.stringify(article.tags)}
-      data-preview={article.preview === undefined ? undefined : encodeURI(article.preview)}
+      data-preview={article.preview}
     >
       <div class="bk-card-frame">
         <div class="bk-card-fallback">
@@ -166,7 +166,7 @@ function Card(props) {
               {article.title}
             </span>
           ) : (
-            <img src={encodeURI(article.image)} alt="" loading="lazy" decoding="async" />
+            <img src={article.image} alt="" loading="lazy" decoding="async" />
           )}
         </div>
         {article.draft ? <span class="bk-card-draft">{labels.draft}</span> : null}
