@@ -55,62 +55,67 @@
   grid-column: span min(var(--bt-span), var(--bt-cols));
 }
 
-.bt-grid[data-packed] {
-  display: block;
-  position: relative;
-}
+@media screen {
+  .bt-grid[data-packed] {
+    display: block;
+    position: relative;
+    height: var(--bt-height);
+  }
 
-.bt-grid[data-packed] > .bt-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
+  .bt-grid[data-packed] > .bt-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--bt-width);
+    transform: translate(var(--bt-x), var(--bt-y));
+  }
 
-.bt-grid[data-packed] > .bt-card[data-rows] {
-  height: calc(var(--bt-rows) * var(--bt-row-height) + (var(--bt-rows) - 1) * var(--bt-gap));
-  overflow: hidden;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
-  transition: outline-color var(--motion-fast) var(--ease);
-}
+  .bt-grid[data-packed] > .bt-card[data-rows] {
+    height: calc(var(--bt-rows) * var(--bt-row-height) + (var(--bt-rows) - 1) * var(--bt-gap));
+    overflow: hidden;
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color var(--motion-fast) var(--ease);
+  }
 
-.bt-grid[data-packed] > .bt-card[data-rows][data-active] {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  outline-color: var(--accent);
-}
+  .bt-grid[data-packed] > .bt-card[data-rows][data-active] {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    outline-color: var(--accent);
+  }
 
-.bt-grid[data-packed] > .bt-card[data-overflow]::after {
-  content: '';
-  position: sticky;
-  bottom: calc(-1 * var(--bt-padding-bottom));
-  display: block;
-  height: var(--bt-fade);
-  margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
-  background: linear-gradient(to bottom, transparent, var(--surface));
-  pointer-events: none;
-  transition: opacity var(--motion) var(--ease);
-}
+  .bt-grid[data-packed] > .bt-card[data-overflow]::after {
+    content: '';
+    position: sticky;
+    bottom: calc(-1 * var(--bt-padding-bottom));
+    display: block;
+    height: var(--bt-fade);
+    margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
+    background: linear-gradient(to bottom, transparent, var(--surface));
+    pointer-events: none;
+    transition: opacity var(--motion) var(--ease);
+  }
 
-.bt-grid[data-packed] > .bt-card[data-overflow][data-end]::after {
-  opacity: 0;
-}
+  .bt-grid[data-packed] > .bt-card[data-overflow][data-end]::after {
+    opacity: 0;
+  }
 
-.bt-grid[data-packed] > .bt-card[data-hint]::before {
-  content: attr(data-hint);
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  z-index: 1;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--surface-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--accent);
-  pointer-events: none;
+  .bt-grid[data-packed] > .bt-card[data-hint]::before {
+    content: attr(data-hint);
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--accent);
+    pointer-events: none;
+  }
 }
 
 .bt-card {
@@ -120,6 +125,16 @@
   border: 1px solid var(--line);
   border-radius: var(--bt-radius);
   --scroll-cover: var(--surface);
+  --block-margin: 18px 0 20px;
+  --formula-margin: 10px 0 14px;
+  --frame-padding: 0;
+  --frame-border: 0;
+  --frame-radius: 0;
+  --frame-background: none;
+  --frame-shadow: none;
+  --code-white-space: pre-wrap;
+  --code-overflow-wrap: anywhere;
+  --cell-white-space: normal;
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: calc(var(--bt-text-size) * var(--reader-scale));
@@ -187,14 +202,6 @@
     line-height: 1.5;
   }
 
-  .bt-card .bk-block[data-width] {
-    margin: 18px 0 20px;
-  }
-
-  .bt-card .bk-block[data-type='math'] {
-    margin: 10px 0 14px;
-  }
-
   .bt-card :is(pre.shiki, .table-scroll, mjx-container[display]) {
     background-position:
       left center,
@@ -208,28 +215,11 @@
       16px calc(100% - 2px);
   }
 
-  .bt-card :is(.figure, .component:not([data-frame='none'])) {
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-  }
-
-  .bt-card > .bk-block > pre.shiki {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
   .bt-card > .bk-block > pre.shiki .line {
     display: inline-block;
     width: 100%;
     padding-left: 4ch;
     text-indent: -4ch;
-  }
-
-  .bt-card :is(th, td) {
-    white-space: normal;
   }
 
   .bt-card > .bk-references {
@@ -343,29 +333,15 @@
     padding: 0;
   }
 
-  .bt-grid,
-  .bt-grid[data-packed] {
+  .bt-grid {
     display: block;
-    height: auto !important;
   }
 
-  .bt-card,
-  .bt-grid[data-packed] > .bt-card,
-  .bt-grid[data-packed] > .bt-card[data-rows] {
-    position: static;
-    width: auto !important;
-    height: auto;
+  .bt-card {
     margin-bottom: 16px;
-    overflow: visible;
+    padding: 0;
     border: 0;
     box-shadow: none;
-    padding: 0;
-    transform: none !important;
-  }
-
-  .bt-grid[data-packed] > .bt-card::after,
-  .bt-grid[data-packed] > .bt-card::before {
-    display: none;
   }
 }
 

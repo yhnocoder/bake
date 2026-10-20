@@ -22,11 +22,11 @@ export function placeCards(article) {
   const spanWidth = (span) => column * span + gap * (span - 1);
   const spans = new Map(cards.map((card) => [card, declaredSpan(card, columns)]));
   setAttribute(grid, 'data-packed', '');
-  for (const card of cards) setStyle(card, 'width', `${spanWidth(spans.get(card))}px`);
+  for (const card of cards) setStyle(card, '--bt-width', `${spanWidth(spans.get(card))}px`);
   const wideSpan = levelSpan('wide', columns);
   for (const card of wideCards(cards.filter((card) => card.dataset.span === 'auto' && spans.get(card) < wideSpan))) {
     spans.set(card, wideSpan);
-    setStyle(card, 'width', `${spanWidth(wideSpan)}px`);
+    setStyle(card, '--bt-width', `${spanWidth(wideSpan)}px`);
   }
   const boxes = cards.map((card) => ({ height: card.getBoundingClientRect().height, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, end: card.scrollTop + card.clientHeight >= card.scrollHeight - 1 }));
   const tops = Array(columns).fill(0);
@@ -47,24 +47,24 @@ export function placeCards(article) {
     for (let next = start; next < start + span; next += 1) tops[next] = top + height + gap;
     placedHeights.set(card, height);
     resizes.observe(card);
-    setStyle(card, 'transform', `translate(${start * (column + gap)}px, ${top}px)`);
+    setStyle(card, '--bt-x', `${start * (column + gap)}px`);
+    setStyle(card, '--bt-y', `${top}px`);
     const overflow = card.dataset.rows === undefined ? 0 : scrollHeight - clientHeight;
     setAttribute(card, 'data-overflow', overflow > 1 ? '' : null);
     setAttribute(card, 'data-end', overflow > 1 && end ? '' : null);
     setAttribute(card, 'tabindex', overflow > 1 ? '0' : null);
     setAttribute(card, 'data-hint', hint !== null && overflow > 1 ? hint(Math.ceil(overflow), Math.ceil((scrollHeight + borders + gap) / (rowHeight + gap))) : null);
   });
-  setStyle(grid, 'height', `${Math.max(0, ...tops) - gap}px`);
+  setStyle(grid, '--bt-height', `${Math.max(0, ...tops) - gap}px`);
 }
 
 function unpack(grid, cards) {
   setAttribute(grid, 'data-packed', null);
-  setStyle(grid, 'height', '');
+  setStyle(grid, '--bt-height', '');
   for (const card of cards) {
     resizes.unobserve(card);
     placedHeights.delete(card);
-    setStyle(card, 'width', '');
-    setStyle(card, 'transform', '');
+    for (const name of ['--bt-width', '--bt-x', '--bt-y']) setStyle(card, name, '');
     for (const name of ['data-overflow', 'data-end', 'data-hint', 'data-active', 'tabindex']) setAttribute(card, name, null);
   }
 }

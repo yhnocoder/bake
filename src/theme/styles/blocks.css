@@ -2,21 +2,21 @@
   .bk-block[data-width] {
     position: relative;
     clear: both;
-    width: var(--body-width);
-    margin: 22px 0 26px;
+    width: var(--body-width, 100%);
+    margin: var(--block-margin, 22px 0 26px);
   }
 
   .bk-block:is([data-width='wide'], [data-resolved='wide']) {
-    width: var(--wide-width);
+    width: var(--wide-width, 100%);
   }
 
   .bk-block:is([data-width='page'], [data-resolved='page']) {
-    width: var(--page-width);
-    margin-left: var(--page-shift);
+    width: var(--page-width, 100%);
+    margin-left: var(--page-shift, 0px);
   }
 
   .bk-block[data-type='math'] {
-    margin: 14px 0 18px;
+    margin: var(--formula-margin, 14px 0 18px);
   }
 
   :scope {
@@ -93,8 +93,8 @@
     line-height: 1.65;
     font-variant-ligatures: none;
     tab-size: 4;
-    white-space: pre;
-    overflow-wrap: normal;
+    white-space: var(--code-white-space, pre);
+    overflow-wrap: var(--code-overflow-wrap, normal);
   }
 
   :scope pre.shiki code {
@@ -132,7 +132,7 @@
     border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
-    white-space: nowrap;
+    white-space: var(--cell-white-space, nowrap);
   }
 
   :scope tbody tr:last-child > td {
@@ -186,11 +186,11 @@
     width: 100%;
     max-width: 100%;
     margin: 0 auto;
-    padding: 18px 18px 12px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-    box-shadow: var(--shadow);
+    padding: var(--frame-padding, 18px 18px 12px);
+    border: var(--frame-border, 1px solid var(--line));
+    border-radius: var(--frame-radius, 10px);
+    background: var(--frame-background, var(--surface));
+    box-shadow: var(--frame-shadow, var(--shadow));
   }
 
   :scope :not(.bk-block) > :is(.figure, .component) {
@@ -223,7 +223,7 @@
     max-width: 50%;
     margin-top: 7px;
     margin-bottom: 12px;
-    padding: 8px 8px 6px;
+    padding: var(--frame-padding, 8px 8px 6px);
   }
 
   :scope .figure[data-float='left'] {
@@ -656,7 +656,7 @@
 
   @media (max-width: 999.98px) {
     :scope :is(.figure, .component:not([data-frame='none'])) {
-      padding: 12px 12px 10px;
+      padding: var(--frame-padding, 12px 12px 10px);
     }
   }
 

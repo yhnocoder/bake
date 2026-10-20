@@ -5,6 +5,9 @@
     --page-width: 100%;
     --body-left: 0px;
     --page-shift: 0px;
+    --code-white-space: pre-wrap;
+    --code-overflow-wrap: anywhere;
+    --cell-white-space: normal;
   }
 
   body {
@@ -35,15 +38,6 @@
     :scope :is(pre.shiki, .table-scroll, mjx-container[display]) {
       overflow: visible;
       background-image: none;
-    }
-
-    :scope pre.shiki {
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-    }
-
-    :scope :is(th, td) {
-      white-space: normal;
     }
 
     :scope details.fold::details-content {
