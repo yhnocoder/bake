@@ -11,7 +11,7 @@ const BLOCK =
 const HEADING = 'h1, h2, h3, h4, h5, h6';
 const BARE_VALUE = /^[\w.%/-]+$/;
 const LINE_MARK = '\uFDD0';
-const LINE_START = new RegExp(`(^|\\n)((?:[ \\t]*(?:>[ \\t]?|(?:[-+*]|\\d{1,9}[.)])[ \\t]+))*[ \\t]*)(\\d*)${LINE_MARK}`, 'g');
+const LINE_PREFIX = '(^|\\n)((?:[ \\t]*(?:>[ \\t]?|(?:[-+*]|\\d{1,9}[.)])[ \\t]+))*[ \\t]*)(\\d*)';
 const LINE_SYNTAX = /^(?:#{1,6}(?:[ \t]|$)|>|[-+](?:[ \t]|$)|[- \t]+$|:{3})/;
 const LINE_NUMBER = /^\d{1,9}(?=[.)](?:[ \t]|$))/;
 const ALWAYS_ESCAPED = new Set(['\\', '`', '[', ']', '$']);
@@ -38,12 +38,13 @@ export class MarkdownWriter {
     this.notes = [];
     this.copied = [];
     this.inCell = false;
+    this.mark = LINE_MARK.repeat(longestRun(`${article.innerHTML}\n${(lines ?? []).join('\n')}`, LINE_MARK) + 1);
   }
 
   write() {
     const common = this.range.commonAncestorContainer;
     const start = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
-    const markdown = resolveLineStarts(tidy(this.selection(start)));
+    const markdown = resolveLineStarts(tidy(this.selection(start)), this.mark);
     const footnotes = this.footnotes();
     return footnotes.length === 0 ? markdown : `${markdown}\n\n${footnotes.join('\n\n')}`;
   }
@@ -156,7 +157,7 @@ export class MarkdownWriter {
     };
     for (const child of parent.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
-        run += escapeText(this.textPart(child), false);
+        run += escapeText(this.textPart(child), false, this.mark);
         continue;
       }
       if (child.nodeType !== Node.ELEMENT_NODE || child.matches(UI) || child.matches(NOTE) || !this.hasSelection(child)) continue;
@@ -198,7 +199,7 @@ export class MarkdownWriter {
     let text = '';
     for (const child of element.childNodes) {
       if (!this.range.intersectsNode(child)) continue;
-      if (child.nodeType === Node.TEXT_NODE) text += escapeText(this.textPart(child), this.inCell);
+      if (child.nodeType === Node.TEXT_NODE) text += escapeText(this.textPart(child), this.inCell, this.mark);
       else if (child.nodeType === Node.ELEMENT_NODE) text += this.inlineElement(child);
     }
     return text;
@@ -359,7 +360,7 @@ function siteAddress(target) {
   return hash === -1 ? target : `${target.slice(0, hash)}${fragmentOf(target.slice(hash + 1))}`;
 }
 
-function escapeText(text, inCell) {
+function escapeText(text, inCell, mark) {
   let offset = 0;
   return text
     .split('\n')
@@ -367,17 +368,17 @@ function escapeText(text, inCell) {
       let escaped = '';
       for (let index = 0; index < line.length; index += 1) escaped += isSyntax(text, offset + index, inCell) ? `\\${line[index]}` : line[index];
       offset += line.length + 1;
-      return markLineStart(escaped);
+      return markLineStart(escaped, mark);
     })
     .join('\n');
 }
 
-function markLineStart(line) {
+function markLineStart(line, mark) {
   const content = line.trimStart();
   const space = line.slice(0, line.length - content.length);
   const number = LINE_NUMBER.exec(content);
-  if (number !== null) return `${space}${number[0]}${LINE_MARK}${content.slice(number[0].length)}`;
-  return LINE_SYNTAX.test(content) ? `${space}${LINE_MARK}${content}` : line;
+  if (number !== null) return `${space}${number[0]}${mark}${content.slice(number[0].length)}`;
+  return LINE_SYNTAX.test(content) ? `${space}${mark}${content}` : line;
 }
 
 function isSyntax(text, index, inCell) {
@@ -483,8 +484,9 @@ function noteBody(definition, label) {
   return [body, ...rest.map((line) => line.slice(common))].join('\n');
 }
 
-function resolveLineStarts(text) {
-  return text.replace(LINE_START, `$1$2$3\\`).replaceAll(LINE_MARK, '');
+function resolveLineStarts(text, mark) {
+  const end = `${mark}(?!${LINE_MARK})`;
+  return text.replace(new RegExp(`${LINE_PREFIX}${end}`, 'g'), '$1$2$3\\').replace(new RegExp(end, 'g'), '');
 }
 
 function tidy(text) {
