@@ -560,6 +560,15 @@ test('the table of contents', async (t) => {
     const hidden = () => page.evaluate(() => document.documentElement.classList.contains('bk-buttons-hidden'));
     const shown = () =>
       page.evaluate(() => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].map((element) => element.getBoundingClientRect().left >= 0 && getComputedStyle(element).opacity === '1'));
+    const focusable = () =>
+      page.evaluate(() =>
+        [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings-toggle')].map((element) => {
+          element.focus();
+          const focused = document.activeElement === element;
+          element.blur();
+          return focused;
+        }),
+      );
     const scrollBy = async (delta) => {
       for (let step = 0; step < 5; step += 1) {
         await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
@@ -571,9 +580,11 @@ test('the table of contents', async (t) => {
     await scrollBy(600);
     assert.equal(await hidden(), true);
     assert.deepEqual(await page.evaluate(() => document.querySelector('.bk-toc-handle').getBoundingClientRect().right <= 0), true);
+    assert.deepEqual(await focusable(), [false, false]);
     await scrollBy(-200);
     assert.equal(await hidden(), false);
     assert.deepEqual(await shown(), [true, true]);
+    assert.deepEqual(await focusable(), [true, true]);
     await scrollBy(600);
     await page.evaluate(() => scrollTo(0, 0));
     await settle(page);

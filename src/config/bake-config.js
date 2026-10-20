@@ -13,6 +13,7 @@ const BENTO_FIELDS = ['columns'];
 const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
 const HOME_COLUMNS = [3, 4, 5];
+const MAX_BENTO_COLUMNS = 6;
 const GROUP_BY = ['category', 'month'];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -75,7 +76,7 @@ function validateConfig(value, themes, report) {
   const categories = validateCategories(value.categories ?? [], report);
   const bento = section(value, 'bento', BENTO_FIELDS, report);
   const bentoColumns = bento.columns ?? 4;
-  field(['bento', 'columns'], Number.isInteger(bentoColumns) && bentoColumns > 0 ? null : `bento.columns must be a positive integer, got ${describeValue(bentoColumns)}`);
+  field(['bento', 'columns'], Number.isInteger(bentoColumns) && bentoColumns >= 1 && bentoColumns <= MAX_BENTO_COLUMNS ? null : `bento.columns must be an integer from 1 to ${MAX_BENTO_COLUMNS}, got ${describeValue(bentoColumns)}`);
   const home = section(value, 'home', HOME_FIELDS, report);
   const homeColumns = home.columns ?? 3;
   field(['home', 'columns'], choiceProblem('home.columns', HOME_COLUMNS, homeColumns));

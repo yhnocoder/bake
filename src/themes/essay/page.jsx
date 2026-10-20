@@ -45,11 +45,11 @@ export default function Page(props) {
   );
 }
 
-function sourceJson(source) {
+export function sourceJson(source) {
   return JSON.stringify(source).replaceAll('<', '\\u003c');
 }
 
-function labelStyle(labels) {
+export function labelStyle(labels) {
   const { before, after } = labels.embedSource;
   const variables = {
     'embed-source-before': before,
