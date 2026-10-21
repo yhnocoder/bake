@@ -45,20 +45,12 @@ jobs:
       - uses: ./.github/actions/setup
       - run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 "test/browser/*.test.js"
 
-  frames:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - run: npm run test:frames
-
   test:
-    needs: [lint, unit, browser, frames]
+    needs: [lint, unit, browser]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: test "$RESULTS" = "success success success success"
+      - run: test "$RESULTS" = "success success success"
         env:
-          RESULTS: ${{ needs.lint.result }} ${{ needs.unit.result }} ${{ needs.browser.result }} ${{ needs.frames.result }}
+          RESULTS: ${{ needs.lint.result }} ${{ needs.unit.result }} ${{ needs.browser.result }}

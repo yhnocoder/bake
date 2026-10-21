@@ -3,8 +3,6 @@ import { test } from 'node:test';
 import { launchBrowser, serveExample, settle } from '../browser/browser.js';
 import { describe, frameProblem, frameStats, openPage, paced, record } from './frames.js';
 
-const everyInteraction = process.env.BAKE_FRAMES === 'all';
-
 const SYNTAX = '/2026-10/syntax/';
 const BENTO = '/2026-10/activations/';
 const HOME = '/';
@@ -16,7 +14,7 @@ const WHEEL_INTERVAL = 50;
 
 const knownFailures = [
   { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: 'the longest frame takes 50 ms in three of ten runs', task: 'perf-fixes' },
-  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'on pull request CI the longest frame takes 50 ms and 6 frames are dropped (4.3%), because a new color scheme restyles every element of the page in one frame, 20 ms on macOS and 30 to 40 ms on Linux', task: 'perf-fixes' },
+  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'on Linux CI the longest frame takes 50 ms and 6 frames are dropped (4.3%), because a new color scheme restyles every element of the page in one frame, 20 ms on macOS and 30 to 40 ms on Linux', task: 'perf-fixes' },
   { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 50 or 67 ms in two of ten runs, frames without script work; evaluating MathJax and the first render of act-fn-plot and glu-heatmap each drop one frame', task: 'perf-fixes' },
   { name: 'scrolling the whole llm-act-fns article at 1440 pixels', reason: 'the longest frame takes 50 to 67 ms in ten of ten runs', task: 'long-article-frames' },
   { name: 'scrolling the whole matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 ms or more in five of five runs', task: 'long-article-frames' },
@@ -214,21 +212,21 @@ const interactions = [
   { name: 'highlighting a sidenote of the syntax article', path: SYNTAX, devices: BOTH, prepare: hoverSidenote },
   { name: 'moving over the ticks table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'ticks' }, prepare: hoverToc('ticks') },
   { name: 'changing the theme in the settings panel of the syntax article', path: SYNTAX, devices: BOTH, prepare: changeTheme },
-  { name: 'scrolling the whole syntax article', path: SYNTAX, devices: BOTH, nightly: true, prepare: scroll() },
-  { name: 'moving over the tabs table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'tabs' }, nightly: true, prepare: hoverToc('tabs') },
-  { name: 'moving over the dots table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'dots' }, nightly: true, prepare: hoverToc('dots') },
-  { name: 'opening and closing the table of contents drawer of the syntax article', path: SYNTAX, devices: ['phone'], nightly: true, prepare: openDrawer },
-  { name: 'opening and closing the AI chat panel on the syntax article', path: SYNTAX, devices: BOTH, nightly: true, prepare: openChat },
-  { name: 'dragging the slider of the function plot in the syntax article', path: SYNTAX, devices: BOTH, nightly: true, prepare: dragPlot },
-  { name: 'opening and closing a fold of the syntax article', path: SYNTAX, devices: BOTH, nightly: true, prepare: toggleFold },
-  { name: 'scrolling the whole bento article', path: BENTO, devices: BOTH, nightly: true, prepare: scroll() },
-  { name: 'dragging the slider of the function plot in the bento article', path: BENTO, devices: BOTH, nightly: true, prepare: dragPlot },
-  { name: 'resizing the bento article', path: BENTO, devices: ['desktop'], nightly: true, prepare: resizeColumns },
-  { name: 'scrolling the whole homepage', path: HOME, devices: BOTH, nightly: true, prepare: scroll() },
-  { name: 'scrolling the whole llm-act-fns article', path: ACTIVATIONS, devices: BOTH, nightly: true, prepare: scroll() },
-  { name: 'dragging a slider of act-fn-plot in the llm-act-fns article', path: ACTIVATIONS, devices: BOTH, nightly: true, prepare: dragSlider('act-fn-plot') },
-  { name: 'scrolling the whole matrix-calculus article', path: MATRIX, devices: BOTH, nightly: true, prepare: scroll() },
-  { name: 'dragging a slider of gradient-field in the matrix-calculus article', path: MATRIX, devices: BOTH, nightly: true, prepare: dragSlider('gradient-field') },
+  { name: 'scrolling the whole syntax article', path: SYNTAX, devices: BOTH, prepare: scroll() },
+  { name: 'moving over the tabs table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'tabs' }, prepare: hoverToc('tabs') },
+  { name: 'moving over the dots table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'dots' }, prepare: hoverToc('dots') },
+  { name: 'opening and closing the table of contents drawer of the syntax article', path: SYNTAX, devices: ['phone'], prepare: openDrawer },
+  { name: 'opening and closing the AI chat panel on the syntax article', path: SYNTAX, devices: BOTH, prepare: openChat },
+  { name: 'dragging the slider of the function plot in the syntax article', path: SYNTAX, devices: BOTH, prepare: dragPlot },
+  { name: 'opening and closing a fold of the syntax article', path: SYNTAX, devices: BOTH, prepare: toggleFold },
+  { name: 'scrolling the whole bento article', path: BENTO, devices: BOTH, prepare: scroll() },
+  { name: 'dragging the slider of the function plot in the bento article', path: BENTO, devices: BOTH, prepare: dragPlot },
+  { name: 'resizing the bento article', path: BENTO, devices: ['desktop'], prepare: resizeColumns },
+  { name: 'scrolling the whole homepage', path: HOME, devices: BOTH, prepare: scroll() },
+  { name: 'scrolling the whole llm-act-fns article', path: ACTIVATIONS, devices: BOTH, prepare: scroll() },
+  { name: 'dragging a slider of act-fn-plot in the llm-act-fns article', path: ACTIVATIONS, devices: BOTH, prepare: dragSlider('act-fn-plot') },
+  { name: 'scrolling the whole matrix-calculus article', path: MATRIX, devices: BOTH, prepare: scroll() },
+  { name: 'dragging a slider of gradient-field in the matrix-calculus article', path: MATRIX, devices: BOTH, prepare: dragSlider('gradient-field') },
 ];
 
 function caseName(interaction, device) {
@@ -243,7 +241,7 @@ test('every known failure names a measured case', () => {
 test('interactions draw every frame within the 60 fps budget', async (t) => {
   const base = await serveExample(t, { localhost: true });
   const browser = await launchBrowser();
-  for (const interaction of interactions.filter((entry) => everyInteraction || !entry.nightly)) {
+  for (const interaction of interactions) {
     for (const device of interaction.devices) {
       const name = caseName(interaction, device);
       const known = knownFailures.find((entry) => entry.name === name);
