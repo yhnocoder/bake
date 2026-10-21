@@ -9,7 +9,8 @@ import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-conf
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { BUILT_IN_THEMES, availableThemes } from '../config/rules.js';
-import { BUILT_IN_BLOCK_NAMES, readArticle } from '../markdown/article.js';
+import { readArticle } from '../markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES } from '../markdown/parse.js';
 import { IMAGE_FORMATS, convertImage, readImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
