@@ -19,7 +19,7 @@
 
 | Tier | When | Time limit |
 |---|---|---|
-| Local check | After a change to code | 3 minutes |
+| Local check | After a change to code: the tests of the changed features | 3 minutes |
 | Pull request CI | Every push to a pull request or to `main` | 5 minutes per job |
 | Nightly | Once a day | 30 minutes per job |
 
