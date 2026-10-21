@@ -104,7 +104,9 @@ function positionedChildren(element, source) {
 }
 
 function markup(element, root, source) {
-  const [first, last] = source.range(element);
+  const [, last] = source.range(element);
+  // why: rows of a pipe table are no table without the header and delimiter rows, which stand before the body
+  const [first] = element.matches('tbody') ? source.range(element.parentElement) : source.range(element);
   const content = { start: offsetAt({ node: element, offset: 0 }, 'start', root, source), end: offsetAt({ node: element, offset: element.childNodes.length }, 'end', root, source) };
   return { opening: source.slice(first, content.start), closing: source.slice(content.end, last) };
 }

@@ -339,7 +339,7 @@ No npm publish workflow in this branch. The full test suites run in CI on the pu
 - Narrow bento: the unit is the registered property `--bt-unit`, computed from `--bt-wide-gutter` (104 px) without the scrollbar; "half the columns" means half of the narrow grid; the narrow span starts from the span written in the article. Below 1000 px the grid is replaced by rows that share their free width, see Step 7: components.
 - A sticker card is transparent and stretches with its row; the visible sticker is its tilted `.bt-block-body`. Sticker and note cards carry `data-theme-block`.
 - Bento browser tests check that no two cards overlap instead of equal gaps.
-- Copy regression from part 13: a partial selection inside a pipe table copies whole rows without the header row; fix in the component cleanup round.
+- Copy regression from part 13: a partial selection inside a pipe table copied whole rows without the header row; fixed in Step 7: components.
 
 #### Step 7: components
 
@@ -357,3 +357,4 @@ No npm publish workflow in this branch. The full test suites run in CI on the pu
 - The nightly case `dragSlider('matrix-gradient-field')` of `test/frames/frames.test.js` must name `gradient-field`.
 - `bundleComponents` returns the modules of its chunks, and the cached bundle uses the blog files among them, scripts and styles, as its inputs; a change to an unused file of `components/` keeps the bundle, and a change to a module that a component imports from outside `components/` builds it again. A bundle that failed has no modules and depends on `components/` and the `components/` folders of the articles of its components.
 - Narrow bento: below 1000 px `.bt-grid` is a wrapping flex row. The script sets `--bt-basis` of each card to its span times `--bt-unit` plus the gaps between, or `100%` when that is more than half of the row; flex grow fills each row and stretch makes its cards equally tall. Without scripts `--bt-basis` is unset and every card takes the row. `--bt-cols` and `--bt-narrow-span` are gone. Before and after screenshots at 768, 600, 430 and 375 px are in `test-out/components-round/bento-before/`, `bento-after/` and `bento-pairs/`: at 768 and 600 px the cards that stood alone in part of a row with empty columns next to them now fill their row, for example the Markdown and table cards; at 430 and 375 px every section card already took the row, and a sticker before a full-row card stands alone on a row of its own as before.
+- Copy: the opening of a `tbody` in the copied Markdown is the source from the start of its table, the header and delimiter rows, so rows copied from the body of a pipe table, alone or followed by later blocks, stay a table.

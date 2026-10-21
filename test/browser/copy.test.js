@@ -109,6 +109,15 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal((await copied(page)).text, '- 页边的旁注编号可以选中，复制的内容里没有它们。\n- 选区从文章外面开始时');
   });
 
+  await t.test('a selection across the rows of a pipe table gives whole rows under the header and delimiter rows', async () => {
+    const table = '#front-matter ~ .bk-block table';
+    const header = [sourceLine('| 字段 |'), sourceLine('|---|')];
+    await select(page, { selector: `${table} td`, text: '网址的最后一段' }, { selector: `${table} td`, text: '一句摘要', after: true });
+    assert.equal((await copied(page)).text, [...header, sourceLine('| `slug` |'), sourceLine('| `date` |'), sourceLine('| `summary` |')].join('\n'));
+    await select(page, { selector: `${table} td`, text: '时不发布' }, { selector: '#front-matter ~ .bk-block p', contains: '指向的脚本' });
+    assert.equal((await copied(page)).text, [...header, sourceLine('| `draft` |'), sourceLine('| `page` |')].join('\n'));
+  });
+
   await t.test('a partly selected example converts its result, with the math and images of list-table cells', async () => {
     await select(page, { selector: '#tables ~ .bk-block .example-result .list-table', text: '激活函数' }, { selector: '#tables ~ .bk-block .example-result .list-table', text: '负半轴梯度为 0', after: true });
     assert.equal((await copied(page)).text, [':::list-table', '* - 激活函数', '  - 公式', '  - 特点', '  - 曲线', '* - ReLU', '  - $\\max(0, x)$', '  - - 计算只需要一次比较', '    - 负半轴梯度为 0', '  - ![](relu.svg){width=64px}', ':::'].join('\n'));
