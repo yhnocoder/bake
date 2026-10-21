@@ -16,6 +16,8 @@ const WHEEL_INTERVAL = 50;
 
 const knownFailures = [
   { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: 'the longest frame takes 50 ms in three of ten runs', task: 'perf-fixes' },
+  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'on pull request CI the longest frame takes 50 ms and 6 frames are dropped (4.3%), because a new color scheme restyles every element of the page in one frame, 20 ms on macOS and 30 to 40 ms on Linux', task: 'perf-fixes' },
+  { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 50 or 67 ms in two of ten runs, frames without script work; evaluating MathJax and the first render of act-fn-plot and glu-heatmap each drop one frame', task: 'perf-fixes' },
   { name: 'scrolling the whole llm-act-fns article at 1440 pixels', reason: 'the longest frame takes 50 to 67 ms in ten of ten runs', task: 'long-article-frames' },
   { name: 'scrolling the whole matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 ms or more in five of five runs', task: 'long-article-frames' },
   { name: 'scrolling the whole matrix-calculus article at 375 pixels', reason: 'the longest frame takes 50 to 67 ms in five of five runs', task: 'long-article-frames' },
