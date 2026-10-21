@@ -6,6 +6,7 @@ summary: 本文介绍激活函数如何引入非线性、现代 LLM 为什么采
 tags: [LLM, 激活函数]
 toc: notes
 category: llm
+preview: preview.js
 ---
 
 ## 引言 {#s0}

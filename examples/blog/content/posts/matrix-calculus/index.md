@@ -6,6 +6,7 @@ summary: 以 Transformer 语言模型里的运算为例，梳理训练时反向�
 tags: [深度学习, 矩阵微积分, 反向传播]
 toc: notes
 category: math
+preview: preview.js
 ---
 
 ## 引言 {#intro}
