@@ -1,10 +1,10 @@
 const CHINESE = {
   settings: '设置',
-  defaultValue: '默认',
+  home: '首页',
   theme: '主题',
   themes: { system: '跟随系统', light: '浅', dark: '深' },
-  font: '正文',
-  fonts: { sans: '黑体', wenkai: '霞鹜文楷' },
+  font: '字体',
+  fontPlaceholder: '本机字体名，多个用逗号隔开',
   size: '字号',
   sizes: { small: '小', medium: '标准', large: '大', larger: '特大' },
   weight: '字重',
@@ -39,11 +39,11 @@ const CHINESE = {
 
 const ENGLISH = {
   settings: 'Settings',
-  defaultValue: 'default',
+  home: 'Home',
   theme: 'Theme',
   themes: { system: 'System', light: 'Light', dark: 'Dark' },
-  font: 'Text',
-  fonts: { sans: 'Sans', wenkai: 'LXGW WenKai' },
+  font: 'Font',
+  fontPlaceholder: 'Installed fonts, separated by commas',
   size: 'Size',
   sizes: { small: 'Small', medium: 'Medium', large: 'Large', larger: 'Larger' },
   weight: 'Weight',

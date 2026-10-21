@@ -12,6 +12,7 @@ const COLUMN_WIDTH = 24;
 const TEXT_DISTANCE = 76;
 const CARD_GAP = 14;
 const CARD_RISE = 34;
+const FOLDED = -1;
 
 export function dotsView({ outline, labels, host, article, reserve, jumping }) {
   const root = createElement('nav', 'bk-toc-dots');
@@ -34,6 +35,7 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
   });
   host.append(root);
   let current = null;
+  let goal = null;
   let left = 0;
   let top = 0;
   let offsets = [];
@@ -46,13 +48,14 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
     root.style.setProperty('--dot-pitch', `${pitch}px`);
     const entry = items[current];
     const limit = Math.max(0, Math.min(TITLE_MAX, room - count * pitch - CAPSULE_EDGES));
-    const title = Math.min(entry.title.scrollHeight, limit);
+    const title = entry === undefined ? 0 : Math.min(entry.title.scrollHeight, limit);
     root.style.setProperty('--capsule-title', `${limit}px`);
-    entry.dot.style.setProperty('--capsule-height', `${title + CAPSULE_EDGES}px`);
-    const grown = title + CAPSULE_EDGES - DOT_SIZE;
+    entry?.dot.style.setProperty('--capsule-height', `${title + CAPSULE_EDGES}px`);
+    const grown = entry === undefined ? 0 : title + CAPSULE_EDGES - DOT_SIZE;
     offsets = items.map((item, index) => index * pitch + (index > current ? grown : 0));
     items.forEach((item, index) => (item.item.style.translate = `0 ${offsets[index]}px`));
-    top = Math.round(clamp(innerHeight * TOP_SHARE, TOP_MIN, innerHeight - reserve - ENTRY_GAP - count * pitch - title - CAPSULE_EDGES));
+    // why: the column keeps its place while a jump folds the capsule, so that only the dots change
+    if (entry !== undefined) top = Math.round(clamp(innerHeight * TOP_SHARE, TOP_MIN, innerHeight - reserve - ENTRY_GAP - count * pitch - title - CAPSULE_EDGES));
     root.style.top = `${top}px`;
     root.style.height = `${count * pitch + grown}px`;
     dotInset = (pitch - DOT_SIZE) / 2;
@@ -64,9 +67,24 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
     columns: [root],
     chapters: items.map((entry) => [entry.item]),
     anchor: (chapter) => ({ left: left + COLUMN_WIDTH + CARD_GAP, top: top + offsets[chapter] + dotInset + DOT_SIZE / 2 - CARD_RISE }),
+    jumped(hash) {
+      const target = outline.entries.find((entry) => entry.id === decodeURIComponent(hash.slice(1)));
+      if (current === null || target?.chapter === current) return;
+      current = FOLDED;
+      goal = target?.chapter;
+      items.forEach((entry) => markCurrent(entry.item, false));
+      measure();
+    },
     update(state) {
-      if (jumping() && current !== null) return;
       const next = Math.max(0, state.chapter);
+      if (jumping() && current === FOLDED && next !== goal) {
+        items.forEach((entry, index) => {
+          entry.item.classList.toggle('is-read', index < next);
+          entry.item.classList.toggle('is-passing', index === next);
+        });
+        return;
+      }
+      items.forEach((entry) => entry.item.classList.remove('is-passing'));
       items.forEach((entry, index) => {
         entry.item.classList.toggle('is-read', index < next);
         markCurrent(entry.item, index === next);

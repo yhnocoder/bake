@@ -7,6 +7,7 @@
 @scope (.bk-article) to (.component-box) {
   :scope {
     --scroll-cover: var(--bg);
+    --scroll-fade: 40px;
     --formula-scale: 1.08;
     --formula-inset: 2px;
     --code-size: calc(13.5px * var(--reader-scale));
@@ -77,6 +78,55 @@
     background-size: 40px 100%, 40px 100%, 16px 100%, 16px 100%;
     background-repeat: no-repeat;
     background-attachment: local, local, scroll, scroll;
+  }
+
+  /* why: the fades lie over the content at the edge where it continues, in the colour under the box, so the content fades out instead of passing under a shadow */
+  @supports (animation-timeline: scroll()) {
+    :scope :is(pre.shiki, .table-scroll) {
+      display: flex;
+    }
+
+    /* why: a sticky element keeps clear of the padding of its scroll container, so the fades move out by the inline padding to reach the edges */
+    :scope pre.shiki {
+      --scroll-inset: var(--code-inset);
+    }
+
+    :scope mjx-container[display] {
+      --scroll-inset: var(--formula-inset);
+    }
+
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display]) {
+      background-image: none;
+    }
+
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display])::before,
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display])::after {
+      content: '';
+      position: sticky;
+      z-index: 1;
+      flex: none;
+      width: var(--scroll-fade);
+      opacity: 0;
+      pointer-events: none;
+      animation: linear both;
+      animation-timeline: scroll(nearest inline);
+    }
+
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display])::before {
+      order: -1;
+      left: calc(-1 * var(--scroll-inset, 0px));
+      margin-right: calc(-1 * var(--scroll-fade));
+      background: linear-gradient(to right, var(--scroll-cover), transparent);
+      animation-name: bk-scroll-fade-start;
+    }
+
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display])::after {
+      order: 1;
+      right: calc(-1 * var(--scroll-inset, 0px));
+      margin-left: calc(-1 * var(--scroll-fade));
+      background: linear-gradient(to left, var(--scroll-cover), transparent);
+      animation-name: bk-scroll-fade-end;
+    }
   }
 
   :scope mjx-container[display] {
@@ -707,9 +757,15 @@
 
 .bk-article .component-box {
   position: relative;
-  height: var(--component-height, var(--component-placeholder-height));
+  height: var(--component-height, var(--component-placeholder-narrow, var(--component-placeholder-height)));
   aspect-ratio: var(--component-ratio, auto);
   border-radius: 6px;
+}
+
+@media (min-width: 600px) {
+  .bk-article .component-box {
+    height: var(--component-height, var(--component-placeholder-wide, var(--component-placeholder-height)));
+  }
 }
 
 .bk-article .component[data-state='ready'] > .component-box {
@@ -747,4 +803,18 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article .component-box > * {
   display: block;
   height: 100%;
+}
+
+@keyframes bk-scroll-fade-start {
+  8%,
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bk-scroll-fade-end {
+  from,
+  92% {
+    opacity: 1;
+  }
 }

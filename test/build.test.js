@@ -94,7 +94,6 @@ describe('bake build', () => {
     const assets = Object.keys(tree).filter((path) => path.startsWith('assets/'));
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.js$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.css$/.test(path)).length, 1);
-    assert.equal(assets.filter((path) => /^assets\/fonts-[\w-]+\.css$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/chat-[\w-]+\.js$/.test(path)).length, 1);
     for (const path of assets.filter((asset) => /^assets\/(essay|chat)-[\w-]+\.(js|css)$/.test(asset))) assert.ok(page.includes(`../../${path}`), `the page links ${path}`);
     assert.equal(tree['2026-10/rope/index.md'].toString(), readFileSync(join(dir, 'content/posts/2026-10/rope/index.md'), 'utf8'));
@@ -104,18 +103,6 @@ describe('bake build', () => {
     assert.deepEqual(stagingFolders(dir), []);
   });
 
-  test('gives the essay and the bento pages one font face stylesheet', (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article(),
-      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
-    });
-    assert.equal(bake(dir, 'build').status, 0);
-    const tree = readTree(join(dir, 'dist'));
-    const fonts = Object.keys(tree).filter((path) => /^assets\/[\w-]*fonts-[\w-]+\.css$/.test(path));
-    assert.equal(fonts.length, 1, fonts.join());
-    for (const page of ['2026-10/rope/index.html', '2026-10/gelu/index.html', 'index.html']) assert.ok(tree[page].toString().includes(fonts[0]), `${page} links ${fonts[0]}`);
-  });
 
   test('prints 1 page for a single article', (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article() });
@@ -170,7 +157,7 @@ describe('bake build', () => {
         'content/posts/a/index.md:1:1 front matter is missing "slug"',
         'content/posts/a/index.md:3:7 date must be a date in the form YYYY-MM-DD, got "2026-10-32"',
         'content/posts/b/index.md:3:7 slug "B" may only contain lowercase letters, digits and "-"',
-        'content/posts/b/index.md:5:6 toc must be one of notes, tabs, dots or ticks, got "sidebar"',
+        'content/posts/b/index.md:5:6 toc must be one of notes, dots or ticks, got "sidebar"',
         'content/posts/b/index.md:6:1 unknown front matter field "layout"',
         'content/posts/c/index.md:1:1 index.md must start with front matter between two --- lines',
         'content/posts/c/index.md:1:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##',
@@ -286,7 +273,7 @@ describe('bake build', () => {
     assert.match(page, /<h1[^>]*>Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
     assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
-    assert.match(page, /<a [^>]*href="\.\.\/\.\.\/2026-10\/syntax-linked\/#chain-rule"/);
+    assert.ok(page.includes(`href="../../2026-10/syntax-linked/#${encodeURIComponent('链式法则')}"`));
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
     assert.match(page, /<h2[^>]*>链式法则<\/h2>/);
     for (const url of ['2026-10/syntax-linked', '2026-10/jacobian', '2026-10/activations', '2026-09/llm-act-fns', '2026-09/matrix-calculus', '2026-09/html-page']) assert.ok(existsSync(join(dir, 'dist', url, 'index.html')), url);

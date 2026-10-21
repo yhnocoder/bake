@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { article, bake, createBlog, validConfig } from './blog.js';
@@ -143,7 +143,7 @@ describe('site files', () => {
         { title: "Rope & <'angles'>", url: '2026-10/rope/' },
         { title: 'Demo', url: '2026-09/demo/' },
       ],
-      assets: { root: '/bake/', styles, fonts: [], scripts },
+      assets: { root: '/bake/', styles, scripts },
     });
     assert.equal(probed(read('2026-10/rope/index.html')), 'https://x.github.io/bake/2026-10/rope/');
   });
@@ -154,7 +154,6 @@ describe('site files', () => {
     assert.match(html, /^<!doctype html>\n<html lang="en"/);
     assert.match(html, /<meta name="robots" content="noindex"><title>This page does not exist · Notes &amp; &lt;Models><\/title>/);
     assert.match(html, /<link rel="stylesheet" href="\/bake\/assets\/essay-[\w-]+\.css">/);
-    assert.match(html, /<link rel="preload" as="style" href="\/bake\/assets\/fonts-[\w-]+\.css" onload="this.rel='stylesheet'"><noscript><link rel="stylesheet" href="\/bake\/assets\/fonts-[\w-]+\.css"><\/noscript>/);
     assert.match(html, /<script type="module" src="\/bake\/assets\/essay-[\w-]+\.js"><\/script>/);
     assert.match(html, /<main class="bk-not-found"[^>]*><a class="bk-site" href="\/bake\/">Notes &amp; &lt;Models><\/a><h1 class="bk-not-found-title">This page does not exist<\/h1><p class="bk-not-found-path" hidden>/);
     assert.match(html, /<section class="bk-not-found-matches" hidden><h2>You may be looking for:<\/h2><ul><li data-url="2026-10\/alpha\/" hidden><a href="\/bake\/2026-10\/alpha\/">Alpha<\/a>/);
@@ -195,19 +194,12 @@ describe('site files', () => {
     assert.match(home, /<link rel="canonical" href="https:\/\/x.github.io\/bake\/"><link rel="alternate" type="application\/rss\+xml" href=".\/feed.xml" title="Notes &amp; <Models>"><meta property="og:type" content="website"><meta property="og:title" content="Notes &amp; <Models>"><meta property="og:description" content="Short &quot;notes&quot;.">/);
   });
 
-  test('_bake/theme.css holds the fonts and colours of the site theme, and plain HTML pages are published unchanged', (t) => {
-    const themeCss = "@import 'bake/theme/styles/fonts.css';\n@import 'bake/theme/styles/tokens.css';\n@import 'bake/theme/styles/base.css';\n\n:root {\n  --bg: #123456;\n}\n";
-    const { dir, read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss) });
+  test('_bake/theme.css holds the colours of the site theme, and plain HTML pages are published unchanged', (t) => {
+    const themeCss = "@import 'bake/theme/styles/tokens.css';\n@import 'bake/theme/styles/base.css';\n\n:root {\n  --bg: #123456;\n}\n";
+    const { read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss) });
     const styles = read('_bake/theme.css');
     assert.match(styles, /--bg:#123456/);
-    assert.match(styles, /font-family:LXGW WenKai/);
     assert.match(styles, /body\{[^}]*background:var\(--bg\)/);
-    const fonts = [...styles.matchAll(/url\(([^)]+)\)/g)].map(([, url]) => url);
-    assert.ok(fonts.length > 0);
-    for (const url of fonts) {
-      assert.match(url, /^\.\.\/assets\/[\w.-]+\.woff2$/);
-      assert.ok(existsSync(join(dir, 'dist/_bake', url)), url);
-    }
     assert.equal(read('2026-09/demo/index.html'), pageHtml);
   });
 

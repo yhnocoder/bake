@@ -4,7 +4,7 @@ import './lib/glu-diagram.css'
 
 export const params = {}
 
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 610, wide: 545 } }
 
 const UNIT = 42
 const ACT_HEIGHT = 27

@@ -45,7 +45,7 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   assert.ok(report.embedded > 0, 'expected an embed with formulas in the syntax article');
   assert.deepEqual(report.duplicateIds, []);
 
-  const link = page.locator('.bk-article p a[href="../../2026-10/syntax-linked/#chain-rule"]').first();
+  const link = page.locator(`.bk-article p a[href="../../2026-10/syntax-linked/#${encodeURIComponent('链式法则')}"]`).first();
   await link.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await settle(page);
   await link.hover();

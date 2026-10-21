@@ -51,13 +51,3 @@ test('no rule tests the root element or the body with :has() on its descendants'
   }
   assert.deepEqual(problems, []);
 });
-
-test('the essay fonts use an installed LXGW WenKai before the files of lxgw-wenkai-webfont, in both weights', () => {
-  const css = readFileSync(join(SRC, 'theme/styles/fonts.css'), 'utf8');
-  const lastImport = css.lastIndexOf('@import');
-  const localFaces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)]
-    .filter((match) => match[1].includes("'LXGW WenKai'"))
-    .map((match) => ({ after: match.index > lastImport, weight: match[1].match(/font-weight:\s*(\d+)/)[1], sources: match[1].match(/src:\s*([^;]*);/)[1].split(/,\s*/) }));
-  assert.deepEqual(localFaces.map(({ after, weight }) => [after, weight]), [[true, '400'], [true, '700']]);
-  for (const { sources } of localFaces) assert.ok(sources.every((source) => source.startsWith('local(')), sources.join());
-});

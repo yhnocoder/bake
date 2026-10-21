@@ -41,7 +41,7 @@ function exampleBlocks(text) {
 }
 
 function appendixMessages(text) {
-  const appendix = text.slice(text.indexOf('{#errors}'));
+  const appendix = text.slice(text.indexOf('## 附录：构建报错的写法'));
   return appendix
     .split('\n')
     .filter((line) => line.startsWith('| ') && !line.startsWith('| 写错的地方'))

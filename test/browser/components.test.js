@@ -62,6 +62,14 @@ export default class TextView extends HTMLElement {
   }
 }
 `,
+  'components/hint-view.js': `export const layout = { placeholder: { narrow: 420, wide: 240 } };
+
+export default class HintView extends HTMLElement {
+  connectedCallback() {
+    this.textContent = 'hint';
+  }
+}
+`,
   'components/broken-view.js': `export const layout = { height: 120 };
 
 export default class BrokenView extends HTMLElement {
@@ -105,6 +113,7 @@ ${spacer}
   'content/posts/gelu/index.md': article({ slug: 'gelu', body: ':::grid-view\n:::\n' }),
   'content/posts/below/index.md': article({ slug: 'below', body: `:::grid-view\n:::\n\n${spacer}\n\n:::text-view\n:::\n` }),
   'content/posts/later/index.md': article({ slug: 'later', body: `:::grid-view\n:::\n\n${spacer}\n\n:::count-view\n:::\n\n${spacer}\n\n:::tex-view\n:::\n` }),
+  'content/posts/hint/index.md': article({ slug: 'hint', body: ':::hint-view\n:::\n' }),
   'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
   'content/posts/source/index.md': article({ slug: 'source', body: '## Grid {#grid}\n\n:::grid-view{mode=far}\n:::\n' }),
   'content/posts/embedder/index.md': article({ slug: 'embedder', body: 'An article without components of its own.\n\n:::embed\n/2026-10/source/#grid\n:::\n' }),
@@ -222,6 +231,19 @@ test('components run in the browser', async (t) => {
         after.map((entry) => Math.round(entry.box)),
         `${width}px: each element fills its box`,
       );
+      await page.close();
+    }
+  });
+
+  await t.test('a component with layout.placeholder shows the narrow height on screens below 600 pixels and the wide height from 600 pixels up until it starts', async () => {
+    for (const [width, height] of [
+      [375, 420],
+      [599, 420],
+      [600, 240],
+      [1440, 240],
+    ]) {
+      const page = await open('hint', { viewport: { width, height: 800 }, javaScriptEnabled: false });
+      assert.equal(await page.evaluate(() => document.querySelector('.component-box').getBoundingClientRect().height), height, `${width}px`);
       await page.close();
     }
   });
@@ -399,6 +421,23 @@ test('components run in the browser', async (t) => {
     await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
     await page.waitForFunction(() => ['ready', 'failed'].includes([...document.querySelectorAll('figure.component')].at(-1).dataset.state));
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state), 'ready');
+    await page.close();
+  });
+
+  await t.test('a Solid component starts when the first request for its shared Solid wrapper fails', async () => {
+    const page = await open(null);
+    await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'connection', { get: () => ({ saveData: true }) }));
+    // why: page.route turns off the HTTP cache that the download before the import relies on, so the request is failed in the network layer instead
+    const session = await page.context().newCDPSession(page);
+    await session.send('Network.enable');
+    await session.send('Network.setBlockedURLs', { urls: ['*/solid-element-*'] });
+    page.on('requestfailed', (request) => {
+      if (/[/]solid-element-[\w-]{8}\.js$/.test(request.url())) session.send('Network.setBlockedURLs', { urls: [] });
+    });
+    await page.goto(`${origin}/2026-10/rope/`);
+    const frame = 'figure.component[data-component="count-view"]';
+    await page.waitForFunction((selector) => ['ready', 'failed'].includes(document.querySelector(selector).dataset.state), frame);
+    assert.equal(await page.locator(frame).getAttribute('data-state'), 'ready');
     await page.close();
   });
 

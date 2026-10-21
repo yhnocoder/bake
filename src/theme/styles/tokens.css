@@ -46,7 +46,6 @@
   --capsule-fill: light-dark(var(--accent), #a97c77);
   --capsule-fill-ink: light-dark(#ffffff, #121514);
   --index-column: light-dark(#f1f3ef, #1f2321);
-  --index-shadow: drop-shadow(0 0 0.5px light-dark(var(--hair), rgba(240, 240, 232, 0.22))) drop-shadow(0 0 0.5px light-dark(var(--hair), transparent)) drop-shadow(0 12px 18px light-dark(rgba(0, 0, 0, 0.1), transparent)) drop-shadow(0 14px 22px light-dark(transparent, rgba(0, 0, 0, 0.55)));
   --selection: color-mix(in srgb, var(--accent) 24%, transparent);
   --selection-quiet: color-mix(in srgb, var(--accent) 9%, transparent);
   --flash: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -56,12 +55,11 @@
   --fade: 0.2s;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --motion-distance: 1;
-  --font-wenkai: 'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
   --font-sans: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --font-heading: var(--font-wenkai);
-  --font-body: var(--font-sans);
+  --font-body: var(--reader-font, var(--font-sans));
+  --font-heading: var(--font-body);
   --font-ui: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC', 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --body-size: 16.5px;
   --reader-scale: 1;
   --reading-size: calc(var(--body-size) * var(--reader-scale));
@@ -104,11 +102,6 @@
   color-scheme: dark;
 }
 
-:root[data-font='wenkai'] {
-  --font-body: var(--font-wenkai);
-  --body-size: 17px;
-}
-
 :root[data-size='small'] {
   --reader-scale: 0.91;
 }
@@ -140,15 +133,6 @@
   --body-weight: 500;
   --strong-weight: 800;
   --strong-color: var(--accent);
-}
-
-:root[data-font='wenkai'][data-weight='light'] {
-  --strong-weight: 700;
-}
-
-:root[data-font='wenkai'][data-weight='bold'] {
-  --body-weight: 700;
-  --strong-weight: 700;
 }
 
 :root {

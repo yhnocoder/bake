@@ -8,7 +8,7 @@ export const params = {
   limit: { label: '色标范围 ±', type: 'number', min: 1, max: 50, step: 1, default: 8 },
 }
 
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 299, wide: 513 } }
 
 const CELLS = 160
 const READOUT_GAP = 12

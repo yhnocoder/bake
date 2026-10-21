@@ -14,14 +14,12 @@ const CLIENT_FILE = 'client.jsx';
 const HOME_FILE = 'home.jsx';
 const NOT_FOUND_FILE = 'not-found.jsx';
 const THEME_STYLES_FILE = 'theme.css';
-const FONTS_FILE = 'fonts.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 const BUILD_FILES = [join(import.meta.dirname, '../theme'), BUILT_IN_DIR, join(import.meta.dirname, '../kit/controls.css'), join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
 const RENDER_ENTRY = 'bake:render';
 const CLIENT_ENTRY = 'bake:client';
-const STYLESHEET = /\.css(?:\?.*)?$/;
 const MISSING_BINDING = /"([^"]+)" is not exported/;
 
 export function builtInThemeFolders(root) {
@@ -55,22 +53,18 @@ export async function compileTheme(root, name, { siteTheme }, errors) {
   let data;
   let theme;
   try {
-    const fontsFile = locate(FONTS_FILE);
-    const [server, client, styles, fonts] = await Promise.all([
+    const [server, client, styles] = await Promise.all([
       build(serverConfig(alias, locate, siteTheme)),
       browserBuild({ input: { [name]: CLIENT_ENTRY }, plugins: [clientEntry(locate(CLIENT_FILE)), solid()], alias }),
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
-      fontsFile === null ? null : browserBuild({ input: { fonts: fontsFile }, alias }),
     ]);
     data = {
       server: outputOf(server)[0].code,
       styles: client.stylesheets,
-      lazyStyles: client.lazyStylesheets,
-      fonts: fonts?.files.filter((file) => STYLESHEET.test(file.path)).map((file) => file.path) ?? [],
       script: client.entry,
     };
-    const files = [client, styles, fonts].flatMap((output) => output?.files ?? []);
-    theme = await loadTheme(data, files, new Set([...[client, styles, fonts].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]));
+    const files = [client, styles].flatMap((output) => output?.files ?? []);
+    theme = await loadTheme(data, files, new Set([...[client, styles].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]));
   } catch (error) {
     errors.push(compileError(root, name, locate(CLIENT_FILE), error));
     return null;

@@ -1,8 +1,7 @@
 import { REGIONS } from 'bake/regions';
-import { FontLinks } from './font-links.jsx';
 import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
-import { READING_SETTINGS, lightWenkaiSteps, prepaintScript, settingAttributes, settingDefaults } from './settings.js';
+import { READING_SETTINGS, prepaintScript, settingAttributes, settingDefaults } from './settings.js';
 
 export function ArticleDocument(props) {
   const { site, article, assets, labels } = props;
@@ -16,11 +15,10 @@ export function ArticleDocument(props) {
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
         <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
-        <script innerHTML={prepaintScript(settings, lightWenkaiSteps(assets.lazyStyles['wenkai-light']))} />
+        <script innerHTML={prepaintScript(settings)} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
-        <FontLinks hrefs={assets.fonts} />
         {assets.mathStyles === undefined ? null : <style innerHTML={assets.mathStyles} />}
         {assets.scripts.map((src) => (
           <script type="module" src={src} />
@@ -31,7 +29,6 @@ export function ArticleDocument(props) {
         {props.children}
         <PreviewTemplates previews={article.content.previews} labels={labels} />
         <script type="application/json" class="bk-source" data-region={REGIONS.source} innerHTML={scriptJson(article.content.source)} />
-        <script type="application/json" class="bk-setting-defaults" innerHTML={scriptJson(defaults)} />
         <div data-edge="start" />
         <div data-edge="end" />
       </body>

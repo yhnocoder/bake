@@ -1,5 +1,4 @@
 import { fragmentOf } from 'bake/fragments';
-import { FontLinks } from './font-links.jsx';
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
 import { HOME_COLUMNS } from '../choices.js';
@@ -31,7 +30,6 @@ export default function Home(props) {
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
-        <FontLinks hrefs={assets.fonts} />
         {assets.scripts.map((src) => (
           <script type="module" src={src} />
         ))}

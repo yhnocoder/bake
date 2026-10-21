@@ -21,7 +21,7 @@ toc: notes
 
 `:::example` 和 `:::` 之间的原文只写一次。页面上原文和效果左右并排，放不下时原文在上、效果在下。效果一侧按正文的规则生成，有三点不同：示例里的标题不进入目录，也不参与章节编号；`:::recap` 的要点直接显示出来，样子和目录里相同；示例里的旁注、参考文献和公式编号和正文一起编号。示例里还有 `:::` 块时，外层的冒号要比内层多。
 
-## 文章开头的 front matter {#front-matter toc="front matter"}
+## 文章开头的 front matter {toc="front matter"}
 
 每篇文章是 `content/posts/` 下的一个文件夹，文件夹里的 `index.md` 以 front matter 开头。这篇文章的 front matter 是：
 
@@ -51,7 +51,7 @@ toc: notes
 | `preview` | 否 | 首页卡片的动画预览脚本，放在文章文件夹里。 |
 | `cover` | 否 | 分享图片，不写时由 Bake 生成。 |
 | `theme` | 否 | 主题，`essay` 或 `bento`，不写时用站点默认值。 |
-| `toc` | 否 | essay 主题的选项，目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用 `bake.config.js` 里 `themes.essay.toc` 的值。front matter 可以写文章所用主题的任何选项，例如 bento 文章的 `columns`。 |
+| `toc` | 否 | essay 主题的选项，目录样式：`notes`、`dots`、`ticks`，分别是前文笔记、圆点胶囊、刻度线，不写时用 `bake.config.js` 里 `themes.essay.toc` 的值。front matter 可以写文章所用主题的任何选项，例如 bento 文章的 `columns`。 |
 | `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。 |
 | `page` | 否 | 纯 HTML 页面要原样发布的文件，写了它的 `index.md` 没有正文。 |
 
@@ -78,7 +78,7 @@ export default function preview(element) {
 
 没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章的 `preview` 让一道渐变的分界在卡片上来回扫过，分界上方是生成的页面，下方是 Markdown 原文。
 
-## 标题与锚点 {#headings toc="标题"}
+## 标题与锚点 {toc="标题"}
 
 二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写这些属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`cols` 和 `rows` 是这一节在 bento 主题里的卡片占几列、几行，例如 `## ReLU {cols=2 rows=23}`，`cols` 可以写 1 到 6，`rows` 可以写 1 到 200，不写 `rows` 时卡片和内容一样高；`width` 也给出 bento 卡片的宽度，`body` 占三分之一的列，`wide` 占一半，`page` 占满一行，写了 `cols` 时以 `cols` 为准。`cols`、`rows` 和 `width` 只能写在 `##` 标题上。`#id` 以外的属性由文章的主题声明：essay 主题读 `toc`，bento 主题读 `cols`、`rows` 和 `width`，写了主题没有声明的属性会报错。
 
@@ -86,7 +86,7 @@ export default function preview(element) {
 ### 三级标题 {#third-level toc="短标题"}
 :::
 
-这一章的标题写成 `## 标题与锚点 {#headings toc="标题"}`。
+这一章的标题写成 `## 标题与锚点 {toc="标题"}`，锚点按标题文字生成，是 `#标题与锚点`。只在标题会改、两个标题文字相同或者标题太长时写 `#id`。
 
 段落末尾写 `^名字`，给这一段一个锚点，页面上不显示。站内链接和 `:::embed` 都可以指向它。
 
@@ -94,9 +94,9 @@ export default function preview(element) {
 每一层的梯度都由上一层传回的梯度乘以本层的局部导数得到。^local-grad
 :::
 
-### 小节要点 {#recap}
+### 小节要点
 
-`:::recap` 写一节的要点，它属于前面最近的 `##` 或 `###` 标题；写在章的第一个三级标题之前时，是这一章的要点。要点不显示在正文里。读者读过这一节后，它出现在 T1 前文笔记目录里这一节的标题下面；T2 书签索引、T3 圆点胶囊和 T4 刻度线的章节卡片，以及手机上的目录抽屉，也在每一节下面显示它。没有要点的节在卡片里显示正文的第一句话。bento 主题没有目录，要点显示在卡片标题或小节标题的下面。要点里可以写行内公式和公式块。
+`:::recap` 写一节的要点，它属于前面最近的 `##` 或 `###` 标题；写在章的第一个三级标题之前时，是这一章的要点。要点不显示在正文里。读者读过这一节后，它出现在前文笔记目录里这一节的标题下面；圆点胶囊和刻度线的章节卡片，以及手机上的目录抽屉，也在每一节下面显示它。没有要点的节在卡片里显示正文的第一句话。bento 主题没有目录，要点显示在卡片标题或小节标题的下面。要点里可以写行内公式和公式块。
 
 ::::example
 :::recap
@@ -110,7 +110,7 @@ export default function preview(element) {
 `:::recap` 写在标题后面，不显示在正文里，读过这一节后出现在目录和章节卡片里。
 :::
 
-## 段落内的写法 {#inline}
+## 段落内的写法
 
 粗体、斜体、删除线、重点标记、行内代码、链接和行内公式：
 
@@ -121,10 +121,10 @@ export default function preview(element) {
 链接到同一页的标题时，地址写 `#` 加锚点：
 
 :::example
-标题的写法见[标题与锚点](#headings)。
+标题的写法见[标题与锚点](#标题与锚点)。
 :::
 
-## 列表与引用 {#lists}
+## 列表与引用
 
 无序列表、有序列表和嵌套列表。列表项开头可以用重点标记作为小标题：
 
@@ -148,7 +148,7 @@ export default function preview(element) {
 > — Shazeer, *GLU Variants Improve Transformer*, 2020
 :::
 
-## 提示框与折叠块 {#aside-fold}
+## 提示框与折叠块
 
 提示框只有一种样式，`title` 是第一行的小标题，可以不写：
 
@@ -182,7 +182,7 @@ export default function preview(element) {
 ::::
 :::::
 
-## 旁注 {#sidenotes}
+## 旁注
 
 旁注用标准脚注写法。正文里显示编号，旁注显示在右侧，和编号所在的那一行对齐；窄屏时点编号在段落下方展开。旁注里可以写公式和链接。
 
@@ -190,10 +190,10 @@ export default function preview(element) {
 推理时这个逐元素操作要能融合进 GEMM 的 epilogue[^gemm]，不额外占带宽。soft-capping 把输出平滑地限制在 $\pm c$ 之内[^cap]。
 
 [^gemm]: epilogue 是矩阵乘法内核里对结果逐元素处理的阶段。在这里做激活，结果不需要写回显存再读一次。
-[^cap]: 做法是 $c \cdot \tanh(x / c)$，见[段落内的写法](#inline)里的例子。
+[^cap]: 做法是 $c \cdot \tanh(x / c)$，见[段落内的写法](#段落内的写法)里的例子。
 :::
 
-## 参考文献 {#citations}
+## 参考文献
 
 正文里写 `[@名字]`，页面上按第一次出现的顺序编号为 [1]、[2]。列表写在 `:::references` 里，引用了列表中没有的名字时构建报错。正文没有引用的条目排在编号条目后面，不编号。`:::references` 紧跟在标题后面时，页面不再显示「参考文献」这个标签。
 
@@ -207,7 +207,7 @@ export default function preview(element) {
 :::
 ::::
 
-## 公式与公式宏 {#math}
+## 公式与公式宏
 
 :::recap
 公式在生成时排版，例如 $\mathrm{FFN}(x)$；带 `\label` 的独立公式有编号，用 `\eqref` 引用。
@@ -223,7 +223,7 @@ $$
 由式 \eqref{eq:ffn} 可知，FFN 的参数集中在 $W_1$ 和 $W_2$ 里。
 :::
 
-### 多行公式 {#multiline}
+### 多行公式
 
 多行公式用 `aligned` 等 MathJax 支持的环境：
 
@@ -236,7 +236,7 @@ $$
 $$
 :::
 
-### 公式宏 {#macros}
+### 公式宏
 
 :::recap
 全站共用的宏写在 `preamble.sty`，例如 $\R^d$ 里的 `\R`；文件里只能写定义宏的命令。
@@ -259,7 +259,7 @@ $$
 设 $x \in \R^d$，$p = \softmax(z)$，$\norm{x}$ 是 $x$ 的范数。
 :::
 
-## 代码 {#code}
+## 代码
 
 代码块按语言高亮，颜色取主题变量，深色模式自动切换：
 
@@ -279,7 +279,7 @@ def swiglu(x, w_gate, w_up, w_down):
 ```
 :::
 
-## 表格与 list-table {#tables}
+## 表格与 list-table
 
 单元格里只有单行内容时用竖线表格，单元格里可以写行内公式、图片和链接。竖线表格的单元格不换行，表格的自然宽度超过正文时扩展到 wide。
 
@@ -317,12 +317,12 @@ def swiglu(x, w_gate, w_up, w_down):
   - $x\Phi(x)$
   - 在 0 附近平滑。
 
-    定义见[公式与公式宏](#math)。
+    定义见[公式与公式宏](#公式与公式宏)。
   - ![](gelu.svg){width=64px}
 :::
 ::::
 
-## 图片与浮动 {#images}
+## 图片与浮动
 
 图片放在和交互组件相同的图框里，引号里的文字是图注。图片文件放在文章文件夹里。
 
@@ -330,7 +330,7 @@ def swiglu(x, w_gate, w_up, w_down):
 ![FFN 的形状](ffn-shapes.svg "FFN 中间层的形状：先升维到 $d_{ff}$，再降回 $d$。")
 :::
 
-### 尺寸 {#image-size}
+### 尺寸
 
 图片后面紧跟 `{…}` 指定尺寸和浮动。`width` 和 `height` 写大于 0 的像素或百分比，百分比相对正文栏的宽度；只写一个时另一个按原始比例。写了尺寸的图片，图框缩到这个宽度，在正文栏里居中；屏幕比图框窄时，图框不超过屏幕宽度。
 
@@ -340,7 +340,7 @@ def swiglu(x, w_gate, w_up, w_down):
 ![神经元](neuron.svg){width=70%}
 :::
 
-### 浮动 {#float}
+### 浮动
 
 `float=left` 或 `float=right` 时图片靠一边，文字环绕在另一边，图片最宽为正文的一半。新的浮动图片和紧跟它的段落从前面所有浮动图片的下方开始；窄于 600px 时浮动取消。
 
@@ -352,7 +352,7 @@ ReLU 在负半轴输出 0，正半轴原样输出输入。它的导数在原点�
 GELU 用标准正态分布的累积分布函数给输入加权，曲线在 0 附近是平滑的，负半轴有一小段负值。两者在正半轴几乎重合，差别集中在 0 附近和负半轴。
 :::
 
-## 宽度写法 {#width}
+## 宽度写法
 
 公式、代码、表格和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。图片不写尺寸时不超过正文宽度，图片文件再宽也不会自动扩展；写了比正文宽的像素宽度时，图片按这个宽度扩展到 wide。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。
 
@@ -398,7 +398,7 @@ def swiglu(x, w_gate, w_up, w_down):
 ::::
 :::::
 
-## 交互组件 {#components}
+## 交互组件
 
 交互组件是博客 `components/` 下的 custom element，名字里必须有 `-`。只有一篇文章用的组件放在这篇文章目录的 `components/` 下，只有这篇文章能用，也不会作为文章的文件发布。组件名在整个博客里不能重复。参数写在花括号里，没写的用默认值；开头和结尾之间的文字是图注。组件只有块写法。
 
@@ -444,7 +444,7 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
-组件默认和它的内容一样高，加载前先显示一个统一高度的占位框。需要填满固定大小的组件在代码里声明 `layout.height`，写像素数，或写 `{ ratio }` 表示宽度除以高度，每种屏幕宽度都用这个高度，加载前后高度不变。在花括号里写 `height` 时，组件的框用这个像素高度：
+组件默认和它的内容一样高，加载前先显示一个占位框。组件可以在代码里声明 `layout.placeholder`，例如 `{ narrow: 600, wide: 340 }`，分别给出窄于 600 像素的屏幕和 600 像素以上的屏幕上占位框的高度，写得接近内容的高度，组件加载时页面就不会跳动；没有声明时，占位框用主题统一的高度。需要填满固定大小的组件在代码里声明 `layout.height`，写像素数，或写 `{ ratio }` 表示宽度除以高度，每种屏幕宽度都用这个高度，加载前后高度不变。在花括号里写 `height` 时，组件的框用这个像素高度：
 
 ::::example
 :::bar-chart{data=ffn-share.json height=320}
@@ -452,20 +452,20 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
-## 站内链接与嵌入 {#links}
+## 站内链接与嵌入
 
 链接到另一篇文章时，地址写目标文章的网址加锚点。锚点可以是标题的 `#id`，也可以是段落的 `^名字`。读者鼠标停在站内链接上时显示预览卡。
 
 :::example
-SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-rule)，门控的梯度按[这一段](/2026-10/syntax-linked/#local-grad)的方法计算。整篇文章见[被引用的文章](/2026-10/syntax-linked/)。
+SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#链式法则)，门控的梯度按[这一段](/2026-10/syntax-linked/#local-grad)的方法计算，可以参考[交互式组件](/2026-10/syntax-linked/#门控函数的导数)。整篇文章见[被引用的文章](/2026-10/syntax-linked/)。
 :::
 
 `:::embed` 把其他文章的内容嵌入这里，每行写一个地址。地址指向标题时嵌入整节，到下一个同级标题为止；指向段落锚点时只嵌入这一段。
 
 ::::example
 :::embed
-/2026-10/syntax-linked/#chain-rule
-/2026-10/syntax-linked/#vjp
+/2026-10/syntax-linked/#链式法则
+/2026-10/syntax-linked/#向量与雅可比矩阵的乘积
 :::
 ::::
 
@@ -475,7 +475,7 @@ SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-r
 :::
 ::::
 
-## 复制为 Markdown {#copy toc="复制"}
+## 复制为 Markdown {toc="复制"}
 
 在页面上选中内容复制，粘贴到文本编辑器里得到的是 Markdown 原文，粘贴到 Notion 或 Word 里得到带格式的内容。复制后右下角显示「已复制为 Markdown」。页头的「复制为 Markdown」复制整篇文章的 `index.md`，包括 front matter。
 
@@ -500,7 +500,7 @@ def silu(x):
 
 [^copy-notes]: 每个脚注的定义只附一次，按 `index.md` 里的原文复制。
 
-## 附录：构建报错的写法 {#errors}
+## 附录：构建报错的写法
 
 下面的写法会让 `bake build` 报错并且不写出 `dist/`。报错格式是 `文件:行:列 说明`，全部检查完后一起报告。每一行在 `test/fixtures/syntax-errors/` 里有对应的测试文件或文件夹。
 
@@ -509,7 +509,7 @@ def silu(x):
 | front matter 缺少必填字段 | 没有 `slug:` 一行 | `front matter is missing "slug"` |
 | slug 含有不允许的字符 | `slug: LLM_Act` | `slug "LLM_Act" may only contain lowercase letters, digits and "-"` |
 | front matter 有不认识的字段 | `layout: wide` | `unknown front matter field "layout"` |
-| toc 取值不对 | `toc: sidebar` | `toc must be one of notes, tabs, dots or ticks, got "sidebar"` |
+| toc 取值不对 | `toc: sidebar` | `toc must be one of notes, dots or ticks, got "sidebar"` |
 | 同一页的锚点重复 | 两个标题都写 `{#intro}` | `duplicate anchor "intro", first defined at 7:7` |
 | 标题写了文章主题没有声明的属性 | essay 文章里写 `## 引言 {cols=2}` | `unknown attribute "cols" on heading; the essay theme reads #id and toc` |
 | 卡片列数超出范围 | bento 文章里写 `## 卡片 {cols=0}` | `cols must be between 1 and 6, got 0` |
@@ -536,5 +536,5 @@ def silu(x):
 | 组件声明不是字面量 | `components/range-plot.js` 写 `params = { n: range('N') }` | `range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |
 | 嵌入本文自己 | `:::embed` 里写本文的地址 | `:::embed cannot embed the article itself` |
-| 同一个地址写两次 | `:::embed` 里两行相同 | `:::embed lists /2026-10/syntax-linked/#vjp twice` |
-| 一个地址包含另一个 | 同时写 `#chain-rule` 和它里面的 `#local-grad` | `:::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad` |
+| 同一个地址写两次 | `:::embed` 里两行相同 | `:::embed lists /2026-10/syntax-linked/#向量与雅可比矩阵的乘积 twice` |
+| 一个地址包含另一个 | 同时写 `#chain-rule` 和它里面的 `#local-grad` | `:::embed address /2026-10/syntax-linked/#链式法则 contains /2026-10/syntax-linked/#local-grad` |

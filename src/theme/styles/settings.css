@@ -4,7 +4,12 @@
   --ui-bottom: 16px;
   --ui-button-height: 34px;
   --ui-stack-gap: 8px;
-  --ui-reserve: calc(var(--ui-bottom) + var(--ui-button-height) + var(--ui-stack-gap));
+  --ui-buttons-height: calc(2 * var(--ui-button-height) + var(--ui-stack-gap));
+  --ui-reserve: calc(var(--ui-bottom) + var(--ui-buttons-height) + var(--ui-stack-gap));
+}
+
+.bk-settings:not(:has(.bk-settings-home)) {
+  --ui-buttons-height: var(--ui-button-height);
 }
 
 [data-edge] {
@@ -71,7 +76,13 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.bk-settings-toggle {
+.bk-settings-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-stack-gap);
+}
+
+:is(.bk-settings-home, .bk-settings-toggle) {
   display: grid;
   place-items: center;
   width: 34px;
@@ -86,21 +97,36 @@
     var(--button-shadow);
   transition:
     color var(--motion-fast),
+    background-color var(--motion-fast),
     scale var(--motion-fast);
 }
 
-.bk-settings-toggle:active {
+@media (hover: hover) {
+  :is(.bk-settings-home, .bk-settings-toggle):hover {
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    color: var(--accent);
+  }
+}
+
+.bk-settings.is-open .bk-settings-toggle {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+:is(.bk-settings-home, .bk-settings-toggle):active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
   scale: 0.95;
   transition: none;
 }
 
-.bk-settings-toggle svg {
+:is(.bk-settings-home, .bk-settings-toggle) svg {
   width: 17px;
   height: 17px;
 }
 
 .bk-settings-panel {
-  --panel-bottom: calc(var(--ui-button-height) + var(--ui-stack-gap));
+  --panel-bottom: calc(var(--ui-buttons-height) + var(--ui-stack-gap));
   position: absolute;
   bottom: var(--panel-bottom);
   left: 0;
@@ -183,12 +209,6 @@
   font-weight: 500;
 }
 
-.bk-settings-choice small {
-  display: block;
-  font-size: 11.5px;
-  color: var(--ink-3);
-}
-
 .bk-settings .bk-settings-options {
   display: flex;
 }
@@ -232,6 +252,35 @@
   background: none;
   color: var(--ink);
   text-align: left;
+}
+
+.bk-settings-row[data-setting='font'] {
+  display: block;
+}
+
+.bk-settings-font {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.bk-settings-font::placeholder {
+  color: var(--ink-3);
+}
+
+@media (hover: none) {
+  .bk-settings-font {
+    /* why: Safari on iOS zooms the page into a text field whose text is smaller than 16 pixels */
+    font-size: 16px;
+  }
 }
 
 .bk-toast {
@@ -488,10 +537,22 @@
     left: 0;
   }
 
-  .bk-settings-toggle {
+  :root {
+    --ui-buttons-height: calc(2 * var(--ui-button-height));
+  }
+
+  .bk-settings-buttons {
+    gap: 0;
+    border-radius: 0 11px 11px 0;
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  :is(.bk-settings-home, .bk-settings-toggle) {
     width: 40px;
     border-radius: 0 11px 11px 0;
-    box-shadow: var(--card-shadow);
+    background: none;
+    box-shadow: none;
   }
 
   .bk-settings-panel {

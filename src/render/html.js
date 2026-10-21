@@ -191,12 +191,13 @@ function blockElement(state, node, context) {
 }
 
 function componentElement(state, node, context) {
-  const { frame, frameWidth, height } = node.component;
+  const { frame, frameWidth, height, placeholder } = node.component;
   const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
   if (context.excerpt === undefined) properties.dataLine = node.position.start.line;
   if (!frame) properties.dataFrame = 'none';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
-  const box = element('div', { className: ['component-box'], ...(height === null ? {} : { style: `--component-height:${height.height};--component-ratio:${height.ratio}` }) }, []);
+  const size = height !== null ? `--component-height:${height.height};--component-ratio:${height.ratio}` : placeholder !== null ? `--component-placeholder-narrow:${placeholder.narrow};--component-placeholder-wide:${placeholder.wide}` : null;
+  const box = element('div', { className: ['component-box'], ...(size === null ? {} : { style: size }) }, []);
   const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
   return element('figure', properties, [box, ...caption]);
 }

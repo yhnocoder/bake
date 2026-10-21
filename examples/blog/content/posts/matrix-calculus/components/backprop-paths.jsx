@@ -9,7 +9,7 @@ export const params = {
     default: 'chain',
   },
 }
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 128, wide: 200 } }
 
 const descriptions = {
   chain: '反向传播的方向：从 y 经过 u 传回 x，只有一条路径',

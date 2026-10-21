@@ -38,7 +38,7 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
 
   await t.test('one Escape closes only the chat while the keyboard focus is in it, and only an overlay of the theme while the focus is on the page', async (t) => {
     const { page } = await openBrowser(t, base);
-    await page.addInitScript(() => localStorage.setItem('bk-toc', 'tabs'));
+    await page.addInitScript(() => localStorage.setItem('bk-toc', 'dots'));
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
     const chatOpen = () => page.locator('.bk-chat').evaluate((chat) => chat.hasAttribute('data-open'));
@@ -70,13 +70,13 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
 
     await page.locator('.bk-chat-launcher').click();
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
-    await page.locator('.bk-toc-tab').nth(1).hover();
-    await page.locator('.bk-toc-index.is-on').waitFor({ state: 'attached' });
+    await page.locator('.bk-toc-dot-item').nth(1).hover();
+    await page.locator('.bk-toc-popover.is-on').waitFor({ state: 'attached' });
     await focusQuestion();
     await page.keyboard.press('Escape');
     await settle();
     assert.equal(await chatOpen(), false, 'Escape in the chat leaves the chat open');
-    assert.equal(await page.locator('.bk-toc-index.is-on').count(), 1, 'Escape in the chat closes the chapter card');
+    assert.equal(await page.locator('.bk-toc-popover.is-on').count(), 1, 'Escape in the chat closes the chapter card');
   });
 
   await t.test('an Escape that ends the composition of an input method closes neither the chat nor an overlay of the theme', async (t) => {

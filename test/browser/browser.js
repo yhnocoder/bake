@@ -43,8 +43,8 @@ export function settle(target) {
     await frame();
     const roots = [document, ...[...document.querySelectorAll('*')].flatMap((host) => host.shadowRoot ?? [])];
     const all = element === undefined ? roots.flatMap((root) => root.getAnimations()) : element.getAnimations({ subtree: true });
-    // why: an animation inside a subtree that content-visibility hides does not advance
-    const animations = all.filter((animation) => animation.playState === 'running' && animation.effect?.getComputedTiming().endTime !== Infinity && animation.effect.target?.checkVisibility() !== false);
+    // why: an animation inside a subtree that content-visibility hides does not advance, and an animation driven by a scroll timeline, such as the fades at the edges of a scrolling code block, runs for as long as the page is open
+    const animations = all.filter((animation) => animation.playState === 'running' && animation.timeline instanceof DocumentTimeline && animation.effect?.getComputedTiming().endTime !== Infinity && animation.effect.target?.checkVisibility() !== false);
     // why: Chromium sometimes leaves the finished promise of a finished CSS transition pending, so the play state is read in every frame
     while (animations.some((animation) => animation.playState === 'running')) await frame();
     await frame();

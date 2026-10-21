@@ -7,7 +7,7 @@ import 'bake/theme/styles/home.css';
 import 'bake/theme/styles/not-found.css';
 import 'bake/theme/styles/print.css';
 import './styles/bento.css';
-import { resolveWidths, startArticle, startHome, startLayout, startNotFound, startSettings } from 'bake/theme/client';
+import { resolveWidths, startArticle, startHome, startLayout, startLeaveFade, startNotFound, startSettings } from 'bake/theme/client';
 import { startNotes } from './scripts/notes.js';
 import { startCardScroll } from './scripts/card-scroll.js';
 import { placeCards, releaseCards } from './scripts/spans.js';
@@ -15,6 +15,7 @@ import { placeCards, releaseCards } from './scripts/spans.js';
 const home = document.querySelector('.bk-home');
 const notFound = document.querySelector('.bk-not-found');
 startSettings();
+startLeaveFade();
 if (home !== null) startHome(home);
 if (notFound !== null) startNotFound(notFound);
 

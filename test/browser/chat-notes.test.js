@@ -35,14 +35,14 @@ const NOTE = [
   '',
   '## 锚点',
   '',
-  '- 每个标题都有锚点。[Bake 写法一览 §02](/2026-10/syntax/#headings)',
+  '- 每个标题都有锚点。[Bake 写法一览 §02](/2026-10/syntax/#标题与锚点)',
   '- 雅可比矩阵按定义写出。[雅可比矩阵 §01](/2026-10/jacobian/#定义)',
   '- 这一条指向不存在的文章。[不存在](/2026-10/nowhere/)',
   '- 这一条指向不存在的小节。[缺的小节](/2026-10/syntax/#nowhere)',
   '',
   '> 标题会得到锚点。',
   '>',
-  '> 出自[《Bake 写法一览》§02](/2026-10/syntax/#headings)',
+  '> 出自[《Bake 写法一览》§02](/2026-10/syntax/#标题与锚点)',
   '',
   '## 还没弄清的',
   '',
@@ -56,7 +56,7 @@ test('the history of the AI chat', async (t) => {
     const { page, api, problems } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
-    api.answers.push({ body: text('第一个回答，见 [标题](#headings)。') }, { body: text('第二个回答。') });
+    api.answers.push({ body: text('第一个回答，见 [标题](#标题与锚点)。') }, { body: text('第二个回答。') });
     await ask(page, '第一个问题');
     await answered(page, 1);
     await ask(page, '第二个问题');
@@ -79,7 +79,7 @@ test('the history of the AI chat', async (t) => {
     await row.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-history').waitFor({ state: 'detached' });
     assert.deepEqual(await page.locator('.bk-chat-user').allTextContents(), ['第一个问题', '第二个问题']);
-    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), '#headings');
+    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), `#${encodeURIComponent('标题与锚点')}`);
     api.answers.push({ body: text('第三个回答。') });
     await ask(page, '第三个问题');
     await answered(page, 3);
@@ -90,7 +90,7 @@ test('the history of the AI chat', async (t) => {
         .map((message) => [message.role, message.content]),
       [
         ['user', '第一个问题'],
-        ['assistant', '第一个回答，见 [标题](#headings)。'],
+        ['assistant', '第一个回答，见 [标题](#标题与锚点)。'],
         ['user', '第二个问题'],
         ['assistant', '第二个回答。'],
         ['user', '第三个问题'],
@@ -112,14 +112,14 @@ test('the history of the AI chat', async (t) => {
     await page.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-note').filter({ hasText: '这段对话来自《Bake 写法一览》，接着问时会读这篇文章。' }).waitFor();
     assert.deepEqual(await page.locator('.bk-chat-user').allTextContents(), ['第一个问题', '第二个问题', '第三个问题']);
-    assert.equal(await page.locator('.bk-chat-answer a').first().getAttribute('href'), `${base}/2026-10/syntax/#headings`);
-    api.answers.push({ body: text('第四个回答，见 [标题](#headings)。') });
+    assert.equal(await page.locator('.bk-chat-answer a').first().getAttribute('href'), `${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`);
+    api.answers.push({ body: text('第四个回答，见 [标题](#标题与锚点)。') });
     await ask(page, '第四个问题');
     await answered(page, 4);
     const system = chatRequests(api).at(-1).body.messages[0].content;
     assert.ok(system.includes(`<article>\n${syntaxSource}\n</article>`), 'the article of a conversation opened on the homepage is its context');
     assert.ok(system.includes('[the heading](/2026-10/syntax/#id)'));
-    assert.equal(await page.locator('.bk-chat-answer a').last().getAttribute('href'), `${base}/2026-10/syntax/#headings`);
+    assert.equal(await page.locator('.bk-chat-answer a').last().getAttribute('href'), `${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`);
 
     await openMenu(page);
     await page.locator('.bk-chat-menu-item', { hasText: '新对话' }).click();
@@ -190,7 +190,7 @@ test('the notes of the AI chat', async (t) => {
     assert.deepEqual(
       await card.locator('.bk-chat-note-body li a').evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')])),
       [
-        ['Bake 写法一览 §02', `${base}/2026-10/syntax/#headings`],
+        ['Bake 写法一览 §02', `${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`],
         ['雅可比矩阵 §01', `${base}/2026-10/jacobian/#%E5%AE%9A%E4%B9%89`],
       ],
     );
@@ -204,8 +204,8 @@ test('the notes of the AI chat', async (t) => {
     const markdown = await card.locator('.bk-chat-note-source').textContent();
     assert.ok(markdown.startsWith(`# 标题与锚点的写法\n\n整理自 `));
     assert.ok(markdown.includes(`在[《Bake 写法一览》](${base}/2026-10/syntax/)的对话。`));
-    assert.ok(markdown.includes(`[Bake 写法一览 §02](${base}/2026-10/syntax/#headings)`));
-    assert.ok(markdown.includes(`> 出自[《Bake 写法一览》§02](${base}/2026-10/syntax/#headings)`));
+    assert.ok(markdown.includes(`[Bake 写法一览 §02](${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
+    assert.ok(markdown.includes(`> 出自[《Bake 写法一览》§02](${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
     assert.ok(markdown.includes('- 这一条指向不存在的文章。不存在\n'));
     await card.getByRole('button', { name: '复制 Markdown' }).click();
     await card.locator('.bk-chat-note-hint', { hasText: '已复制 Markdown。' }).waitFor();
@@ -239,12 +239,12 @@ test('the notes of the AI chat', async (t) => {
     await redo.fill('只留锚点');
     await page.keyboard.press('Shift+Enter');
     await page.keyboard.type('写短一点');
-    api.answers.push({ body: text('# 锚点\n\n- 每个标题都有锚点。[Bake 写法一览 §02](/2026-10/syntax/#headings)') });
+    api.answers.push({ body: text('# 锚点\n\n- 每个标题都有锚点。[Bake 写法一览 §02](/2026-10/syntax/#标题与锚点)') });
     await page.keyboard.press('Enter');
     await card.locator('.bk-chat-note-count', { hasText: '第 2/2 版' }).waitFor();
     const rewrite = chatRequests(api).at(-1).body.messages[1].content;
     assert.ok(rewrite.includes('<note>\n# 标题与锚点的写法\n'));
-    assert.ok(rewrite.includes('[Bake 写法一览 §02](/2026-10/syntax/#headings)'));
+    assert.ok(rewrite.includes(`[Bake 写法一览 §02](/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
     assert.ok(rewrite.endsWith('Rewrite this note as the reader asks: 只留锚点\n写短一点\nKeep what the request does not ask to change.'));
     assert.equal(await card.locator('h4').textContent(), '锚点');
     assert.equal(await card.locator('.bk-chat-note-intro').nth(1).textContent(), '按要求重新整理：只留锚点\n写短一点');

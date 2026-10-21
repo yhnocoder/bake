@@ -244,6 +244,7 @@ function cardPreview(card) {
         sync();
       } catch (error) {
         stage.remove();
+        card.toggleAttribute('data-preview-failed', true);
         state = 'failed';
         console.error(`the preview ${card.dataset.preview} cannot be shown`, error);
       }

@@ -5,7 +5,7 @@ import { chainArrows, drawChain } from './lib/graph.js'
 import { SketchView } from './lib/view.jsx'
 
 export const params = {}
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 1414, wide: 899 } }
 
 const norm = (name, mark) => ({ op: '$\\mathrm{RMSNorm}$', w: `$\\gamma_{${name}}$：$d$`, fp: true, mark })
 const attention = {

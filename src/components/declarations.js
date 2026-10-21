@@ -10,9 +10,10 @@ const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 const PIXELS = /^\d+(?:\.\d+)?$/;
 const COMMON_FIELDS = ['label', 'type', 'default'];
 const TYPE_FIELDS = { number: ['min', 'max', 'step'], text: [], boolean: [], enum: ['options'], file: [] };
-const LAYOUT_FIELDS = ['width', 'height', 'frame'];
+const LAYOUT_FIELDS = ['width', 'height', 'placeholder', 'frame'];
 const LAYOUT_WIDTH_CHOICES = 'body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%';
 const HEIGHT_FORMS = 'a number of pixels or { ratio }, the width divided by the height, such as { ratio: 1.5 }';
+const PLACEHOLDER_FORM = '{ narrow, wide }, the heights in pixels on screens narrower than 600 pixels and from 600 pixels up, such as { narrow: 600, wide: 340 }';
 
 export const REMOVED_LAYOUT_FIELDS = Object.freeze({
   narrowHeight: 'layout.narrowHeight no longer exists: a component without layout.height takes the height of its content at every screen width, and layout.height applies at every screen width; delete narrowHeight',
@@ -64,6 +65,8 @@ export function layoutProblems(layout) {
   }
   if (layout.width !== undefined && readWidth(layout.width) === null) report('width', `layout.width must be ${LAYOUT_WIDTH_CHOICES}, got ${describeValue(layout.width)}`);
   if (layout.height !== undefined && readHeight(layout.height) === null) report('height', `layout.height must be ${HEIGHT_FORMS}, got ${describeValue(layout.height)}`);
+  if (layout.placeholder !== undefined && readPlaceholder(layout.placeholder) === null) report('placeholder', `layout.placeholder must be ${PLACEHOLDER_FORM}, got ${describeValue(layout.placeholder)}`);
+  else if (layout.placeholder !== undefined && layout.height !== undefined) report('placeholder', 'layout.placeholder is the height before a component without layout.height starts; a component with layout.height keeps that height, so delete placeholder');
   if (layout.frame !== undefined && typeof layout.frame !== 'boolean') report('frame', `layout.frame must be true or false, got ${describeValue(layout.frame)}`);
   return problems;
 }
@@ -96,8 +99,9 @@ export function resolveComponent(name, component, attributes, files) {
   }
   const width = componentWidth(name, component.layout, attributes.width, report);
   const height = componentHeight(name, component.layout, attributes.height, report);
+  const placeholder = height === null && component.layout.placeholder !== undefined ? readPlaceholder(component.layout.placeholder) : null;
   const fileParams = Object.keys(component.params).filter((param) => component.params[param].type === 'file');
-  return { params, fileParams, ...width, height, frame: component.layout.frame !== false, problems };
+  return { params, fileParams, ...width, height, placeholder, frame: component.layout.frame !== false, problems };
 }
 
 export function fileProblem(declaration, value, files) {
@@ -134,6 +138,13 @@ function readHeight(value) {
   if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? { height: `${round(value, 2)}px`, ratio: 'auto' } : null;
   if (!isPlainObject(value) || Object.keys(value).length !== 1 || !Number.isFinite(value.ratio) || !(value.ratio > 0)) return null;
   return { height: 'auto', ratio: String(round(value.ratio, 4)) };
+}
+
+function readPlaceholder(value) {
+  if (!isPlainObject(value) || Object.keys(value).length !== 2) return null;
+  const { narrow, wide } = value;
+  if (![narrow, wide].every((height) => Number.isFinite(height) && height > 0)) return null;
+  return { narrow: `${round(narrow, 2)}px`, wide: `${round(wide, 2)}px` };
 }
 
 export function convertAttribute(declaration, raw) {

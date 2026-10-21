@@ -69,8 +69,8 @@
   grid-row: 1 / span 4;
   grid-template-rows: subgrid;
   justify-items: center;
-  /* the width of the typeset title, which arrives after the heatmap is drawn; reserving it keeps the heatmap from shrinking then */
-  min-width: 6em;
+  /* the width of the typeset title, which arrives after the heatmap is drawn; reserving it keeps the heatmap from shrinking then. MathJax sizes the title in ex of this font, so the reserve is in ex too */
+  min-width: 10.8ex;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--ink-2);

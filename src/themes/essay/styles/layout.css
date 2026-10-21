@@ -61,7 +61,7 @@
 
 @media (max-width: 999.98px) {
   [data-edge='start']:has(.bk-toc-handle) .bk-settings-panel {
-    --panel-bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
+    --panel-bottom: calc(var(--ui-buttons-height) + 10px + 38px + 14px);
   }
 }
 

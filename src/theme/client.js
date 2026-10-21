@@ -1,5 +1,6 @@
 export { startArticle } from './scripts/article.js';
 export { labelsFor } from './labels.js';
+export { startLeaveFade } from './scripts/leave.js';
 export { startMarkdownCopy } from './scripts/copy.js';
 export { markCurrent } from './scripts/current.js';
 export { closeOnEscape } from './scripts/escape.js';

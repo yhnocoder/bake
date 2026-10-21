@@ -38,7 +38,7 @@ describe('front matter', () => {
       ['tags: [LLM, @3]', 'tags must be a list of strings'],
       ['category: @ml', 'category is set but bake.config.js defines no categories'],
       ['theme: @paper', 'theme must be essay, bento or mine, got "paper"'],
-      ['toc: @sidebar', 'toc must be one of notes, tabs, dots or ticks, got "sidebar"'],
+      ['toc: @sidebar', 'toc must be one of notes, dots or ticks, got "sidebar"'],
       ['draft: @yes', 'draft must be true or false, got "yes"'],
       ['draft:@', 'draft must be true or false, got an empty value'],
       ['preview: @preview.js', 'preview file "preview.js" does not exist'],

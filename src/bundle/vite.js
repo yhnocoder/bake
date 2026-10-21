@@ -49,9 +49,6 @@ export async function browserBuild({ input, plugins = [], alias = [], stylesheet
   return {
     entry: entry?.fileName,
     stylesheets,
-    lazyStylesheets: Object.fromEntries(
-      outputs.filter((output) => output.type === 'asset' && isStylesheet(output) && !stylesheets.includes(output.fileName)).map((asset) => [asset.names[0].replace(/\.css$/, ''), asset.fileName]),
-    ),
     files: outputs.map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source })),
     modules: [...chunks.values()].flatMap((chunk) => chunk.moduleIds),
   };

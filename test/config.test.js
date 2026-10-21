@@ -62,7 +62,7 @@ describe('bake.config.js', () => {
         ["categories: [{ id: 'ml', name: 'ML', color: '#000000', desc: @3 }]", 'categories[0].desc must be a string, got 3'],
       ],
       [
-        ["themes: { essay: { toc: @'sidebar' } }", 'themes.essay.toc must be one of notes, tabs, dots or ticks, got "sidebar"'],
+        ["themes: { essay: { toc: @'sidebar' } }", 'themes.essay.toc must be one of notes, dots or ticks, got "sidebar"'],
         ["home: { groupBy: @'category' }", 'home.groupBy is "category" but bake.config.js defines no categories'],
       ],
     ];
@@ -142,7 +142,7 @@ describe('bake.config.js', () => {
       'themes/mine/options.js:1:1 mine: option "data" has the type "file"; a theme option is set in bake.config.js and cannot name a file of an article',
       'themes/mine/options.js:1:1 mine: option "plain" needs a label, the text shown next to its control',
       'themes/mine/options.js:1:1 mine: option "tags" has the name of the front matter field "tags", so an article could not set it',
-      'themes/mine/options.js:1:1 mine: setting "font" uses a name reserved for Bake; a theme cannot declare theme, font, size, weight, spacing, scheme or script',
+      'themes/mine/options.js:1:1 mine: setting "font" uses a name reserved for Bake; a theme cannot declare theme, size, weight, spacing, font, scheme or script',
       'themes/mine/options.js:1:1 mine: setting "Mode" becomes the attribute data-Mode; use lowercase letters and digits, starting with a letter',
       'themes/mine/options.js:1:1 mine: setting "ink" is a switch and needs two values, the value when it is on and the value when it is off',
       'themes/mine/options.js:1:1 mine: the default of setting "ink" must be one of its values, a, b or c, got "d"',
