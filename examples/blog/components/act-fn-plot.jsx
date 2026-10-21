@@ -25,7 +25,7 @@ export const params = {
 export const layout = { width: 'body' }
 
 const ZOOM_MIN = 0.25
-const TWO_COLUMN_MIN_WIDTH = 480
+const TWO_COLUMN_MIN_WIDTH = 420
 const PANEL_GAP = 14
 const PANEL_TITLE_HEIGHT = 30
 const MIN_PLOT_HEIGHT = 120
