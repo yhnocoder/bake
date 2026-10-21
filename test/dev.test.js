@@ -386,6 +386,21 @@ describe('updates while bake dev runs', () => {
     }
   });
 
+  test('bundles the components again when a module that a component imports from outside components/ changes', async (t) => {
+    const { dir, get } = await serve(t, {
+      'components/demo-chart.js': "import { text } from '../shared/text.js';\n\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = text;\n  }\n}\n",
+      'shared/text.js': "export const text = 'first text';\n",
+      'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }),
+    });
+    const scripts = async () => {
+      const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
+      const names = (await (await get(`/${runtime}`)).text()).match(/demo-chart-[\w-]+\.js/g);
+      return (await Promise.all(names.map(async (name) => (await get(`/assets/${name}`)).text()))).join('\n');
+    };
+    assert.match(await scripts(), /first text/);
+    await save(dir, { 'shared/text.js': "export const text = 'second text';\n" }, async () => /second text/.test(await scripts()), 'the components were not bundled again');
+  });
+
   test('checks an article again when a component that it names is added or changes its parameters', async (t) => {
     const chart = (params) => `export const params = { ${params} };\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {}\n`;
     const { dir, lines } = await serve(t, { 'content/posts/rope/index.md': article({ body: ':::demo-chart{size=2}\n:::\n' }) });

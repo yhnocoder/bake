@@ -224,8 +224,10 @@ async function compileComponents(site, published, errors) {
   const result = await cached(site.results, 'bundle', JSON.stringify([names, settings.preamble]), async () => {
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    const folders = components.map((component) => (component.article === null ? COMPONENTS_DIR : posix.join(component.article, COMPONENTS_DIR)));
-    return { value: { bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors }, inputs: [...new Set([COMPONENTS_DIR, ...folders])] };
+    const bundle = await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch });
+    // why: a bundle that failed has no modules, so it depends on every folder that a component of it can import from
+    const folders = [COMPONENTS_DIR, ...components.flatMap((component) => (component.article === null ? [] : [posix.join(component.article, COMPONENTS_DIR)]))];
+    return { value: { bundle, errors: bundleErrors }, inputs: bundle === null ? folders : blogPaths(root, bundle.modules) };
   });
   errors.push(...result.errors);
   return result.bundle;
