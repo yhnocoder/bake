@@ -52,6 +52,8 @@ export async function updateSite(site, changedPaths = null) {
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
   linkArticles(articles, errors);
+  // why: bake build publishes no draft, so a draft that is half written does not keep the other articles from being published
+  if (!site.drafts) dropDraftErrors(articles, errors);
   const published = articles.filter((article) => article.url !== null && (site.drafts || !article.draft));
   const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), chatBundle()]);
   const assetFiles = assetOutputs(themes, bundle, chat);
@@ -77,6 +79,12 @@ export async function updateSite(site, changedPaths = null) {
   const failed = new Set(errors.map((error) => error.file));
   const drawable = [...shareImages.values()].filter((image) => !failed.has(image.owner));
   return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, assetSources, shareImages: drawable, publicFiles };
+}
+
+function dropDraftErrors(articles, errors) {
+  const folders = articles.filter((article) => article.draft).map((article) => `${article.dir}/`);
+  const kept = errors.filter((error) => !folders.some((folder) => error.file.startsWith(folder)));
+  errors.splice(0, errors.length, ...kept);
 }
 
 // Each cached result keeps the paths of the blog files it read and is dropped when one of them, or a folder that holds one, changes.
