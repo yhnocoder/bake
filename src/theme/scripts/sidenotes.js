@@ -12,12 +12,19 @@ export function startSidenoteHighlight(article, onChange) {
     active = number;
     if (active !== null) highlight(active, true);
   };
-  article.addEventListener('pointerover', (event) => {
+  const over = (event) => {
     const target = event.target.closest(TRIGGER);
     if (target !== null) activate(target.dataset.sidenote);
-  });
-  article.addEventListener('pointerout', (event) => {
+  };
+  const out = (event) => {
     const target = event.target.closest(TRIGGER);
     if (target !== null && !target.contains(event.relatedTarget)) activate(null);
-  });
+  };
+  article.addEventListener('pointerover', over);
+  article.addEventListener('pointerout', out);
+  return () => {
+    article.removeEventListener('pointerover', over);
+    article.removeEventListener('pointerout', out);
+    activate(null);
+  };
 }

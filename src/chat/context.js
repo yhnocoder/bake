@@ -1,9 +1,9 @@
 import { escapeMarkup } from '../escape.js';
 import { articleSource } from '../copy/copy.js';
+import { REGIONS, regionSelector } from '../regions.js';
 import { instructionLines } from './instructions.js';
 
 export const CATALOG_PATH = '_bake/articles.json';
-export const ARTICLE_REGION = '[data-region="article"]';
 export const READ_ARTICLE = 'read_article';
 
 const MAX_TOOL_TEXT = 120000;
@@ -33,7 +33,7 @@ export const chatTools = [
 
 export function currentPage(root) {
   const source = articleSource();
-  const article = document.querySelector(ARTICLE_REGION);
+  const article = document.querySelector(regionSelector(REGIONS.article));
   return {
     address: pageAddress(root, location.pathname),
     site: meta('og:site_name') ?? location.hostname,

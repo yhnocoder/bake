@@ -1,10 +1,11 @@
+import { REGIONS } from 'bake/regions';
 import { Block, SectionHeading, Sidenotes, arrange } from 'bake/theme';
 
 export function Article(props) {
   const { content, labels } = props;
   const { intro, sections, rest } = arrange(content);
   return (
-    <article class="bk-article" data-region="article">
+    <article class="bk-article" data-region={REGIONS.article}>
       <Flow entries={intro} labels={labels} />
       {sections.map(({ section, notes, entries }) => (
         <section class="bk-section">

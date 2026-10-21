@@ -1,3 +1,4 @@
+import { REGIONS } from 'bake/regions';
 import { Block, SectionHeading, Sidenotes, arrange, subsectionOf } from 'bake/theme';
 import { levelSpan } from './spans.js';
 
@@ -6,7 +7,7 @@ export function Article(props) {
   const { intro, sections, rest } = arrange(content, { recaps: true });
   const introNotes = intro.flatMap((entry) => entry.notes);
   return (
-    <article class="bk-article bt-article" data-region="article">
+    <article class="bk-article bt-article" data-region={REGIONS.article}>
       {intro.length === 0 && introNotes.length === 0 ? null : (
         <div class="bt-intro">
           {intro.map(({ block, afterHeading }) => (

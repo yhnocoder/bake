@@ -1,4 +1,5 @@
 import { files, loaders } from 'bake:component-loaders';
+import { livePage } from '../live.js';
 
 const FRAME = 'figure.component[data-component]';
 const BOX = '.component-box';
@@ -143,10 +144,12 @@ function pausePrefetch(name) {
   prefetching = null;
 }
 
-const frames = observeFrames();
-if (document.readyState === 'complete') queuePrefetch(frames);
-else addEventListener('load', () => queuePrefetch(frames), { once: true });
-document.addEventListener('bake:content', () => queuePrefetch(observeFrames()));
+livePage(() => {
+  const frames = observeFrames();
+  if (document.readyState === 'complete') queuePrefetch(frames);
+  else addEventListener('load', () => queuePrefetch(frames), { once: true });
+  return () => observer.disconnect();
+});
 addEventListener('resize', () => {
   if (nearMargin() === margin) return;
   margin = nearMargin();

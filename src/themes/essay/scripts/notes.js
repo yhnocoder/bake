@@ -1,4 +1,4 @@
-import { CONTENT_EVENT, EASING, LAYOUT_EVENT, flash, labelsFor, notesColumnScreen, reducedMotion } from 'bake/theme/client';
+import { EASING, LAYOUT_EVENT, flash, labelsFor, notesColumnScreen, reducedMotion } from 'bake/theme/client';
 
 const NOTE_GAP = 12;
 const TINTED_CONTAINER = 'p, li, td, th, h2, h3, h4, h5, h6, figcaption, blockquote, .bk-block';
@@ -11,46 +11,41 @@ const closing = new WeakSet();
 
 export function startNotes(article) {
   const labels = labelsFor(document.documentElement.lang);
-  let layer = null;
-  let placed = [];
-  const read = () => {
-    layer?.remove();
-    const originals = [...article.querySelectorAll('.bk-sidenote')];
-    layer = null;
-    placed = [];
-    if (originals.length === 0) return;
-    layer = document.createElement('div');
-    layer.className = 'bk-notes-layer';
-    layer.dataset.ui = '';
-    placed = originals.map((original) => {
-      const note = original.cloneNode(true);
-      for (const element of [note, ...note.querySelectorAll('[id]')]) element.removeAttribute('id');
-      note.setAttribute('aria-label', labels.sidenote(original.dataset.sidenote));
-      layer.append(note);
-      return { note, number: original.dataset.sidenote };
-    });
-    article.append(layer);
-  };
-
-  read();
-  document.addEventListener(LAYOUT_EVENT, (event) => {
-    if (layer !== null) placeNotes(article, layer, placed, event.detail);
+  const originals = [...article.querySelectorAll('.bk-sidenote')];
+  const layer = document.createElement('div');
+  layer.className = 'bk-notes-layer';
+  layer.dataset.ui = '';
+  const placed = originals.map((original) => {
+    const note = original.cloneNode(true);
+    for (const element of [note, ...note.querySelectorAll('[id]')]) element.removeAttribute('id');
+    note.setAttribute('aria-label', labels.sidenote(original.dataset.sidenote));
+    layer.append(note);
+    return { note, number: original.dataset.sidenote };
   });
-  document.addEventListener(CONTENT_EVENT, read);
-
-  article.addEventListener('click', (event) => {
+  if (originals.length > 0) article.append(layer);
+  const place = (event) => {
+    if (originals.length > 0) placeNotes(article, layer, placed, event.detail);
+  };
+  const click = (event) => {
     const link = event.target.closest('.sidenote-ref a');
     if (link === null || event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
     const number = link.parentElement.dataset.sidenote;
     if (notesColumnScreen.matches) {
-      const note = layer?.querySelector(`.bk-sidenote[data-sidenote="${number}"]`) ?? null;
+      const note = layer.querySelector(`.bk-sidenote[data-sidenote="${number}"]`);
       if (note !== null) flash(note);
       return;
     }
     const inline = article.querySelector(`.bk-sidenote[data-sidenote="${number}"]:not(.bk-notes-layer *)`);
     if (inline !== null) toggleInline(article, inline);
-  });
+  };
+  document.addEventListener(LAYOUT_EVENT, place);
+  article.addEventListener('click', click);
+  return () => {
+    document.removeEventListener(LAYOUT_EVENT, place);
+    article.removeEventListener('click', click);
+    layer.remove();
+  };
 }
 
 function placeNotes(article, layer, placed, measured) {

@@ -12,6 +12,8 @@ export const PUBLIC_MODULES = Object.freeze([
   { name: 'bake/copy', file: join(SRC_DIR, 'copy/copy.js'), importers: ['themes'] },
   { name: 'bake/fragments', file: join(SRC_DIR, 'fragments.js'), importers: ['themes'] },
   { name: 'bake/keys', file: join(SRC_DIR, 'keys.js'), importers: ['themes'] },
+  { name: 'bake/live', file: join(SRC_DIR, 'live.js'), importers: ['themes'] },
+  { name: 'bake/regions', file: join(SRC_DIR, 'regions.js'), importers: ['themes'] },
   { name: 'bake/math', file: join(SRC_DIR, 'components/math.js'), importers: ['components', 'chat'] },
   { name: 'bake/kit', file: join(SRC_DIR, 'kit/index.js'), importers: ['components'] },
 ]);

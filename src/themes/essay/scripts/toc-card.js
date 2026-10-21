@@ -52,10 +52,6 @@ export function readOutline(nav) {
   return { chapters, entries, leads: new Map() };
 }
 
-export function outlineKey(outline) {
-  return JSON.stringify(outline.chapters.map((chapter) => [chapter.id, chapter.number, chapter.title, chapter.recap, chapter.sections.map((section) => [section.id, section.title, section.recap])]));
-}
-
 export function chapterCard(context, chapterIndex, state) {
   const chapter = context.outline.chapters[chapterIndex];
   const current = chapterIndex === state.chapter;
@@ -275,9 +271,6 @@ export function createCardHost({ variant, showDelay }) {
       render(shownChapter, true);
       if (joined) position();
       mark(false);
-    },
-    refresh() {
-      if (!panel && isShown()) render(shownChapter, true);
     },
     relayout() {
       if (isShown()) position();

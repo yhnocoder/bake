@@ -6,10 +6,6 @@ import { startSidenoteHighlight } from './sidenotes.js';
 import { startToast } from './toast.jsx';
 
 export function startArticle(article, { onSidenote } = {}) {
-  startToast();
-  startFolds(article);
-  startSidenoteHighlight(article, onSidenote);
-  startHeadingLinks();
-  startMarkdownCopy(article);
-  startPreviewCard(article);
+  const stops = [startToast(), startFolds(article), startSidenoteHighlight(article, onSidenote), startHeadingLinks(), startMarkdownCopy(article), startPreviewCard(article)];
+  return () => stops.forEach((stop) => stop());
 }

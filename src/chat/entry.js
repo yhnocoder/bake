@@ -1,8 +1,10 @@
+import { livePage } from '../live.js';
+import { REGIONS, regionSelector } from '../regions.js';
 import styles from './entry.css?inline';
 import { chatLabels } from './labels.js';
 import petStyles from './pet.css?inline';
 import { createPet, petSource } from './pet.js';
-import { ARTICLE_REGION, selectedRange } from './selection.js';
+import { selectedRange } from './selection.js';
 import { passkeysAvailable } from './vault.js';
 
 const ASK_GAP = 8;
@@ -32,6 +34,10 @@ function startChat(root) {
   launcher.setAttribute('aria-expanded', 'false');
   let chat = null;
   const loadChat = () => (chat ??= import('./bubbles.jsx').then((module) => module.createChat({ shadow, root, labels, pet, petSource: () => petSource(root), launcher })));
+  livePage(() => {
+    chat?.then((controls) => controls.readPage());
+    return () => {};
+  });
   const greet = () => {
     pet.load();
     loadChat();
@@ -55,7 +61,7 @@ function startChat(root) {
   const follow = () => {
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
-      range = selectedRange(document.querySelector(ARTICLE_REGION));
+      range = selectedRange(document.querySelector(regionSelector(REGIONS.article)));
       ask.hidden = range === null;
       if (range !== null) place();
     });

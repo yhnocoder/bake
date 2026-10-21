@@ -1,4 +1,5 @@
 import { fragmentOf } from 'bake/fragments';
+import { REGIONS } from 'bake/regions';
 
 export function Toc(props) {
   const { toc, labels } = props;
@@ -11,7 +12,7 @@ export function Toc(props) {
           <span class="bk-toc-label-notes">{labels.notes}</span>
         </p>
         <div class="bk-toc-list">
-          <ol class="bk-toc-chapters" data-region="toc">
+          <ol class="bk-toc-chapters" data-region={REGIONS.toc}>
             {toc.map((chapter) => (
               <li class="bk-toc-chapter" data-target={chapter.id} data-state="ahead">
                 <a class="bk-toc-chapter-title" href={fragmentOf(chapter.id)}>

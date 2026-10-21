@@ -1,3 +1,4 @@
+import { REGIONS } from 'bake/regions';
 import { FontLinks } from './font-links.jsx';
 import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
@@ -24,10 +25,10 @@ export function ArticleDocument(props) {
         ))}
       </head>
       <body class={props.bodyClass} style={labelStyle(labels)}>
-        {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region="glyphs" innerHTML={article.content.glyphs} />}
+        {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region={REGIONS.glyphs} innerHTML={article.content.glyphs} />}
         {props.children}
         <PreviewTemplates previews={article.content.previews} labels={labels} />
-        <script type="application/json" class="bk-source" data-region="source" innerHTML={sourceJson(article.content.source)} />
+        <script type="application/json" class="bk-source" data-region={REGIONS.source} innerHTML={sourceJson(article.content.source)} />
       </body>
     </html>
   );

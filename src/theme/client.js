@@ -7,7 +7,7 @@ export { startFolds } from './scripts/folds.js';
 export { followLink, startHeadingLinks } from './scripts/heading-links.jsx';
 export { startHome } from './scripts/home.js';
 export { LAYOUT_EVENT, currentLayout, requestLayout, startLayout } from './scripts/layout.js';
-export { CONTENT_EVENT, EASING, flash, oncePerFrame, reducedMotion } from './scripts/motion.js';
+export { EASING, flash, oncePerFrame, reducedMotion } from './scripts/motion.js';
 export { startNotFound } from './scripts/not-found.js';
 export { startPreviewCard } from './scripts/preview-card.jsx';
 export { hoverWithFinePointer, leftColumnScreen, notesColumnScreen, withoutHover } from './scripts/screens.js';

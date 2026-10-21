@@ -93,12 +93,6 @@ export function drawerView(view) {
         button.classList.toggle('is-read', buttonIndex < next.chapter);
       });
     },
-    refresh() {
-      if (!isOpen()) return;
-      const scrollTop = detail.scrollTop;
-      detail.replaceChildren(chapterCard(view, selected, state()));
-      detail.scrollTop = scrollTop;
-    },
     saved() {
       return isOpen() ? { selected, detail: detail.scrollTop, index: index.scrollTop } : null;
     },

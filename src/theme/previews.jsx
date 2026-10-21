@@ -1,7 +1,9 @@
+import { REGIONS } from 'bake/regions';
+
 export function PreviewTemplates(props) {
   const { previews, labels } = props;
   return (
-    <div class="bk-previews" data-region="previews">
+    <div class="bk-previews" data-region={REGIONS.previews}>
       {previews.map((preview) =>
         preview.kind === 'reference' ? (
           <template class="bk-preview-template" data-target={preview.target} data-kind="reference">

@@ -30,8 +30,8 @@ export async function startParamBars({ file, token, version, setVersion, compone
   }
 
   scan();
-  document.addEventListener('bake:content', scan);
   return {
+    scan,
     setShown(value) {
       visible = value;
       for (const bar of document.querySelectorAll(BAR)) bar.hidden = !value;

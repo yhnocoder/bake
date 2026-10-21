@@ -1,4 +1,4 @@
-import { CONTENT_EVENT, oncePerFrame } from './motion.js';
+import { oncePerFrame } from './motion.js';
 import { leftColumnScreen, notesColumnScreen, phoneScreen } from './screens.js';
 import { declaresNaturalWidth } from './widths.js';
 
@@ -42,29 +42,41 @@ export function startLayout(article, arrangements) {
     if (now) run();
     else pass();
   };
-  new ResizeObserver(([entry]) => {
+  const resizes = new ResizeObserver(([entry]) => {
     const changed = entry.contentRect.width !== width;
     width = entry.contentRect.width;
     schedule(changed);
-  }).observe(article);
-  addEventListener('resize', () => schedule(true));
-  for (const screen of [leftColumnScreen, notesColumnScreen, phoneScreen]) screen.addEventListener('change', () => schedule(true, true));
-  document.fonts.ready.then(() => schedule(true, true));
-  document.fonts.addEventListener('loadingdone', (event) => {
-    const families = measuredFamilies(article);
-    const fresh = event.fontfaces.some((face) => families.has(face.family.replace(QUOTES, '')));
-    document.fonts.ready.then(() => schedule(true, fresh));
   });
-  document.addEventListener(CONTENT_EVENT, () => schedule(true, true));
+  resizes.observe(article);
+  const controller = new AbortController();
+  const { signal } = controller;
+  addEventListener('resize', () => schedule(true), { signal });
+  for (const screen of [leftColumnScreen, notesColumnScreen, phoneScreen]) screen.addEventListener('change', () => schedule(true, true), { signal });
+  document.fonts.ready.then(() => schedule(true, true));
+  document.fonts.addEventListener(
+    'loadingdone',
+    (event) => {
+      const families = measuredFamilies(article);
+      const fresh = event.fontfaces.some((face) => families.has(face.family.replace(QUOTES, '')));
+      document.fonts.ready.then(() => schedule(true, fresh));
+    },
+    { signal },
+  );
   article.addEventListener(
     'toggle',
     (event) => {
       const block = event.target.closest(WIDTH_BLOCKS);
       schedule(block !== null && !declaresNaturalWidth(block));
     },
-    true,
+    { capture: true, signal },
   );
   pass();
+  return () => {
+    resizes.disconnect();
+    controller.abort();
+    schedule = () => {};
+    last = null;
+  };
 }
 
 function measuredFamilies(article) {

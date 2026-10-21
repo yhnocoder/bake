@@ -17,19 +17,23 @@ export function startCardScroll(article) {
     active = card;
     card.setAttribute('data-active', '');
   };
-  document.addEventListener('pointerdown', (event) => activate(event.target.closest?.(OVERFLOWING) ?? null));
-  article.addEventListener('focusin', (event) => activate(event.target.closest(OVERFLOWING)));
-  article.addEventListener('focusout', (event) => {
-    if (active !== null && !active.contains(event.relatedTarget)) deactivate();
-  });
+  const scroll = (event) => {
+    const card = event.target;
+    if (!(card instanceof Element) || !card.matches(OVERFLOWING)) return;
+    card.toggleAttribute('data-end', card.scrollTop + card.clientHeight >= card.scrollHeight - 1);
+  };
+  const controller = new AbortController();
+  const { signal } = controller;
+  document.addEventListener('pointerdown', (event) => activate(event.target.closest?.(OVERFLOWING) ?? null), { signal });
+  article.addEventListener('focusin', (event) => activate(event.target.closest(OVERFLOWING)), { signal });
   article.addEventListener(
-    'scroll',
+    'focusout',
     (event) => {
-      const card = event.target;
-      if (!(card instanceof Element) || !card.matches(OVERFLOWING)) return;
-      card.toggleAttribute('data-end', card.scrollTop + card.clientHeight >= card.scrollHeight - 1);
+      if (active !== null && !active.contains(event.relatedTarget)) deactivate();
     },
-    true,
+    { signal },
   );
+  article.addEventListener('scroll', scroll, { capture: true, signal });
   closeOnEscape(article, deactivate);
+  return () => controller.abort();
 }

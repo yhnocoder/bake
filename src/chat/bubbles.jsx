@@ -529,17 +529,14 @@ function Chat(props) {
   const escape = (event) => {
     if (event.key === 'Escape' && open() && !event.defaultPrevented && !composing(event)) hide();
   };
-  const refresh = () => (page = currentPage(root));
   document.addEventListener('pointerdown', outside);
   document.addEventListener('keydown', escape);
-  document.addEventListener('bake:content', refresh);
   onCleanup(() => {
     document.removeEventListener('pointerdown', outside);
     document.removeEventListener('keydown', escape);
-    document.removeEventListener('bake:content', refresh);
   });
 
-  props.ref({ open: show, toggle, ask });
+  props.ref({ open: show, toggle, ask, readPage: () => (page = currentPage(root)) });
 
   const updateFade = () => {
     const fade = list.scrollHeight - list.clientHeight + list.scrollTop > 2;

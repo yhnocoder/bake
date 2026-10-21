@@ -58,6 +58,10 @@ export function placeCards(article) {
   setStyle(grid, '--bt-height', `${Math.max(0, ...tops) - gap}px`);
 }
 
+export function releaseCards() {
+  resizes.disconnect();
+}
+
 function unpack(grid, cards) {
   setAttribute(grid, 'data-packed', null);
   setStyle(grid, '--bt-height', '');

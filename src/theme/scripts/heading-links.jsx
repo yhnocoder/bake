@@ -7,6 +7,7 @@ import { showToast } from './toast.jsx';
 const JUMP_MARGIN = 24;
 const SCROLL_TIMEOUT = 1500;
 const FLASHED = 'h1, h2, h3, h4, h5, h6, p, li, aside, .bk-block';
+let jumpedOnLoad = false;
 
 function jumpTo(target, { smooth = true } = {}) {
   openFoldsAround(target);
@@ -39,7 +40,7 @@ function scrollEnd() {
 
 export function startHeadingLinks() {
   const labels = labelsFor(document.documentElement.lang);
-  document.addEventListener('click', (event) => {
+  const click = (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest('a[href^="#"]');
     if (link === null || link.closest('.sidenote-ref') !== null) return;
@@ -52,9 +53,14 @@ export function startHeadingLinks() {
       return;
     }
     followLink(hash);
-  });
-  const initial = elementOfFragment(document, location.hash);
-  if (initial !== null) requestAnimationFrame(() => jumpTo(initial, { smooth: false }));
+  };
+  document.addEventListener('click', click);
+  if (!jumpedOnLoad) {
+    jumpedOnLoad = true;
+    const initial = elementOfFragment(document, location.hash);
+    if (initial !== null) requestAnimationFrame(() => jumpTo(initial, { smooth: false }));
+  }
+  return () => document.removeEventListener('click', click);
 }
 
 function copyLink(hash, labels) {
