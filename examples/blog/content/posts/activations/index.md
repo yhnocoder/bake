@@ -5,6 +5,7 @@ date: 2026-10-16
 summary: ReLU、GELU 和 SiLU 的公式、导数和实现。这一篇用 bento 主题排版，每一节是一张卡片。
 tags: [激活, bento]
 category: writing
+preview: preview.js
 theme: bento
 ---
 

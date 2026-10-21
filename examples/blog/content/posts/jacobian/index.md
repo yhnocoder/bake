@@ -5,6 +5,7 @@ date: 2026-10-12
 summary: 向量函数的雅可比矩阵收集每个输出对每个输入的偏导数，反向传播用它的转置把梯度传回上一层。
 tags: [数学, 梯度]
 category: math
+preview: preview.js
 ---
 
 设 $f: \mathbb{R}^n \to \mathbb{R}^m$ 是一个可微的向量函数，输入是 $x$，输出是 $y = f(x)$。

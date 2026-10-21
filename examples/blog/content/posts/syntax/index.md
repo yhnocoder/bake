@@ -5,6 +5,7 @@ date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
 category: writing
+preview: preview.js
 toc: notes
 ---
 
@@ -32,6 +33,7 @@ date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
 category: writing
+preview: preview.js
 toc: notes
 ---
 ```
@@ -74,7 +76,7 @@ export default function preview(element) {
 }
 ```
 
-没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章没有 `preview`，卡片显示它的第一张图片。
+没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章的 `preview` 画出 Markdown 源码逐块变成页面的过程。
 
 ## 标题与锚点 {#headings toc="标题"}
 
