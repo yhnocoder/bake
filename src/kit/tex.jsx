@@ -5,12 +5,23 @@ const ANCHORS = { start: 0, middle: 0.5, end: 1 };
 const BASELINES = { top: 0, middle: 0.5, bottom: 1 };
 const TEXT_ANCHORS = { start: 'start', middle: 'middle', end: 'end' };
 
+let math;
+const afterFrame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done)));
+
+// why: evaluating MathJax takes 20 to 30 ms, typesetting the first labels about 10 ms and the first render of a component at its size up to 25 ms, so MathJax is imported after the frame that draws the component that asks for it and the formulas are typeset a frame later, and no frame holds two of them
+function loadMath() {
+  math ??= afterFrame()
+    .then(() => import('bake/math'))
+    .then((module) => afterFrame().then(() => module));
+  return math;
+}
+
 function createFormula(tex, display, host) {
   const [formula] = createResource(
     () => [tex(), display()],
     async ([source, display]) => {
       try {
-        const { texToSvg } = await import('bake/math');
+        const { texToSvg } = await loadMath();
         const svg = await texToSvg(source, { display });
         svg.setAttribute('aria-hidden', 'true');
         return svg;
@@ -87,7 +98,7 @@ export function SvgMathText(props) {
   const [formulas] = createResource(
     () => segments(props.text).filter((part) => part.tex !== undefined),
     async (parts) => {
-      const { texToSvg } = await import('bake/math');
+      const { texToSvg } = await loadMath();
       return Promise.all(
         parts.map((part) =>
           texToSvg(part.tex).catch((error) => {
