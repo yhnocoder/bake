@@ -250,7 +250,7 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
   });
 
-  await t.test('on phones the button that asks about a selected passage shows while scrolling down hides the chat button', async (t) => {
+  await t.test('on phones the button that asks about a selected passage shows while scrolling down hides the chat button, and asking shows the chat', async (t) => {
     const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 760 } } });
     await page.goto(`${base}/2026-10/syntax/`);
     const launcher = page.locator('.bk-chat-launcher');
@@ -267,7 +267,13 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
       getSelection().removeAllRanges();
       getSelection().addRange(range);
     });
-    await page.locator('.bk-chat-ask').waitFor();
+    await page.locator('.bk-chat-ask').click();
+    await page.locator('.bk-chat[data-open]').waitFor();
+    await page.waitForFunction(() => {
+      const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
+      const composer = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-composer');
+      return getComputedStyle(composer).visibility === 'visible' && seenOpacity(composer) === 1;
+    }, null, { timeout: 5000 });
   });
 
   await t.test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the chat without a quote', async (t) => {

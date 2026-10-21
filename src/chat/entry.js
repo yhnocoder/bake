@@ -27,7 +27,8 @@ function startChat(root) {
   launcher.setAttribute('aria-haspopup', 'dialog');
   launcher.append(pet.element);
   shadow.append(style, launcher);
-  document.querySelector('[data-edge="end"]').append(host);
+  const edge = document.querySelector('[data-edge="end"]');
+  edge.append(host);
   const ask = button('bk-chat-ask', labels.ask);
   ask.hidden = true;
   const askHost = document.createElement('div');
@@ -82,6 +83,7 @@ function startChat(root) {
     if (range === null) return;
     const chosen = range.cloneRange();
     ask.hidden = true;
+    edge.removeAttribute('data-hidden');
     (await loadChat()).ask(chosen);
   });
 }
