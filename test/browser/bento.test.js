@@ -165,27 +165,34 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.close();
   });
 
-  await t.test('below 1000 pixels the grid has as many columns of the desktop width as fit, a card keeps its span when it takes at most half of them and the whole row otherwise, cards follow the order of the article and the cards of a row are equally tall', async () => {
+  await t.test('below 1000 pixels the cards wrap into rows in the order of the article, a card is as wide as its span in desktop columns or takes the row when that is more than half of it, and the cards of a row fill it and are equally tall', async () => {
     const page = await open('bento-cards');
     const expected = {
-      768: [5, { 'Wide section': 5, 'Body one': 2, 'Body two': 2, 'Page section': 5, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 5 }],
-      600: [4, { 'Wide section': 4, 'Body one': 2, 'Body two': 2, 'Page section': 4, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 4 }],
-      430: [3, { 'Wide section': 3, 'Body one': 3, 'Body two': 3, 'Page section': 3, Component: 3, 'Body three': 3, 'Body four': 3, Fixed: 3 }],
+      768: [['Wide section'], ['Body one', 'Body two'], ['Page section'], ['Component', 'Body three'], ['Body four'], ['Fixed']],
+      600: [['Wide section'], ['Body one', 'Body two'], ['Page section'], ['Component', 'Body three'], ['Body four'], ['Fixed']],
+      430: [['Wide section'], ['Body one'], ['Body two'], ['Page section'], ['Component'], ['Body three'], ['Body four'], ['Fixed']],
     };
-    for (const [width, [columns, spans]] of Object.entries(expected)) {
+    for (const [width, names] of Object.entries(expected)) {
       await resize(page, Number(width));
-      assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bt-grid')).gridTemplateColumns.split(' ').length), columns, `${width}px`);
-      const grid = await page.evaluate(gridLayout, columns);
-      assert.deepEqual(grid.spans, spans, `${width}px`);
       const rows = await page.evaluate(() => {
-        const boxes = [...document.querySelectorAll('.bt-grid > .bt-card')].map((card) => card.getBoundingClientRect());
-        const sameRow = (box, other) => Math.abs(other.top - box.top) < 0.5;
-        return {
-          inOrder: boxes.every((box, index) => index === 0 || box.top > boxes[index - 1].bottom || (sameRow(box, boxes[index - 1]) && box.left > boxes[index - 1].right)),
-          unequal: boxes.filter((box, index) => boxes.some((other, before) => before < index && sameRow(box, other) && Math.abs(other.height - box.height) > 0.5)).length,
-        };
+        const grid = document.querySelector('.bt-grid');
+        const gap = parseFloat(getComputedStyle(grid).columnGap);
+        const rows = [];
+        for (const card of grid.querySelectorAll(':scope > .bt-card')) {
+          const box = card.getBoundingClientRect();
+          const row = rows.at(-1);
+          if (row !== undefined && Math.abs(row.top - box.top) < 0.5) row.cards.push({ card, box });
+          else rows.push({ top: box.top, cards: [{ card, box }] });
+        }
+        return rows.map(({ cards }) => ({
+          names: cards.map(({ card }) => card.querySelector('h2 .bk-heading-text').textContent),
+          free: grid.clientWidth - cards.reduce((sum, { box }) => sum + box.width, 0) - gap * (cards.length - 1),
+          inOrder: cards.every(({ box }, index) => index === 0 || box.left > cards[index - 1].box.right),
+          heights: new Set(cards.map(({ box }) => Math.round(box.height))).size,
+        }));
       });
-      assert.deepEqual(rows, { inOrder: true, unequal: 0 }, `${width}px`);
+      assert.deepEqual(rows.map((row) => row.names), names, `${width}px`);
+      for (const row of rows) assert.deepEqual([Math.abs(row.free) < 1, row.inOrder, row.heights], [true, true, 1], `${width}px ${row.names.join(', ')}: ${JSON.stringify(row)}`);
     }
     await page.close();
     const still = await open('bento-cards', { javaScriptEnabled: false, viewport: { width: 768, height: 900 } });

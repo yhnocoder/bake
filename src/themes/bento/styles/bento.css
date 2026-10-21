@@ -46,17 +46,16 @@
 }
 
 .bt-grid {
-  --bt-cols: var(--bt-columns);
-  /* why: below 1000 pixels the cards keep the column width that the grid has on a screen 1000 pixels wide */
+  /* why: below 1000 pixels a card is as wide as its span in the columns that the grid has on a screen 1000 pixels wide, before its row shares the free width */
   --bt-unit: calc((1000px - 2 * var(--bt-wide-gutter) - (var(--bt-columns) - 1) * var(--bt-gap)) / var(--bt-columns));
   display: grid;
-  grid-template-columns: repeat(var(--bt-cols), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--bt-columns), minmax(0, 1fr));
   gap: var(--bt-gap);
   align-items: start;
 }
 
 .bt-grid > .bt-card {
-  grid-column: span min(var(--bt-span), var(--bt-cols));
+  grid-column: span min(var(--bt-span), var(--bt-columns));
 }
 
 @media screen {
@@ -388,12 +387,14 @@
   }
 
   .bt-grid {
-    --bt-cols: 1;
+    display: flex;
+    flex-wrap: wrap;
     align-items: stretch;
   }
 
   .bt-grid > .bt-card {
-    grid-column: span var(--bt-narrow-span, 1);
+    flex: 1 1 var(--bt-basis, 100%);
+    min-width: 0;
   }
 
   .bt-page .bk-header {

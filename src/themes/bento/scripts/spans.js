@@ -18,11 +18,10 @@ export function placeCards(article) {
   const columns = Number(grid.dataset.columns);
   if (!notesColumnScreen.matches) {
     unpack(grid, cards);
-    fitColumns(grid, cards, columns);
+    shareRows(grid, cards, columns);
     return;
   }
-  setStyle(grid, '--bt-cols', '');
-  for (const card of cards) setStyle(card, '--bt-narrow-span', '');
+  for (const card of cards) setStyle(card, '--bt-basis', '');
   const style = getComputedStyle(grid);
   const gap = parseFloat(style.columnGap);
   const rowHeight = parseFloat(style.getPropertyValue('--bt-row-height'));
@@ -102,15 +101,14 @@ function unpack(grid, cards) {
   }
 }
 
-function fitColumns(grid, cards, columns) {
+// Below 1000 pixels the cards wrap into rows in the order of the article and grow to fill each row; a card that is wider than half the row takes the whole row.
+function shareRows(grid, cards, columns) {
   const style = getComputedStyle(grid);
   const gap = parseFloat(style.columnGap);
   const unit = parseFloat(style.getPropertyValue('--bt-unit'));
-  const count = Math.max(1, Math.min(columns, Math.floor((grid.clientWidth + gap) / (unit + gap))));
-  setStyle(grid, '--bt-cols', String(count));
   for (const card of cards) {
-    const span = declaredSpan(card, columns);
-    setStyle(card, '--bt-narrow-span', String(span <= count / 2 ? span : count));
+    const basis = declaredSpan(card, columns) * (unit + gap) - gap;
+    setStyle(card, '--bt-basis', basis > grid.clientWidth / 2 ? '100%' : `${basis}px`);
   }
 }
 
