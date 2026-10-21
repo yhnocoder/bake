@@ -13,4 +13,4 @@ export { startPreviewCard } from './scripts/preview-card.jsx';
 export { hoverWithFinePointer, leftColumnScreen, notesColumnScreen, withoutHover } from './scripts/screens.js';
 export { SETTING_EVENT, startSettings } from './scripts/settings.jsx';
 export { showToast, startToast } from './scripts/toast.jsx';
-export { declaresNaturalWidth, naturalWidthProbe, naturalWidths, overflows, resolveWidths } from './scripts/widths.js';
+export { declaresNaturalWidth, naturalWidth, overflows, resolveWidths } from './scripts/widths.js';

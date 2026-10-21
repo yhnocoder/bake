@@ -230,7 +230,7 @@ Bake reads every image at build time and writes its width and height into the pa
 
 ### Widths
 
-`:::{width=body}`, `:::{width=wide}` and `:::{width=page}` set the width of the one block inside them, such as a formula, a code block, a table, an image or a component. `body` is the width of the text, `wide` extends into the margin and `page` uses the whole page. The theme decides how each width is laid out. A block without a width is placed automatically: it has the width of the text when it fits, extends to `wide` when it does not, and scrolls horizontally when it is wider still. For formulas, code blocks and figures with a pixel width Bake records the natural width at build time; for tables and components the page measures it. A figure without a size stays at the width of the text.
+`:::{width=body}`, `:::{width=wide}` and `:::{width=page}` set the width of the one block inside them, such as a formula, a code block, a table, an image or a component. `body` is the width of the text, `wide` extends into the margin and `page` uses the whole page. The theme decides how each width is laid out. A block without a width is placed automatically: it has the width of the text when it fits, extends to `wide` when it does not, and scrolls horizontally when it is wider still. For formulas, code blocks, and figures and components with a pixel width, Bake records the natural width at build time, and the stylesheet sizes these blocks, also without scripts and at every text size the reader chooses; for tables and components without a pixel width the page measures it. A figure without a size stays at the width of the text.
 
 ### Examples
 

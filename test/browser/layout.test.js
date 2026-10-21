@@ -110,7 +110,7 @@ test('the essay theme lays out articles', async (t) => {
   const open = async (path, options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', ...options });
     await page.goto(`${origin}/2026-10/${path}/`);
-    await settle(page);
+    if (options.javaScriptEnabled !== false) await settle(page);
     return page;
   };
 
@@ -156,6 +156,15 @@ test('the essay theme lays out articles', async (t) => {
     assert.equal(Math.round(narrow.column), 820);
     for (const [width, box] of Object.entries(narrow.blocks)) assert.equal(Math.round(box.width), Math.round(narrow.column), `${width} block at 900px`);
     assert.deepEqual(narrow.auto, [narrow.column]);
+    await page.close();
+  });
+
+  await t.test('without scripts a formula and a code block wider than the body take the wide width, and a short one keeps the body width', async () => {
+    const page = await open('stress', { javaScriptEnabled: false });
+    const widths = await page.evaluate(() => ['code', 'math'].map((type) => Math.round(document.querySelector(`.bk-block[data-type="${type}"]`).getBoundingClientRect().width)));
+    assert.deepEqual(widths, [1100, 1100]);
+    await page.goto(`${origin}/2026-10/syntax/`);
+    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-block[data-type="code"]').getBoundingClientRect().width)), 820);
     await page.close();
   });
 

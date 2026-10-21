@@ -1,4 +1,18 @@
+@property --natural-box {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 @scope (.bk-article) to (.component-box) {
+  :scope {
+    --scroll-cover: var(--bg);
+    --formula-scale: 1.08;
+    --formula-inset: 2px;
+    --code-size: calc(13.5px * var(--reader-scale));
+    --code-inset: 18px;
+  }
+
   .bk-block[data-width] {
     position: relative;
     clear: both;
@@ -6,21 +20,30 @@
     margin: var(--block-margin, 22px 0 26px);
   }
 
+  .bk-block[data-width='auto'] {
+    --natural-box: var(--natural-width);
+    width: calc(var(--body-width, 100%) + clamp(0px, (var(--natural-box) - var(--body-width, 100%)) * 1000, var(--wide-width, 100%) - var(--body-width, 100%)));
+  }
+
+  .bk-block[data-type='math'] {
+    --natural-box: calc(var(--natural-width) * var(--formula-scale) + 2 * var(--formula-inset));
+    margin: var(--formula-margin, 14px 0 18px);
+  }
+
+  /* why: the natural width of code is a number of columns, which the ch of the code font measures */
+  .bk-block[data-type='code'] {
+    --natural-box: calc(var(--natural-width) + 2 * var(--code-inset));
+    font-family: var(--font-mono);
+    font-size: var(--code-size);
+  }
+
   .bk-block:is([data-width='wide'], [data-resolved='wide']) {
     width: var(--wide-width, 100%);
   }
 
-  .bk-block:is([data-width='page'], [data-resolved='page']) {
+  .bk-block[data-width='page'] {
     width: var(--page-width, 100%);
     margin-left: var(--page-shift, 0px);
-  }
-
-  .bk-block[data-type='math'] {
-    margin: var(--formula-margin, 14px 0 18px);
-  }
-
-  :scope {
-    --scroll-cover: var(--bg);
   }
 
   :scope :is(.aside, .quote, blockquote) {
@@ -62,8 +85,8 @@
     min-width: 0 !important;
     max-width: 100%;
     margin: 0;
-    padding: 0.3em 2px;
-    font-size: 1.08em;
+    padding: 0.3em var(--formula-inset);
+    font-size: calc(var(--formula-scale) * 1em);
   }
 
   :scope mjx-container[display] > svg {
@@ -86,10 +109,10 @@
   :scope pre.shiki {
     --scroll-cover: var(--code-background);
     margin: 0;
-    padding: 14px 18px;
+    padding: 14px var(--code-inset);
     border-radius: 8px;
     font-family: var(--font-mono);
-    font-size: calc(13.5px * var(--reader-scale));
+    font-size: var(--code-size);
     line-height: 1.65;
     font-variant-ligatures: none;
     tab-size: 4;
