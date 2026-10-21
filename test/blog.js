@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
+import sharp from 'sharp';
 
 export const cli = join(import.meta.dirname, '../src/cli.js');
 export const exampleBlog = join(import.meta.dirname, '../examples/blog');
@@ -48,6 +49,11 @@ export function writeFiles(dir, files) {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     writeFileSync(join(dir, path), content);
   }
+}
+
+export async function decodeImage(file) {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  return { width: info.width, height: info.height, data };
 }
 
 export function bake(dir, ...args) {

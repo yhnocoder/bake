@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { PNG } from 'pngjs';
-import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
+import { article, bake, createBlog, decodeImage, exampleBuild, validConfig } from '../blog.js';
 import { launchBrowser, serve, settle } from './browser.js';
 
 const PLOT = 'figure.component[data-component="act-fn-plot"]';
@@ -373,7 +372,7 @@ test('the kit draws the example function plot', async (t) => {
       const svg = await frame.locator('.bk-kit-plot-svg').first().boundingBox();
       await page.mouse.move(svg.x + svg.width * 0.6, svg.y + svg.height / 2);
       await settle(page);
-      shots[colorScheme] = PNG.sync.read(await frame.screenshot());
+      shots[colorScheme] = await decodeImage(await frame.screenshot());
       strokes[colorScheme] = await page.evaluate(() => {
         const frame = document.querySelector('figure.component[data-component="act-fn-plot"]');
         return [frame.querySelector('path.bk-kit-curve'), frame.querySelector('.bk-kit-grid'), frame.querySelector('.bk-kit-readout')].map((element) => {

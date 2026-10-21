@@ -3,9 +3,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { PNG } from 'pngjs';
 import { startDevServer } from '../../src/dev/server.js';
-import { article, bake, copyExample, exampleBlog, writeFiles } from '../blog.js';
+import { article, bake, copyExample, decodeImage, exampleBlog, writeFiles } from '../blog.js';
 import { openWithSelectionModule } from './selection-module.js';
 import { launchBrowser, serve, settle } from './browser.js';
 
@@ -373,7 +372,7 @@ test('the bento theme lays out sections as cards', async (t) => {
         await box.evaluate((element) => (element.style.backgroundImage = 'none'));
         const plain = await box.screenshot();
         await box.evaluate((element) => element.style.removeProperty('background-image'));
-        const difference = largestDifference(PNG.sync.read(shown), PNG.sync.read(plain));
+        const difference = largestDifference(await decodeImage(shown), await decodeImage(plain));
         if (difference > 2) leaks.push(`${colorScheme}: ${await box.evaluate((element) => element.closest('.bt-card').querySelector('h2 .bk-heading-text').textContent)} ${index} differs by ${difference}`);
       }
       assert.deepEqual(leaks, []);
