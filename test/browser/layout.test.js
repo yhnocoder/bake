@@ -200,6 +200,17 @@ test('the essay theme lays out articles', async (t) => {
       ['stress', 1440],
     ]) {
       const page = await open(path, { viewport: { width, height: 900 } });
+      // why: a component takes its height when it comes near the screen, which moves every table below it
+      await page.evaluate(async () => {
+        for (const frame of [...document.querySelectorAll('.bk-article figure.component')].filter((element) => element.checkVisibility())) {
+          frame.scrollIntoView({ block: 'center' });
+          await new Promise((done) => {
+            const ready = () => frame.dataset.state === 'ready' || frame.dataset.state === 'failed';
+            if (ready()) return done();
+            new MutationObserver((_, observer) => ready() && (observer.disconnect(), done())).observe(frame, { attributes: true, attributeFilter: ['data-state'] });
+          });
+        }
+      });
       const count = await page.evaluate(() => document.querySelectorAll('.bk-article .table-scroll').length);
       let scrolled = 0;
       for (let index = 0; index < count; index += 1) {
@@ -207,12 +218,14 @@ test('the essay theme lays out articles', async (t) => {
         if (!(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth + 1))) continue;
         for (const position of [0, 0.5]) {
           await scroller.scrollIntoViewIfNeeded();
-          const frame = await scroller.evaluate((element, fraction) => {
+          await scroller.evaluate((element, fraction) => {
             element.scrollLeft = (element.scrollWidth - element.clientWidth) * fraction;
-            const box = element.getBoundingClientRect();
-            return { x: Math.floor(box.right) - 1, y: Math.floor(box.top + box.height / 2), border: getComputedStyle(element).borderRightColor };
           }, position);
           await settle(page);
+          const frame = await scroller.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return { x: Math.floor(box.right) - 1, y: Math.floor(box.top + box.height / 2), border: getComputedStyle(element).borderRightColor };
+          });
           const pixel = await page.screenshot({ clip: { x: frame.x, y: frame.y, width: 1, height: 1 } });
           const { data } = await sharp(pixel).raw().toBuffer({ resolveWithObject: true });
           const expected = frame.border.match(/\d+/g).map(Number);
