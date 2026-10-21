@@ -28,7 +28,7 @@ Code, identifiers, test names, CLI output, error messages, commits and documenta
 
 - Test behavior that a user of Bake or a reader of a blog can observe, not the implementation.
 - Add a test only for a behavior that no other test guards.
-- Size the verification to the change: a change to documentation only runs no tests, a change to one feature runs the tests of that feature, and a change to shared code (build, theme layer, test helpers) runs `npm test` and the browser suite.
+- Size the local verification to the change: a change to documentation only runs no tests, and a change to code runs the unit and browser tests of the features it changes. The full suites run in CI on every pull request.
 
 ## Commits and pull requests
 
