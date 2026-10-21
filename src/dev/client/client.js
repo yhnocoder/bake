@@ -234,9 +234,19 @@ function showChanges(lines, kept) {
 
 function reloadPage() {
   try {
-    sessionStorage.setItem(scrollKey, String(scrollY));
+    sessionStorage.setItem(scrollKey, JSON.stringify(scrollAnchor()));
   } catch {}
   location.reload();
+}
+
+// why: a component without a height shows a placeholder until it starts again after the reload, so the same scroll offset would show other text
+function scrollAnchor() {
+  const index = [...document.querySelectorAll(BLOCKS)].findIndex((block) => isShown(block) && block.getBoundingClientRect().top >= 0);
+  return { index, top: anchorElement(index).getBoundingClientRect().top };
+}
+
+function anchorElement(index) {
+  return index === -1 ? document.documentElement : document.querySelectorAll(BLOCKS)[index];
 }
 
 function restoreScroll() {
@@ -247,7 +257,11 @@ function restoreScroll() {
   } catch {}
   if (saved === null) return;
   history.scrollRestoration = 'manual';
-  const apply = () => scrollTo({ top: Number(saved), behavior: 'instant' });
+  const { index, top } = JSON.parse(saved);
+  const apply = () => {
+    const element = anchorElement(index);
+    if (element !== undefined) scrollBy({ top: element.getBoundingClientRect().top - top, behavior: 'instant' });
+  };
   apply();
   addEventListener(
     'load',

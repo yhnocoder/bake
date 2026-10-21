@@ -275,16 +275,18 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.deepEqual(await page.evaluate(() => window.openedUrls.at(-1)), [`vscode://file${pathToFileURL(file).pathname}:${line}:1`, '_self']);
   });
 
-  await t.test('changing the front matter reloads the page at the same scroll position', async () => {
+  await t.test('changing the front matter reloads the page with the visible text in place, although the open fold above it closes', async () => {
+    const editingTop = () => page.evaluate(() => document.getElementById('editing').getBoundingClientRect().top);
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
-    const before = await scrollPosition();
+    assert.equal(await page.locator('details.fold').evaluate((fold) => fold.open), true);
     await page.evaluate(() => {
       window.beforeReload = true;
     });
     edit('title: Live', 'title: Live again');
     await page.waitForFunction(() => document.querySelector('.bk-title')?.textContent === 'Live again' && window.beforeReload === undefined);
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    await page.waitForFunction((expected) => Math.abs(scrollY - expected) <= 1, before);
+    await settle(page);
+    assert.ok(Math.abs((await editingTop()) - 200) <= 1, `the heading is at ${await editingTop()} pixels`);
   });
 
   await t.test('a draft shows its label and the page for a missing address lists every article', async () => {
@@ -849,6 +851,42 @@ test('bake dev starts an embedded component again when its source article change
   writeFileSync(file, readFileSync(file, 'utf8').replace('{text=first}', '{text=first height=200}'));
   await page.waitForFunction(() => document.querySelector('.embed .component-box').getBoundingClientRect().height === 200);
   await page.waitForFunction(() => document.querySelector('.embed label-view')?.textContent === 'first');
+  await page.close();
+});
+
+const tallView = `export default class TallView extends HTMLElement {
+  connectedCallback() {
+    this.style.display = 'block';
+    this.style.height = '1500px';
+  }
+}
+`;
+
+test('bake dev reloads a page at the same text when a component above the screen is taller than its placeholder', async (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': validConfig,
+    'components/tall-view.js': tallView,
+    [ARTICLE]: article({ title: 'Live', slug: 'live', body: [':::tall-view\n:::', filler('the middle', 20), 'The anchor paragraph.', filler('the end', 20)].join('\n\n') }),
+  });
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await launchBrowser();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(`${server.url}2026-10/live/`);
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('figure.component').dataset.state === 'ready');
+  const anchorTop = () => page.evaluate(() => [...document.querySelectorAll('.bk-article p')].find((paragraph) => paragraph.textContent === 'The anchor paragraph.').getBoundingClientRect().top);
+  await page.evaluate(() => {
+    const anchor = [...document.querySelectorAll('.bk-article p')].find((paragraph) => paragraph.textContent === 'The anchor paragraph.');
+    scrollTo(0, anchor.getBoundingClientRect().top + scrollY - 300);
+    window.beforeReload = true;
+  });
+  const before = await anchorTop();
+  writeFileSync(join(dir, 'components/tall-view.js'), `${tallView}// changed\n`);
+  await page.waitForFunction(() => window.beforeReload === undefined);
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  await settle(page);
+  assert.ok(Math.abs((await anchorTop()) - before) <= 1, `the anchor paragraph moved from ${before} to ${await anchorTop()} pixels`);
   await page.close();
 });
 
