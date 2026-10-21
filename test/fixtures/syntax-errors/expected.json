@@ -15,7 +15,7 @@
   "label-outside-environment.md": "label-outside-environment.md:8:1 \\label{eq:ffn} is outside the environment of its equation; write it inside \\begin{…} and \\end{…}, on the line it labels",
   "list-table-cell-count.md": "list-table-cell-count.md:12:1 list-table row 2 has 2 cells, the header row has 3",
   "image-width-tier.md": "image-width-tier.md:8:18 image width must be a positive number of pixels or a percentage, got \"wide\"; use :::{width=wide} around the image",
-  "unknown-component-parameter.md": "unknown-component-parameter.md:8:16 unknown parameter \"bta\" for act-fn-plot",
+  "unknown-component-parameter.md": "unknown-component-parameter.md:8:16 unknown parameter \"bta\" for act-fn-plot; did you mean beta?",
   "component-parameter-range.md": "component-parameter-range.md:8:16 parameter \"xmax\" of act-fn-plot must be between -100 and 100, got 200",
   "unknown-component.md": "unknown-component.md:8:1 unknown component \"fn-plot\"; there is no fn-plot.js or fn-plot.jsx in components/ or in the components/ folder of this article",
   "component-width.md": "component-width.md:8:16 width of glu-heatmap must be body, wide, page, auto, a size in pixels such as 560px or a percentage such as 70%, got \"full\"",

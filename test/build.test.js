@@ -286,7 +286,7 @@ describe('bake build', () => {
     const dir = copyExample(t);
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    assert.equal(result.stdout, '7 pages\ndist/ written\n');
+    assert.equal(result.stdout, '8 pages\ndist/ written\n');
     const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8'));
     assert.match(page, /<h1[^>]*>Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
