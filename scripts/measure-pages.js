@@ -3,15 +3,6 @@ import { join, relative, resolve, sep } from 'node:path';
 import { chromium } from 'playwright';
 import { serveStatic } from './static-server.js';
 
-export const cpuThrottlingRate = 4;
-
-export const network = {
-  name: 'Fast 4G of Chrome DevTools',
-  downloadBytesPerSecond: (9 * 1000 * 1000 * 0.9) / 8,
-  uploadBytesPerSecond: (1.5 * 1000 * 1000 * 0.9) / 8,
-  latencyMs: 60 * 2.75,
-};
-
 export const screens = [
   { width: 1440, height: 900, mobile: false },
   { width: 375, height: 812, mobile: true },
@@ -74,7 +65,7 @@ export async function measureSite(dist) {
     await browser.close();
     await server.close();
   }
-  return { cpuThrottlingRate, network, compression: 'gzip', scrollStep, measurements };
+  return { compression: 'gzip', scrollStep, measurements };
 }
 
 export function listPages(dist) {
@@ -105,13 +96,6 @@ async function measurePage(browser, origin, path, screen) {
     const cdp = await context.newCDPSession(page);
     const requests = recordRequests(cdp);
     await cdp.send('Network.enable');
-    await cdp.send('Network.emulateNetworkConditions', {
-      offline: false,
-      latency: network.latencyMs,
-      downloadThroughput: network.downloadBytesPerSecond,
-      uploadThroughput: network.uploadBytesPerSecond,
-    });
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpuThrottlingRate });
     await page.goto(origin + path, { waitUntil: 'load', timeout: 120000 });
     await requests.idle();
     await page.waitForFunction(firstScreenSettled, undefined, { timeout: 60000, polling: 100 });
@@ -321,6 +305,5 @@ export function formatTable(report) {
   ]);
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => row[column].length)));
   const line = (cells) => cells.map((cell, column) => (column < 2 ? cell.padEnd(widths[column]) : cell.padStart(widths[column]))).join('  ');
-  const settings = `CPU throttled ${report.cpuThrottlingRate}x, network ${report.network.name} (${report.network.downloadBytesPerSecond} bytes/s down, ${report.network.uploadBytesPerSecond} bytes/s up, ${report.network.latencyMs} ms latency), text files sent with ${report.compression}`;
-  return [settings, '', line(header), ...rows.map(line)].join('\n');
+  return [line(header), ...rows.map(line)].join('\n');
 }

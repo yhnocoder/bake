@@ -15,17 +15,11 @@ const WHEEL_STEP = 120;
 const WHEEL_INTERVAL = 50;
 
 const knownFailures = [
-  { name: 'moving over the tabs table of contents of the syntax article at 1440 pixels', reason: 'the longest frame takes 50 ms in one of five runs', task: 'content-paint' },
-  { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: '8 to 16 percent of the frames are slower than the budget and 10 to 19 percent are dropped in five of five runs', task: 'perf-fixes' },
-  { name: 'changing the theme in the settings panel of the syntax article at 375 pixels', reason: 'the longest frame takes 50 to 100 ms in five of five runs', task: 'perf-fixes' },
-  { name: 'scrolling the whole syntax article at 1440 pixels', reason: 'the longest frame takes 67 to 100 ms in five of five runs', task: 'content-paint' },
-  { name: 'scrolling the whole syntax article at 375 pixels', reason: 'the longest frame takes 83 to 117 ms in five of five runs', task: 'content-paint' },
-  { name: 'scrolling the whole llm-act-fns article at 1440 pixels', reason: 'the longest frame takes 100 to 117 ms in five of five runs', task: 'long-article-frames' },
-  { name: 'scrolling the whole llm-act-fns article at 375 pixels', reason: 'the longest frame takes 67 to 83 ms in five of five runs', task: 'long-article-frames' },
-  { name: 'scrolling the whole matrix-calculus article at 1440 pixels', reason: '6 to 8 percent of the frames are slower than the budget and the longest frame takes 83 to 100 ms in five of five runs', task: 'long-article-frames' },
-  { name: 'scrolling the whole matrix-calculus article at 375 pixels', reason: 'the longest frame takes 100 to 117 ms in five of five runs', task: 'long-article-frames' },
-  { name: 'dragging a slider of matrix-gradient-field in the matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 ms in one of five runs', task: 'long-article-frames' },
-  { name: 'resizing the bento article at 1440 pixels', reason: '8 to 14 percent of the frames are dropped and the longest frame takes 67 to 100 ms in five of five runs', task: 'bento-redesign' },
+  { name: 'changing the theme in the settings panel of the syntax article at 1440 pixels', reason: 'the longest frame takes 50 ms in three of ten runs', task: 'perf-fixes' },
+  { name: 'scrolling the whole llm-act-fns article at 1440 pixels', reason: 'the longest frame takes 50 to 67 ms in ten of ten runs', task: 'long-article-frames' },
+  { name: 'scrolling the whole matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 ms or more in five of five runs', task: 'long-article-frames' },
+  { name: 'scrolling the whole matrix-calculus article at 375 pixels', reason: 'the longest frame takes 50 to 67 ms in five of five runs', task: 'long-article-frames' },
+  { name: 'resizing the bento article at 1440 pixels', reason: 'the longest frame takes 50 to 100 ms in two of ten runs', task: 'bento-redesign' },
 ];
 
 function scroll(distance) {
@@ -243,7 +237,7 @@ test('every known failure names a measured case', () => {
   assert.deepEqual(knownFailures.map((entry) => entry.name).filter((name) => !names.includes(name)), []);
 });
 
-test('interactions draw every frame within the 60 fps budget on a CPU twice as slow', async (t) => {
+test('interactions draw every frame within the 60 fps budget', async (t) => {
   const base = await serveExample(t, { localhost: true });
   const browser = await launchBrowser();
   for (const interaction of interactions.filter((entry) => everyInteraction || !entry.nightly)) {
