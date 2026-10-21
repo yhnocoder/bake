@@ -7,7 +7,6 @@ import 'bake/theme/styles/home.css';
 import 'bake/theme/styles/not-found.css';
 import 'bake/theme/styles/print.css';
 import './styles/bento.css';
-import { livePage } from 'bake/live';
 import { resolveWidths, startArticle, startHome, startLayout, startNotFound, startSettings } from 'bake/theme/client';
 import { startNotes } from './scripts/notes.js';
 import { startCardScroll } from './scripts/card-scroll.js';
@@ -18,9 +17,8 @@ const notFound = document.querySelector('.bk-not-found');
 startSettings();
 if (home !== null) startHome(home);
 if (notFound !== null) startNotFound(notFound);
-livePage(start);
 
-function start(document) {
+export default function start(document) {
   const article = document.querySelector('.bk-article');
   if (article === null) return () => {};
   const stops = [startLayout(article, [resolveWidths, placeCards]), startArticle(article), startNotes(article), startCardScroll(article), releaseCards];

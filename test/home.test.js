@@ -22,7 +22,7 @@ const categoriesConfig = `export default {
 `;
 
 const probeTheme = {
-  'themes/probe/client.jsx': "import './probe.css';\n",
+  'themes/probe/client.jsx': "import './probe.css';\n\nexport default () => () => {};\n",
   'themes/probe/probe.css': 'body {\n  margin: 0;\n}\n',
   'themes/probe/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify({ site: props.site, options: props.options })} /></body></html>;\n}\n',
   'themes/probe/home.jsx': 'export default function Home(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props)} /></body></html>;\n}\n',

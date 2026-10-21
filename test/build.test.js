@@ -401,7 +401,7 @@ describe('bake build', () => {
       'content/posts/host/d e.svg': vector,
       'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-10-17', extra: 'theme: "plain#1 %"\n' }),
       'themes/plain#1 %/page.jsx': plainPage,
-      'themes/plain#1 %/client.jsx': "import './plain.css';\n",
+      'themes/plain#1 %/client.jsx': "import './plain.css';\n\nexport default () => () => {};\n",
       'themes/plain#1 %/plain.css': 'main { color: #985b57; }\n',
     });
     const result = bake(dir, 'build');

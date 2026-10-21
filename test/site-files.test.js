@@ -28,13 +28,24 @@ const blogFiles = {
 };
 
 const probeNotFound = {
-  'themes/probe/client.jsx': "import './probe.css';\n",
+  'themes/probe/client.jsx': "import './probe.css';\n\nexport default () => () => {};\n",
   'themes/probe/probe.css': 'body {\n  margin: 0;\n}\n',
   'themes/probe/theme.css': 'body {\n  color: black;\n}\n',
   'themes/probe/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props.article.link)} /></body></html>;\n}\n',
   'themes/probe/home.jsx': 'export default function Home() {\n  return <html><body /></html>;\n}\n',
   'themes/probe/not-found.jsx': 'export default function NotFound(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props)} /></body></html>;\n}\n',
 };
+
+function essaySiteTheme(themeCss) {
+  return {
+    'bake.config.js': subPathConfig.replace("language: 'en',", "language: 'en',\n  theme: 'mine',"),
+    'themes/mine/page.jsx': "export { Page as default } from 'bake/themes/essay';\n",
+    'themes/mine/home.jsx': "export { Home as default } from 'bake/theme';\n",
+    'themes/mine/not-found.jsx': "export { NotFound as default } from 'bake/theme';\n",
+    'themes/mine/client.jsx': "export { default } from 'bake/themes/essay/client';\n",
+    'themes/mine/theme.css': themeCss,
+  };
+}
 
 function built(t, files) {
   const dir = createBlog(t, files);
@@ -185,7 +196,8 @@ describe('site files', () => {
   });
 
   test('_bake/theme.css holds the fonts and colours of the site theme, and plain HTML pages are published unchanged', (t) => {
-    const { dir, read } = built(t, { ...blogFiles, 'themes/essay/styles/tokens.css': ':root {\n  --bg: #123456;\n}\n' });
+    const themeCss = "@import 'bake/theme/styles/fonts.css';\n@import 'bake/theme/styles/tokens.css';\n@import 'bake/theme/styles/base.css';\n\n:root {\n  --bg: #123456;\n}\n";
+    const { dir, read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss) });
     const styles = read('_bake/theme.css');
     assert.match(styles, /--bg:#123456/);
     assert.match(styles, /font-family:LXGW WenKai/);
@@ -199,21 +211,23 @@ describe('site files', () => {
     assert.equal(read('2026-09/demo/index.html'), pageHtml);
   });
 
-  test('_bake/theme.css resolves every form of a relative @import in a theme folder against the built-in theme', (t) => {
+  test('_bake/theme.css resolves every form of @import of a file in the theme folder and of a stylesheet of bake/theme', (t) => {
     const themeCss = [
-      '@import url(./styles/fonts.css);',
-      "@import url( './styles/tokens.css' );",
-      '@import url("./styles/home.css");',
-      "@import './styles/not-found.css';",
+      '@import url(./styles/a.css);',
+      "@import url( './styles/b.css' );",
+      '@import url("./styles/c.css");',
+      "@import './styles/d.css';",
+      "@import 'bake/theme/styles/tokens.css';",
+      '@import "bake/theme/styles/home.css";',
       '',
     ].join('\n');
-    const { read } = built(t, { ...blogFiles, 'themes/essay/theme.css': themeCss });
+    const own = Object.fromEntries(['a', 'b', 'c', 'd'].map((name) => [`themes/mine/styles/${name}.css`, `.own-${name} {\n  color: red;\n}\n`]));
+    const { read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss), ...own });
     const styles = read('_bake/theme.css');
     assert.doesNotMatch(styles, /@import/i);
-    assert.match(styles, /font-family:LXGW WenKai/);
+    assert.match(styles, /\.own-a,\.own-b,\.own-c,\.own-d\{color:red\}/);
     assert.match(styles, /--bg:[^;]*#f5f6f4/);
     assert.match(styles, /\.bk-card-frame\{/);
-    assert.match(styles, /\.bk-not-found/);
   });
 
   test('reports public files at the addresses of the feed, the sitemap, the 404 page and in _bake/', (t) => {

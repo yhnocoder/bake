@@ -1,5 +1,5 @@
 import { LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, leftColumnScreen, notesColumnScreen, oncePerFrame, requestLayout } from 'bake/theme/client';
-import { essayLabels } from '../essay-labels.js';
+import { essayLabels } from '../labels.js';
 import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
 import { bottomReserve, createCardHost, readOutline } from './toc-card.js';

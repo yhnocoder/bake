@@ -1,6 +1,7 @@
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BUILT_IN_THEMES } from '../config/rules.js';
 
 const SRC_DIR = join(import.meta.dirname, '..');
 const PREAMBLE_MODULE = 'bake:preamble';
@@ -16,10 +17,20 @@ export const PUBLIC_MODULES = Object.freeze([
   { name: 'bake/regions', file: join(SRC_DIR, 'regions.js'), importers: ['themes'] },
   { name: 'bake/math', file: join(SRC_DIR, 'components/math.js'), importers: ['components', 'chat'] },
   { name: 'bake/kit', file: join(SRC_DIR, 'kit/index.js'), importers: ['components'] },
+  { name: 'bake/theme', file: join(SRC_DIR, 'theme/index.jsx'), importers: ['themes'] },
+  { name: 'bake/theme/client', file: join(SRC_DIR, 'theme/client.js'), importers: ['themes'] },
+  ...BUILT_IN_THEMES.flatMap((theme) => [
+    { name: `bake/themes/${theme}`, file: join(SRC_DIR, `themes/${theme}/index.jsx`), importers: ['themes'] },
+    { name: `bake/themes/${theme}/client`, file: join(SRC_DIR, `themes/${theme}/client.jsx`), importers: ['themes'] },
+    { name: `bake/themes/${theme}/options`, file: join(SRC_DIR, `themes/${theme}/options.js`), importers: ['themes'] },
+  ]),
 ]);
 
+const PUBLIC_STYLES = Object.freeze([{ name: 'bake/theme/styles/', folder: join(SRC_DIR, 'theme/styles/') }, ...BUILT_IN_THEMES.map((theme) => ({ name: `bake/themes/${theme}/styles/`, folder: join(SRC_DIR, `themes/${theme}/styles/`) }))]);
+
 export function publicModules(importer, replacements = {}) {
-  return PUBLIC_MODULES.filter((module) => module.importers.includes(importer)).map(({ name, file }) => ({ find: new RegExp(`^${name}$`), replacement: replacements[name] ?? file }));
+  const modules = PUBLIC_MODULES.filter((module) => module.importers.includes(importer)).map(({ name, file }) => ({ find: new RegExp(`^${name}$`), replacement: replacements[name] ?? file }));
+  return importer === 'themes' ? [...modules, ...PUBLIC_STYLES.map(({ name, folder }) => ({ find: new RegExp(`^${name}`), replacement: folder }))] : modules;
 }
 
 export function mathModules(preamble) {

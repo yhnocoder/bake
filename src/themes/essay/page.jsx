@@ -1,6 +1,6 @@
 import { ArticleDocument, Header, labelsFor } from 'bake/theme';
 import { Article } from './article.jsx';
-import { essayLabels } from './essay-labels.js';
+import { essayLabels } from './labels.js';
 import { settings } from './options.js';
 import { Toc } from './toc.jsx';
 

@@ -52,7 +52,7 @@ describe('front matter', () => {
     const lines = problems(t, {
       'bake.config.js': validConfig,
       'themes/mine/page.jsx': 'export default function Page() {\n  return <html />;\n}\n',
-      'themes/mine/client.jsx': '',
+      'themes/mine/client.jsx': 'export default () => () => {};\n',
       ...articles(Object.fromEntries(cases.map(([marked], index) => [`case-${index}`, withField(marked.replace('@', ''), `case-${index}`)]))),
     });
     assert.deepEqual(

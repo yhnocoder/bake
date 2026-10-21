@@ -8,7 +8,7 @@ import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
-import { availableThemes } from '../config/rules.js';
+import { BUILT_IN_THEMES, availableThemes } from '../config/rules.js';
 import { BUILT_IN_BLOCK_NAMES, readArticle } from '../markdown/article.js';
 import { IMAGE_FORMATS, convertImage, readImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
@@ -19,7 +19,7 @@ import { listFiles } from './files.js';
 import { checkDuplicateUrls, indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, chatCatalogJson, feedXml, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
-import { THEMES_DIR, THEME_STYLES_PATH, compileTheme } from './theme.js';
+import { THEMES_DIR, THEME_STYLES_PATH, builtInThemeFolders, compileTheme } from './theme.js';
 import { THEME_OPTIONS_FILE, optionProblem, readThemeOptions } from './theme-options.js';
 import { absoluteLink, articleUrl, encodePath, pageRoot, siteLink, sitePath } from '../urls.js';
 
@@ -41,7 +41,7 @@ export async function updateSite(site, changedPaths = null) {
     if (themePaths.some((path) => readsThemePath(root, name, compiled.theme, path))) site.themes.delete(name);
   }
   const themeNamesChanged = themePaths.length > 0 && site.settings?.rules?.themes.join('\n') !== availableThemes(root).join('\n');
-  const themeOptionsChanged = themePaths.some((path) => path.split('/').length <= 2 || path.split('/')[2] === THEME_OPTIONS_FILE);
+  const themeOptionsChanged = themePaths.some((path) => path.split('/').length <= 2 || path.split('/')[2] === THEME_OPTIONS_FILE || BUILT_IN_THEMES.includes(path.split('/')[1]));
   const pet = site.settings?.config ? petFolder(site.settings.config.chat.pet) : null;
   if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || themeNamesChanged || themeOptionsChanged || touches(COMPONENTS_DIR) || (pet !== null && touches(pet))) {
     site.settings = await readSettings(root);
@@ -95,7 +95,7 @@ function touchesArticle(found, changedPaths) {
 }
 
 async function readSettings(root) {
-  const errors = [];
+  const errors = builtInThemeFolders(root);
   const themeNames = availableThemes(root);
   const themeOptions = await readThemeOptions(root, themeNames, errors);
   const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);

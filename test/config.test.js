@@ -7,7 +7,7 @@ import { article, bake, createBlog } from './blog.js';
 const base = "title: 'Test', url: 'https://example.com', language: 'en'";
 
 function problems(t, files) {
-  const result = bake(createBlog(t, { 'themes/mine/style.css': '', 'themes/essay/style.css': '', ...files }), 'build');
+  const result = bake(createBlog(t, { 'themes/mine/style.css': '', ...files }), 'build');
   assert.equal(result.status, 1, result.stdout);
   return result.stderr.trimEnd().split('\n').slice(0, -1);
 }
@@ -122,7 +122,7 @@ describe('bake.config.js', () => {
       'bake.config.js': `export default { ${base}, themes: { mine: { density: 'tight' } } };\n`,
       'themes/mine/options.js': options,
       'themes/mine/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props.options)} /></body></html>;\n}\n',
-      'themes/mine/client.jsx': '',
+      'themes/mine/client.jsx': 'export default () => () => {};\n',
       'content/posts/rope/index.md': article({ extra: 'theme: mine\n' }),
       'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: mine\nrule: false\n' }),
     });

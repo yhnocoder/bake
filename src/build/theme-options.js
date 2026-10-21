@@ -4,9 +4,9 @@ import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { paramProblems, valueProblem } from '../components/declarations.js';
 import { FRONT_MATTER_FIELDS } from '../config/front-matter.js';
-import { BUILT_IN_THEMES } from '../config/rules.js';
 import { describeValue, errorAt, fileStart, listChoices } from '../report.js';
 import { READING_SETTINGS } from '../theme/settings.js';
+import { themeFolder } from './theme.js';
 
 export const THEME_OPTIONS_FILE = 'options.js';
 const OPTION = { noun: 'option', reserved: [], written: 'as a key of bake.config.js', setter: 'bake.config.js' };
@@ -14,13 +14,12 @@ const SETTING_NAME = /^[a-z][a-z0-9]*$/;
 const SETTING_FIELDS = ['values', 'default', 'control'];
 const CONTROLS = ['segmented', 'switch', 'list'];
 const CORE_SETTINGS = [...Object.keys(READING_SETTINGS), 'scheme', 'script'];
-const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
 
 export async function readThemeOptions(root, names, errors) {
   const themes = new Map();
   for (const name of names) {
-    const path = [join(root, 'themes', name, THEME_OPTIONS_FILE), ...(BUILT_IN_THEMES.includes(name) ? [join(BUILT_IN_DIR, name, THEME_OPTIONS_FILE)] : [])].find((candidate) => existsSync(candidate));
-    themes.set(name, path === undefined ? {} : await readOptions(root, name, path, errors));
+    const path = join(themeFolder(root, name), THEME_OPTIONS_FILE);
+    themes.set(name, existsSync(path) ? await readOptions(root, name, path, errors) : {});
   }
   return themes;
 }

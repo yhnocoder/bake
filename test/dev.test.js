@@ -256,14 +256,33 @@ describe('updates while bake dev runs', () => {
   }
 
   test('serves a saved article, a nested article and a changed theme file and leaves the other pages as they were', async (t) => {
+    const mine = 'theme: mine\n';
     const { dir, text } = await serve(t, {
-      'content/posts/rope/index.md': article(),
+      'content/posts/rope/index.md': article({ extra: mine }),
       'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n', body: '## One\n\nGELU text.\n' }),
-      'content/posts/rope/inner/index.md': article({ slug: 'inner', body: 'Inner.\n' }),
+      'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner.\n' }),
+      'themes/mine/page.jsx': [
+        "import { ArticleDocument, labelsFor } from 'bake/theme';",
+        "import { Article } from 'bake/themes/essay';",
+        "import { Header } from './header.jsx';",
+        '',
+        'export default function Page(props) {',
+        '  const labels = labelsFor(props.site.language);',
+        '  return (',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels}>',
+        '      <Header />',
+        '      <Article content={props.article.content} labels={labels} />',
+        '    </ArticleDocument>',
+        '  );',
+        '}',
+        '',
+      ].join('\n'),
+      'themes/mine/header.jsx': 'export function Header() {\n  return <header class="first-header" />;\n}\n',
+      'themes/mine/client.jsx': "export { default } from 'bake/themes/essay/client';\n",
     });
-    await saveUntil(dir, { 'content/posts/rope/index.md': article({ body: 'Changed.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Changed.'), 'the saved article was not served');
-    await saveUntil(dir, { 'content/posts/rope/inner/index.md': article({ slug: 'inner', body: 'Inner changed.\n' }) }, async () => (await text('/2026-10/inner/')).includes('Inner changed.'), 'the nested article was not served');
-    await saveUntil(dir, { 'themes/essay/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' }, async () => (await text('/2026-10/rope/')).includes('custom-header'), 'the changed theme file was not used');
+    await saveUntil(dir, { 'content/posts/rope/index.md': article({ extra: mine, body: 'Changed.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Changed.'), 'the saved article was not served');
+    await saveUntil(dir, { 'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner changed.\n' }) }, async () => (await text('/2026-10/inner/')).includes('Inner changed.'), 'the nested article was not served');
+    await saveUntil(dir, { 'themes/mine/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' }, async () => (await text('/2026-10/rope/')).includes('custom-header'), 'the changed theme file was not used');
     const gelu = await text('/2026-10/gelu/');
     assert.match(gelu, /GELU text\./);
     assert.doesNotMatch(gelu, /custom-header/);
@@ -274,7 +293,7 @@ describe('updates while bake dev runs', () => {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
       'themes/plain/page.jsx': "import { word } from '../common/word.js';\nexport default function Page(props) {\n  return <html><head>{props.assets.styles.map((href) => <link rel=\"stylesheet\" href={href} />)}</head><body><p class=\"word\">{word}</p></body></html>;\n}\n",
-      'themes/plain/client.jsx': "import '../common/look.css';\n",
+      'themes/plain/client.jsx': "import '../common/look.css';\n\nexport default () => () => {};\n",
       'themes/common/word.js': "export const word = 'first';\n",
       'themes/common/look.css': '.word { color: red; }\n',
     });
@@ -294,22 +313,22 @@ describe('updates while bake dev runs', () => {
   test('reports the options of a theme folder that is removed or added as a whole', async (t) => {
     const options = "export const options = { extra: { label: 'Extra', type: 'number', default: 1 } };\n";
     const dir = createBlog(t, {
-      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', themes: { bento: { extra: 2 } } };\n",
+      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', themes: { mine: { extra: 2 } } };\n",
       'content/posts/rope/index.md': article(),
-      'themes/bento/options.js': options,
+      'themes/mine/options.js': options,
     });
     const { lines } = await start(t, dir);
-    await saveUntil(dir, { 'themes/bento/options.js': options }, async () => lines.includes('Updated every page') || lines.some((line) => line.startsWith('Updated ')), 'bake dev did not watch the theme folder');
-    rmSync(join(dir, 'themes/bento'), { recursive: true });
-    await eventually(() => lines.includes('bake.config.js:1:101 unknown config field "themes.bento.extra"'), `bake dev printed ${JSON.stringify(lines)}`);
-    await saveUntil(dir, { 'themes/bento/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
+    await saveUntil(dir, { 'themes/mine/options.js': options }, async () => lines.includes('Updated every page') || lines.some((line) => line.startsWith('Updated ')), 'bake dev did not watch the theme folder');
+    rmSync(join(dir, 'themes/mine'), { recursive: true });
+    await eventually(() => lines.includes('bake.config.js:1:92 themes.mine names no theme; the themes are essay, bento'), `bake dev printed ${JSON.stringify(lines)}`);
+    await saveUntil(dir, { 'themes/mine/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
   });
 
   test('reports the missing files of a theme that becomes the site theme', async (t) => {
     const { dir, lines } = await serve(t, {
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
       'themes/plain/page.jsx': 'export default function Page(props) {\n  return <html><body>{props.article.title}</body></html>;\n}\n',
-      'themes/plain/client.jsx': '',
+      'themes/plain/client.jsx': 'export default () => () => {};\n',
     });
     await saveUntil(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('3 errors'), `bake dev printed ${JSON.stringify(lines)}`);
     assert.deepEqual(lines.slice(-4), ['themes/plain:1:1 theme "plain" has no home.jsx', 'themes/plain:1:1 theme "plain" has no not-found.jsx', 'themes/plain:1:1 theme "plain" has no theme.css', '3 errors']);
