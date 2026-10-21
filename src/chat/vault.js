@@ -1,5 +1,5 @@
-export const STORAGE_KEY = 'bk-chat-key';
-export const REMEMBER_DAYS = 30;
+const STORAGE_KEY = 'bk-chat-key';
+const REMEMBER_DAYS = 30;
 
 const DATABASE = 'bake-chat';
 const STORE = 'keys';

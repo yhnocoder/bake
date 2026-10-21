@@ -1,6 +1,6 @@
 import { readerPetSheet, storedReaderPet } from './reader-pet.js';
 
-export const PET_ROWS = {
+const PET_ROWS = {
   idle: { row: 0, frames: 6 },
   waving: { row: 3, frames: 4 },
   jumping: { row: 4, frames: 5 },
@@ -10,7 +10,7 @@ export const PET_ROWS = {
   review: { row: 8, frames: 6 },
 };
 
-export const PET_STATES = {
+const PET_STATES = {
   idle: { animation: 'idle', play: 'still' },
   greet: { animation: 'waving', play: 'once' },
   open: { animation: 'idle', play: 'once' },

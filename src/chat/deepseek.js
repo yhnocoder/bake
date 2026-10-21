@@ -1,5 +1,5 @@
-export const API = 'https://api.deepseek.com';
-export const MODEL = 'deepseek-flash';
+const API = 'https://api.deepseek.com';
+const MODEL = 'deepseek-flash';
 
 const DATA = 'data:';
 const DONE = '[DONE]';
