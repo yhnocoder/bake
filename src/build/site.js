@@ -217,8 +217,8 @@ function renderDocument(render, file, failure, errors) {
   }
 }
 
-function homeArticle({ title, summary, date, tags, category, draft, path, preview, image }) {
-  return { title, summary, date, tags, category, draft, url: path, preview, image };
+function homeArticle({ title, summary, date, tags, category, draft, path, preview, image, sections }) {
+  return { title, summary, date, tags, category, draft, url: path, preview, image, sections };
 }
 
 function articleTheme(article, config) {

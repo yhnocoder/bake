@@ -439,6 +439,38 @@ html:has(> body > .bk-home) {
   overflow-wrap: anywhere;
 }
 
+.bk-home .bk-card-outline {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: calc(6px * var(--k));
+  margin: 0;
+  padding: 16px 28px;
+  list-style: none;
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: calc(14px * var(--k));
+  line-height: 1.45;
+  text-align: start;
+}
+
+.bk-home .bk-card-outline li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bk-home .bk-card-outline li:nth-child(n + 6) {
+  display: none;
+}
+
+.bk-home .bk-card-outline-number {
+  margin-inline-end: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: color-mix(in srgb, var(--c) 60%, var(--ink-3));
+}
+
 .bk-home .bk-card-draft {
   position: absolute;
   top: 8px;

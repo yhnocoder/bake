@@ -99,7 +99,7 @@ describe('homepage', () => {
         ],
       },
       articles: [
-        { title: 'Alpha', date: '2026-10-02', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-10/alpha/', image: '2026-10/alpha/plot.svg' },
+        { title: 'Alpha', date: '2026-10-02', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-10/alpha/', image: '2026-10/alpha/plot.svg', sections: [] },
         {
           title: 'Rope',
           summary: 'Rotary positions.',
@@ -110,9 +110,10 @@ describe('homepage', () => {
           url: '2026-10/rope/',
           preview: '2026-10/rope/preview.js',
           image: '2026-10/rope/angles.webp',
+          sections: [],
         },
-        { title: 'Demo', summary: 'A page.', date: '2026-09-05', tags: ['html'], category: { id: 'ml', name: 'ML', color: '#2a78d6', desc: '' }, draft: false, url: '2026-09/demo/', preview: '2026-09/demo/anim/preview.js' },
-        { title: 'Old', date: '2026-08-30', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-08/old/' },
+        { title: 'Demo', summary: 'A page.', date: '2026-09-05', tags: ['html'], category: { id: 'ml', name: 'ML', color: '#2a78d6', desc: '' }, draft: false, url: '2026-09/demo/', preview: '2026-09/demo/anim/preview.js', sections: [] },
+        { title: 'Old', date: '2026-08-30', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-08/old/', sections: [] },
       ],
       assets: { root: './', styles, scripts },
     });
@@ -156,7 +157,7 @@ describe('homepage', () => {
     assert.deepEqual([...html.matchAll(/<button type="button" class="bk-chip"[^>]*>([^<]*)/g)].map((match) => match[1]), ['All', 'llm', 'position']);
   });
 
-  test('a card shows its first image, a colour block with the title when there is none, the date and the tags', async (t) => {
+  test('a card shows its first image, the numbered titles of its sections when there is none, a colour block with the title when there are no sections either, the date and the tags', async (t) => {
     const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
     const { html } = buildHome(t, {
       'bake.config.js': validConfig,
@@ -166,14 +167,16 @@ describe('homepage', () => {
       'content/posts/demo/index.md': '---\ntitle: Demo\nslug: demo\ndate: 2026-10-01\npage: demo.html\npreview: preview.js\n---\n',
       'content/posts/demo/demo.html': '<p>demo</p>\n',
       'content/posts/demo/preview.js': 'export default () => ({ start() {}, stop() {} });\n',
+      'content/posts/outline/index.md': article({ title: 'Outline', slug: 'outline', date: '2026-10-01', body: 'Intro.\n\n## First part\n\nText.\n\n### Detail\n\nText.\n\n## Second part\n\nText.\n' }),
     });
-    const cards = html.split('<a class="bk-card"').slice(1, 4);
+    const cards = html.split('<a class="bk-card"').slice(1, 5);
     assert.match(cards[0], /<div class="bk-card-fallback"><img src="2026-10\/photo\/my%20photo.webp" alt loading="lazy" decoding="async"><\/div>/);
     assert.match(cards[0], /<p class="bk-card-summary">One sentence.<\/p><p class="bk-card-meta"><time datetime="2026-10-03">2026-10-03<\/time><span class="bk-card-tag">a<\/span><span class="bk-card-tag">b<\/span><\/p>/);
     assert.match(cards[1], /<span class="bk-card-cover" aria-hidden="true">Plain &lt;b><\/span>/);
     assert.doesNotMatch(cards[1], /bk-card-summary|data-preview/);
     assert.match(cards[2], /^ href="2026-10\/demo\/"[^>]* data-preview="2026-10\/demo\/preview.js">/);
     assert.match(cards[2], /<span class="bk-card-cover" aria-hidden="true">Demo<\/span>/);
+    assert.match(cards[3], /<ol class="bk-card-cover bk-card-outline" aria-hidden="true"><li><span class="bk-card-outline-number">01<\/span>First part<\/li><li><span class="bk-card-outline-number">02<\/span>Second part<\/li><\/ol>/);
     assert.doesNotMatch(html, /bk-card-draft/);
   });
 
