@@ -34,12 +34,16 @@ export function themeFolder(root, name) {
   return BUILT_IN_THEMES.includes(name) ? join(BUILT_IN_DIR, name) : join(root, THEMES_DIR, name);
 }
 
+export function themeLocation(root, name) {
+  return blogPath(root, themeFolder(root, name));
+}
+
 export async function compileTheme(root, name, { siteTheme }, errors) {
   const folder = themeFolder(root, name);
   const locate = (file) => (existsSync(join(folder, file)) ? join(folder, file) : null);
   const count = errors.length;
   for (const file of [PAGE_FILE, CLIENT_FILE, ...(siteTheme ? [HOME_FILE, NOT_FOUND_FILE, THEME_STYLES_FILE] : [])]) {
-    if (locate(file) === null) errors.push(errorAt(`${THEMES_DIR}/${name}`, fileStart, `theme "${name}" has no ${file}`));
+    if (locate(file) === null) errors.push(errorAt(themeLocation(root, name), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
   const cache = buildCache('theme', `${BAKE_ROOT}\0${name}\0${siteTheme}`, resolve(root));
@@ -112,6 +116,6 @@ function compileError(root, name, clientFile, error) {
     return errorAt(blogPath(root, clientFile), fileStart, `${CLIENT_FILE} has no default export; export the function start(document), which starts the page script and returns a function that stops it`);
   }
   const { message, file, position } = compileProblem(root, error);
-  if (file === null) return errorAt(`${THEMES_DIR}/${name}`, fileStart, `theme "${name}" cannot be built: ${message}`);
+  if (file === null) return errorAt(themeLocation(root, name), fileStart, `theme "${name}" cannot be built: ${message}`);
   return errorAt(file, position, message);
 }

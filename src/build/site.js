@@ -21,7 +21,7 @@ import { listFiles } from './files.js';
 import { checkDuplicateUrls, indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, chatCatalogJson, feedXml, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
-import { THEMES_DIR, THEME_STYLES_PATH, builtInThemeFolders, compileTheme } from './theme.js';
+import { THEMES_DIR, THEME_STYLES_PATH, builtInThemeFolders, compileTheme, themeLocation } from './theme.js';
 import { THEME_OPTIONS_FILE, readThemeDeclarations } from './theme-options.js';
 import { absoluteLink, articleUrl, encodePath, pageRoot, siteLink, sitePath } from '../urls.js';
 
@@ -58,7 +58,7 @@ export async function updateSite(site, changedPaths = null) {
   const assetSources = new Map(site.shareImages ? assetFiles.map((file) => [file.path, file.render()]) : []);
   const current = published.map((article) => ({ article, entry: articleEntry(article, config) }));
   const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, current, config, assetSources, errors) : new Map();
-  const pageSettings = { config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
+  const pageSettings = { root, config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
   const pages = current.map(({ article, entry }) => ({ article, entry, outputs: articleOutputs(root, article, entry, pageSettings, errors) }));
   const listing = [...pages].sort((a, b) => newestFirst(a.entry, b.entry));
   const listed = listing.filter(({ entry }) => !entry.draft);
@@ -165,8 +165,8 @@ function siteProps(config) {
   return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
 }
 
-function homeOutput(entries, { config, themes, chat }, errors) {
-  const html = renderSitePage(config, themes, 'the homepage', errors, (theme) =>
+function homeOutput(entries, { root, config, themes, chat }, errors) {
+  const html = renderSitePage(root, config, themes, 'the homepage', errors, (theme) =>
     theme.renderHome({
       site: siteProps(config),
       options: config.themes[config.theme],
@@ -178,8 +178,8 @@ function homeOutput(entries, { config, themes, chat }, errors) {
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
 }
 
-function notFoundOutput(entries, base, { config, themes }, errors) {
-  const html = renderSitePage(config, themes, 'the 404 page', errors, (theme) =>
+function notFoundOutput(entries, base, { root, config, themes }, errors) {
+  const html = renderSitePage(root, config, themes, 'the 404 page', errors, (theme) =>
     theme.renderNotFound({
       site: siteProps(config),
       options: config.themes[config.theme],
@@ -194,10 +194,10 @@ function assetLinks(root, paths) {
   return paths.map((path) => `${root}${encodePath(path)}`);
 }
 
-function renderSitePage(config, themes, label, errors, render) {
+function renderSitePage(root, config, themes, label, errors, render) {
   const theme = themes.get(config.theme);
   if (theme === null) return '';
-  return renderDocument(() => render(theme), posix.join(THEMES_DIR, config.theme), `the ${config.theme} theme cannot render ${label}`, errors);
+  return renderDocument(() => render(theme), themeLocation(root, config.theme), `the ${config.theme} theme cannot render ${label}`, errors);
 }
 
 function renderDocument(render, file, failure, errors) {
