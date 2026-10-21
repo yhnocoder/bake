@@ -1,4 +1,4 @@
-.PHONY: check browser example dev perf
+.PHONY: check browser example dev perf perf-dev
 
 check: node_modules
 	scripts/test.sh
@@ -22,3 +22,8 @@ perf: node_modules
 	mkdir -p test-out/perf
 	node scripts/measure-pages.js examples/blog/dist --out test-out/perf/report.json
 	node scripts/check-budgets.js test-out/perf/report.json
+
+perf-dev: node_modules
+	mkdir -p test-out/perf
+	node scripts/measure-dev.js --out test-out/perf/dev.json
+	node scripts/check-budgets.js test-out/perf/dev.json

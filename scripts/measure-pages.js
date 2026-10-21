@@ -65,7 +65,7 @@ export async function measureSite(dist) {
     await browser.close();
     await server.close();
   }
-  return { compression: 'gzip', scrollStep, measurements };
+  return { compression: 'gzip', scrollStep, metrics: metrics.map((metric) => metric.key), measurements };
 }
 
 export function listPages(dist) {
