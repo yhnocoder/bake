@@ -4,12 +4,14 @@ import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { readPet } from '../chat/pet-files.js';
 import { petFolder } from '../config/pet.js';
 import { bundleComponents } from '../components/bundle.js';
+import { optionProblem } from '../components/declarations.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { BUILT_IN_THEMES, availableThemes } from '../config/rules.js';
-import { BUILT_IN_BLOCK_NAMES, readArticle } from '../markdown/article.js';
+import { readArticle } from '../markdown/article.js';
+import { BUILT_IN_BLOCK_NAMES } from '../markdown/parse.js';
 import { IMAGE_FORMATS, convertImage, readImage } from '../render/images.js';
 import { mathStyles, typesetMath } from '../render/math.js';
 import { errorAt, fileStart, sortErrors } from '../report.js';
@@ -20,7 +22,7 @@ import { checkDuplicateUrls, indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, chatCatalogJson, feedXml, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, builtInThemeFolders, compileTheme } from './theme.js';
-import { THEME_OPTIONS_FILE, optionProblem, readThemeOptions } from './theme-options.js';
+import { THEME_OPTIONS_FILE, readThemeDeclarations } from './theme-options.js';
 import { absoluteLink, articleUrl, encodePath, pageRoot, siteLink, sitePath } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
@@ -122,13 +124,13 @@ async function siteSettings(site) {
 
 async function readSettings(root, themeNames) {
   const errors = builtInThemeFolders(root);
-  const themeOptions = await readThemeOptions(root, themeNames, errors);
+  const { options: themeOptions, markdown } = await readThemeDeclarations(root, themeNames, errors);
   const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
   if (config === null || errors.length > 0) return { errors };
   const preamble = await readMathPreamble(root, errors);
   const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id), theme: config.theme, options: themeOptions, optionProblem };
-  return { errors, config, preamble, pet, rules };
+  return { errors, config, preamble, pet, rules, markdown };
 }
 
 function themeOf(site, name, siteTheme) {
@@ -262,7 +264,7 @@ function linkTarget({ url, fields, draft, document }) {
 // An article also depends on the values of the settings it read, so a change of bake.config.js or of a component that leaves them as they were keeps it.
 async function articleOf(site, found) {
   const { root, settings } = site;
-  const key = (lookups) => JSON.stringify([found.files, settings.rules, [...settings.rules.options], settings.preamble, lookups.map((name) => settings.components.get(name) ?? null)]);
+  const key = (lookups) => JSON.stringify([found.files, settings.rules, [...settings.rules.options], [...settings.markdown], settings.preamble, lookups.map((name) => settings.components.get(name) ?? null)]);
   const entry = site.articles.get(found.file);
   if (entry !== undefined && entry.key === key(entry.lookups)) return entry.article;
   const lookups = new Set();
@@ -277,14 +279,15 @@ async function articleOf(site, found) {
   return article;
 }
 
-async function loadArticle(root, article, { rules, preamble, components }) {
+async function loadArticle(root, article, { rules, preamble, components, markdown }) {
   const errors = [];
   const source = readFileSync(join(root, article.file), 'utf8');
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
   const folder = { path: join(root, article.dir), files: article.files };
-  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
+  const theme = markdown.get(fields?.theme ?? rules.theme);
+  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components, theme }) : null;
   const positions = frontMatter?.positions ?? {};
   const options = frontMatter?.options ?? {};
   const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);

@@ -4,39 +4,32 @@ import { describe, test } from 'node:test';
 import { parseAttributes, writeAttributes } from '../src/markdown/attributes.js';
 import { serializeMarkdown } from '../src/markdown/serialize.js';
 import { formatError, sortErrors } from '../src/report.js';
-import { components, folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
+import { bentoTheme, components, folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
 
 const exampleBlog = fileURLToPath(new URL('../examples/blog/', import.meta.url));
 
 describe('headings and anchors', () => {
   test('numbers ## sections and lists ### headings under them in the table of contents', async () => {
-    const article = await parsed('Intro.\n\n## First {#one toc="1st"}\n\nA.\n\n### Inner\n\nB.\n\n## Second {width=page}\n\nC.\n');
+    const article = await parsed('Intro.\n\n## First {#one toc="1st"}\n\nA.\n\n### Inner\n\nB.\n\n## Second\n\nC.\n');
     assert.deepEqual(article.intro.map((block) => block.html), ['<p>Intro.</p>']);
     assert.deepEqual(
-      article.sections.map(({ id, number, title, text, toc, width, line }) => ({ id, number, title, text, toc, width, line })),
+      article.sections.map(({ id, number, title, text, attributes, line }) => ({ id, number, title, text, attributes, line })),
       [
-        { id: 'one', number: '01', title: 'First', text: 'First', toc: '1st', width: undefined, line: 9 },
-        { id: 'second', number: '02', title: 'Second', text: 'Second', toc: 'Second', width: 'page', line: 17 },
+        { id: 'one', number: '01', title: 'First', text: 'First', attributes: { toc: '1st' }, line: 9 },
+        { id: 'second', number: '02', title: 'Second', text: 'Second', attributes: {}, line: 17 },
       ],
     );
     assert.deepEqual(article.sections[0].blocks.map((block) => block.html), ['<p>A.</p>', '<h3 id="inner">Inner</h3>', '<p>B.</p>']);
-    assert.deepEqual(article.sections[0].blocks[1], { type: 'heading', line: 13, endLine: 13, html: '<h3 id="inner">Inner</h3>', sidenotes: [], depth: 3, id: 'inner', title: 'Inner', text: 'Inner', toc: 'Inner' });
+    assert.deepEqual(article.sections[0].blocks[1], { type: 'heading', line: 13, endLine: 13, html: '<h3 id="inner">Inner</h3>', sidenotes: [], depth: 3, id: 'inner', title: 'Inner', text: 'Inner', attributes: {} });
     assert.deepEqual(article.toc, [
-      { id: 'one', number: '01', title: '1st', recap: undefined, children: [{ id: 'inner', title: 'Inner', recap: undefined }] },
-      { id: 'second', number: '02', title: 'Second', recap: undefined, children: [] },
+      { id: 'one', number: '01', title: 'First', attributes: { toc: '1st' }, recap: undefined, children: [{ id: 'inner', title: 'Inner', attributes: {}, recap: undefined }] },
+      { id: 'second', number: '02', title: 'Second', attributes: {}, recap: undefined, children: [] },
     ]);
   });
 
-  test('gives a ## section the card columns and rows written on its heading', async () => {
-    const article = await parsed('## First {cols=2 rows=23}\n\nA.\n\n## Second {cols=3}\n\nB.\n\n## Third\n\nC.\n');
-    assert.deepEqual(
-      article.sections.map(({ cols, rows }) => ({ cols, rows })),
-      [
-        { cols: 2, rows: 23 },
-        { cols: 3, rows: undefined },
-        { cols: undefined, rows: undefined },
-      ],
-    );
+  test('gives a ## section the attributes that the theme of the article declares, as values of their declared types', async () => {
+    const article = await parsed('## First {cols=2 rows=23}\n\nA.\n\n## Second {cols=3 width=wide}\n\nB.\n\n## Third\n\nC.\n', { theme: bentoTheme });
+    assert.deepEqual(article.sections.map((section) => section.attributes), [{ cols: 2, rows: 23 }, { cols: 3, width: 'wide' }, {}]);
   });
 
   test('keeps the source text and the lines of each heading, counted from the first line of the file', async () => {
@@ -95,24 +88,33 @@ describe('headings and anchors', () => {
   });
 
   const headingErrors = [
-    ['## A {width=full}', 'index.md:7:6 width must be body, wide or page, got "full"'],
-    ['### A {width=wide}', 'index.md:7:7 width only applies to ## headings'],
-    ['## A {cols=0}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
-    ['## A {cols=1.5}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
-    ['## A {rows}', 'index.md:7:6 rows must be a whole number of card rows from 1 to 200, for example rows=12'],
-    ['## A {cols=7}', 'index.md:7:6 cols must be a whole number of card columns from 1 to 6, for example cols=2'],
-    ['## A {rows=201}', 'index.md:7:6 rows must be a whole number of card rows from 1 to 200, for example rows=12'],
-    ['### A {cols=2 rows=3}', 'index.md:7:7 cols only applies to ## headings', 'index.md:7:7 rows only applies to ## headings'],
-    ['## A {toc}', 'index.md:7:6 toc must be a short title in quotes, for example toc="Short title"'],
+    ['## A {cols=2 width=wide}', 'index.md:7:7 unknown attribute "cols" on heading; the essay theme reads #id and toc', 'index.md:7:14 unknown attribute "width" on heading; the essay theme reads #id and toc'],
+    ['## A {toc}', 'index.md:7:7 toc needs a value, got no value'],
     ['## A {id}', 'index.md:7:6 id must be an anchor name, for example {#intro}'],
-    ['## A {.red}', 'index.md:7:6 unknown attribute "class" on heading'],
+    ['## A {.red}', 'index.md:7:7 unknown attribute "class" on heading; the essay theme reads #id and toc'],
     ['## A {toc="a" toc="b"}', 'index.md:7:6 attribute "toc" is written twice'],
     ['## A {toc="unclosed}', 'index.md:7:6 cannot read the attributes {toc="unclosed}; write them as {#id key=value key="text with spaces"}'],
     ['# Title', 'index.md:7:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##'],
   ];
   for (const [line, ...messages] of headingErrors) {
-    test(`reports ${messages[0].slice(messages[0].indexOf(' ') + 1)} for ${line}`, async () => {
+    test(`reports ${messages[0].slice(messages[0].indexOf(' ') + 1)} for ${line} in an essay article`, async () => {
       assert.deepEqual((await parse(`${line}\n`)).errors, messages);
+    });
+  }
+
+  const bentoHeadingErrors = [
+    ['## A {toc="Short"}', 'index.md:7:7 unknown attribute "toc" on heading; the bento theme reads #id, width, cols and rows'],
+    ['## A {width=full}', 'index.md:7:7 width must be one of body, wide or page, got "full"'],
+    ['### A {width=wide}', 'index.md:7:8 width only applies to ## headings'],
+    ['## A {cols=0}', 'index.md:7:7 cols must be between 1 and 6, got 0'],
+    ['## A {cols=1.5}', 'index.md:7:7 cols must be a whole number from 1 to 6, got 1.5'],
+    ['## A {rows}', 'index.md:7:7 rows must be a number, got no value'],
+    ['## A {rows=201}', 'index.md:7:7 rows must be between 1 and 200, got 201'],
+    ['### A {cols=2 rows=3}', 'index.md:7:8 cols only applies to ## headings', 'index.md:7:15 rows only applies to ## headings'],
+  ];
+  for (const [line, ...messages] of bentoHeadingErrors) {
+    test(`reports ${messages[0].slice(messages[0].indexOf(' ') + 1)} for ${line} in a bento article`, async () => {
+      assert.deepEqual((await parse(`${line}\n`, { theme: bentoTheme })).errors, messages);
     });
   }
 });
@@ -517,7 +519,7 @@ describe('citations', () => {
 
 describe('blocks', () => {
   test('reports an unknown block and keeps components with their attributes', async () => {
-    assert.deepEqual((await parse(':::warning\nText.\n:::\n')).errors, ['index.md:7:1 unknown block ":::warning"']);
+    assert.deepEqual((await parse(':::warning\nText.\n:::\n')).errors, ['index.md:7:1 unknown block ":::warning"; the essay theme declares no blocks']);
     const params = {
       fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'silu' },
       range: { label: 'Range', type: 'number', min: 1, max: 10, default: 4 },
@@ -543,6 +545,27 @@ describe('blocks', () => {
     const errors = [];
     await parseArticle('index.md', frontMatter.replaceAll('\n', '\r\n') + 'Text.\r\n\r\n## A {#a}\r\n\r\nB[^x] ^a\r\n', errors);
     assert.deepEqual(sortErrors(errors).map(formatError), ['index.md:11:2 footnote "x" has no definition', 'index.md:11:7 duplicate anchor "a", first defined at 9:6']);
+  });
+
+  const cardTheme = { name: 'mine', headings: {}, blocks: { card: { tint: { type: 'enum', options: ['red', 'blue'] }, size: { type: 'number', min: 1, max: 3, step: 1 } }, plain: {} } };
+
+  test('reads a block that the theme declares as a container of Markdown and gives the theme its attributes and its HTML', async () => {
+    const article = await parsed('## A\n\n:::card{tint=blue size=2}\nSee [A](#a), $x$ and a note.[^n]\n:::\n\n[^n]: Note.\n', { theme: cardTheme });
+    const [block] = article.sections[0].blocks;
+    assert.deepEqual([block.type, block.name, block.attributes, block.line, block.endLine, block.sidenotes], ['themeBlock', 'card', { tint: 'blue', size: 2 }, 9, 11, [1]]);
+    assert.match(outline(block.html), /^<p>See <a href="#a">A<\/a>, \$x\$ and a note\.<sup class="sidenote-ref" data-sidenote="1"><a href="#sidenote-1">1<\/a><\/sup><\/p>$/);
+  });
+
+  test('reports a block or an attribute that the theme does not declare, a wrong value and a declared block inside another block', async () => {
+    const source = ':::card{tint=green size=1.5 width=wide}\nA.\n:::\n\n:::plain{x=1}\nB.\n:::\n\n:::panel\nC.\n:::\n\n> :::card\n> D.\n> :::\n';
+    assert.deepEqual((await parse(source, { theme: cardTheme })).errors, [
+      'index.md:7:9 tint must be one of red or blue, got "green"',
+      'index.md:7:20 size must be a whole number from 1 to 3, got 1.5',
+      'index.md:7:29 unknown attribute "width" on :::card; :::card of the mine theme takes tint and size',
+      'index.md:11:10 unknown attribute "x" on :::plain; :::plain of the mine theme takes no attributes',
+      'index.md:15:1 unknown block ":::panel"; the blocks of the mine theme are card and plain',
+      'index.md:19:3 :::card of the mine theme stands at the top level of the article, outside other blocks, lists and quotes',
+    ]);
   });
 });
 

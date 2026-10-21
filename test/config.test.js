@@ -150,4 +150,27 @@ describe('bake.config.js', () => {
       'themes/mine/options.js:1:1 mine: the default of setting "rule" names the option "rule", which must be an enum whose options are values of the setting',
     ]);
   });
+
+  test('reports wrong declarations of heading attributes and blocks in options.js of a theme', (t) => {
+    const broken = [
+      'export const options = {};',
+      "export const headings = { id: { type: 'text' }, 'two words': { type: 'text' }, tone: { type: 'color' }, size: { type: 'number', min: 3, max: 1, depth: 1 }, kind: { type: 'enum', options: [] }, mark: { type: 'text', label: 'Mark' } };",
+      "export const blocks = { aside: {}, 'my-card': {}, Card: {}, card: { tone: { type: 'text', depth: 2 } }, plain: 'x' };",
+      '',
+    ].join('\n');
+    assert.deepEqual(problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
+      'themes/mine/options.js:1:1 mine: heading attribute "id" is the anchor of a heading, which Bake reads itself',
+      'themes/mine/options.js:1:1 mine: heading attribute "two words" cannot be written as a Markdown attribute; use letters, digits, "_" and "-", starting with a letter or "_"',
+      'themes/mine/options.js:1:1 mine: heading attribute "tone" has the type "color"; use number, text, enum or boolean',
+      'themes/mine/options.js:1:1 mine: heading attribute "size" has min 3 above max 1',
+      'themes/mine/options.js:1:1 mine: heading attribute "size" has depth 1; it must be the level of a heading from 2 to 6',
+      "themes/mine/options.js:1:1 mine: heading attribute \"kind\" is an enum without options; list them as strings, for example options: ['body', 'wide']",
+      'themes/mine/options.js:1:1 mine: heading attribute "mark" has the unknown field "label"; the fields of a text attribute are type and depth',
+      'themes/mine/options.js:1:1 mine: block "aside" has the name of a block of Bake; a theme cannot declare aside, fold, recap, references, example, list-table or embed',
+      'themes/mine/options.js:1:1 mine: block "my-card" must be named with lowercase letters and digits, starting with a letter; a name with "-" is a component',
+      'themes/mine/options.js:1:1 mine: block "Card" must be named with lowercase letters and digits, starting with a letter; a name with "-" is a component',
+      'themes/mine/options.js:1:1 mine: attribute "tone" of block "card" has the unknown field "depth"; the fields of a text attribute are type',
+      "themes/mine/options.js:1:1 mine: block \"plain\" must be declared as an object that maps each of its attributes to its declaration, such as { cols: { type: 'number', min: 1, max: 6, step: 1 } }, got \"x\"",
+    ]);
+  });
 });

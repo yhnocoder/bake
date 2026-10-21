@@ -160,6 +160,40 @@ describe('themes', () => {
     assert.match(html('gelu'), /<html lang="en" [^>]*data-ink="light">/);
   });
 
+  test('a theme of the blog declares the heading attributes and the blocks that its articles write, and renders the blocks into the page', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: '## One {tone=loud}\n\n:::card{tint=blue}\nSee [one](#one) and $x$.\n:::\n' }),
+      'themes/plain/options.js': [
+        'export const options = {};',
+        "export const headings = { tone: { type: 'enum', options: ['calm', 'loud'], depth: 2 } };",
+        "export const blocks = { card: { tint: { type: 'enum', options: ['red', 'blue'] } } };",
+        '',
+      ].join('\n'),
+      'themes/plain/page.jsx': [
+        'export default function Page(props) {',
+        '  return (',
+        '    <html>',
+        '      <body>',
+        '        {props.article.content.sections.map((section) => (',
+        '          <section data-tone={section.attributes.tone}>',
+        "            {section.blocks.map((block) => (block.type === 'themeBlock' ? <aside data-block={block.name} data-tint={block.attributes.tint} innerHTML={block.html} /> : null))}",
+        '          </section>',
+        '        ))}',
+        '      </body>',
+        '    </html>',
+        '  );',
+        '}',
+        '',
+      ].join('\n'),
+      'themes/plain/client.jsx': 'export default () => () => {};\n',
+    });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const html = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    assert.match(html, /<section data-tone="loud"><aside data-block="card" data-tint="blue"><p>See <a href="#one">one<\/a> and <mjx-container[^>]*>.*<\/mjx-container>\.<\/p><\/aside><\/section>/s);
+    assert.doesNotMatch(html, /<script/);
+  });
+
   test('a module that the page script imports dynamically is a separate chunk with its own stylesheet, which the page loads when the import runs', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

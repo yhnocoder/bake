@@ -1,5 +1,5 @@
 import { WIDTHS, folderFile, parseSize } from '../config/rules.js';
-import { describeValue, listChoices } from '../report.js';
+import { describeValue, listAll, listChoices } from '../report.js';
 
 export const PARAM_TYPES = Object.freeze(['number', 'text', 'boolean', 'enum', 'file']);
 export const SIZE_ATTRIBUTES = Object.freeze(['width', 'height']);
@@ -151,6 +151,16 @@ export function convertAttribute(declaration, raw) {
   return problem === null ? { value } : { problem };
 }
 
+export function optionProblem(declaration, value) {
+  const problem = valueProblem(declaration, value);
+  if (problem !== null || declaration.type !== 'number' || declaration.step === undefined) return problem;
+  const steps = (value - (declaration.min ?? 0)) / declaration.step;
+  if (Math.abs(steps - Math.round(steps)) < 1e-9) return null;
+  const range = declaration.min !== undefined && declaration.max !== undefined ? ` from ${declaration.min} to ${declaration.max}` : '';
+  if (declaration.step === 1 && Number.isInteger(declaration.min ?? 0)) return `must be a whole number${range}, got ${describeValue(value)}`;
+  return `must be ${declaration.min ?? 0} plus a multiple of ${declaration.step}, got ${describeValue(value)}`;
+}
+
 export function valueProblem(declaration, value) {
   switch (declaration.type) {
     case 'number': {
@@ -168,10 +178,6 @@ export function valueProblem(declaration, value) {
     default:
       return typeof value === 'string' ? null : `must be text, got ${describeValue(value)}`;
   }
-}
-
-function listAll(items) {
-  return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 }
 
 function describeAttribute(value) {

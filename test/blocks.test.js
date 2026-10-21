@@ -41,7 +41,7 @@ describe(':::example', () => {
 
   test('keeps example headings out of the sections, shows recaps in place and numbers notes with the article', async () => {
     const article = await parsed('Body[^a] and \\eqref{eq:b}.\n\n## A\n\n::::example\n### Inner\n\n:::recap\nPoint.\n:::\n\nNote[^b] and\n\n$$\nx \\label{eq:b}\n$$\n\n[^b]: B.\n::::\n\n[^a]: A.\n');
-    assert.deepEqual(article.toc, [{ id: 'a', number: '01', title: 'A', recap: undefined, children: [] }]);
+    assert.deepEqual(article.toc, [{ id: 'a', number: '01', title: 'A', attributes: {}, recap: undefined, children: [] }]);
     assert.deepEqual(article.sidenotes.map((note) => [note.number, note.html]), [[1, '<p>A.</p>'], [2, '<p>B.</p>']]);
     const example = outline(article.sections[0].blocks[0].html);
     assert.match(example, /<div class="example-result">\n<h3 id="inner">Inner<\/h3>\n<div class="recap">\n<p>Point.<\/p>\n<\/div>\n<p>Note<sup class="sidenote-ref" data-sidenote="2">/);

@@ -1,5 +1,12 @@
+@property --bt-unit {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 .bt-page {
-  --bt-gutter: 104px;
+  --bt-wide-gutter: 104px;
+  --bt-gutter: var(--bt-wide-gutter);
   --bt-gap: 6px;
   --bt-measure: 46em;
   --bt-padding-top: 22px;
@@ -40,6 +47,8 @@
 
 .bt-grid {
   --bt-cols: var(--bt-columns);
+  /* why: below 1000 pixels the cards keep the column width that the grid has on a screen 1000 pixels wide */
+  --bt-unit: calc((1000px - 2 * var(--bt-wide-gutter) - (var(--bt-columns) - 1) * var(--bt-gap)) / var(--bt-columns));
   display: grid;
   grid-template-columns: repeat(var(--bt-cols), minmax(0, 1fr));
   gap: var(--bt-gap);
@@ -141,6 +150,59 @@
   line-height: var(--bt-leading);
 }
 
+.bt-sticker {
+  display: grid;
+  align-content: center;
+  padding: 6px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-family: var(--font-heading);
+  font-size: calc(19px * var(--reader-scale));
+  line-height: 1.4;
+  text-align: center;
+  color: var(--accent);
+  text-wrap: balance;
+}
+
+.bt-sticker[data-emoji] {
+  font-size: calc(46px * var(--reader-scale));
+  line-height: 1.15;
+}
+
+.bt-sticker > .bt-block-body {
+  padding: 16px 18px;
+  border-radius: 20px;
+  --scroll-cover: var(--accent-soft);
+  background: var(--accent-soft);
+  box-shadow:
+    0 0 0 4px var(--surface),
+    0 0 0 5px var(--line),
+    0 10px 18px -10px var(--scroll-shadow);
+  rotate: var(--bt-tilt);
+}
+
+.bt-note {
+  --bt-note: var(--series-4);
+  --scroll-cover: color-mix(in srgb, var(--bt-note) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--bt-note) 30%, var(--surface));
+  border-radius: 6px var(--bt-radius) var(--bt-radius) var(--bt-radius);
+  background: var(--scroll-cover);
+  font-size: calc((var(--bt-text-size) - 1px) * var(--reader-scale));
+}
+
+.bt-note[data-color='green'] {
+  --bt-note: var(--series-3);
+}
+
+.bt-note[data-color='blue'] {
+  --bt-note: var(--series-1);
+}
+
+.bt-note[data-color='pink'] {
+  --bt-note: var(--series-5);
+}
+
 @scope (.bk-article) to (.component-box) {
   .bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
   .bt-card > .bk-block[data-type='math'][data-width='auto'] {
@@ -188,8 +250,24 @@
     text-wrap: pretty;
   }
 
-  .bt-card > .bt-recap > :last-child {
+  .bt-card > .bt-recap > :last-child,
+  .bt-block-body > :last-child {
     margin-bottom: 0;
+  }
+
+  .bt-block-body > :first-child {
+    margin-top: 0;
+  }
+
+  .bt-sticker img {
+    max-width: 100%;
+    max-height: 160px;
+    width: auto;
+    height: auto;
+  }
+
+  .bt-sticker .figure {
+    margin: 0;
   }
 
   .bt-card .embed h2 {
@@ -311,6 +389,11 @@
 
   .bt-grid {
     --bt-cols: 1;
+    align-items: stretch;
+  }
+
+  .bt-grid > .bt-card {
+    grid-column: span var(--bt-narrow-span, 1);
   }
 
   .bt-page .bk-header {
@@ -337,6 +420,23 @@
     padding: 0;
     border: 0;
     box-shadow: none;
+  }
+
+  .bt-note,
+  .bt-sticker > .bt-block-body {
+    padding: 8px 12px;
+    border: 1px solid var(--line-2);
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .bt-sticker {
+    display: inline-grid;
+    margin-right: 12px;
+  }
+
+  .bt-sticker > .bt-block-body {
+    rotate: none;
   }
 }
 
