@@ -120,7 +120,7 @@ test('the bento theme lays out sections as cards', async (t) => {
     await settle(page);
   };
 
-  await t.test('cards span the columns their sections ask for, the cards keep the order of the article and the grid has one column below 1000 pixels', async () => {
+  await t.test('cards span the columns their sections ask for, the cards keep the order of the article and every card takes the whole row on a phone', async () => {
     const page = await open('bento-cards');
     const desktop = { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 3, 'Body three': 2, 'Body four': 2, Fixed: 3 };
     for (const width of [1440, 1100]) {
@@ -164,6 +164,34 @@ test('the bento theme lays out sections as cards', async (t) => {
     assert.deepEqual(narrow.map(({ name }) => name), ['Tall', 'sticker', 'Short', 'Across', 'note']);
     assert.ok(narrow.every(({ top }, index) => index === 0 || top >= narrow[index - 1].top), JSON.stringify(narrow));
     await page.close();
+  });
+
+  await t.test('below 1000 pixels the grid has as many columns of the desktop width as fit, a card keeps its span when it takes at most half of them and the whole row otherwise, cards follow the order of the article and the cards of a row are equally tall', async () => {
+    const page = await open('bento-cards');
+    const expected = {
+      768: [5, { 'Wide section': 5, 'Body one': 2, 'Body two': 2, 'Page section': 5, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 5 }],
+      600: [4, { 'Wide section': 4, 'Body one': 2, 'Body two': 2, 'Page section': 4, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 4 }],
+      430: [3, { 'Wide section': 3, 'Body one': 3, 'Body two': 3, 'Page section': 3, Component: 3, 'Body three': 3, 'Body four': 3, Fixed: 3 }],
+    };
+    for (const [width, [columns, spans]] of Object.entries(expected)) {
+      await resize(page, Number(width));
+      assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bt-grid')).gridTemplateColumns.split(' ').length), columns, `${width}px`);
+      const grid = await page.evaluate(gridLayout, columns);
+      assert.deepEqual(grid.spans, spans, `${width}px`);
+      const rows = await page.evaluate(() => {
+        const boxes = [...document.querySelectorAll('.bt-grid > .bt-card')].map((card) => card.getBoundingClientRect());
+        const sameRow = (box, other) => Math.abs(other.top - box.top) < 0.5;
+        return {
+          inOrder: boxes.every((box, index) => index === 0 || box.top > boxes[index - 1].bottom || (sameRow(box, boxes[index - 1]) && box.left > boxes[index - 1].right)),
+          unequal: boxes.filter((box, index) => boxes.some((other, before) => before < index && sameRow(box, other) && Math.abs(other.height - box.height) > 0.5)).length,
+        };
+      });
+      assert.deepEqual(rows, { inOrder: true, unequal: 0 }, `${width}px`);
+    }
+    await page.close();
+    const still = await open('bento-cards', { javaScriptEnabled: false, viewport: { width: 768, height: 900 } });
+    assert.ok((await still.evaluate(gridLayout, 1)).fullWidth);
+    await still.close();
   });
 
   await t.test('the column count follows themes.bento.columns in bake.config.js', async () => {

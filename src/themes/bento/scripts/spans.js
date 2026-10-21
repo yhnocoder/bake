@@ -15,11 +15,14 @@ export function placeCards(article) {
   const grid = article.querySelector('.bt-grid');
   if (grid === null) return;
   const cards = [...grid.querySelectorAll(':scope > .bt-card')];
+  const columns = Number(grid.dataset.columns);
   if (!notesColumnScreen.matches) {
     unpack(grid, cards);
+    fitColumns(grid, cards, columns);
     return;
   }
-  const columns = Number(grid.dataset.columns);
+  setStyle(grid, '--bt-cols', '');
+  for (const card of cards) setStyle(card, '--bt-narrow-span', '');
   const style = getComputedStyle(grid);
   const gap = parseFloat(style.columnGap);
   const rowHeight = parseFloat(style.getPropertyValue('--bt-row-height'));
@@ -96,6 +99,18 @@ function unpack(grid, cards) {
     placedHeights.delete(card);
     for (const name of ['--bt-width', '--bt-x', '--bt-y']) setStyle(card, name, '');
     for (const name of ['data-overflow', 'data-end', 'data-hint', 'data-active', 'tabindex']) setAttribute(card, name, null);
+  }
+}
+
+function fitColumns(grid, cards, columns) {
+  const style = getComputedStyle(grid);
+  const gap = parseFloat(style.columnGap);
+  const unit = parseFloat(style.getPropertyValue('--bt-unit'));
+  const count = Math.max(1, Math.min(columns, Math.floor((grid.clientWidth + gap) / (unit + gap))));
+  setStyle(grid, '--bt-cols', String(count));
+  for (const card of cards) {
+    const span = declaredSpan(card, columns);
+    setStyle(card, '--bt-narrow-span', String(span <= count / 2 ? span : count));
   }
 }
 

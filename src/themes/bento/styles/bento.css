@@ -1,5 +1,12 @@
+@property --bt-unit {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 .bt-page {
-  --bt-gutter: 104px;
+  --bt-wide-gutter: 104px;
+  --bt-gutter: var(--bt-wide-gutter);
   --bt-gap: 6px;
   --bt-measure: 46em;
   --bt-padding-top: 22px;
@@ -40,6 +47,8 @@
 
 .bt-grid {
   --bt-cols: var(--bt-columns);
+  /* why: below 1000 pixels the cards keep the column width that the grid has on a screen 1000 pixels wide */
+  --bt-unit: calc((1000px - 2 * var(--bt-wide-gutter) - (var(--bt-columns) - 1) * var(--bt-gap)) / var(--bt-columns));
   display: grid;
   grid-template-columns: repeat(var(--bt-cols), minmax(0, 1fr));
   gap: var(--bt-gap);
@@ -143,17 +152,11 @@
 
 .bt-sticker {
   display: grid;
-  place-content: center;
-  padding: 16px 18px;
+  align-content: center;
+  padding: 6px;
   border: 0;
-  border-radius: 20px;
-  --scroll-cover: var(--accent-soft);
-  background: var(--accent-soft);
-  box-shadow:
-    0 0 0 4px var(--surface),
-    0 0 0 5px var(--line),
-    0 10px 18px -10px var(--scroll-shadow);
-  rotate: var(--bt-tilt);
+  background: none;
+  box-shadow: none;
   font-family: var(--font-heading);
   font-size: calc(19px * var(--reader-scale));
   line-height: 1.4;
@@ -165,6 +168,18 @@
 .bt-sticker[data-emoji] {
   font-size: calc(46px * var(--reader-scale));
   line-height: 1.15;
+}
+
+.bt-sticker > .bt-block-body {
+  padding: 16px 18px;
+  border-radius: 20px;
+  --scroll-cover: var(--accent-soft);
+  background: var(--accent-soft);
+  box-shadow:
+    0 0 0 4px var(--surface),
+    0 0 0 5px var(--line),
+    0 10px 18px -10px var(--scroll-shadow);
+  rotate: var(--bt-tilt);
 }
 
 .bt-note {
@@ -374,6 +389,11 @@
 
   .bt-grid {
     --bt-cols: 1;
+    align-items: stretch;
+  }
+
+  .bt-grid > .bt-card {
+    grid-column: span var(--bt-narrow-span, 1);
   }
 
   .bt-page .bk-header {
@@ -402,16 +422,20 @@
     box-shadow: none;
   }
 
-  .bt-sticker,
-  .bt-note {
+  .bt-note,
+  .bt-sticker > .bt-block-body {
     padding: 8px 12px;
     border: 1px solid var(--line-2);
+    box-shadow: none;
     break-inside: avoid;
   }
 
   .bt-sticker {
     display: inline-grid;
     margin-right: 12px;
+  }
+
+  .bt-sticker > .bt-block-body {
     rotate: none;
   }
 }
