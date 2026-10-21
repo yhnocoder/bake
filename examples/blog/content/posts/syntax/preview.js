@@ -1,7 +1,7 @@
 const COLOR = '#985b57';
 const MATH_FONT = "'STIX Two Math', 'Cambria Math', 'Times New Roman', serif";
 const SWEEP = 2600;
-const HOLD = 1200;
+const HOLD = 500;
 const FADE = 7;
 let previews = 0;
 
