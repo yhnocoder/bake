@@ -18,15 +18,19 @@ function main(args) {
 }
 
 export function budgetProblems(report, budgets) {
-  return report.measurements.flatMap((measurement) =>
-    Object.entries(budgets.limits).flatMap(([metric, { limit }]) => {
-      const value = measurement[metric];
-      const where = `${measurement.page} at ${measurement.width} pixels`;
-      if (value === undefined) return [`${where}: ${metric} is missing from the report`];
-      if (value === null || value <= limit) return [];
-      return [`${where}: ${metric} is ${value}, over the limit of ${limit}`];
-    }),
-  );
+  const limits = Object.entries(budgets.limits).filter(([metric]) => report.metrics.includes(metric));
+  const missing = limits.filter(([metric]) => report.measurements.every((measurement) => measurement[metric] === undefined));
+  return [
+    ...missing.map(([metric]) => `${metric} is missing from the report`),
+    ...report.measurements.flatMap((measurement) =>
+      limits.flatMap(([metric, { limit }]) => {
+        const value = measurement[metric];
+        if (value === undefined || value === null || value <= limit) return [];
+        const where = measurement.page === undefined ? '' : `${measurement.page} at ${measurement.width} pixels: `;
+        return [`${where}${metric} is ${value}, over the limit of ${limit}`];
+      }),
+    ),
+  ];
 }
 
 export function budgetSummary(report, problems) {

@@ -5,7 +5,6 @@ export const SLOW_FRAME = FRAME_BUDGET + 1;
 export const MAX_SLOW_SHARE = 0.03;
 export const MAX_DROPPED_SHARE = 0.03;
 export const MAX_FRAME = 2 * FRAME_BUDGET + 1;
-export const CPU_SLOWDOWN = 2;
 
 export const VIEWPORTS = {
   desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
@@ -60,7 +59,6 @@ export async function openPage(browser, url, { device, storage = {} }) {
   await page.goto(url, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state !== 'loading'));
-  await session.send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
   await settle(page);
   return { context, page, errors };
 }

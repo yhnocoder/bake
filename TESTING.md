@@ -10,6 +10,7 @@
 | `npm run test:frames` | The frame time gate in `test/frames/`; with `BAKE_FRAMES=all` it measures every interaction |
 | `make browser` | Installs the dependencies when needed, downloads Playwright's Chromium and runs the browser tests |
 | `make perf` | Builds `examples/blog/`, measures its pages and checks them against the performance budgets |
+| `make perf-dev` | Measures `bake dev` on a copy of `examples/blog/` and checks it against the performance budgets |
 | `make example` | Builds `examples/blog/` and serves `examples/blog/dist/` at the `localhost` address it prints |
 | `make dev` | Runs `bake dev` in `examples/blog/` |
 
@@ -25,7 +26,7 @@
 
 `.github/workflows/test.yml` runs on every pull request, on every push to `main` and when started by hand; a new push cancels the run that is still going for the same pull request or branch. Its jobs `lint`, `unit` (two shards), `browser` (three shards) and `frames` run in parallel, and the job `test` passes when all of them passed, so `test` is the check to read. `node --test --test-shard` runs each test file whole on one shard; when a shard comes close to its time limit, add a shard to the matrix and to the command. The jobs that run tests set up Node, the dependencies and Chromium with `.github/actions/setup`.
 
-`.github/workflows/nightly.yml` runs once a day and when started by hand. Its job `performance` measures the pages of the example blog and checks the budgets, and its job `frames` runs the frame time gate with `BAKE_FRAMES=all`.
+`.github/workflows/nightly.yml` runs once a day and when started by hand. Its job `performance` measures the pages of the example blog and checks the budgets, its job `dev` measures `bake dev` and checks the budgets, and its job `frames` runs the frame time gate with `BAKE_FRAMES=all`.
 
 ## Rules for tests
 
@@ -43,6 +44,6 @@
 
 **Browser tests** (`test/browser/`) build a blog into a temporary directory, serve its `dist/` over HTTP on a free port and drive it with Playwright, so the page loads its scripts and fonts as a published site does. `test/browser/browser.js` serves a folder or the built example blog, launches one Chromium per test file and waits until a page has settled: its fonts are loaded and its animations have finished. The server, `scripts/static-server.js`, answers like GitHub Pages: `404.html` with status 404 for a missing file, and `cache-control: max-age=600` for the files in `assets/`. It serves at `127.0.0.1`, or at `localhost` when the test needs the AI chat, which appears only there.
 
-**Frame time gate** (`test/frames/`) opens pages of the example blog in Chromium with the CPU slowed down, records the frame times while Playwright performs an interaction, and fails when too many frames are slow or dropped, when one frame is too long, when the page throws or when a component enters the viewport before it is ready. The limits, the slowdown and the screen sizes are in `test/frames/frames.js`; the interactions, and which of them run only in the nightly tier, are in `test/frames/frames.test.js`. A case listed in `knownFailures` reports its numbers and is marked as a todo instead of failing.
+**Frame time gate** (`test/frames/`) opens pages of the example blog in Chromium, records the frame times while Playwright performs an interaction, and fails when too many frames are slow or dropped, when one frame is too long, when the page throws or when a component enters the viewport before it is ready. The limits and the screen sizes are in `test/frames/frames.js`; the interactions, and which of them run only in the nightly tier, are in `test/frames/frames.test.js`. A case listed in `knownFailures` reports its numbers and is marked as a todo instead of failing.
 
-**Performance budgets.** `scripts/measure-pages.js` loads and scrolls every page of a built site in Chromium with a slowed CPU and network and writes the bytes, paint times and component states per page and screen width; the settings and the metrics are defined at the top of the script. `scripts/check-budgets.js` checks the report against `test/perf/budgets.json`, which holds one limit per metric with the basis of each limit. A change that makes pages larger or slower on purpose raises the limit and rewrites its basis in the same change.
+**Performance budgets.** `scripts/measure-pages.js` loads and scrolls every page of a built site in Chromium and writes the bytes, paint times and component states per page and screen width; the settings and the metrics are defined at the top of the script. `scripts/measure-dev.js` starts `bake dev` on a copy of `examples/blog/` and writes the median time until the homepage answers and, on three articles, the median time from saving an article, a component and `bake.config.js` until the changed text is visible in Chromium; it runs only in the nightly tier, because these times vary too much between runs. `scripts/check-budgets.js` checks either report against `test/perf/budgets.json`, which holds one limit per metric with the basis of each limit. A change that makes pages larger or slower on purpose raises the limit and rewrites its basis in the same change.
