@@ -20,8 +20,6 @@ export const params = {
   count: { label: 'Count', type: 'number', min: 0, max: 9, default: 1 },
   on: { label: 'On', type: 'boolean', default: false },
 };
-export const layout = { height: 240, narrowHeight: 300 };
-
 export default function CountView(props) {
   const [themes, setThemes] = createSignal(0);
   const redraw = () => setThemes(themes() + 1);
@@ -196,11 +194,8 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
-  await t.test('the frame keeps its height when the component loads, at 1440 and 375 pixels', async () => {
-    for (const [width, expected] of [
-      [1440, 240],
-      [375, 300],
-    ]) {
+  await t.test('a component without layout.height shows the placeholder height until it loads and then the height of its content, and a box with a ratio keeps its height, at 1440 and 375 pixels', async () => {
+    for (const width of [1440, 375]) {
       const page = await open(null, { viewport: { width, height: 800 } });
       let release;
       const held = new Promise((done) => {
@@ -217,8 +212,11 @@ test('components run in the browser', async (t) => {
       await waitForReady(page, 2);
       const after = await page.evaluate(frameHeights);
       const elements = await page.evaluate(() => ['count-view', 'grid-view'].map((name) => document.querySelector(name).getBoundingClientRect().height));
-      assert.deepEqual(after, before, `${width}px`);
-      assert.equal(Math.round(before[0].box), expected, `${width}px: count-view placeholder height`);
+      const placeholder = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--component-placeholder-height')));
+      const text = await page.evaluate(() => document.querySelector('.count-view-text').getBoundingClientRect().height);
+      assert.equal(before[0].box, placeholder, `${width}px: count-view placeholder height`);
+      assert.equal(after[0].box, text, `${width}px: count-view takes the height of its content`);
+      assert.deepEqual(after[1], before[1], `${width}px: grid-view keeps its box`);
       assert.ok(Math.abs(before[1].box - before[1].width / 2) < 1, `${width}px: grid-view keeps the ratio 2, ${before[1].width}x${before[1].box}`);
       assert.deepEqual(
         elements.map(Math.round),
@@ -524,8 +522,8 @@ function distinctColors({ data }) {
 }
 
 async function contentHeights() {
-  const frames = [...document.querySelectorAll('figure.component[data-height="auto"]')];
-  if (frames.length === 0) return ['the page has no component with autoHeight'];
+  const frames = [...document.querySelectorAll('figure.component')].filter((frame) => !frame.querySelector('.component-box').hasAttribute('style'));
+  if (frames.length === 0) return ['the page has no component without layout.height'];
   const problems = [];
   for (const frame of frames) {
     frame.scrollIntoView({ block: 'center' });
@@ -610,7 +608,7 @@ test('the example components run on the syntax page', async (t) => {
     }
   });
 
-  await t.test('a component with autoHeight is as tall as its content at 1440, 800, 600 and 375 pixels', async () => {
+  await t.test('a component without layout.height is as tall as its content at 1440, 800, 600 and 375 pixels', async () => {
     for (const width of [1440, 800, 600, 375]) {
       const { page, problems } = await start({ viewport: { width, height: 900 } }, '2026-09/matrix-calculus/');
       assert.deepEqual(await page.evaluate(contentHeights), [], `${width}px`);

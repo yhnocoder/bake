@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { parseSync } from 'vite';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { layoutProblems, paramProblems } from './declarations.js';
+import { HEIGHT_FUNCTION, REMOVED_LAYOUT_FIELDS, layoutProblems, paramProblems } from './declarations.js';
 
 export const COMPONENTS_DIR = 'components';
 
@@ -90,14 +90,27 @@ function readDeclarations(file, source, report) {
   if (main === undefined) report(null, 'the default export must be a SolidJS component or a class that extends HTMLElement');
   const customElement = CLASSES.includes(main?.type) || (main?.type === 'Identifier' && classes.has(main.name));
   const fields = (name) => objectFields(exported.get(name), name, constants, report);
+  const read = (name, node) => readLiteral(node, name, constants, report);
   const params = {};
-  for (const { name, key, value } of fields('params')) {
+  for (const { name, key, node } of fields('params')) {
+    const value = read('params', node);
+    if (value === undefined) continue;
     params[name] = value;
     for (const problem of paramProblems(name, value)) report(key, problem);
   }
   const layout = {};
   const keys = new Map();
-  for (const { name, key, value } of fields('layout')) {
+  for (const { name, key, node } of fields('layout')) {
+    if (Object.hasOwn(REMOVED_LAYOUT_FIELDS, name)) {
+      report(key, REMOVED_LAYOUT_FIELDS[name]);
+      continue;
+    }
+    if (name === 'height' && FUNCTIONS.includes(node.type)) {
+      report(node, HEIGHT_FUNCTION);
+      continue;
+    }
+    const value = read('layout', node);
+    if (value === undefined) continue;
     layout[name] = value;
     keys.set(name, key);
   }
@@ -119,8 +132,7 @@ function objectFields(node, name, constants, report) {
       report(property, notLiteral(name, property));
       continue;
     }
-    const value = readLiteral(property.value, name, constants, report);
-    if (value !== undefined) fields.push({ name: propertyName(property.key), key: property.key, value });
+    fields.push({ name: propertyName(property.key), key: property.key, node: property.value });
   }
   return fields;
 }

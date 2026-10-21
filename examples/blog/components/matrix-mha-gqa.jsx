@@ -3,7 +3,7 @@ import { SketchView } from './lib/matrix/view.jsx'
 import './lib/matrix/pair.css'
 
 export const params = {}
-export const layout = { width: 'body', height: 210, narrowHeight: 340 }
+export const layout = { width: 'body' }
 
 function draw(title, groups) {
   const sketch = new Sketch()

@@ -24,11 +24,7 @@ export const params = {
   beta: { label: 'β 初始值', type: 'number', min: 0.1, max: 5, step: 0.05, default: 1 },
 }
 
-export const layout = {
-  width: 'body',
-  height: 360,
-  narrowHeight: 500,
-}
+export const layout = { width: 'body' }
 
 const NAME = 'llm-act-plot'
 const ZOOM_MIN = 0.25
@@ -36,6 +32,7 @@ const TWO_COLUMN_MIN_WIDTH = 600
 const PANEL_GAP = 14
 const PANEL_TITLE_HEIGHT = 30
 const MIN_PLOT_HEIGHT = 120
+const PLOT_ASPECT = 1.4
 const FIT_SAMPLES = 200
 const FIT_PAD = 0.12
 const LN9 = Math.log(9)
@@ -143,10 +140,8 @@ export default function ActFnPlot(props) {
   const width = () => size().width
   const twoColumns = () => width() >= TWO_COLUMN_MIN_WIDTH
   const panelWidth = () => (twoColumns() ? (width() - PANEL_GAP) / 2 : width())
-  const plotHeight = () => {
-    const perPanel = twoColumns() ? size().height : (size().height - PANEL_GAP) / 2
-    return Math.max(MIN_PLOT_HEIGHT, Math.floor(perPanel - PANEL_TITLE_HEIGHT))
-  }
+  const plotHeight = () => Math.max(MIN_PLOT_HEIGHT, Math.floor(panelWidth() / PLOT_ASPECT))
+  const panelsHeight = () => (twoColumns() ? plotHeight() + PANEL_TITLE_HEIGHT : 2 * (plotHeight() + PANEL_TITLE_HEIGHT) + PANEL_GAP)
 
   const status = createMemo(() => {
     if (!hasSwish()) return null
@@ -207,8 +202,8 @@ export default function ActFnPlot(props) {
           </div>
         </Show>
       </Show>
-      <div ref={panels} class="llm-panels" classList={{ 'llm-single': !twoColumns() }}>
-        <Show when={ready() && width() > 0 && size().height > 0}>
+      <div ref={panels} class="llm-panels" classList={{ 'llm-single': !twoColumns() }} style={{ 'min-height': width() > 0 ? `${panelsHeight()}px` : undefined }}>
+        <Show when={ready() && width() > 0}>
           <div class="llm-panel">
             <div class="llm-panel-title">{richNodes(F_TITLE)}</div>
             <FunctionPanel x={view().x} y={view().yf} width={panelWidth()} height={plotHeight()} series={functionSeries()} guides={functionGuides()} label="函数" />

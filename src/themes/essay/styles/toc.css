@@ -12,6 +12,8 @@
   margin: 0 0 40px var(--body-left);
   width: var(--body-width);
   font-family: var(--font-ui);
+  /* the column of the table of contents spans the screen before the article, so the browser would keep it in place instead of the text when a component above the screen changes its height */
+  overflow-anchor: none;
 }
 
 :where(.bk-toc, .bk-toc-ui) a {

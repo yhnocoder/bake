@@ -9,7 +9,7 @@ export const params = {
   points: { label: '标注点', type: 'file', default: '' },
 };
 
-export const layout = { width: 'body', height: 360, narrowHeight: 400, frame: false };
+export const layout = { width: 'body', height: 360, frame: false };
 
 const Y_TICKS_WIDTH = 36;
 const TITLE_HEIGHT = 22;

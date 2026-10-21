@@ -71,6 +71,7 @@
   --body-weight: 400;
   --strong-weight: 700;
   --strong-color: currentColor;
+  --component-placeholder-height: 360px;
   --code-foreground: var(--ink);
   --code-background: var(--surface-2);
   --code-token-keyword: var(--accent);

@@ -7,7 +7,7 @@ import './lib/llm/diagram.css'
 
 export const params = {}
 
-export const layout = { width: 'body', height: { ratio: 1.4343 }, narrowHeight: { ratio: 0.5444 } }
+export const layout = { width: 'body' }
 
 const NAME = 'llm-glu-diagram'
 
@@ -190,6 +190,11 @@ function Diagram(props) {
   )
 }
 
+function aspectRatio(narrow) {
+  const drawings = panels.map((panel) => panel.draw('', narrow))
+  return `${drawings[0].W} / ${drawings.reduce((height, d) => height + TITLE_HEIGHT + d.H, PANEL_GAP * (drawings.length - 1))}`
+}
+
 const texSources = () => [...panels.map((panel) => panel.title), ...[false, true].flatMap((narrow) => panels.flatMap((panel) => panel.draw('', narrow).sources))]
 
 export default function FfnGluDiagram() {
@@ -197,7 +202,7 @@ export default function FfnGluDiagram() {
   const size = createElementSize(() => root)
   const [ready] = createResource(() => typesetAll(NAME, texSources()))
   return (
-    <div ref={root} class="llm-diagram">
+    <div ref={root} class="llm-diagram" style={{ 'aspect-ratio': aspectRatio(size().width < NARROW_BELOW) }}>
       <Show when={ready() && size().width > 0}>
         <Show when={size().width < NARROW_BELOW} fallback={<Diagram narrow={false} />}>
           <Diagram narrow />

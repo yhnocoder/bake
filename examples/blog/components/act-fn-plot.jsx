@@ -9,17 +9,15 @@ export const params = {
   beta: { label: 'β 初始值', type: 'number', min: 0, max: 4, step: 0.1, default: 1 },
 };
 
-export const layout = {
-  width: 'body',
-  height: 340,
-  narrowHeight: 560,
-};
+export const layout = { width: 'body' };
 
 const NAMES = { relu: 'ReLU', gelu: 'GELU', silu: 'SiLU' };
 const FUNCTIONS = params.fn.options.map((value) => ({ value, label: NAMES[value] }));
 const PANEL_GAP = 16;
 const TITLE_HEIGHT = 24;
 const TARGET_ASPECT = 1.5;
+const TWO_COLUMN_MIN_WIDTH = 336;
+const MIN_PLOT_HEIGHT = 160;
 const FIT_SAMPLES = 200;
 
 function curvesFor(fn, beta, approximations) {
@@ -49,12 +47,10 @@ function fitRange(curves, key, low, high) {
   return [min - padding, max + padding];
 }
 
-function arrange(width, height) {
-  const columns = { columns: 2, width: (width - PANEL_GAP) / 2, height: height - TITLE_HEIGHT };
-  const rows = { columns: 1, width, height: (height - PANEL_GAP) / 2 - TITLE_HEIGHT };
-  const distance = (option) => Math.abs(Math.log(option.width / Math.max(1, option.height) / TARGET_ASPECT));
-  const chosen = distance(columns) <= distance(rows) ? columns : rows;
-  return { columns: chosen.columns, width: Math.floor(chosen.width), height: Math.max(0, Math.floor(chosen.height)) };
+function arrange(width) {
+  const columns = width >= TWO_COLUMN_MIN_WIDTH ? 2 : 1;
+  const panelWidth = Math.floor((width - PANEL_GAP * (columns - 1)) / columns);
+  return { columns, width: panelWidth, height: Math.max(MIN_PLOT_HEIGHT, Math.floor(panelWidth / TARGET_ASPECT)) };
 }
 
 export default function ActFnPlot(props) {
@@ -75,7 +71,7 @@ export default function ActFnPlot(props) {
     return [...x, ...fitRange(curves(), 'f', ...x), ...fitRange(curves(), 'd', ...x)];
   });
   const view = createTween(target);
-  const box = createMemo(() => arrange(size().width, size().height));
+  const box = createMemo(() => arrange(size().width));
 
   const panel = (key, title, label) => (
     <div class="act-plot-panel">
@@ -114,7 +110,7 @@ export default function ActFnPlot(props) {
         </Controls>
       </div>
       <div ref={panels} class="act-plot-panels" style={{ 'grid-template-columns': `repeat(${box().columns}, ${box().width}px)` }}>
-        <Show when={size().width > 0 && box().height > 0}>
+        <Show when={size().width > 0}>
           {panel('f', 'f(x)', '函数曲线')}
           {panel('d', "f'(x)", '导数曲线')}
         </Show>

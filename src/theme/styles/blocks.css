@@ -707,9 +707,13 @@
 
 .bk-article .component-box {
   position: relative;
-  height: var(--component-height);
-  aspect-ratio: var(--component-ratio);
+  height: var(--component-height, var(--component-placeholder-height));
+  aspect-ratio: var(--component-ratio, auto);
   border-radius: 6px;
+}
+
+.bk-article .component[data-state='ready'] > .component-box {
+  height: var(--component-height, auto);
 }
 
 .bk-article .component:not([data-state='ready']) > .component-box {
@@ -743,20 +747,4 @@ html:not([data-script]) .bk-article .component > .component-box::before {
 .bk-article .component-box > * {
   display: block;
   height: 100%;
-}
-
-.bk-article .component[data-height='auto'][data-state='ready'] > .component-box {
-  height: auto;
-  aspect-ratio: auto;
-}
-
-.bk-article .component[data-height='auto'][data-state='ready'] > .component-box > * {
-  height: auto;
-}
-
-@media (max-width: 599.98px) {
-  .bk-article .component-box {
-    height: var(--component-narrow-height);
-    aspect-ratio: var(--component-narrow-ratio);
-  }
 }

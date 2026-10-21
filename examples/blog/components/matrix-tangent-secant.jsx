@@ -5,7 +5,7 @@ import { MathText, SvgTex, fadeIn } from './lib/matrix/view.jsx'
 export const params = {
   fn: { label: '函数', type: 'enum', options: ['cube', 'sin', 'ln', 'swish'], default: 'cube' },
 }
-export const layout = { width: 'body', height: 636, narrowHeight: 620 }
+export const layout = { width: 'body' }
 
 const sigmoid = (x) => 1 / (1 + Math.exp(-x))
 const functions = {

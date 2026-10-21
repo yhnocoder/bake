@@ -9,11 +9,7 @@ export const params = {
     default: 'chain',
   },
 }
-export const layout = {
-  width: 'body',
-  height: 110,
-  narrowHeight: { ratio: 5 },
-}
+export const layout = { width: 'body' }
 
 const descriptions = {
   chain: '反向传播的方向：从 y 经过 u 传回 x，只有一条路径',

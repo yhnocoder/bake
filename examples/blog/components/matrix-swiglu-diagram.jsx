@@ -3,7 +3,7 @@ import { chainArrows, drawGraph } from './lib/matrix/graph.js'
 import { SketchView } from './lib/matrix/view.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 540, narrowHeight: { ratio: 0.8 } }
+export const layout = { width: 'body' }
 
 const linear = '$\\mathrm{Linear}$'
 const nodes = {

@@ -7,7 +7,7 @@ export const params = {
   s: { label: 'key 的位置 s', type: 'number', min: 0, max: 20, step: 1, default: 1 },
   pair: { label: '分量对', type: 'number', min: 1, max: 4, step: 1, default: 1 },
 }
-export const layout = { width: 'body', height: 410, narrowHeight: 650, autoHeight: true }
+export const layout = { width: 'body' }
 
 const CENTER = 160
 const UNIT = 120

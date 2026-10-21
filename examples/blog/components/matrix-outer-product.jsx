@@ -4,7 +4,7 @@ import { MathText, fadeIn } from './lib/matrix/view.jsx'
 import { Matrix } from './lib/matrix/matrix.jsx'
 
 export const params = {}
-export const layout = { width: 'body', height: 395, narrowHeight: 770, autoHeight: true }
+export const layout = { width: 'body' }
 
 const WEIGHTS = [
   [1, 1, 0.5],
