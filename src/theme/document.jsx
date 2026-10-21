@@ -29,7 +29,6 @@ export function ArticleDocument(props) {
         {props.children}
         <PreviewTemplates previews={article.content.previews} labels={labels} />
         <script type="application/json" class="bk-source" data-region={REGIONS.source} innerHTML={scriptJson(article.content.source)} />
-        <script type="application/json" class="bk-setting-defaults" innerHTML={scriptJson(defaults)} />
         <div data-edge="start" />
         <div data-edge="end" />
       </body>

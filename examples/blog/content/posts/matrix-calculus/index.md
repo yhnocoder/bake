@@ -9,7 +9,7 @@ category: math
 preview: preview.js
 ---
 
-## 引言 {#intro}
+## 引言
 
 :::aside
 规则本身与 Terence Parr 和 Jeremy Howard 的[《深度学习所需的矩阵微积分》](https://yhnocoder.github.io/learn_by_visualization/topics/matrix-calculus/)[@parr2018]一致。本文把贯穿全文的例子换成了 Transformer 语言模型里的运算。
@@ -33,7 +33,7 @@ $$
 
 本文假定读者了解 Transformer 的各个模块，用 PyTorch 训练过模型，微积分已经生疏 :)。
 
-### 本文使用的模型 {#model}
+### 本文使用的模型
 
 下图是一个 decoder-only Transformer 做语言模型训练时，从输入 token 到 Loss 的完整计算过程。$T$ 是序列长度，$d$ 是模型宽度，$V$ 是词表大小，$N$ 是 Decoder 的层数。图中省略了 batch 维度。
 
@@ -191,11 +191,11 @@ RoPE 没有参数，$R_t$ 由位置 $t$ 完全确定。实现里分量的配对�
 Transformer：从输入 token_ids 到 loss 的完整计算过程，以及模型结构的定义
 :::
 
-### 深度学习中用到的导数概览 {#shapes}
+### 深度学习中用到的导数概览
 
-一元微积分里，$y = f(x)$ 的输入和输出都是标量，[导数](#derivative) $\dfrac{dy}{dx}$ 也是一个标量。
+一元微积分里，$y = f(x)$ 的输入和输出都是标量，[导数](#什么是导数) $\dfrac{dy}{dx}$ 也是一个标量。
 
-神经网络中一个运算的输入和输出可以是标量 $x \in \mathbb{R}$、向量 $\mathbf{x} \in \mathbb{R}^{n}$ 或矩阵 $W \in \mathbb{R}^{p \times q}$，这时导数由多个数组成：需要给出输出的每个分量对输入的每个分量的[偏导数](#partial)。
+神经网络中一个运算的输入和输出可以是标量 $x \in \mathbb{R}$、向量 $\mathbf{x} \in \mathbb{R}^{n}$ 或矩阵 $W \in \mathbb{R}^{p \times q}$，这时导数由多个数组成：需要给出输出的每个分量对输入的每个分量的[偏导数](#偏导数)。
 
 下表列出输入和输出分别是标量、向量、矩阵时的导数。高阶 Tensor（大于 2 维）规则与矩阵类似。
 
@@ -234,9 +234,9 @@ Transformer：从输入 token_ids 到 loss 的完整计算过程，以及模型�
 输入 $\times$ 输出：（标量、向量、矩阵） $\times$ （标量、向量、矩阵）
 :::
 
-## 标量对标量：导数 {#review}
+## 标量对标量：导数
 
-### 什么是导数 {#derivative}
+### 什么是导数
 
 先看最简单的情形：输入 $x \in \mathbb{R}$，输出 $y = f(x) \in \mathbb{R}$，两者都是标量。
 
@@ -272,7 +272,7 @@ $\dfrac{dy}{dx} = \lim\limits_{\Delta x \to 0} \dfrac{f(x+\Delta x) - f(x)}{\Del
 即 $f$ 的图像在 $x$ 处切线的斜率
 :::
 
-### 标量求导规则 {#rules}
+### 标量求导规则
 
 下表列出本文用到的标量求导规则。这些规则读者在微积分课上都见过，如果不理解需要重新上高中。
 
@@ -310,7 +310,7 @@ $$
 标量求导规则
 :::
 
-### 单变量链式法则 {#chain-scalar}
+### 单变量链式法则
 
 我们经常遇到这样的函数[^operator]：虽然最终只关心输入 $x$ 和输出 $y$，但从 $x$ 算到 $y$，中间需要经过几步运算。例如
 
@@ -405,7 +405,7 @@ $$
 $\mathrm{Swish}(x) = x\,\sigma(x)$，按乘积法则得 $\mathrm{Swish}'(x) = \sigma(x)\big(1 + x(1-\sigma(x))\big)$。逐元素函数 $f$ 的导数记作 $f'$。
 :::
 
-## 标量对向量 {#partials}
+## 标量对向量
 
 前面讨论的函数只有一个标量输入，例如 $y = f(x)$。但神经网络中的一个输出通常同时依赖许多量，我们一般写成 $y = f(\mathbf{x})$。例如 lm head 的一个 logit：
 
@@ -417,7 +417,7 @@ $z_j$ 同时依赖 $x_1, \ldots, x_d$ 和 $W_{1j}, \ldots, W_{dj}$。如果我�
 
 我们先用一个只有两个输入的函数把这个概念讲清楚，再回到上面的 lm head。
 
-### 偏导数 {#partial}
+### 偏导数
 
 对多元函数，==只改变其中一个自变量、保持其他自变量不变==时得到的导数称为偏导数，通常用 $\partial$ 表示，写作 $\dfrac{\partial f}{\partial x}$，在 $(x_0, y_0)$ 处的值写作 $\left.\dfrac{\partial f}{\partial x}\right|_{(x_0,y_0)}$。
 
@@ -477,7 +477,7 @@ $$
 $\dfrac{\partial f}{\partial x}$ 是其余输入固定、只让 $x$ 变化时的导数。例如 $\dfrac{\partial}{\partial x}\,3x^2y = 6xy$。
 :::
 
-### 梯度 {#gradient}
+### 梯度
 
 偏导数描述的是：保持其他输入不变，只改变其中一个输入分量时，输出如何变化。但训练模型时，多个参数通常会同时更新。我们还需要知道：当多个输入一起发生微小变化时，它们对输出的影响应该怎样组合？
 
@@ -560,7 +560,7 @@ $\nabla f = \dfrac{\partial f}{\partial \mathbf{x}} = \Big[\,\dfrac{\partial f}{
 梯度指向函数局部增长最快的方向。
 :::
 
-### 全导数链式法则 {#chain-paths}
+### 全导数链式法则
 
 前面的链式法则只有一条依赖路径。更一般地，一个变量对输出的影响可能经过多条路径。设
 
@@ -570,7 +570,7 @@ $$
 
 那么 $x$ 的变化会同时通过所有 $u_k$ 影响 $y$。
 
-按[“梯度”一节](#gradient)中得到的结论 $df=\nabla_{\mathbf{x}}f\cdot d\mathbf{x}$，$dy$ 是各个 $u_k$ 的贡献之和：
+按[“梯度”一节](#梯度)中得到的结论 $df=\nabla_{\mathbf{x}}f\cdot d\mathbf{x}$，$dy$ 是各个 $u_k$ 的贡献之和：
 
 $$
 dy = \nabla_{\mathbf{u}}f\cdot d\mathbf{u} = \sum_{k=1}^{n} \frac{\partial y}{\partial u_k}\,du_k
@@ -729,7 +729,7 @@ $$
 
 第一项 $-z_y$：$j = y$ 时，它对 $z_j$ 的导数是 $-1$；$j \neq y$ 时，$-z_y$ 不含 $z_j$，导数是 $0$。
 
-第二项：记 $u = \sum_k e^{z_k}$。其余 logit 固定时，$u$ 是 $z_j$ 的单变量函数，按[单变量链式法则](#chain-scalar)，$\ln u$ 对 $z_j$ 的导数是 $\dfrac{1}{u}$ 乘 $u$ 对 $z_j$ 的导数。$u$ 的 $V$ 项里只有 $e^{z_j}$ 含 $z_j$，它的导数是 $e^{z_j}$，所以
+第二项：记 $u = \sum_k e^{z_k}$。其余 logit 固定时，$u$ 是 $z_j$ 的单变量函数，按[单变量链式法则](#单变量链式法则)，$\ln u$ 对 $z_j$ 的导数是 $\dfrac{1}{u}$ 乘 $u$ 对 $z_j$ 的导数。$u$ 的 $V$ 项里只有 $e^{z_j}$ 含 $z_j$，它的导数是 $e^{z_j}$，所以
 
 $$
 \frac{\partial}{\partial z_j} \ln \sum_k e^{z_k} = \frac{e^{z_j}}{\sum_k e^{z_k}} = p_j
@@ -766,7 +766,7 @@ $\rightarrow$ $\dfrac{\partial \ell}{\partial \mathbf{z}} = \mathbf{p} - \mathbf
 
 ## 向量对向量：Jacobian {#vector}
 
-### Jacobian {#jacobian}
+### Jacobian
 
 现在考虑向量到向量的函数。一个向量输入
 
@@ -808,7 +808,7 @@ $$
 \frac{\partial z_j}{\partial\mathbf{x}}=\Big[\,\frac{\partial z_j}{\partial x_1}\ \ \frac{\partial z_j}{\partial x_2}\ \ \cdots\ \ \frac{\partial z_j}{\partial x_n}\,\Big]
 $$
 
-它是标量 $z_j$ 对整个输入向量 $\mathbf{x}$ 的梯度。按[“梯度”](#gradient)一节的全微分，输入有微小变化 $d\mathbf{x}$ 时，$z_j$ 的一阶变化是这一行与 $d\mathbf{x}$ 的点积：
+它是标量 $z_j$ 对整个输入向量 $\mathbf{x}$ 的梯度。按[“梯度”](#梯度)一节的全微分，输入有微小变化 $d\mathbf{x}$ 时，$z_j$ 的一阶变化是这一行与 $d\mathbf{x}$ 的点积：
 
 $$
 dz_j = \frac{\partial z_j}{\partial \mathbf{x}} \cdot d\mathbf{x} = \sum_{i=1}^{n} \frac{\partial z_j}{\partial x_i}\,dx_i
@@ -830,7 +830,7 @@ $$
 
 它描述只改变一个输入 $x_i$ 时，所有输出分量分别如何变化。
 
-反向传播用到的是列。设 $\mathbf{z}$ 后面还有运算，最终得到标量 Loss $L$，并且已经求出 $L$ 对输出的导数 $\dfrac{\partial L}{\partial \mathbf{z}}$（行向量）。$x_i$ 经过 $z_1, \ldots, z_m$ 影响 $L$，按[全导数链式法则](#chain-paths)：
+反向传播用到的是列。设 $\mathbf{z}$ 后面还有运算，最终得到标量 Loss $L$，并且已经求出 $L$ 对输出的导数 $\dfrac{\partial L}{\partial \mathbf{z}}$（行向量）。$x_i$ 经过 $z_1, \ldots, z_m$ 影响 $L$，按[全导数链式法则](#全导数链式法则)：
 
 $$
 \frac{\partial L}{\partial x_i} = \sum_{j=1}^{m} \frac{\partial L}{\partial z_j}\,\frac{\partial z_j}{\partial x_i}
@@ -863,7 +863,7 @@ $W_{ij}$ 在 $W$ 的第 $i$ 行、第 $j$ 列，在 Jacobian 中则位于第 $j$
 第 $j$ 行是 $z_j$ 的梯度，$dz_j = \dfrac{\partial z_j}{\partial \mathbf{x}} \cdot d\mathbf{x}$。按列看：$\dfrac{\partial L}{\partial \mathbf{x}} = \dfrac{\partial L}{\partial \mathbf{z}}\,J$。
 :::
 
-### 逐元素运算的 Jacobian {#elementwise}
+### 逐元素运算的 Jacobian
 
 神经网络中有很多运算是逐元素进行的。例如 sigmoid、SiLU、ReLU 等激活函数，都对输入向量的每个分量独立执行同一个标量函数。设
 
@@ -955,7 +955,7 @@ J = \frac{\partial\mathbf y}{\partial\mathbf x} = \operatorname{diag}\bigl(\phi'
 $$
 :::
 
-### softmax 的 Jacobian {#softmax}
+### softmax 的 Jacobian
 
 softmax 的输入是 $\mathbf{x} \in \mathbb{R}^{n}$，输出是 $\mathbf{p} \in \mathbb{R}^{n}$：
 
@@ -1018,11 +1018,11 @@ $$
 反向传播时不构造 $J$：$\dfrac{\partial L}{\partial \mathbf{x}} = \mathbf{p} \otimes (\mathbf{g} - \mathbf{g} \cdot \mathbf{p})$，$\mathbf{g} = \dfrac{\partial L}{\partial \mathbf{p}}$。
 :::
 
-### 向量链式法则 {#chain-vector}
+### 向量链式法则
 
 两个运算嵌套时，先由 $\mathbf{x} \in \mathbb{R}^{n}$ 算出 $\mathbf{u} \in \mathbb{R}^{q}$，再由 $\mathbf{u}$ 算出 $\mathbf{z} \in \mathbb{R}^{m}$。设两个运算各自的 Jacobian $\dfrac{\partial \mathbf{u}}{\partial \mathbf{x}}$（$q \times n$）和 $\dfrac{\partial \mathbf{z}}{\partial \mathbf{u}}$（$m \times q$）已经算出，我们要计算整体的 Jacobian $\dfrac{\partial \mathbf{z}}{\partial \mathbf{x}}$，即 $m \times n$ 个偏导数 $\dfrac{\partial z_j}{\partial x_i}$。
 
-$x_i$ 经由 $u_1, u_2, \ldots, u_q$ 影响 $z_j$，属于[多条路径](#chain-paths)的情形，需要使用全导数：
+$x_i$ 经由 $u_1, u_2, \ldots, u_q$ 影响 $z_j$，属于[多条路径](#全导数链式法则)的情形，需要使用全导数：
 
 $$
 \frac{\partial z_j}{\partial x_i} = \sum_{k=1}^{q} \frac{\partial z_j}{\partial u_k}\,\frac{\partial u_k}{\partial x_i}
@@ -1185,7 +1185,7 @@ $$
 :::swiglu-jacobian
 :::
 
-**一条路径上的 Jacobian 相乘**。gate 路径 $\mathbf{x} \to \mathbf{a} \to \mathrm{Swish}(\mathbf{a}) \to \mathbf{u} \to \mathbf{h}$ 是四个运算的嵌套。按[向量链式法则](#chain-vector)，各层的 Jacobian 按从外到内的顺序相乘。从外到内就是从 $\mathbf{h}$ 出发沿反向箭头走回 $\mathbf{x}$ 的顺序，所以按经过的顺序从左到右写下箭头上的 Jacobian 即可：
+**一条路径上的 Jacobian 相乘**。gate 路径 $\mathbf{x} \to \mathbf{a} \to \mathrm{Swish}(\mathbf{a}) \to \mathbf{u} \to \mathbf{h}$ 是四个运算的嵌套。按[向量链式法则](#向量链式法则)，各层的 Jacobian 按从外到内的顺序相乘。从外到内就是从 $\mathbf{h}$ 出发沿反向箭头走回 $\mathbf{x}$ 的顺序，所以按经过的顺序从左到右写下箭头上的 Jacobian 即可：
 
 $$
 \underbrace{W_{down}^{T}}_{d \times d_{ff}}\,\underbrace{\mathrm{diag}(\mathbf{b})}_{d_{ff} \times d_{ff}}\,\underbrace{\mathrm{diag}\big(\mathrm{Swish}'(\mathbf{a})\big)}_{d_{ff} \times d_{ff}}\,\underbrace{W_{gate}^{T}}_{d_{ff} \times d}
@@ -1193,7 +1193,7 @@ $$
 
 相邻两个因子中，左边的列数等于右边的行数，乘积是 $d \times d$，与 $\dfrac{\partial \mathbf{h}}{\partial \mathbf{x}}$ 的形状一致。up 路径同理，乘积是 $W_{down}^{T}\,\mathrm{diag}\big(\mathrm{Swish}(\mathbf{a})\big)\,W_{up}^{T}$。
 
-**两条路径的结果相加**。$\mathbf{x}$ 同时经过两条路径影响 $\mathbf{h}$。对每个偏导数 $\dfrac{\partial h_j}{\partial x_i}$，按[全导数链式法则](#chain-paths)把两条路径的贡献相加，写成矩阵就是两条路径的乘积之和。两条路径从 $\mathbf{h}$ 到 $\mathbf{u}$ 的一段相同，可以把公共因子 $W_{down}^{T}$ 提到括号外：
+**两条路径的结果相加**。$\mathbf{x}$ 同时经过两条路径影响 $\mathbf{h}$。对每个偏导数 $\dfrac{\partial h_j}{\partial x_i}$，按[全导数链式法则](#全导数链式法则)把两条路径的贡献相加，写成矩阵就是两条路径的乘积之和。两条路径从 $\mathbf{h}$ 到 $\mathbf{u}$ 的一段相同，可以把公共因子 $W_{down}^{T}$ 提到括号外：
 
 $$
 \frac{\partial \mathbf{h}}{\partial \mathbf{x}} = 
@@ -1205,13 +1205,13 @@ $$
 由三次矩阵乘法的 $W^{T}$、Swish 的 $\mathrm{diag}\big(\mathrm{Swish}'(\mathbf{a})\big)$ 和逐元素乘的 $\mathrm{diag}$ 相乘得到。$\mathbf{x}$ 经过 gate 和 up 两条路径，两项相加。
 :::
 
-## 反向传播的计算顺序 {#vjp}
+## 反向传播的计算顺序
 
 [“例：SwiGLU FFN 的 Jacobian”](#ffn-jac)把 $\dfrac{\partial \mathbf{h}}{\partial \mathbf{x}} \in \mathbb{R}^{d \times d}$ 写成了几个矩阵的乘积。训练时真正需要的不是这个 Jacobian，而是 $\dfrac{\partial \ell}{\partial \mathbf{x}} \in \mathbb{R}^d$。
 
 这就给了我们一个优化的方向：==为了得到这个行向量，是否一定要先算出整个 Jacobian==？
 
-### 两种乘法顺序 {#vjp-order}
+### 两种乘法顺序
 
 设已经知道 Loss 对 FFN 输出的导数 $\mathbf{g} = \dfrac{\partial L}{\partial \mathbf{h}} \in \mathbb{R}^{1 \times d}$，它是一个行向量。按[“Jacobian”](#jacobian)一节的式子，$\dfrac{\partial L}{\partial \mathbf{x}} = \mathbf{g}\,\dfrac{\partial \mathbf{h}}{\partial \mathbf{x}}$。
 
@@ -1350,7 +1350,7 @@ $$
 $\mathbf{g}\,J_1J_2\cdots$ 从左往右算，每一步都是行向量乘矩阵。
 :::
 
-### vector-Jacobian product {#vjp-def}
+### vector-Jacobian product
 
 从左往右的每一步都是同一种运算：已知 Loss 对某个运算输出的导数（行向量），乘这个运算的 Jacobian，得到 Loss 对这个运算输入的导数（仍是行向量）。设运算的输入是 $\mathbf{x}$，输出是 $\mathbf{z}$，Jacobian 是 $J = \dfrac{\partial \mathbf{z}}{\partial \mathbf{x}}$：
 
@@ -1364,7 +1364,7 @@ $$
 
 VJP 不需要先构造 $J$。本文出现过的几种运算：
 
-- **逐元素函数** $\mathbf{y} = \phi(\mathbf{x})$：$J = \mathrm{diag}\big(\phi'(\mathbf{x})\big)$，VJP 是逐元素乘 $\dfrac{\partial L}{\partial \mathbf{y}} \otimes \phi'(\mathbf{x})$，见[“逐元素运算的 Jacobian”](#elementwise)。
+- **逐元素函数** $\mathbf{y} = \phi(\mathbf{x})$：$J = \mathrm{diag}\big(\phi'(\mathbf{x})\big)$，VJP 是逐元素乘 $\dfrac{\partial L}{\partial \mathbf{y}} \otimes \phi'(\mathbf{x})$，见[“逐元素运算的 Jacobian”](#逐元素运算的-jacobian)。
 - **逐元素乘** $\mathbf{u} = \mathbf{a} \otimes \mathbf{b}$：对 $\mathbf{a}$ 的 Jacobian 是 $\mathrm{diag}(\mathbf{b})$，VJP 是 $\dfrac{\partial L}{\partial \mathbf{u}} \otimes \mathbf{b}$；对 $\mathbf{b}$ 同理。
 - **矩阵乘法** $\mathbf{z} = \mathbf{x}W$：$J = W^{T}$，VJP 是 $\dfrac{\partial L}{\partial \mathbf{z}}\,W^{T}$，直接用 $W$ 做一次矩阵乘法。
 - **softmax**：$J$ 不是对角矩阵，VJP 是 $\mathbf{p} \otimes (\mathbf{g} - \mathbf{g} \cdot \mathbf{p})$，只需要一次点积、一次减法和一次逐元素乘，见[“softmax 的 Jacobian”](#softmax-vjp)。
@@ -1377,9 +1377,9 @@ VJP 不需要先构造 $J$。本文出现过的几种运算：
 $\dfrac{\partial L}{\partial \mathbf{x}} = \dfrac{\partial L}{\partial \mathbf{z}}\,J$。反向传播从 $\dfrac{\partial L}{\partial L} = 1$ 开始，按前向的相反顺序对每个运算做一次 VJP，不构造 $J$。$L$ 是标量，每一步得到的都是 $L$ 对某个量的导数，与这个量同形状。
 :::
 
-## 标量对矩阵 {#matrix}
+## 标量对矩阵
 
-### 求 lm head 的权重的梯度 {#head-weight toc="lm head 的权重"}
+### 求 lm head 的权重的梯度 {toc="lm head 的权重"}
 
 :::lm-head{from=head to=head brace=true}
 :::
@@ -1396,13 +1396,13 @@ $$
 
 **$W_{ij}$ 只经过一条路径影响 Loss**
 
-前向公式仍是 $z_j = \sum_{k=1}^{d} x_k W_{kj}$。[“偏导数”](#partial)一节已经算过：
+前向公式仍是 $z_j = \sum_{k=1}^{d} x_k W_{kj}$。[“偏导数”](#偏导数)一节已经算过：
 
 $$
 \frac{\partial z_j}{\partial W_{ij}} = x_i
 $$
 
-$W$ 的第 $j$ 列只用来计算 $z_j$，其余 logits 都不含 $W_{ij}$，按[单变量链式法则](#chain-scalar)直接相乘：
+$W$ 的第 $j$ 列只用来计算 $z_j$，其余 logits 都不含 $W_{ij}$，按[单变量链式法则](#单变量链式法则)直接相乘：
 
 $$
 \frac{\partial \ell}{\partial W_{ij}} = \frac{\partial \ell}{\partial z_j}\,\frac{\partial z_j}{\partial W_{ij}} = \boxed{x_i\,(p_j - y_j)}
@@ -1464,7 +1464,7 @@ $$
 
 **为什么不需要三维数组**
 
-按[向量链式法则](#chain-vector)的写法，$\dfrac{\partial \ell}{\partial \mathbf{W}}$ 似乎要经过 $\dfrac{\partial \mathbf{z}}{\partial \mathbf{W}}$。这是向量对矩阵的导数，共有 $V \times d \times V$ 个元素。写出来如下：
+按[向量链式法则](#向量链式法则)的写法，$\dfrac{\partial \ell}{\partial \mathbf{W}}$ 似乎要经过 $\dfrac{\partial \mathbf{z}}{\partial \mathbf{W}}$。这是向量对矩阵的导数，共有 $V \times d \times V$ 个元素。写出来如下：
 
 $$
 \frac{\partial z_k}{\partial W_{ij}}
@@ -1536,7 +1536,7 @@ $$
 
 **对权重的导数：各位置相加**
 
-$W$ 被 $T$ 个位置共用。$W_{ij}$ 经过 $Z_{1j}, Z_{2j}, \ldots, Z_{Tj}$ 共 $T$ 条路径影响 $L$，每个位置一条。按[全导数链式法则](#chain-paths)，把 $T$ 条路径的贡献相加，每个位置的贡献都是上一节的外积：
+$W$ 被 $T$ 个位置共用。$W_{ij}$ 经过 $Z_{1j}, Z_{2j}, \ldots, Z_{Tj}$ 共 $T$ 条路径影响 $L$，每个位置一条。按[全导数链式法则](#全导数链式法则)，把 $T$ 条路径的贡献相加，每个位置的贡献都是上一节的外积：
 
 $$
 \frac{\partial L}{\partial W} = \sum_{t=1}^{T} \mathbf{x}_t^{T}\,\frac{\partial L}{\partial \mathbf{z}_t} = \boxed{X^{T}G}
@@ -1551,9 +1551,9 @@ $$
 $L = \frac{1}{T}\sum_t \ell_t$，$G = \dfrac{\partial L}{\partial Z} = \frac{1}{T}(P - Y)$。对输入逐行计算，$\dfrac{\partial L}{\partial X} = GW^{T}$；权重被各位置共用，贡献相加，$\dfrac{\partial L}{\partial W} = X^{T}G$。
 :::
 
-## 速查表 {#cheatsheet}
+## 速查表
 
-### 求导规则汇总 {#rules-summary}
+### 求导规则汇总
 
 $\mathbf{g}$ 和 $G$ 是 Loss 对运算输出的导数，与输出同形状。一个位置时写成行向量，$T$ 个位置堆成矩阵时把 $\mathbf{x}$、$\mathbf{g}$ 换成 $X$、$G$。
 
@@ -1572,7 +1572,7 @@ $\mathbf{g}$ 和 $G$ 是 Loss 对运算输出的导数，与输出同形状。�
 本文各种运算的前向、Jacobian、Loss 对输入的导数和 Loss 对权重的导数。
 :::
 
-### 符号说明 {#notation}
+### 符号说明
 
 | 符号 | 含义 |
 |---|---|
@@ -1598,7 +1598,7 @@ $\mathbf{g}$ 和 $G$ 是 Loss 对运算输出的导数，与输出同形状。�
 $T$、$d$、$V$、$N$ 是序列长度、模型宽度、词表大小和 Decoder 层数。$\ell_t$ 是位置 $t$ 的 Loss，$L$ 是它们的平均。$G$ 是 Loss 对运算输出的导数，$\otimes$ 是逐元素相乘。
 :::
 
-### 参考文献 {#references}
+### 参考文献
 
 :::references
 - [@parr2018] Parr, T. & Howard, J. [The Matrix Calculus You Need For Deep Learning](https://arxiv.org/abs/1802.01528), 2018. 中文翻译见[旧站](https://yhnocoder.github.io/learn_by_visualization/topics/matrix-calculus/)。

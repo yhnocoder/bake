@@ -46,7 +46,6 @@
   --capsule-fill: light-dark(var(--accent), #a97c77);
   --capsule-fill-ink: light-dark(#ffffff, #121514);
   --index-column: light-dark(#f1f3ef, #1f2321);
-  --index-shadow: drop-shadow(0 0 0.5px light-dark(var(--hair), rgba(240, 240, 232, 0.22))) drop-shadow(0 0 0.5px light-dark(var(--hair), transparent)) drop-shadow(0 12px 18px light-dark(rgba(0, 0, 0, 0.1), transparent)) drop-shadow(0 14px 22px light-dark(transparent, rgba(0, 0, 0, 0.55)));
   --selection: color-mix(in srgb, var(--accent) 24%, transparent);
   --selection-quiet: color-mix(in srgb, var(--accent) 9%, transparent);
   --flash: color-mix(in srgb, var(--accent) 14%, transparent);

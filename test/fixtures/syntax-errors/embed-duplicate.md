@@ -6,6 +6,6 @@ category: writing
 ---
 
 :::embed
-/2026-10/syntax-linked/#vjp
-/2026-10/syntax-linked/#vjp
+/2026-10/syntax-linked/#向量与雅可比矩阵的乘积
+/2026-10/syntax-linked/#向量与雅可比矩阵的乘积
 :::

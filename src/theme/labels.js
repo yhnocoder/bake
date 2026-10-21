@@ -1,7 +1,6 @@
 const CHINESE = {
   settings: '设置',
   home: '首页',
-  defaultValue: '默认',
   theme: '主题',
   themes: { system: '跟随系统', light: '浅', dark: '深' },
   font: '字体',
@@ -41,7 +40,6 @@ const CHINESE = {
 const ENGLISH = {
   settings: 'Settings',
   home: 'Home',
-  defaultValue: 'default',
   theme: 'Theme',
   themes: { system: 'System', light: 'Light', dark: 'Dark' },
   font: 'Font',

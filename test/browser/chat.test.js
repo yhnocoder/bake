@@ -40,11 +40,11 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.doesNotMatch(JSON.stringify(await storage(page)), new RegExp(API_KEY));
     assert.equal(await page.locator(QUESTION).getAttribute('placeholder'), '问这篇文章，打 @ 选范围…');
 
-    api.answers.push({ body: text('标题见 [标题](#headings)。公式 $\\R^2$ 和\n\n$$\\frac{a}{b}$$\n\n结束。') });
+    api.answers.push({ body: text('标题见 [标题](#标题与锚点)。公式 $\\R^2$ 和\n\n$$\\frac{a}{b}$$\n\n结束。') });
     await ask(page, '这篇文章讲什么？');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '结束。' }).waitFor();
     await page.locator('.bk-chat-answer .bk-chat-math[data-state="ready"] svg').nth(1).waitFor();
-    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), '#headings');
+    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), '#标题与锚点');
     assert.equal(await page.locator('.bk-chat-user').textContent(), '这篇文章讲什么？');
     const request = api.requests.at(-1);
     assert.equal(request.path, '/chat/completions');
@@ -57,7 +57,7 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     );
     assert.equal(request.body.messages[0].role, 'system');
     assert.ok(request.body.messages[0].content.includes(`<article>\n${syntaxSource}\n</article>`), 'the system message holds the article source');
-    assert.match(request.body.messages[0].content, /\n- #headings 标题与锚点\n {2}- #third-level 三级标题\n/);
+    assert.match(request.body.messages[0].content, /\n- #标题与锚点 标题与锚点\n {2}- #third-level 三级标题\n/);
     assert.match(request.body.messages[0].content, /"address":"\/2026-10\/jacobian\/","title":"雅可比矩阵"/);
     assert.deepEqual(request.body.messages.slice(1), [{ role: 'user', content: '这篇文章讲什么？' }]);
     assert.deepEqual(problems, []);

@@ -91,15 +91,8 @@ export function chapterCard(context, chapterIndex, state) {
 
 export function createCardHost({ variant, showDelay }) {
   const panel = variant === 'panel';
-  const joined = variant === 'tabs';
   const on = panel ? 'is-open' : 'is-on';
-  const frame = createElement('div', panel ? 'bk-toc-panel' : joined ? 'bk-toc-index' : `bk-toc-popover is-${variant}`);
-  const scroller = joined ? createElement('div', 'bk-toc-index-body') : frame;
-  const tab = joined ? createElement('a', 'bk-toc-index-tab') : null;
-  if (joined) {
-    tab.tabIndex = -1;
-    frame.append(tab, scroller);
-  }
+  const frame = createElement('div', panel ? 'bk-toc-panel' : `bk-toc-popover is-${variant}`);
   const element = panel ? frame : createElement('div', `bk-toc-place is-${variant}`);
   if (!panel) element.append(frame);
   let parts = null;
@@ -116,26 +109,18 @@ export function createCardHost({ variant, showDelay }) {
 
   function render(chapter, keepScroll) {
     const state = parts.context.state();
-    const scrollTop = keepScroll ? scroller.scrollTop : 0;
-    scroller.replaceChildren(chapterCard(parts.context, chapter, state));
-    scroller.scrollTop = scrollTop;
+    const scrollTop = keepScroll ? frame.scrollTop : 0;
+    frame.replaceChildren(chapterCard(parts.context, chapter, state));
+    frame.scrollTop = scrollTop;
     shownKey = stateKey(state);
-    if (!joined) return;
-    const { id, number } = parts.context.outline.chapters[chapter];
-    tab.href = fragmentOf(id);
-    tab.textContent = number;
-    markCurrent(tab, chapter === Math.max(0, state.chapter));
   }
   function position() {
     if (panel || shownChapter < 0) return;
     const spot = parts.anchor(shownChapter);
-    const floor = innerHeight - (joined ? parts.context.reserve : EDGE);
-    scroller.style.maxHeight = `${floor - EDGE}px`;
-    const top = clamp(spot.top, EDGE, floor - Math.min(scroller.scrollHeight, floor - EDGE));
+    const floor = innerHeight - EDGE;
+    frame.style.maxHeight = `${floor - EDGE}px`;
+    const top = clamp(spot.top, EDGE, floor - Math.min(frame.scrollHeight, floor - EDGE));
     element.style.transform = `translate(${spot.left}px, ${top}px)`;
-    if (!joined) return;
-    tab.style.top = `${spot.tabTop - top}px`;
-    tab.style.height = `${spot.tabHeight}px`;
   }
   function mark(reveal) {
     for (const entry of parts.entries) entry.classList.toggle('is-hover', entry === pointed);
@@ -269,7 +254,6 @@ export function createCardHost({ variant, showDelay }) {
     update(state) {
       if (panel || !isShown() || stateKey(state) === shownKey) return;
       render(shownChapter, true);
-      if (joined) position();
       mark(false);
     },
     relayout() {

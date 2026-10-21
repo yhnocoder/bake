@@ -114,7 +114,7 @@ describe('homepage', () => {
         { title: 'Demo', summary: 'A page.', date: '2026-09-05', tags: ['html'], category: { id: 'ml', name: 'ML', color: '#2a78d6', desc: '' }, draft: false, url: '2026-09/demo/', preview: '2026-09/demo/anim/preview.js' },
         { title: 'Old', date: '2026-08-30', tags: [], category: { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' }, draft: false, url: '2026-08/old/' },
       ],
-      assets: { root: './', styles, fonts: [], scripts },
+      assets: { root: './', styles, scripts },
     });
     assert.deepEqual(probed(dir, '2026-10/rope/index.html'), { site: { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes on models.', link: 'https://example.com/' }, options: { density: 'tight' } });
     assert.equal(readFileSync(join(dir, 'dist/2026-09/demo/anim/preview.js'), 'utf8'), 'export default () => ({ start() {}, stop() {} });\n');

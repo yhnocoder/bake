@@ -2,7 +2,7 @@
   "missing-slug.md": "missing-slug.md:1:1 front matter is missing \"slug\"",
   "invalid-slug.md": "invalid-slug.md:3:7 slug \"LLM_Act\" may only contain lowercase letters, digits and \"-\"",
   "unknown-front-matter-field.md": "unknown-front-matter-field.md:6:1 unknown front matter field \"layout\"",
-  "invalid-toc.md": "invalid-toc.md:6:6 toc must be one of notes, tabs, dots or ticks, got \"sidebar\"",
+  "invalid-toc.md": "invalid-toc.md:6:6 toc must be one of notes, dots or ticks, got \"sidebar\"",
   "duplicate-anchor.md": "duplicate-anchor.md:11:7 duplicate anchor \"intro\", first defined at 7:7",
   "unknown-heading-attribute.md": "unknown-heading-attribute.md:8:8 unknown attribute \"cols\" on heading; the essay theme reads #id and toc",
   "unknown-block.md": "unknown-block.md:8:1 unknown block \":::warning\"; the essay theme declares no blocks",
@@ -29,6 +29,6 @@
   "component-declaration": "components/range-plot.js:3:28 range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call",
   "missing-link-target.md": "missing-link-target.md:8:2 link target /2026-10/syntax-linked/#chain does not exist",
   "embed-self.md": "embed-self.md:9:1 :::embed cannot embed the article itself",
-  "embed-duplicate.md": "embed-duplicate.md:10:1 :::embed lists /2026-10/syntax-linked/#vjp twice",
-  "embed-overlap.md": "embed-overlap.md:10:1 :::embed address /2026-10/syntax-linked/#chain-rule contains /2026-10/syntax-linked/#local-grad"
+  "embed-duplicate.md": "embed-duplicate.md:10:1 :::embed lists /2026-10/syntax-linked/#向量与雅可比矩阵的乘积 twice",
+  "embed-overlap.md": "embed-overlap.md:10:1 :::embed address /2026-10/syntax-linked/#链式法则 contains /2026-10/syntax-linked/#local-grad"
 }

@@ -5,7 +5,7 @@ const CHINESE = {
   close: '关闭',
   reading: '正在读',
   settings: {
-    toc: { label: '目录样式', values: { notes: '前文笔记', tabs: '书签索引', dots: '圆点胶囊', ticks: '刻度线' } },
+    toc: { label: '目录样式', values: { notes: '前文笔记', dots: '圆点胶囊', ticks: '刻度线' } },
     buttons: { label: '按钮', values: { autohide: '向下滚动时隐藏按钮' } },
   },
 };
@@ -17,7 +17,7 @@ const ENGLISH = {
   close: 'Close',
   reading: 'Reading',
   settings: {
-    toc: { label: 'Contents style', values: { notes: 'Notes', tabs: 'Tabs', dots: 'Dots', ticks: 'Ticks' } },
+    toc: { label: 'Contents style', values: { notes: 'Notes', dots: 'Dots', ticks: 'Ticks' } },
     buttons: { label: 'Buttons', values: { autohide: 'Hide the buttons while scrolling down' } },
   },
 };

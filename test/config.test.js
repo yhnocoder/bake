@@ -62,7 +62,7 @@ describe('bake.config.js', () => {
         ["categories: [{ id: 'ml', name: 'ML', color: '#000000', desc: @3 }]", 'categories[0].desc must be a string, got 3'],
       ],
       [
-        ["themes: { essay: { toc: @'sidebar' } }", 'themes.essay.toc must be one of notes, tabs, dots or ticks, got "sidebar"'],
+        ["themes: { essay: { toc: @'sidebar' } }", 'themes.essay.toc must be one of notes, dots or ticks, got "sidebar"'],
         ["home: { groupBy: @'category' }", 'home.groupBy is "category" but bake.config.js defines no categories'],
       ],
     ];

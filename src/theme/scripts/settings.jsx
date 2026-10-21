@@ -127,19 +127,18 @@ function followSystemScheme() {
 
 export function startSettings(settings = {}, { labels: themeLabels = {}, drawings = {} } = {}) {
   const labels = labelsFor(document.documentElement.lang);
-  const defaults = JSON.parse(document.querySelector('.bk-setting-defaults')?.textContent ?? '{}');
   // why: the panel opens upward from its button, so a tall list sits at the top and a switch at the bottom, whatever the order of the declarations
   rows = [...readingRows(labels), ...themeRows(settings, themeLabels)].sort((a, b) => CONTROLS.indexOf(a.control) - CONTROLS.indexOf(b.control));
   values = Object.fromEntries(rows.map((row) => [row.name, createSignal(document.documentElement.dataset[row.name])]));
   const host = document.createElement('div');
   document.querySelector('[data-edge="start"]').append(host);
-  render(() => <Settings labels={labels} defaults={defaults} drawings={drawings} />, host);
+  render(() => <Settings labels={labels} drawings={drawings} />, host);
   darkScheme.addEventListener('change', followSystemScheme);
   endFadeOnPress();
 }
 
 function Settings(props) {
-  const { labels, defaults, drawings } = props;
+  const { labels, drawings } = props;
   const [open, setOpen] = createSignal(false);
   let root;
   let toggle;
@@ -191,7 +190,7 @@ function Settings(props) {
         <For each={rows.filter((row) => row.control === 'font' || settingValue(row.name) !== undefined)}>
           {(row) =>
             row.control === 'list' ? (
-              <ListRow row={row} initial={defaults[row.name]} drawings={drawings[row.name]} labels={labels} />
+              <ListRow row={row} drawings={drawings[row.name]} />
             ) : row.control === 'switch' ? (
               <SwitchRow row={row} />
             ) : row.control === 'font' ? (
@@ -207,7 +206,7 @@ function Settings(props) {
 }
 
 function ListRow(props) {
-  const { row, initial, drawings, labels } = props;
+  const { row, drawings } = props;
   return (
     <div class="bk-settings-row is-list" data-setting={row.name}>
       <span class="bk-settings-label" id={`bk-settings-${row.name}`}>
@@ -215,13 +214,10 @@ function ListRow(props) {
       </span>
       <div class="bk-settings-list" role="radiogroup" aria-labelledby={`bk-settings-${row.name}`}>
         <For each={row.values}>
-          {(value, index) => (
+          {(value) => (
             <button type="button" class="bk-settings-choice" role="radio" data-value={value} aria-checked={String(settingValue(row.name) === value)} onClick={() => chooseSetting(row.name, value)}>
               <svg viewBox="0 0 28 28" aria-hidden="true" innerHTML={drawings?.[value]} />
-              <span>
-                <b>{row.text(value)}</b>
-                <small>{value === initial ? `T${index() + 1} · ${labels.defaultValue}` : `T${index() + 1}`}</small>
-              </span>
+              <b>{row.text(value)}</b>
             </button>
           )}
         </For>

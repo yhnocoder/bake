@@ -5,19 +5,16 @@ import { drawerView } from './drawer.js';
 import { bottomReserve, createCardHost, readOutline } from './toc-card.js';
 import { DOTS_CARD, dotsView } from './toc-dots.js';
 import { RAIL_CARD, notesView, railView } from './toc-notes.js';
-import { TABS_CARD, tabsView } from './toc-tabs.js';
 import { TICKS_CARD, ticksView } from './toc-ticks.js';
 
 const READING_LINE = 0.25;
 const READING_LINE_MAX = 200;
 const DONE_SHARE = 0.85;
 const DRAWER = { view: drawerView };
-const TABS = { view: tabsView, card: TABS_CARD };
 const DOTS = { view: dotsView, card: DOTS_CARD };
 const TICKS = { view: ticksView, card: TICKS_CARD };
 const STYLES = {
   notes: { left: { view: notesView }, notes: { view: railView, card: RAIL_CARD }, phone: DRAWER },
-  tabs: { left: TABS, notes: TABS, phone: DRAWER },
   dots: { left: DOTS, notes: DOTS, phone: DRAWER },
   ticks: { left: TICKS, notes: TICKS, phone: DRAWER },
 };
@@ -44,7 +41,7 @@ export function startToc(article) {
 
   const go = (hash) => {
     jumping = true;
-    view.jumped?.();
+    view.jumped?.(hash);
     const jump = followLink(hash);
     showButtonsDuring(jump);
     jump.then(() =>
@@ -94,7 +91,7 @@ export function startToc(article) {
     card = spec.card === undefined ? null : createCardHost(spec.card);
     const reserve = bottomReserve(host);
     view = spec.view({ outline, labels, style, host, card, go, nav, article, reserve, jumping: () => jumping, state: () => state });
-    card?.connect(view, { outline, labels, host, reserve, state: () => state });
+    card?.connect(view, { outline, labels, host, state: () => state });
     layout();
   };
 

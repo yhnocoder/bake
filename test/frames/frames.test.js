@@ -71,7 +71,7 @@ async function hoverSidenote(page, device) {
   };
 }
 
-const TOC_ENTRIES = { ticks: '.bk-toc-ticks .bk-toc-tick', tabs: '.bk-toc-tabs .bk-toc-tab', dots: '.bk-toc-dots .bk-toc-dot-item' };
+const TOC_ENTRIES = { ticks: '.bk-toc-ticks .bk-toc-tick', dots: '.bk-toc-dots .bk-toc-dot-item' };
 
 function hoverToc(style) {
   return async (page) => {
@@ -213,7 +213,6 @@ const interactions = [
   { name: 'moving over the ticks table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'ticks' }, prepare: hoverToc('ticks') },
   { name: 'changing the theme in the settings panel of the syntax article', path: SYNTAX, devices: BOTH, prepare: changeTheme },
   { name: 'scrolling the whole syntax article', path: SYNTAX, devices: BOTH, prepare: scroll() },
-  { name: 'moving over the tabs table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'tabs' }, prepare: hoverToc('tabs') },
   { name: 'moving over the dots table of contents of the syntax article', path: SYNTAX, devices: ['desktop'], storage: { 'bk-toc': 'dots' }, prepare: hoverToc('dots') },
   { name: 'opening and closing the table of contents drawer of the syntax article', path: SYNTAX, devices: ['phone'], prepare: openDrawer },
   { name: 'opening and closing the AI chat panel on the syntax article', path: SYNTAX, devices: BOTH, prepare: openChat },

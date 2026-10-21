@@ -6,6 +6,6 @@ category: writing
 ---
 
 :::embed
-/2026-10/syntax-linked/#chain-rule
+/2026-10/syntax-linked/#链式法则
 /2026-10/syntax-linked/#local-grad
 :::

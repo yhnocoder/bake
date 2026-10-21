@@ -30,7 +30,7 @@ describe('themes', () => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: mine\ntoc: dots\n', body: '## One\n\nText.\n' }),
-      'themes/mine/options.js': "export const options = { toc: { label: 'Table of contents style', type: 'enum', options: ['notes', 'tabs', 'dots', 'ticks'], default: 'notes' } };\n",
+      'themes/mine/options.js': "export const options = { toc: { label: 'Table of contents style', type: 'enum', options: ['notes', 'dots', 'ticks'], default: 'notes' } };\n",
       'themes/mine/page.jsx': [
         "import { ArticleDocument, labelsFor } from 'bake/theme';",
         "import { Article, Toc, essayLabels } from 'bake/themes/essay';",

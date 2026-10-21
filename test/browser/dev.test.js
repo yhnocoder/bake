@@ -776,11 +776,9 @@ const tocBody = [
 const TOC_VIEWS = [
   { style: 'notes', width: 1440 },
   { style: 'notes', width: 1024 },
-  { style: 'tabs', width: 1440 },
   { style: 'dots', width: 1024 },
   { style: 'ticks', width: 1440 },
   { style: 'dots', width: 375 },
-  { style: 'tabs', width: 375 },
 ];
 
 test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async (t) => {

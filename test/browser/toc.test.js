@@ -5,7 +5,7 @@ import { article, bake, createBlog } from '../blog.js';
 import { launchBrowser, nextFrame, serve, settle, until } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
-const STYLES = ['notes', 'tabs', 'dots', 'ticks'];
+const STYLES = ['notes', 'dots', 'ticks'];
 const filler = (topic, count = 5) => Array.from({ length: count }, (_, index) => `${topic}的第 ${index + 1} 段。${'这一段只是为了让页面足够长，读者需要滚动才能读完。'.repeat(8)}`).join('\n\n');
 
 const body = [
@@ -65,7 +65,6 @@ export default class PageBox extends HTMLElement {
 
 const VISIBLE_ENTRIES = {
   notes: '.bk-toc .bk-toc-chapter-title, .bk-toc .bk-toc-section-title',
-  tabs: '.bk-toc-tab, .bk-toc-tab-title.is-on',
   dots: '.bk-toc-dot-item',
   ticks: '.bk-toc-tick',
 };
@@ -74,7 +73,6 @@ function current(style) {
   const selector = {
     notes: '.bk-toc [aria-current="true"]',
     rail: '.bk-toc-ticks.is-rail [aria-current="true"]',
-    tabs: '.bk-toc-tabs [aria-current="true"]',
     dots: '.bk-toc-dots [aria-current="true"]',
     ticks: '.bk-toc-ticks [aria-current="true"]',
   }[style];
@@ -201,7 +199,7 @@ test('the table of contents', async (t) => {
     for (const [style, width] of [...STYLES.map((name) => [name, 1440]), ['rail', 1100]]) {
       const { page, context } = await open({ style: style === 'rail' ? 'notes' : style, viewport: { width, height: 900 } });
       const readCurrent = () => page.evaluate(current, style);
-      const chapterLevel = style === 'tabs' || style === 'dots';
+      const chapterLevel = style === 'dots';
       assert.equal(await readCurrent(), chapterLevel ? 'one' : null, `${style} before the first chapter`);
       await scrollToHeading(page, 'one-b');
       assert.equal(await readCurrent(), chapterLevel ? 'one' : 'one-b', `${style} in the second section of the first chapter`);
@@ -256,17 +254,17 @@ test('the table of contents', async (t) => {
   });
 
   await t.test('hover cards stay inside the viewport and show the recap, else the first sentence, without highlights', async () => {
-    const triggers = { tabs: '.bk-toc-tab', dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' };
+    const triggers = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' };
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 1024, height: 600 },
     ]) {
-      for (const style of ['tabs', 'dots', 'ticks']) {
+      for (const style of ['dots', 'ticks']) {
         const { page, context } = await open({ style, viewport });
         await scrollToHeading(page, 'one-a');
-        const selector = style === 'tabs' ? '.bk-toc-index-body' : '.bk-toc-popover';
+        const selector = '.bk-toc-popover';
         await pointAt(page, page.locator(triggers[style]).first());
-        await page.waitForFunction(shownCard, style === 'tabs' ? '.bk-toc-index' : '.bk-toc-popover');
+        await page.waitForFunction(shownCard, selector);
         const first = await page.evaluate(cardReport, selector);
         assert.deepEqual(
           first,
@@ -293,27 +291,12 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('the tab and the index card form one shape that follows the hovered tab', async () => {
-    const { page, context } = await open({ style: 'tabs' });
-    await page.hover('.bk-toc-tab:nth-of-type(2)');
-    await page.waitForFunction(shownCard, '.bk-toc-index');
-    await settle(page);
-    const shape = await page.evaluate(() => {
-      const tab = document.querySelector('.bk-toc-tab.is-hover').getBoundingClientRect();
-      const white = document.querySelector('.bk-toc-index-tab').getBoundingClientRect();
-      const card = document.querySelector('.bk-toc-index-body').getBoundingClientRect();
-      return { top: Math.abs(white.top - tab.top), height: Math.abs(white.height - tab.height), left: white.left, joins: white.right - card.left };
-    });
-    assert.ok(shape.top < 0.5 && shape.height < 0.5 && shape.left === 0, `the white tab is not over the tab: ${JSON.stringify(shape)}`);
-    assert.ok(shape.joins >= 0 && shape.joins <= 1.5, `the white tab and the card do not join: ${JSON.stringify(shape)}`);
-    await context.close();
-  });
 
   await t.test('the cards of the table of contents keep their own look on article pages, and the homepage cards keep theirs', async () => {
-    for (const style of ['tabs', 'dots', 'ticks']) {
+    for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style });
-      const trigger = { tabs: '.bk-toc-tab', dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
-      const box = style === 'tabs' ? '.bk-toc-index-body' : '.bk-toc-popover';
+      const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
+      const box = '.bk-toc-popover';
       await pointAt(page, page.locator(trigger).nth(1));
       await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('第2章'), box);
       const look = await page.evaluate((selector) => {
@@ -336,7 +319,7 @@ test('the table of contents', async (t) => {
       }, box);
       assert.deepEqual(
         look,
-        { border: '0px', radius: '0px', shadow: 'none', background: 'rgba(0, 0, 0, 0)', width: true, titleSize: '17px', titleWrap: 'balance', frameRadius: '12px', frameShadow: style !== 'tabs' },
+        { border: '0px', radius: '0px', shadow: 'none', background: 'rgba(0, 0, 0, 0)', width: true, titleSize: '17px', titleWrap: 'balance', frameRadius: '12px', frameShadow: true },
         `the ${style} card`,
       );
       await context.close();
@@ -353,20 +336,15 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
-  await t.test('the tabs of chapters ahead, the drawer tabs, the drawer close button and the settings button use the ink colour', async () => {
+  await t.test('the drawer tabs, the drawer close button and the settings button use the ink colour', async () => {
     for (const [colorScheme, ink] of [
       ['light', 'rgb(22, 26, 29)'],
       ['dark', 'rgb(233, 236, 231)'],
     ]) {
-      const desk = await open({ style: 'tabs', colorScheme });
-      await scrollToHeading(desk.page, 'chapter-2');
-      const tabs = await desk.page.evaluate(() => ({
-        ahead: getComputedStyle(document.querySelectorAll('.bk-toc-tab')[4]).color,
-        settings: getComputedStyle(document.querySelector('.bk-settings-toggle')).color,
-      }));
-      assert.deepEqual(tabs, { ahead: ink, settings: ink }, colorScheme);
+      const desk = await open({ style: 'dots', colorScheme });
+      assert.equal(await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-settings-toggle')).color), ink, colorScheme);
       await desk.context.close();
-      const phone = await open({ style: 'tabs', colorScheme, viewport: { width: 375, height: 760 } });
+      const phone = await open({ style: 'ticks', colorScheme, viewport: { width: 375, height: 760 } });
       await phone.page.click('.bk-settings-toggle');
       await phone.page.getByRole('switch').click();
       await phone.page.keyboard.press('Escape');
@@ -383,20 +361,14 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('the shadows of the current tab and of the phone handle follow dark mode', async () => {
+  await t.test('the shadow of the phone handle follows dark mode', async () => {
     const shadows = {};
     for (const colorScheme of ['light', 'dark']) {
-      const desk = await open({ style: 'tabs', colorScheme });
-      await scrollToHeading(desk.page, 'chapter-2');
-      const tab = await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-tab[aria-current="true"]'), '::before').boxShadow);
-      await desk.context.close();
-      const phone = await open({ style: 'tabs', colorScheme, viewport: { width: 375, height: 760 } });
-      const handle = await phone.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle.is-tab')).boxShadow);
+      const phone = await open({ style: 'ticks', colorScheme, viewport: { width: 375, height: 760 } });
+      shadows[colorScheme] = await phone.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle.is-tab')).boxShadow);
       await phone.context.close();
-      shadows[colorScheme] = { tab, handle };
     }
-    assert.deepEqual(sharedShadowLayers(shadows.light.tab, shadows.dark.tab), [], 'the current tab');
-    assert.deepEqual(sharedShadowLayers(shadows.light.handle, shadows.dark.handle), [], 'the handle');
+    assert.deepEqual(sharedShadowLayers(shadows.light, shadows.dark), []);
   });
 
   await t.test('the notes style keeps the top padding of the first chapter', async () => {
@@ -406,28 +378,27 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
-  await t.test('the dots and ticks cards may reach 12 pixels above the bottom of the screen, and the tabs card stops above the settings button', async () => {
-    for (const style of ['tabs', 'dots', 'ticks']) {
+  await t.test('the dots and ticks cards may reach 12 pixels above the bottom of the screen', async () => {
+    for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style, path: 'long', viewport: { width: 1440, height: 600 } });
-      const trigger = { tabs: '.bk-toc-tab', dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
-      const box = style === 'tabs' ? '.bk-toc-index-body' : '.bk-toc-popover';
+      const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
+      const box = '.bk-toc-popover';
       await pointAt(page, page.locator(trigger).last());
       await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('Chapter 18'), box);
       const limit = await page.evaluate((selector) => {
         const frame = document.querySelector(selector);
-        const toggle = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
-        return { maxHeight: parseFloat(getComputedStyle(frame).maxHeight), screen: innerHeight - 24, settings: toggle.top - 20 };
+        return { maxHeight: parseFloat(getComputedStyle(frame).maxHeight), screen: innerHeight - 24 };
       }, box);
-      assert.equal(limit.maxHeight, style === 'tabs' ? limit.settings : limit.screen, `${style}: ${JSON.stringify(limit)}`);
+      assert.equal(limit.maxHeight, limit.screen, `${style}: ${JSON.stringify(limit)}`);
       await context.close();
     }
   });
 
-  await t.test('the keyboard reaches the tabs, dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter, and the notes panel closes when the focus leaves it', async () => {
-    for (const style of ['tabs', 'dots', 'ticks']) {
+  await t.test('the keyboard reaches the dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter, and the notes panel closes when the focus leaves it', async () => {
+    for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style });
       const entry = 'entry';
-      const focused = () => page.evaluate(focusTarget, '.bk-toc-index, .bk-toc-popover');
+      const focused = () => page.evaluate(focusTarget, '.bk-toc-popover');
       const chapters = [
         ['one', 'one-a', 'one-b'],
         ...[2, 3, 4, 5, 6].map((number) => [`chapter-${number}`, `chapter-${number}-a`]),
@@ -461,11 +432,11 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
-  await t.test('Escape closes the chapter card of the tabs, dots and ticks styles, returns the focus from the card to its entry, and after a keyboard Escape the pointer opens the card of that entry again', async () => {
-    for (const style of ['tabs', 'dots', 'ticks']) {
+  await t.test('Escape closes the chapter card of the dots and ticks styles, returns the focus from the card to its entry, and after a keyboard Escape the pointer opens the card of that entry again', async () => {
+    for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style, reducedMotion: 'no-preference' });
-      const trigger = { tabs: '.bk-toc-tab', dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
-      const frame = style === 'tabs' ? '.bk-toc-index' : '.bk-toc-popover';
+      const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
+      const frame = '.bk-toc-popover';
       const shown = () => page.evaluate(shownCard, frame);
       const focused = async () => {
         const entry = await page.evaluate(focusTarget, frame);
@@ -498,7 +469,7 @@ test('the table of contents', async (t) => {
       assert.equal(await focused(), 'card', `${style}: the keyboard does not reach the card`);
       await page.keyboard.press('Escape');
       await cardCloses('Escape leaves the card open while it has the focus');
-      assert.equal(await focused(), { tabs: 'entry #one', dots: 'entry #one', ticks: 'entry #one-b' }[style], `${style}: the focus does not return to the entry`);
+      assert.equal(await focused(), { dots: 'entry #one', ticks: 'entry #one-b' }[style], `${style}: the focus does not return to the entry`);
       await page.waitForTimeout(300);
       assert.equal(await shown(), false, `${style}: the card opens again when the focus returns to its entry`);
       const focusedEntry = await page.evaluate(() => {
@@ -581,37 +552,38 @@ test('the table of contents', async (t) => {
     await context.close();
   });
 
-  await t.test('a jump from the dots or the tabs switches the chapter once, on arrival', async () => {
-    for (const style of ['dots', 'tabs']) {
-      const { page, context } = await open({ style, reducedMotion: 'no-preference' });
-      await page.evaluate((name) => {
-        const entry = name === 'dots' ? '.bk-toc-dot-item' : '.bk-toc-tab';
-        window.seen = [];
-        const record = () => {
-          const index = [...document.querySelectorAll(entry)].findIndex((element) => element.getAttribute('aria-current') === 'true');
-          if (window.seen.at(-1) !== index) window.seen.push(index);
-          window.recording = requestAnimationFrame(record);
-        };
-        record();
-      }, style);
-      await page.click(style === 'dots' ? '.bk-toc-dot-item:nth-child(5)' : '.bk-toc-tab:nth-of-type(5)');
-      await page.waitForFunction(() => Math.abs(document.getElementById('chapter-5').getBoundingClientRect().top - 24) < 2, null, { timeout: 5000 });
-      await settle(page);
-      const seen = await page.evaluate(() => {
-        cancelAnimationFrame(window.recording);
-        return window.seen;
-      });
-      assert.deepEqual(seen, [0, 4], `${style} showed the chapters ${seen} during the jump`);
-      await context.close();
-    }
+  await t.test('a jump from the dots to another chapter folds the capsule, lights the dots it passes and opens the capsule of the target chapter once', async () => {
+    const { page, context } = await open({ style: 'dots', reducedMotion: 'no-preference' });
+    await page.evaluate(() => {
+      window.seen = [];
+      window.passed = new Set();
+      const record = () => {
+        const items = [...document.querySelectorAll('.bk-toc-dot-item')];
+        const index = items.findIndex((element) => element.getAttribute('aria-current') === 'true');
+        if (window.seen.at(-1) !== index) window.seen.push(index);
+        items.forEach((element, item) => element.classList.contains('is-passing') && window.passed.add(item));
+        window.recording = requestAnimationFrame(record);
+      };
+      record();
+    });
+    await page.click('.bk-toc-dot-item:nth-child(5)');
+    await page.waitForFunction(() => Math.abs(document.getElementById('chapter-5').getBoundingClientRect().top - 24) < 2, null, { timeout: 5000 });
+    await settle(page);
+    const { seen, passed } = await page.evaluate(() => {
+      cancelAnimationFrame(window.recording);
+      return { seen: window.seen, passed: [...window.passed] };
+    });
+    assert.deepEqual(seen, [0, -1, 4], `the dots showed the chapters ${seen} during the jump`);
+    assert.ok(passed.length > 0 && passed.every((index) => index < 4), `the dots passed ${passed}`);
+    await context.close();
   });
 
-  await t.test('a change of the text metrics, such as a font that finishes loading, moves the tabs, the dots and the notes marker without a transition', async () => {
-    for (const style of ['tabs', 'dots', 'notes']) {
+  await t.test('a change of the text metrics, such as a font that finishes loading, moves the dots and the notes marker without a transition', async () => {
+    for (const style of ['dots', 'notes']) {
       const { page, context } = await open({ style, reducedMotion: 'no-preference' });
       await scrollToHeading(page, 'chapter-3');
       const { moved, moving } = await page.evaluate(async () => {
-        const entries = () => [...document.querySelectorAll('.bk-toc-tab, .bk-toc-dot-item, .bk-toc-marker')].map((entry) => `${getComputedStyle(entry).translate} ${getComputedStyle(entry).transform}`).join();
+        const entries = () => [...document.querySelectorAll('.bk-toc-dot-item, .bk-toc-marker')].map((entry) => `${getComputedStyle(entry).translate} ${getComputedStyle(entry).transform}`).join();
         const before = entries();
         const style = document.createElement('style');
         style.textContent = '.bk-toc-ui *, .bk-toc * { font-size: 19px !important; letter-spacing: 0.3em !important; }';
@@ -668,7 +640,7 @@ test('the table of contents', async (t) => {
   });
 
   await t.test('on phones choosing another style in the settings rebuilds the handle and the drawer at once', async () => {
-    const { page, context } = await open({ style: 'tabs', viewport: { width: 375, height: 760 } });
+    const { page, context } = await open({ style: 'ticks', viewport: { width: 375, height: 760 } });
     const read = async () => {
       const capsule = await capsules(page);
       await page.click('.bk-toc-handle');
@@ -681,7 +653,7 @@ test('the table of contents', async (t) => {
     assert.deepEqual(await read(), { capsule: 0, dots: 0, tabs: 6 });
     for (const [name, capsule, dots, tabs] of [
       ['圆点胶囊', 1, 6, 0],
-      ['刻度线', 0, 0, 6],
+      ['前文笔记', 0, 0, 6],
     ]) {
       await page.click('.bk-settings-toggle');
       await page.getByRole('radio', { name: new RegExp(name) }).click();
@@ -802,15 +774,15 @@ test('the table of contents', async (t) => {
     await settle(page);
     const read = () =>
       page.evaluate(() => ({
-        views: ['.bk-toc', '.bk-toc-tabs', '.bk-toc-dots', '.bk-toc-ticks'].filter((selector) => document.querySelector(selector)?.checkVisibility()),
+        views: ['.bk-toc', '.bk-toc-dots', '.bk-toc-ticks'].filter((selector) => document.querySelector(selector)?.checkVisibility()),
         left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
       }));
     assert.deepEqual(await read(), { views: ['.bk-toc-dots'], left: 198 });
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '正文', '字号', '字重', '间距', '按钮']);
+    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '字号', '字重', '间距', '字体', '按钮']);
     await page.click('.bk-settings-toggle');
-    await page.getByRole('radio', { name: /书签索引/ }).click();
+    await page.getByRole('radio', { name: /刻度线/ }).click();
     await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-tabs'], left: 198 });
+    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: 198 });
     await page.getByRole('radio', { name: /前文笔记/ }).click();
     await settle(page);
     assert.deepEqual(await read(), { views: ['.bk-toc'], left: 290 });

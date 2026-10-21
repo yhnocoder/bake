@@ -95,7 +95,7 @@ test('the essay theme lays out articles', async (t) => {
     'content/posts/stress/index.md': stressArticle,
     'content/posts/widths/index.md': widthsArticle,
     'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\ncategory: writing\n', body: tocBody }),
-    'content/posts/tabs/index.md': article({ title: 'Tabs', slug: 'tabs', extra: 'toc: tabs\ncategory: writing\n', body: tocBody }),
+    'content/posts/dots/index.md': article({ title: 'Dots', slug: 'dots', extra: 'toc: dots\ncategory: writing\n', body: tocBody }),
     'content/posts/many-blocks/index.md': article({ title: 'Many blocks', slug: 'many-blocks', extra: 'category: writing\n', body: manyBlocksBody }),
     'content/posts/many-cards/index.md': article({ title: 'Many cards', slug: 'many-cards', extra: 'category: writing\ntheme: bento\n', body: manyBlocksBody }),
   });
@@ -173,7 +173,7 @@ test('the essay theme lays out articles', async (t) => {
       await page.close();
       return result;
     };
-    assert.deepEqual([await left('notes', 1440), await left('tabs', 1440), await left('notes', 1024), await left('tabs', 1024)], [290, 198, 88, 88]);
+    assert.deepEqual([await left('notes', 1440), await left('dots', 1440), await left('notes', 1024), await left('dots', 1024)], [290, 198, 88, 88]);
   });
 
   await t.test('examples show the source beside the result where there is room and above it on phones', async () => {

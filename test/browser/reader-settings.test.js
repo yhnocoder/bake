@@ -101,15 +101,14 @@ test('reader settings', async (t) => {
     assert.deepEqual(await panel.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '字号', '字重', '间距', '字体', '按钮']);
     const styles = await panel.locator('[role="radiogroup"]').evaluate((group) => ({
       label: document.getElementById(group.getAttribute('aria-labelledby')).textContent,
-      choices: [...group.querySelectorAll('[role="radio"]')].map((choice) => [choice.querySelector('svg').getBoundingClientRect().width, choice.querySelector('b').textContent, choice.querySelector('small').textContent, choice.getAttribute('aria-checked')]),
+      choices: [...group.querySelectorAll('[role="radio"]')].map((choice) => [choice.querySelector('svg').getBoundingClientRect().width, choice.querySelector('b').textContent, choice.getAttribute('aria-checked')]),
     }));
     assert.deepEqual(styles, {
       label: '目录样式',
       choices: [
-        [28, '前文笔记', 'T1 · 默认', 'true'],
-        [28, '书签索引', 'T2', 'false'],
-        [28, '圆点胶囊', 'T3', 'false'],
-        [28, '刻度线', 'T4', 'false'],
+        [28, '前文笔记', 'true'],
+        [28, '圆点胶囊', 'false'],
+        [28, '刻度线', 'false'],
       ],
     });
     assert.deepEqual(await panel.locator('.bk-settings-row[data-setting="theme"] button').allTextContents(), ['跟随系统', '浅', '深']);
@@ -117,7 +116,7 @@ test('reader settings', async (t) => {
       const height = (selector) => Math.round(element.querySelector(selector).getBoundingClientRect().height * 100) / 100;
       return { label: height('.bk-settings-label'), choice: height('.bk-settings-choice'), option: height('.bk-settings-options button') };
     });
-    assert.deepEqual(heights, { label: 17.25, choice: 48.75, option: 26.75 });
+    assert.deepEqual(heights, { label: 17.25, choice: 40, option: 26.75 });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).visibility === 'hidden');
     await page.getByRole('button', { name: '设置' }).click();
@@ -126,7 +125,7 @@ test('reader settings', async (t) => {
     await page.close();
   });
 
-  await t.test('the home link and the settings button stack in a round pill from 1000 pixels up and in a tab on the left edge of a phone, labelled without visible text', async () => {
+  await t.test('the home link and the settings button stack as two round buttons from 1000 pixels up and in a tab on the left edge of a phone, labelled without visible text, and the settings button takes the accent colour on hover', async () => {
     const page = await browser.newPage();
     const read = () =>
       page.evaluate(() => {
@@ -147,15 +146,16 @@ test('reader settings', async (t) => {
     for (const width of [1440, 1024]) {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(url);
-      assert.deepEqual(await read(), { box: [16, 16, 34, 34], home: [16, 50, 34, 34], radius: '17px', ...expected }, `at ${width} pixels`);
+      assert.deepEqual(await read(), { box: [16, 16, 34, 34], home: [16, 58, 34, 34], radius: '17px', ...expected }, `at ${width} pixels`);
     }
     await page.setViewportSize({ width: 375, height: 700 });
     await page.goto(url);
     assert.deepEqual(await read(), { box: [0, 24, 40, 38], home: [0, 62, 40, 38], radius: '0px 11px 11px 0px', ...expected });
     const color = () => page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
     assert.equal(await color(), 'rgb(22, 26, 29)');
+    await page.setViewportSize({ width: 1440, height: 800 });
     await page.hover('.bk-settings-toggle');
-    assert.equal(await color(), 'rgb(22, 26, 29)');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-toggle')).color !== 'rgb(22, 26, 29)');
     await page.close();
   });
 
@@ -171,12 +171,11 @@ test('reader settings', async (t) => {
     await choose(page, '深');
     const font = page.locator('.bk-settings-font');
     await font.fill('LXGW "WenKai\\');
-    await font.press('Enter');
+    await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--reader-font') !== '');
     const chosen = await readSettledPage(page);
     assert.notEqual(chosen.background, initial.background);
     assert.match(chosen.bodyFont, /^"LXGW WenKai", "PingFang SC"/);
     assert.equal(chosen.titleFont, chosen.bodyFont);
-    assert.equal(await font.inputValue(), 'LXGW WenKai');
 
     await page.reload();
     assert.deepEqual(await readSettledPage(page), chosen);
@@ -193,7 +192,7 @@ test('reader settings', async (t) => {
     await page.getByRole('button', { name: '设置' }).click();
     await choose(page, '跟随系统');
     await font.fill('');
-    await font.press('Enter');
+    await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--reader-font') === '');
     assert.deepEqual(await readSettledPage(page), initial);
     await context.close();
   });
@@ -301,13 +300,13 @@ test('reader settings', async (t) => {
     await context.close();
   });
 
-  await t.test('the shadows of the settings buttons, the chosen option and the switch follow dark mode', async () => {
+  await t.test('the shadows of the settings button, the chosen option and the switch follow dark mode', async () => {
     const shadows = {};
     for (const colorScheme of ['light', 'dark']) {
       const page = await browser.newPage({ colorScheme });
       await page.goto(url);
       shadows[colorScheme] = await page.evaluate(() => [
-        getComputedStyle(document.querySelector('.bk-settings-buttons')).boxShadow,
+        getComputedStyle(document.querySelector('.bk-settings-toggle')).boxShadow,
         getComputedStyle(document.querySelector('.bk-settings-options button[aria-pressed="true"]'), '::before').boxShadow,
         getComputedStyle(document.querySelector('.bk-settings-switch i'), '::after').boxShadow,
       ]);
