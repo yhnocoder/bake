@@ -1,5 +1,6 @@
 import { livePage } from '../live.js';
 import { REGIONS, regionSelector } from '../regions.js';
+import { oncePerFrame } from '../theme/scripts/motion.js';
 import styles from './entry.css?inline';
 import { chatLabels } from './labels.js';
 import petStyles from './pet.css?inline';
@@ -57,7 +58,6 @@ function startChat(root) {
   launcher.addEventListener('focus', greet);
 
   let range = null;
-  let frame = 0;
   const place = () => {
     const rects = range.getClientRects();
     const last = rects[rects.length - 1] ?? range.getBoundingClientRect();
@@ -67,14 +67,11 @@ function startChat(root) {
     ask.style.left = `${Math.round(Math.max(EDGE, Math.min(last.right - width, innerWidth - width - EDGE)))}px`;
     ask.style.top = `${Math.round(top)}px`;
   };
-  const follow = () => {
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(() => {
-      range = selectedRange(document.querySelector(regionSelector(REGIONS.article)));
-      ask.hidden = range === null;
-      if (range !== null) place();
-    });
-  };
+  const follow = oncePerFrame(() => {
+    range = selectedRange(document.querySelector(regionSelector(REGIONS.article)));
+    ask.hidden = range === null;
+    if (range !== null) place();
+  });
   document.addEventListener('selectionchange', follow);
   addEventListener('scroll', () => range !== null && place(), { passive: true });
   addEventListener('resize', follow);
