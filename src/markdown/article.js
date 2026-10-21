@@ -4,18 +4,19 @@ import { embedParts, indexTargets, linkArticle } from './link.js';
 import { parseArticle } from './parse.js';
 import { articleStructure } from './structure.js';
 
-export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null, components = new Map() } = {}) {
-  const article = new Article(file, source, errors, folder, preamble, url, components);
+export async function readArticle(file, source, errors, { theme, folder = null, preamble = [], url = null, components = new Map() }) {
+  const article = new Article(file, source, errors, theme, folder, preamble, url, components);
   await parseArticle(article);
   indexTargets(article);
   return article;
 }
 
 class Article {
-  constructor(file, source, errors, folder, preamble, url, components) {
+  constructor(file, source, errors, theme, folder, preamble, url, components) {
     this.file = file;
     this.source = source;
     this.errors = errors;
+    this.theme = theme;
     this.folder = folder;
     this.preamble = preamble;
     this.components = components;

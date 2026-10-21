@@ -19,7 +19,7 @@ export function Article(props) {
       {sections.length === 0 ? null : (
         <div class="bt-grid" data-columns={options.columns} style={gridStyle(options)}>
           {sections.map(({ section, notes, entries }) => (
-            <section class="bt-card" data-span={spanOf(section)} data-rows={section.rows} style={cardStyle(section, options.columns)} aria-labelledby={section.id}>
+            <section class="bt-card" data-span={spanOf(section)} data-rows={section.attributes.rows} style={cardStyle(section, options.columns)} aria-labelledby={section.id}>
               <SectionHeading section={section} labels={labels} />
               <Recap html={section.recap} />
               {entries.map(({ block, afterHeading }) => [
@@ -51,8 +51,9 @@ function Notes(props) {
 }
 
 function spanOf(section) {
-  if (section.cols !== undefined) return 'cols';
-  if (section.width !== undefined) return section.width;
+  const { cols, width } = section.attributes;
+  if (cols !== undefined) return 'cols';
+  if (width !== undefined) return width;
   const widths = new Set(section.blocks.map((block) => block.width));
   if (widths.has('page')) return 'page';
   if (widths.has('wide')) return 'wide';
@@ -60,9 +61,9 @@ function spanOf(section) {
 }
 
 function cardStyle(section, columns) {
-  const span = section.cols === undefined ? levelSpan(spanOf(section), columns) : Math.min(section.cols, columns);
-  const rows = section.rows === undefined ? '' : `;--bt-rows:${section.rows}`;
-  return `--bt-span:${span}${rows}`;
+  const { cols, rows } = section.attributes;
+  const span = cols === undefined ? levelSpan(spanOf(section), columns) : Math.min(cols, columns);
+  return rows === undefined ? `--bt-span:${span}` : `--bt-span:${span};--bt-rows:${rows}`;
 }
 
 function gridStyle(options) {

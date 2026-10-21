@@ -6,3 +6,7 @@ export const settings = {
   toc: { values: ['notes', 'tabs', 'dots', 'ticks'], default: { option: 'toc' }, control: 'list' },
   buttons: { values: ['autohide', 'always'], default: 'autohide', control: 'switch' },
 };
+
+export const headings = {
+  toc: { type: 'text' },
+};

@@ -33,6 +33,10 @@ export function listChoices(choices) {
   return choices.length === 1 ? choices[0] : `${choices.slice(0, -1).join(', ')} or ${choices.at(-1)}`;
 }
 
+export function listAll(items) {
+  return items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+}
+
 export function compareText(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }

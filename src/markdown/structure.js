@@ -22,9 +22,6 @@ export function articleStructure(article) {
       const section = {
         ...headingFields(article, node),
         number: String(sections.length + 1).padStart(2, '0'),
-        width: node.attributes.width,
-        cols: count(node.attributes.cols),
-        rows: count(node.attributes.rows),
         line: node.position.start.line,
         endLine: node.position.end.line,
         titleSidenotes: referencedSidenotes(article, node),
@@ -44,7 +41,7 @@ export function articleStructure(article) {
     const block = blockOf(article, node);
     (current?.blocks ?? intro).push(block);
     if (node.type === 'heading' && node.depth === 3 && current) {
-      const subsection = { id: block.id, title: block.title, text: block.text, toc: block.toc, line: block.line, endLine: block.endLine, titleSidenotes: block.sidenotes, recapSidenotes: [] };
+      const subsection = { id: block.id, title: block.title, text: block.text, attributes: block.attributes, line: block.line, endLine: block.endLine, titleSidenotes: block.sidenotes, recapSidenotes: [] };
       current.subsections.push(subsection);
       recapTarget = subsection;
     }
@@ -63,9 +60,10 @@ export function articleStructure(article) {
   const toc = sections.map((section) => ({
     id: section.id,
     number: section.number,
-    title: section.toc,
+    title: section.text,
+    attributes: section.attributes,
     recap: section.recap,
-    children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.toc, recap: subsection.recap })),
+    children: section.subsections.map((subsection) => ({ id: subsection.id, title: subsection.text, attributes: subsection.attributes, recap: subsection.recap })),
   }));
   const html = [...intro, ...sections.flatMap((section) => section.blocks), ...sidenotes, ...previews].map((entry) => entry.html);
   const glyphs = addGlyphs(article.glyphs, [...article.borrowed].map((source) => source.glyphs), html);
@@ -100,8 +98,8 @@ function usedComponents(article) {
 }
 
 function headingFields(article, node) {
-  const text = toString(node);
-  return { id: node.id, title: renderInlineHtml(node.children, article.context), text, toc: node.attributes.toc ?? text };
+  const { id, ...attributes } = node.attributes;
+  return { id: node.id, title: renderInlineHtml(node.children, article.context), text: toString(node), attributes };
 }
 
 function attachRecap(article, node, target) {
@@ -131,6 +129,9 @@ function blockOf(article, node) {
   if (node.type === 'bakeBlock' && node.name === '' && node.children.length === 1) {
     return { ...blockOf(article, node.children[0]), line: node.position.start.line, endLine: node.position.end.line, width: node.attributes.width };
   }
+  if (node.themeBlock) {
+    return { type: 'themeBlock', name: node.name, attributes: node.attributes, line: node.position.start.line, endLine: node.position.end.line, html: renderChildrenHtml(node.children, article.context), sidenotes: referencedSidenotes(article, node) };
+  }
   const block = { type: blockType(node), line: node.position.start.line, endLine: node.position.end.line, html: renderHtml(node, article.context), sidenotes: referencedSidenotes(article, node) };
   const width = naturalWidth(node);
   if (width !== undefined) block.naturalWidth = width;
@@ -142,10 +143,6 @@ function blockOf(article, node) {
     if (node.component?.width !== undefined) block.width = node.component.width;
   }
   return block;
-}
-
-function count(value) {
-  return value === undefined ? undefined : Number(value);
 }
 
 function blockType(node) {

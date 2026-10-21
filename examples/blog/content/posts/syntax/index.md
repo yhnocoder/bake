@@ -78,7 +78,7 @@ export default function preview(element) {
 
 ## 标题与锚点 {#headings toc="标题"}
 
-二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写这些属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`cols` 和 `rows` 是这一节在 bento 主题里的卡片占几列、几行，例如 `## ReLU {cols=2 rows=23}`，`cols` 可以写 1 到 6，`rows` 可以写 1 到 200，不写 `rows` 时卡片和内容一样高；`width` 也给出 bento 卡片的宽度，`body` 占三分之一的列，`wide` 占一半，`page` 占满一行，写了 `cols` 时以 `cols` 为准。`cols`、`rows` 和 `width` 只能写在 `##` 标题上，essay 主题忽略它们。
+二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写这些属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`cols` 和 `rows` 是这一节在 bento 主题里的卡片占几列、几行，例如 `## ReLU {cols=2 rows=23}`，`cols` 可以写 1 到 6，`rows` 可以写 1 到 200，不写 `rows` 时卡片和内容一样高；`width` 也给出 bento 卡片的宽度，`body` 占三分之一的列，`wide` 占一半，`page` 占满一行，写了 `cols` 时以 `cols` 为准。`cols`、`rows` 和 `width` 只能写在 `##` 标题上。`#id` 以外的属性由文章的主题声明：essay 主题读 `toc`，bento 主题读 `cols`、`rows` 和 `width`，写了主题没有声明的属性会报错。
 
 :::example
 ### 三级标题 {#third-level toc="短标题"}
@@ -350,9 +350,9 @@ ReLU 在负半轴输出 0，正半轴原样输出输入。它的导数在原点�
 GELU 用标准正态分布的累积分布函数给输入加权，曲线在 0 附近是平滑的，负半轴有一小段负值。两者在正半轴几乎重合，差别集中在 0 附近和负半轴。
 :::
 
-## 宽度写法 {#width width=wide}
+## 宽度写法 {#width}
 
-公式、代码、表格和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。图片不写尺寸时不超过正文宽度，图片文件再宽也不会自动扩展；写了比正文宽的像素宽度时，图片按这个宽度扩展到 wide。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。这一章的标题写了 `{width=wide}`，在 bento 主题里占两列。
+公式、代码、表格和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。图片不写尺寸时不超过正文宽度，图片文件再宽也不会自动扩展；写了比正文宽的像素宽度时，图片按这个宽度扩展到 wide。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。
 
 ::::example
 :::{width=page}
@@ -508,9 +508,9 @@ def silu(x):
 | front matter 有不认识的字段 | `layout: wide` | `unknown front matter field "layout"` |
 | toc 取值不对 | `toc: sidebar` | `toc must be one of notes, tabs, dots or ticks, got "sidebar"` |
 | 同一页的锚点重复 | 两个标题都写 `{#intro}` | `duplicate anchor "intro", first defined at 7:7` |
-| 标题有不认识的属性 | `## 引言 {color=red}` | `unknown attribute "color" on heading` |
-| 卡片列数不是正整数 | `## 卡片 {cols=0}` | `cols must be a whole number of card columns from 1 to 6, for example cols=2` |
-| 不认识的块 | `:::warning` | `unknown block ":::warning"` |
+| 标题写了文章主题没有声明的属性 | essay 文章里写 `## 引言 {cols=2}` | `unknown attribute "cols" on heading; the essay theme reads #id and toc` |
+| 卡片列数超出范围 | bento 文章里写 `## 卡片 {cols=0}` | `cols must be between 1 and 6, got 0` |
+| 不认识的块 | `:::warning` | `unknown block ":::warning"; the essay theme declares no blocks` |
 | 宽度取值不对 | `:::{width=full}` | `width must be body, wide or page, got "full"` |
 | 脚注没有定义 | `[^gemm]` 没有对应的 `[^gemm]:` | `footnote "gemm" has no definition` |
 | 引用了列表里没有的文献 | `[@vaswani2017]` | `citation "vaswani2017" is not in :::references` |

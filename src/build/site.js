@@ -4,6 +4,7 @@ import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { readPet } from '../chat/pet-files.js';
 import { petFolder } from '../config/pet.js';
 import { bundleComponents } from '../components/bundle.js';
+import { optionProblem } from '../components/declarations.js';
 import { COMPONENTS_DIR, readComponents } from '../components/read.js';
 import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
@@ -21,7 +22,7 @@ import { checkDuplicateUrls, indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, chatCatalogJson, feedXml, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
 import { THEMES_DIR, THEME_STYLES_PATH, builtInThemeFolders, compileTheme } from './theme.js';
-import { THEME_OPTIONS_FILE, optionProblem, readThemeOptions } from './theme-options.js';
+import { THEME_OPTIONS_FILE, readThemeDeclarations } from './theme-options.js';
 import { absoluteLink, articleUrl, encodePath, pageRoot, siteLink, sitePath } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
@@ -98,7 +99,7 @@ function touchesArticle(found, changedPaths) {
 async function readSettings(root) {
   const errors = builtInThemeFolders(root);
   const themeNames = availableThemes(root);
-  const themeOptions = await readThemeOptions(root, themeNames, errors);
+  const { options: themeOptions, markdown } = await readThemeDeclarations(root, themeNames, errors);
   const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
   if (config === null || errors.length > 0) return { errors };
   const preamble = await readMathPreamble(root, errors);
@@ -106,7 +107,7 @@ async function readSettings(root) {
   const componentErrors = [];
   const components = errors.length > 0 ? new Map() : readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id), theme: config.theme, options: themeOptions, optionProblem };
-  return { errors, config, preamble, pet, components, componentErrors, rules };
+  return { errors, config, preamble, pet, components, componentErrors, rules, markdown };
 }
 
 function readsThemePath(root, name, theme, path) {
@@ -243,14 +244,15 @@ function linkTarget({ url, fields, draft, document }) {
   return { url, title: fields?.title ?? '', draft, article: document };
 }
 
-async function loadArticle(root, article, { rules, preamble, components }) {
+async function loadArticle(root, article, { rules, preamble, components, markdown }) {
   const errors = [];
   const source = readFileSync(join(root, article.file), 'utf8');
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
   const folder = { path: join(root, article.dir), files: article.files };
-  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
+  const theme = markdown.get(fields?.theme ?? rules.theme);
+  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components, theme }) : null;
   const positions = frontMatter?.positions ?? {};
   const options = frontMatter?.options ?? {};
   const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);

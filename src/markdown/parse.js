@@ -4,12 +4,13 @@ import { toString } from 'mdast-util-to-string';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import { resolveComponent } from '../components/declarations.js';
+import { convertAttribute, optionProblem, resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, folderFile, parseSize, sizeProblem } from '../config/rules.js';
 import { percentDecode, referenceId, sidenoteId } from '../fragments.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, typesetMath } from '../render/math.js';
+import { listAll } from '../report.js';
 import { encodePath } from '../urls.js';
 import { HEADING_ATTRIBUTE_SUFFIX, PARAGRAPH_ANCHOR_SUFFIX, parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
@@ -44,15 +45,7 @@ const BUILT_IN_BLOCKS = {
 };
 export const BUILT_IN_BLOCK_NAMES = Object.freeze(Object.keys(BUILT_IN_BLOCKS));
 const WIDTH_BLOCK_ATTRIBUTES = { width: WIDTH };
-const HEADING_ATTRIBUTES = {
-  id: { text: 'an anchor name, for example {#intro}' },
-  toc: { text: 'a short title in quotes, for example toc="Short title"' },
-  width: WIDTH,
-  cols: { count: 'a whole number of card columns from 1 to 6, for example cols=2', most: 6 },
-  rows: { count: 'a whole number of card rows from 1 to 200, for example rows=12', most: 200 },
-};
-const SECTION_ATTRIBUTES = ['width', 'cols', 'rows'];
-const COUNT = /^[1-9]\d*$/;
+const HEADING_ID = { text: 'an anchor name, for example {#intro}' };
 const IMAGE_FLOATS = ['left', 'right'];
 const IMAGE_ATTRIBUTES = {
   width: { size: 'image width' },
@@ -70,8 +63,8 @@ export async function parseArticle(article) {
   const { tree, unreadLine } = parseWithPipesInMath(processor, article.source);
   if (unreadLine !== undefined) article.report({ line: unreadLine, column: 1 }, UNREAD_TABLE_MATH);
   tree.children = tree.children.filter((node) => node.type !== 'yaml');
-  walk(tree, (node) => {
-    if (node.type === 'bakeBlock') readBlock(article, node);
+  walk(tree, (node, parent) => {
+    if (node.type === 'bakeBlock') readBlock(article, node, parent);
     if (node.type === 'heading') readHeading(article, node);
     if (node.type === 'paragraph') {
       readStrayClosingLines(article, node);
@@ -102,7 +95,7 @@ export function generatedIds(article) {
   return ids;
 }
 
-function readBlock(article, node) {
+function readBlock(article, node, parent) {
   const start = node.position.start;
   const [, name, attributeText] = BLOCK_LINE.exec(node.info);
   node.name = name ?? '';
@@ -131,7 +124,8 @@ function readBlock(article, node) {
     node.attributes = checkAttributes(article, written, BUILT_IN_BLOCKS[node.name], label, start);
     if (node.name === 'fold' && written.title === undefined) article.report(start, ':::fold is missing "title"');
   } else if (!node.name.includes('-')) {
-    article.report(start, `unknown block ":::${node.name}"`);
+    const attributeStart = start.offset + node.colons + node.name.length;
+    readThemeBlock(article, node, parent, (attribute) => article.positionAt(attributeStart + offsets[attribute]));
   } else {
     const attributeStart = start.offset + node.colons + node.name.length;
     readComponent(article, node, (attribute) => (attribute === undefined ? start : article.positionAt(attributeStart + offsets[attribute])));
@@ -150,6 +144,37 @@ function readComponent(article, node, attributePosition) {
   node.component = resolved;
 }
 
+function readThemeBlock(article, node, parent, attributePosition) {
+  const { name, blocks } = article.theme;
+  const start = node.position.start;
+  if (!Object.hasOwn(blocks, node.name)) {
+    const names = Object.keys(blocks);
+    article.report(start, `unknown block ":::${node.name}"; ${names.length === 0 ? `the ${name} theme declares no blocks` : `the blocks of the ${name} theme are ${listAll(names)}`}`);
+    return;
+  }
+  if (parent.type !== 'root') article.report(start, `:::${node.name} of the ${name} theme stands at the top level of the article, outside other blocks, lists and quotes`);
+  const declarations = blocks[node.name];
+  const names = Object.keys(declarations);
+  const takes = names.length === 0 ? 'takes no attributes' : `takes ${listAll(names)}`;
+  node.attributes = themeAttributes(article, node.attributes, declarations, attributePosition, (attribute) => `unknown attribute "${attribute}" on :::${node.name}; :::${node.name} of the ${name} theme ${takes}`);
+  node.themeBlock = true;
+}
+
+function themeAttributes(article, attributes, declarations, attributePosition, unknown) {
+  const values = {};
+  for (const [name, written] of Object.entries(attributes)) {
+    if (!Object.hasOwn(declarations, name)) {
+      article.report(attributePosition(name), unknown(name));
+      continue;
+    }
+    const { value, problem } = convertAttribute(declarations[name], written);
+    const message = problem ?? optionProblem(declarations[name], value);
+    if (message === null) values[name] = value;
+    else article.report(attributePosition(name), `${name} ${message}`);
+  }
+  return values;
+}
+
 function readHeading(article, node) {
   if (node.depth === 1) article.report(node.position.start, 'heading level 1 is not allowed; the article title comes from front matter, sections start at ##');
   node.attributes = {};
@@ -162,10 +187,24 @@ function readHeading(article, node) {
     if (last.value === '') node.children.pop();
     const parsed = parseAttributes(match[1]);
     if (parsed.error) article.report(position, parsed.error);
-    const attributes = checkAttributes(article, parsed.attributes, HEADING_ATTRIBUTES, 'heading', position);
-    node.attributes = attributes;
-    for (const name of SECTION_ATTRIBUTES) if (attributes[name] !== undefined && node.depth !== 2) article.report(position, `${name} only applies to ## headings`);
-    if (attributes.id !== undefined) addAnchor(article, attributes.id, position);
+    const { id, ...written } = parsed.attributes;
+    const attributePosition = (name) => article.positionAt(position.offset + parsed.offsets[name]);
+    const { name, headings } = article.theme;
+    for (const [attribute, { depth }] of Object.entries(headings)) {
+      if (depth === undefined || depth === node.depth || written[attribute] === undefined) continue;
+      article.report(attributePosition(attribute), `${attribute} only applies to ${'#'.repeat(depth)} headings`);
+      delete written[attribute];
+    }
+    const reads = ['#id', ...Object.keys(headings)];
+    node.attributes = themeAttributes(article, written, headings, attributePosition, (attribute) => `unknown attribute "${attribute}" on heading; the ${name} theme reads ${listAll(reads)}`);
+    if (id !== undefined) {
+      const problem = attributeProblem('id', HEADING_ID, id);
+      if (problem) article.report(position, problem);
+      else {
+        node.attributes = { id, ...node.attributes };
+        addAnchor(article, id, position);
+      }
+    }
   }
 }
 
@@ -531,7 +570,6 @@ function readReferenceEntries(article, block, entries) {
 function attributeProblem(name, rule, value) {
   if (rule.choices !== undefined) return choiceProblem(name, rule.choices, value);
   if (rule.size !== undefined) return sizeProblem(rule.size, value, 'image');
-  if (rule.count !== undefined) return typeof value === 'string' && COUNT.test(value) && Number(value) <= rule.most ? null : `${name} must be ${rule.count}`;
   return typeof value === 'string' ? null : `${name} must be ${rule.text}`;
 }
 
