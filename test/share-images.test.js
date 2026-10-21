@@ -5,11 +5,10 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { before, describe, test } from 'node:test';
-import { PNG } from 'pngjs';
 import sharp from 'sharp';
 import { INSTALL_CHROMIUM, SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH } from '../src/build/share-images.js';
 import { startDevServer } from '../src/dev/server.js';
-import { article, bake, cli, createBlog, readTree, writeFiles } from './blog.js';
+import { article, bake, cli, createBlog, decodeImage, readTree, writeFiles } from './blog.js';
 
 const config = `export default {
   title: 'Notes',
@@ -86,7 +85,7 @@ describe('share images', () => {
     assert.equal(images.length, 6);
     const [plain, covered, photoImage, rope, stillImage, vector] = images;
     assert.match(stillImage, /^2026-10\/still-[0-9a-f]{12}\.png$/);
-    const converted = PNG.sync.read(readFileSync(join(dir, 'dist/og', stillImage)));
+    const converted = await decodeImage(readFileSync(join(dir, 'dist/og', stillImage)));
     assert.deepEqual([converted.width, converted.height], [360, 240]);
     assert.match(plain, /^2026-09\/plain-[0-9a-f]{12}\.png$/);
     assert.match(covered, /^2026-10\/covered-[0-9a-f]{12}\.png$/);
@@ -96,15 +95,15 @@ describe('share images', () => {
     assert.deepEqual(readFileSync(join(dir, 'dist/og', covered)), cover);
     assert.equal(covered, `2026-10/covered-${createHash('sha256').update(cover).digest('hex').slice(0, 12)}.png`);
     assert.deepEqual(readFileSync(join(dir, 'dist/og', photoImage)), photo);
-    const raster = PNG.sync.read(readFileSync(join(dir, 'dist/og', vector)));
+    const raster = await decodeImage(readFileSync(join(dir, 'dist/og', vector)));
     assert.deepEqual([raster.width, raster.height], [400, 210]);
     assert.deepEqual(pixel(raster, 200, 105), [0, 0, 255]);
 
-    const card = PNG.sync.read(readFileSync(join(dir, 'dist/og', rope)));
+    const card = await decodeImage(readFileSync(join(dir, 'dist/og', rope)));
     assert.deepEqual([card.width, card.height], [SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT]);
     assert.deepEqual(pixel(card, 904, 315), MAGENTA);
     assert.deepEqual(pixel(card, 10, 315), [0x2a, 0x78, 0xd6]);
-    const withoutPreview = PNG.sync.read(readFileSync(join(dir, 'dist/og', plain)));
+    const withoutPreview = await decodeImage(readFileSync(join(dir, 'dist/og', plain)));
     assert.deepEqual([withoutPreview.width, withoutPreview.height], [SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT]);
     assert.deepEqual(pixel(withoutPreview, 904, 315), [0xf5, 0xf6, 0xf4]);
     assert.deepEqual(pixel(withoutPreview, 10, 315), [0x1b, 0xaf, 0x7a]);
@@ -142,7 +141,7 @@ describe('share images', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     const [card] = readdirSync(join(dir, 'dist/og/2026-10'));
-    assert.deepEqual(pixel(PNG.sync.read(readFileSync(join(dir, 'dist/og/2026-10', card))), 904, 315), MAGENTA);
+    assert.deepEqual(pixel(await decodeImage(readFileSync(join(dir, 'dist/og/2026-10', card))), 904, 315), MAGENTA);
   });
 
   test('the name of a card changes with its title, its preview and the files the preview imports', (t) => {

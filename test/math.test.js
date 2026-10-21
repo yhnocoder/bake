@@ -134,11 +134,4 @@ describe('math', () => {
     assert.match(article.intro[0].html, /<summary>\$\|x\|\$ fold<\/summary>/);
     assert.equal(article.intro[1].params.fn, '$|x|$');
   });
-
-  test('reports | inside $…$ on a table line of an article that uses every private-use character', async () => {
-    const every = Array.from({ length: 0xf8ff - 0xe000 + 1 }, (_, index) => String.fromCharCode(0xe000 + index)).join('');
-    assert.deepEqual((await parse(`${every}\n\n| a |\n|---|\n| $|x|$ |\n`)).errors, [
-      'index.md:11:1 | inside $…$ cannot be read on this line, because the article uses every private-use character from U+E000 to U+F8FF and Bake needs one that it does not use',
-    ]);
-  });
 });

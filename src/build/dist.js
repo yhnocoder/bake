@@ -14,12 +14,13 @@ export async function writeDist(root, outputs) {
   removeFolder(previous);
   try {
     mkdirSync(staging);
-    for (const output of outputs) {
+    const sources = await Promise.all(outputs.map((output) => (output.from === undefined ? output.render() : null)));
+    outputs.forEach((output, index) => {
       const target = join(staging, output.path);
       mkdirSync(dirname(target), { recursive: true });
-      if (output.from === undefined) writeFileSync(target, await output.render());
+      if (output.from === undefined) writeFileSync(target, sources[index]);
       else copyFileSync(output.from, target);
-    }
+    });
     if (existsSync(dist)) renameSync(dist, previous);
     renameSync(staging, dist);
   } catch (error) {

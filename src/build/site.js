@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync } from 'node:fs';
-import { join, posix, sep } from 'node:path';
+import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { readPet } from '../chat/pet-files.js';
 import { petFolder } from '../config/pet.js';
@@ -27,40 +27,29 @@ const PUBLIC_DIR = 'public';
 
 const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
+const QUERY = /\?.*$/;
 
 export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
   // why: Vite reports module paths with symbolic links resolved, and they are compared with paths under the root
-  return { root: realpathSync(root), drafts, base, shareImages, prefetch, settings: null, articles: new Map(), themes: new Map(), bundle: null };
+  return { root: realpathSync(root), drafts, base, shareImages, prefetch, settings: null, results: new Map(), articles: new Map(), themes: new Map() };
 }
 
 export async function updateSite(site, changedPaths = null) {
   const { root } = site;
-  const touches = (path) => changedPaths === null || changedPaths.some((changed) => changed === path || changed.startsWith(`${path}/`));
-  const themePaths = (changedPaths ?? [THEMES_DIR]).filter((path) => path === THEMES_DIR || path.startsWith(`${THEMES_DIR}/`));
-  for (const [name, compiled] of site.themes) {
-    if (themePaths.some((path) => readsThemePath(root, name, compiled.theme, path))) site.themes.delete(name);
-  }
-  const themeNamesChanged = themePaths.length > 0 && site.settings?.rules?.themes.join('\n') !== availableThemes(root).join('\n');
-  const themeOptionsChanged = themePaths.some((path) => path.split('/').length <= 2 || path.split('/')[2] === THEME_OPTIONS_FILE || BUILT_IN_THEMES.includes(path.split('/')[1]));
-  const pet = site.settings?.config ? petFolder(site.settings.config.chat.pet) : null;
-  if (site.settings === null || touches(CONFIG_FILE) || touches(PREAMBLE_FILE) || themeNamesChanged || themeOptionsChanged || touches(COMPONENTS_DIR) || (pet !== null && touches(pet))) {
-    site.settings = await readSettings(root);
-    site.articles.clear();
-    site.bundle = null;
-  }
+  for (const cache of [site.results, site.articles, site.themes]) forgetChanged(cache, changedPaths);
+  site.settings = await siteSettings(site);
   const { settings } = site;
   if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], assetFiles: [], assetSources: new Map(), shareImages: [], publicFiles: [] };
+  const { config } = settings;
+  // why: a failure is reported when compileThemes asks for the theme again after the article loop
+  themeOf(site, config.theme, true).catch(() => {});
+  const found = findArticles(root);
+  for (const file of site.articles.keys()) if (!found.some((article) => article.file === file)) site.articles.delete(file);
   const articles = [];
-  for (const found of findArticles(root)) {
-    const cached = site.articles.get(found.file);
-    const unchanged = cached !== undefined && !touchesArticle(found, changedPaths) && cached.files.join('\n') === found.files.join('\n');
-    articles.push(unchanged ? cached : await loadArticle(root, found, settings));
-  }
-  site.articles = new Map(articles.map((article) => [article.file, article]));
+  for (const article of found) articles.push(await articleOf(site, article));
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
   linkArticles(articles, errors);
-  const { config } = settings;
   const published = articles.filter((article) => article.url !== null && (site.drafts || !article.draft));
   const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), chatBundle()]);
   const assetFiles = assetOutputs(themes, bundle, chat);
@@ -88,49 +77,78 @@ export async function updateSite(site, changedPaths = null) {
   return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, assetSources, shareImages: drawable, publicFiles };
 }
 
-function touchesArticle(found, changedPaths) {
-  if (changedPaths === null) return true;
-  const own = [found.file, ...found.files.map((file) => posix.join(found.dir, file))];
-  return changedPaths.some((changed) => found.dir === changed || found.dir.startsWith(`${changed}/`) || own.some((path) => path === changed || path.startsWith(`${changed}/`)));
+// Each cached result keeps the paths of the blog files it read and is dropped when one of them, or a folder that holds one, changes.
+function forgetChanged(cache, changedPaths) {
+  for (const [name, { inputs }] of cache) {
+    if (changedPaths === null || inputs.some((input) => changedPaths.some((path) => input === path || input.startsWith(`${path}/`) || path.startsWith(`${input}/`)))) cache.delete(name);
+  }
 }
 
-async function readSettings(root) {
-  const errors = builtInThemeFolders(root);
+// The entry holds the promise, so that the theme started before the article loop is not compiled a second time after it.
+function cached(cache, name, key, compute) {
+  const entry = cache.get(name);
+  if (entry?.key === key) return entry.value;
+  const next = { key, inputs: [] };
+  next.value = compute().then(
+    ({ value, inputs }) => {
+      next.inputs = inputs;
+      return value;
+    },
+    (error) => {
+      cache.delete(name);
+      throw error;
+    },
+  );
+  cache.set(name, next);
+  return next.value;
+}
+
+async function siteSettings(site) {
+  const { root } = site;
   const themeNames = availableThemes(root);
+  const settings = await cached(site.results, 'settings', themeNames.join('\n'), async () => {
+    const value = await readSettings(root, themeNames);
+    const pet = value.config === undefined ? null : petFolder(value.config.chat.pet);
+    const options = themeNames.filter((name) => !BUILT_IN_THEMES.includes(name)).map((name) => posix.join(THEMES_DIR, name, THEME_OPTIONS_FILE));
+    return { value, inputs: [CONFIG_FILE, PREAMBLE_FILE, ...BUILT_IN_THEMES.map((name) => posix.join(THEMES_DIR, name)), ...options, ...(pet === null ? [] : [pet])] };
+  });
+  if (settings.errors.length > 0) return settings;
+  const components = await cached(site.results, 'components', '', async () => {
+    const errors = [];
+    return { value: { components: readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors), errors }, inputs: [COMPONENTS_DIR] };
+  });
+  return { ...settings, components: components.components, componentErrors: components.errors };
+}
+
+async function readSettings(root, themeNames) {
+  const errors = builtInThemeFolders(root);
   const themeOptions = await readThemeOptions(root, themeNames, errors);
   const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
   if (config === null || errors.length > 0) return { errors };
   const preamble = await readMathPreamble(root, errors);
   const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
-  const componentErrors = [];
-  const components = errors.length > 0 ? new Map() : readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id), theme: config.theme, options: themeOptions, optionProblem };
-  return { errors, config, preamble, pet, components, componentErrors, rules };
+  return { errors, config, preamble, pet, rules };
 }
 
-function readsThemePath(root, name, theme, path) {
-  const [, folder] = path.split('/');
-  if (folder === undefined || folder === name || theme === null) return true;
-  const file = join(root, path);
-  return [...theme.sources].some((source) => source === file || source.startsWith(`${file}${sep}`));
+function themeOf(site, name, siteTheme) {
+  return cached(site.themes, name, siteTheme, async () => {
+    const errors = [];
+    const theme = await compileTheme(site.root, name, { siteTheme }, errors);
+    const folder = BUILT_IN_THEMES.includes(name) ? [] : [posix.join(THEMES_DIR, name)];
+    return { value: { theme, errors }, inputs: theme === null ? [THEMES_DIR] : [...folder, ...blogPaths(site.root, theme.sources)] };
+  });
+}
+
+function blogPaths(root, files) {
+  return [...files].map((file) => relative(root, file.replace(QUERY, ''))).filter((path) => path !== '' && !path.startsWith('..') && !isAbsolute(path)).map((path) => path.split(sep).join('/'));
 }
 
 async function compileThemes(site, published, config, errors) {
-  const names = new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => themeOf(article, config))]);
-  const sorted = [...names].sort();
-  await Promise.all(sorted.map(async (name) => {
-    const siteTheme = name === config.theme;
-    if (site.themes.get(name)?.siteTheme === siteTheme) return;
-    const themeErrors = [];
-    site.themes.set(name, { theme: await compileTheme(site.root, name, { siteTheme }, themeErrors), siteTheme, errors: themeErrors });
-  }));
-  const themes = new Map();
-  for (const name of sorted) {
-    const { theme, errors: themeErrors } = site.themes.get(name);
-    errors.push(...themeErrors);
-    themes.set(name, theme);
-  }
-  return themes;
+  const names = [...new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => articleTheme(article, config))])].sort();
+  const compiled = await Promise.all(names.map((name) => themeOf(site, name, name === config.theme)));
+  errors.push(...compiled.flatMap((result) => result.errors));
+  return new Map(names.map((name, index) => [name, compiled[index].theme]));
 }
 
 function shareImagesOf(root, pages, config, sources, errors) {
@@ -191,22 +209,21 @@ function homeArticle({ title, summary, date, tags, category, draft, path, previe
   return { title, summary, date, tags, category, draft, url: path, preview, image };
 }
 
-function themeOf(article, config) {
+function articleTheme(article, config) {
   return article.fields.theme ?? config.theme;
 }
 
 async function compileComponents(site, published, errors) {
   const names = [...new Set(published.flatMap((article) => article.content?.components ?? []))].sort();
   if (names.length === 0) return null;
-  const key = names.join('\n');
-  if (site.bundle?.key !== key) {
-    const { root, settings } = site;
+  const { root, settings } = site;
+  const result = await cached(site.results, 'bundle', JSON.stringify([names, settings.preamble]), async () => {
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    site.bundle = { key, bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors };
-  }
-  errors.push(...site.bundle.errors);
-  return site.bundle.bundle;
+    return { value: { bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors }, inputs: [COMPONENTS_DIR] };
+  });
+  errors.push(...result.errors);
+  return result.bundle;
 }
 
 function assetOutputs(themes, bundle, chat) {
@@ -240,6 +257,24 @@ function linkArticles(articles, errors) {
 
 function linkTarget({ url, fields, draft, document }) {
   return { url, title: fields?.title ?? '', draft, article: document };
+}
+
+// An article also depends on the values of the settings it read, so a change of bake.config.js or of a component that leaves them as they were keeps it.
+async function articleOf(site, found) {
+  const { root, settings } = site;
+  const key = (lookups) => JSON.stringify([found.files, settings.rules, [...settings.rules.options], settings.preamble, lookups.map((name) => settings.components.get(name) ?? null)]);
+  const entry = site.articles.get(found.file);
+  if (entry !== undefined && entry.key === key(entry.lookups)) return entry.article;
+  const lookups = new Set();
+  const components = {
+    get: (name) => {
+      lookups.add(name);
+      return settings.components.get(name);
+    },
+  };
+  const article = await loadArticle(root, found, { ...settings, components });
+  site.articles.set(found.file, { article, lookups: [...lookups], key: key([...lookups]), inputs: [found.file, ...found.files.map((file) => posix.join(found.dir, file))] });
+  return article;
 }
 
 async function loadArticle(root, article, { rules, preamble, components }) {
@@ -294,7 +329,7 @@ function convertedImage(file, image) {
 }
 
 function renderArticle(article, entry, { config, themes, bundle, chat, shareImages, mathStyles }, errors) {
-  const name = themeOf(article, config);
+  const name = articleTheme(article, config);
   const theme = themes.get(name);
   if (theme === null) return '';
   const { content } = article;

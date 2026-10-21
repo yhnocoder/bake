@@ -12,14 +12,16 @@ export function isWatched(path) {
 }
 
 export function watchBlog(root, onChange, onError) {
+  const started = Date.now();
   const known = new Set(listWatchedFiles(root));
   let pending = new Set();
   let timer;
   const flush = () => {
     const changed = [...pending].filter((path) => {
-      const exists = statSync(join(root, path), { throwIfNoEntry: false }) !== undefined;
-      const wasKnown = known.has(path) || [...known].some((file) => file.startsWith(`${path}/`));
-      return exists || wasKnown;
+      const stats = statSync(join(root, path), { throwIfNoEntry: false });
+      // why: macOS also reports writes made a moment before fs.watch started; a write, a rename or a change of metadata sets ctime, which no tool can set back
+      if (stats !== undefined) return stats.ctimeMs >= started;
+      return known.has(path) || [...known].some((file) => file.startsWith(`${path}/`));
     });
     pending = new Set();
     for (const path of changed) {

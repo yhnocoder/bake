@@ -73,7 +73,6 @@ const PREVIEW_BLOCKS = 3;
 const WHITESPACE = /\s/;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
-const UNREAD_TABLE_MATH = '| inside $…$ cannot be read on this line, because the article uses every private-use character from U+E000 to U+F8FF and Bake needs one that it does not use';
 
 export async function readArticle(file, source, errors, { folder = null, preamble = [], url = null, components = new Map() } = {}) {
   const article = new ArticleParser(file, source, errors, folder, preamble, url, components);
@@ -124,8 +123,7 @@ class ArticleParser {
   }
 
   async parse() {
-    const { tree, unreadLine } = parseWithPipesInMath(processor, this.source);
-    if (unreadLine !== undefined) this.report({ line: unreadLine, column: 1 }, UNREAD_TABLE_MATH);
+    const tree = parseWithPipesInMath(processor, this.source);
     tree.children = tree.children.filter((node) => node.type !== 'yaml');
     walk(tree, (node) => {
       if (node.type === 'bakeBlock') this.readBlock(node);

@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { PNG } from 'pngjs';
-import { article, bake, createBlog, exampleBuild, validConfig } from '../blog.js';
+import { article, bake, createBlog, decodeImage, exampleBuild, validConfig } from '../blog.js';
 import { launchBrowser, serve, settle } from './browser.js';
 
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
@@ -500,24 +499,18 @@ function formulaShifts() {
   return shifts;
 }
 
-async function sectionScreenshot(page, top, height, width) {
-  const image = new PNG({ width, height });
+async function sectionColors(page, top, height, width) {
+  const colors = new Set();
   const viewport = page.viewportSize().height;
-  for (let offset = 0; offset < height; offset += viewport) {
+  for (let offset = 0; offset < height && colors.size < 2; offset += viewport) {
     const scrolled = await page.evaluate((y) => {
       scrollTo({ top: y, behavior: 'instant' });
       return scrollY;
     }, top + offset);
     const slice = Math.min(viewport, height - offset);
-    const shot = PNG.sync.read(await page.screenshot({ clip: { x: 0, y: top + offset - scrolled, width, height: slice } }));
-    PNG.bitblt(shot, image, 0, 0, width, slice, 0, offset);
+    const { data } = await decodeImage(await page.screenshot({ clip: { x: 0, y: top + offset - scrolled, width, height: slice } }));
+    for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
   }
-  return image;
-}
-
-function distinctColors({ data }) {
-  const colors = new Set();
-  for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
   return colors.size;
 }
 
@@ -629,8 +622,7 @@ test('the example components run on the syntax page', async (t) => {
       assert.equal(sections.length, 16);
       for (const { id, top, width: sectionWidth, height } of sections) {
         assert.ok(sectionWidth > 0 && height > 0, `${width}px ${id}: the section is ${sectionWidth}x${height}`);
-        const image = await sectionScreenshot(page, Math.round(top), Math.round(height), width);
-        assert.ok(distinctColors(image) > 1, `${width}px ${id}: the screenshot has one color`);
+        assert.ok((await sectionColors(page, Math.round(top), Math.round(height), width)) > 1, `${width}px ${id}: the screenshot has one color`);
       }
       assert.deepEqual(problems, [], `${width}px`);
       await page.close();

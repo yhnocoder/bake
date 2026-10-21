@@ -3,8 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { PNG } from 'pngjs';
-import { article, bake, createBlog } from '../blog.js';
+import { article, bake, createBlog, decodeImage } from '../blog.js';
 import { launchBrowser, serve, settle } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
@@ -77,8 +76,8 @@ function cjkFontWithThreeWeights() {
     .join('\n');
 }
 
-function darkPixels(png) {
-  const image = PNG.sync.read(png);
+async function darkPixels(png) {
+  const image = await decodeImage(png);
   let count = 0;
   for (let index = 0; index < image.data.length; index += 4) if (image.data[index] + image.data[index + 1] + image.data[index + 2] < 384) count += 1;
   return count;
@@ -306,7 +305,7 @@ test('reader settings', async (t) => {
         return style.fontWeight;
       });
       await settle(page);
-      return { computed, ink: darkPixels(await paragraph.screenshot()) };
+      return { computed, ink: await darkPixels(await paragraph.screenshot()) };
     };
     await page.goto(url);
     await page.addStyleTag({ content: fontCss });

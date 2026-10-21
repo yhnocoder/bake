@@ -241,18 +241,9 @@ describe('updates while bake dev runs', () => {
     return { dir, ...started, text };
   }
 
-  // why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the files are written until bake dev shows the change
-  async function saveUntil(dir, files, check, message) {
-    const deadline = Date.now() + 30000;
-    for (;;) {
-      writeFiles(dir, files);
-      const retry = Date.now() + 2000;
-      while (Date.now() < retry) {
-        if (await check()) return;
-        await wait(50);
-      }
-      assert.ok(Date.now() < deadline, message);
-    }
+  async function save(dir, files, check, message) {
+    writeFiles(dir, files);
+    await eventually(check, message);
   }
 
   test('serves a saved article, a nested article and a changed theme file and leaves the other pages as they were', async (t) => {
@@ -280,9 +271,9 @@ describe('updates while bake dev runs', () => {
       'themes/mine/header.jsx': 'export function Header() {\n  return <header class="first-header" />;\n}\n',
       'themes/mine/client.jsx': "export { default } from 'bake/themes/essay/client';\n",
     });
-    await saveUntil(dir, { 'content/posts/rope/index.md': article({ extra: mine, body: 'Changed.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Changed.'), 'the saved article was not served');
-    await saveUntil(dir, { 'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner changed.\n' }) }, async () => (await text('/2026-10/inner/')).includes('Inner changed.'), 'the nested article was not served');
-    await saveUntil(dir, { 'themes/mine/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' }, async () => (await text('/2026-10/rope/')).includes('custom-header'), 'the changed theme file was not used');
+    await save(dir, { 'content/posts/rope/index.md': article({ extra: mine, body: 'Changed.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Changed.'), 'the saved article was not served');
+    await save(dir, { 'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner changed.\n' }) }, async () => (await text('/2026-10/inner/')).includes('Inner changed.'), 'the nested article was not served');
+    await save(dir, { 'themes/mine/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' }, async () => (await text('/2026-10/rope/')).includes('custom-header'), 'the changed theme file was not used');
     const gelu = await text('/2026-10/gelu/');
     assert.match(gelu, /GELU text\./);
     assert.doesNotMatch(gelu, /custom-header/);
@@ -306,8 +297,8 @@ describe('updates while bake dev runs', () => {
       return (await get(new URL(href, 'http://localhost/2026-10/rope/').pathname)).text();
     };
     assert.match(await page(), /first/);
-    await saveUntil(dir, { 'themes/common/word.js': "export const word = 'second';\n" }, async () => /second/.test(await page()), 'the imported module was not compiled again');
-    await saveUntil(dir, { 'themes/common/look.css': '.word { color: blue; }\n' }, async () => /color:\s*#?(blue|00f)/.test(await stylesheet()), 'the imported stylesheet was not compiled again');
+    await save(dir, { 'themes/common/word.js': "export const word = 'second';\n" }, async () => /second/.test(await page()), 'the imported module was not compiled again');
+    await save(dir, { 'themes/common/look.css': '.word { color: blue; }\n' }, async () => /color:\s*#?(blue|00f)/.test(await stylesheet()), 'the imported stylesheet was not compiled again');
   });
 
   test('reports the options of a theme folder that is removed or added as a whole', async (t) => {
@@ -318,10 +309,10 @@ describe('updates while bake dev runs', () => {
       'themes/mine/options.js': options,
     });
     const { lines } = await start(t, dir);
-    await saveUntil(dir, { 'themes/mine/options.js': options }, async () => lines.includes('Updated every page') || lines.some((line) => line.startsWith('Updated ')), 'bake dev did not watch the theme folder');
+    await save(dir, { 'themes/mine/options.js': options }, async () => lines.includes('Updated every page') || lines.some((line) => line.startsWith('Updated ')), 'bake dev did not watch the theme folder');
     rmSync(join(dir, 'themes/mine'), { recursive: true });
     await eventually(() => lines.includes('bake.config.js:1:92 themes.mine names no theme; the themes are essay, bento'), `bake dev printed ${JSON.stringify(lines)}`);
-    await saveUntil(dir, { 'themes/mine/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'themes/mine/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
   });
 
   test('reports the missing files of a theme that becomes the site theme', async (t) => {
@@ -330,15 +321,15 @@ describe('updates while bake dev runs', () => {
       'themes/plain/page.jsx': 'export default function Page(props) {\n  return <html><body>{props.article.title}</body></html>;\n}\n',
       'themes/plain/client.jsx': 'export default () => () => {};\n',
     });
-    await saveUntil(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('3 errors'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('3 errors'), `bake dev printed ${JSON.stringify(lines)}`);
     assert.deepEqual(lines.slice(-4), ['themes/plain:1:1 theme "plain" has no home.jsx', 'themes/plain:1:1 theme "plain" has no not-found.jsx', 'themes/plain:1:1 theme "plain" has no theme.css', '3 errors']);
   });
 
   test('updates the homepage when the front matter of an article changes and when an article is added or removed', async (t) => {
     const { dir, text } = await serve(t, { 'content/posts/rope/index.md': article() });
     assert.match(await text('/'), /Rope/);
-    await saveUntil(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => (await text('/')).includes('Rope again'), 'the homepage did not show the new title');
-    await saveUntil(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu' }) }, async () => (await text('/')).includes('GELU'), 'the homepage did not show the added article');
+    await save(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => (await text('/')).includes('Rope again'), 'the homepage did not show the new title');
+    await save(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu' }) }, async () => (await text('/')).includes('GELU'), 'the homepage did not show the added article');
     rmSync(join(dir, 'content/posts/gelu'), { recursive: true });
     await eventually(async () => !(await text('/')).includes('GELU'), 'the homepage still shows the removed article');
   });
@@ -350,8 +341,8 @@ describe('updates while bake dev runs', () => {
     });
     assert.equal(lines[0], 'content/posts/rope/index.md:7:5 footnote "missing" has no definition');
     assert.match(await text('/2026-10/rope/'), /Rope/);
-    await saveUntil(dir, { 'content/posts/rope/index.md': article({ body: 'Rope.\n' }) }, () => lines.at(-1)?.startsWith('Updated '), `bake dev printed ${JSON.stringify(lines)}`);
-    await saveUntil(
+    await save(dir, { 'content/posts/rope/index.md': article({ body: 'Rope.\n' }) }, () => lines.at(-1)?.startsWith('Updated '), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(
       dir,
       { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope[^missing].\n' }), 'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'GELU changed.\n' }) },
       () => lines.at(-2) === 'content/posts/rope/index.md:7:5 footnote "missing" has no definition',
@@ -360,7 +351,7 @@ describe('updates while bake dev runs', () => {
     assert.match(await text('/2026-10/rope/'), /Rope\./);
     assert.match(await text('/2026-10/gelu/'), /GELU\./);
     assert.equal((await get('/2026-10/rotary/')).status, 404);
-    await saveUntil(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }) }, async () => (await get('/2026-10/rotary/')).status === 200, 'the fixed article was not served');
+    await save(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }) }, async () => (await get('/2026-10/rotary/')).status === 200, 'the fixed article was not served');
     assert.match(await text('/2026-10/gelu/'), /GELU changed\./);
     assert.equal((await get('/2026-10/rope/')).status, 404);
   });
@@ -371,9 +362,9 @@ describe('updates while bake dev runs', () => {
       'content/posts/rope/index.md': article({ body: 'See [the rule](/2026-10/gelu/#chain-rule).\n\n:::embed\n/2026-10/gelu/#chain-rule\n:::\n' }),
       'content/posts/gelu/index.md': gelu('Chain rule', 'First text.'),
     });
-    await saveUntil(dir, { 'content/posts/gelu/index.md': gelu('Product rule', 'First text.') }, () => lines.includes('2 errors'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'content/posts/gelu/index.md': gelu('Product rule', 'First text.') }, () => lines.includes('2 errors'), `bake dev printed ${JSON.stringify(lines)}`);
     assert.deepEqual(lines.slice(-3), ['content/posts/rope/index.md:7:5 link target /2026-10/gelu/#chain-rule does not exist', 'content/posts/rope/index.md:10:1 :::embed target /2026-10/gelu/#chain-rule does not exist', '2 errors']);
-    await saveUntil(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'Second text.') }, async () => (await text('/2026-10/rope/')).includes('Second text.'), 'the embedded section was not updated');
+    await save(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'Second text.') }, async () => (await text('/2026-10/rope/')).includes('Second text.'), 'the embedded section was not updated');
     assert.ok(lines.includes('No problems'), lines.join('\n'));
   });
 
@@ -386,16 +377,25 @@ describe('updates while bake dev runs', () => {
       return (await get(`/assets/${name}`)).text();
     };
     assert.match(await chunk(), /first text/);
-    await saveUntil(dir, { 'components/demo-chart.js': chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
-    await saveUntil(dir, { 'components/demo-chart.js': "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'components/demo-chart.js': chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
+    await save(dir, { 'components/demo-chart.js': "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
     assert.equal(lines.at(-2), 'components/demo-chart.js:1:38 demo-chart: layout.frame must be true or false, got "no"');
+  });
+
+  test('checks an article again when a component that it names is added or changes its parameters', async (t) => {
+    const chart = (params) => `export const params = { ${params} };\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {}\n`;
+    const { dir, lines } = await serve(t, { 'content/posts/rope/index.md': article({ body: ':::demo-chart{size=2}\n:::\n' }) });
+    assert.equal(lines[0], 'content/posts/rope/index.md:7:1 unknown component "demo-chart"; components/ has no demo-chart.js or demo-chart.jsx');
+    await save(dir, { 'components/demo-chart.js': chart("size: { label: 'Size', type: 'number', default: 1 }") }, () => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'components/demo-chart.js': chart("scale: { label: 'Scale', type: 'number', default: 1 }") }, () => lines.at(-1) === '1 error', `bake dev printed ${JSON.stringify(lines)}`);
+    assert.match(lines.at(-2), /^content\/posts\/rope\/index\.md:7:\d+ .*size/);
   });
 
   test('keeps every page while bake.config.js has problems and uses the fixed configuration', async (t) => {
     const { dir, lines, text } = await serve(t, { 'content/posts/rope/index.md': article() });
-    await saveUntil(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => /Rope again · Test Blog/.test(await text('/2026-10/rope/')), 'the new title was not served');
-    await saveUntil(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com' };\n" }, () => lines.includes('bake.config.js:1:16 config is missing "language"'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => /Rope again · Test Blog/.test(await text('/2026-10/rope/')), 'the new title was not served');
+    await save(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com' };\n" }, () => lines.includes('bake.config.js:1:16 config is missing "language"'), `bake dev printed ${JSON.stringify(lines)}`);
     assert.match(await text('/2026-10/rope/'), /Rope again · Test Blog/);
-    await saveUntil(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com', language: 'en' };\n" }, async () => /Rope again · Renamed/.test(await text('/2026-10/rope/')), 'the fixed configuration was not used');
+    await save(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com', language: 'en' };\n" }, async () => /Rope again · Renamed/.test(await text('/2026-10/rope/')), 'the fixed configuration was not used');
   });
 });

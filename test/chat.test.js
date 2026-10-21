@@ -111,7 +111,6 @@ describe('AI chat replies', () => {
     const html = replyHtml('| a | b |\n| - | - |\n| $|x|$ | $\\{x \\mid x > 0\\}$ |\n', { root });
     assert.match(html, /<td><span class="bk-chat-math" data-tex="\|x\|">\|x\|<\/span><\/td>/);
     assert.match(html, /data-tex="\\\{x \\mid x > 0\\\}"/);
-    assert.doesNotMatch(html, /\uE000/);
   });
 
   test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', () => {

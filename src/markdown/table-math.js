@@ -2,48 +2,31 @@ const PIPE = '|';
 const BACKSLASH = '\\';
 const BACKTICK = '`';
 const DOLLAR = '$';
-const PRIVATE_USE_START = 0xe000;
-const PRIVATE_USE_END = 0xf8ff;
+// why: a lone surrogate never occurs in text decoded from UTF-8, so it stands for a | inside $…$ that the table parser must not read as a cell border
+const SENTINEL = '\uDFFF';
 
 export function parseWithPipesInMath(processor, source) {
-  const pipes = protectPipesInMath(source);
-  return { tree: restorePipesInMath(processor.parse(pipes.text), pipes.sentinel), unreadLine: pipes.unreadLine };
-}
-
-function protectPipesInMath(source) {
   const lines = source.split('\n');
   const pipes = lines.map((line) => (line.includes(PIPE) && line.includes(DOLLAR) ? pipesInMath([...line]) : []));
-  const first = pipes.findIndex((indexes) => indexes.length > 0);
-  if (first === -1) return { text: source, sentinel: null };
-  const sentinel = unusedPrivateUseCharacter(source);
-  if (sentinel === null) return { text: source, sentinel: null, unreadLine: first + 1 };
+  if (pipes.every((indexes) => indexes.length === 0)) return processor.parse(source);
   const text = lines
     .map((line, index) => {
       const characters = [...line];
-      for (const pipe of pipes[index]) characters[pipe] = sentinel;
+      for (const pipe of pipes[index]) characters[pipe] = SENTINEL;
       return characters.join('');
     })
     .join('\n');
-  return { text, sentinel };
+  return restorePipes(processor.parse(text));
 }
 
-function restorePipesInMath(value, sentinel) {
-  if (sentinel === null) return value;
-  if (typeof value === 'string') return value.replaceAll(sentinel, PIPE);
-  if (Array.isArray(value)) return value.map((item) => restorePipesInMath(item, sentinel));
+function restorePipes(value) {
+  if (typeof value === 'string') return value.replaceAll(SENTINEL, PIPE);
+  if (Array.isArray(value)) return value.map(restorePipes);
   if (value === null || typeof value !== 'object') return value;
   for (const key of Object.keys(value)) {
-    if (key !== 'position') value[key] = restorePipesInMath(value[key], sentinel);
+    if (key !== 'position') value[key] = restorePipes(value[key]);
   }
   return value;
-}
-
-function unusedPrivateUseCharacter(source) {
-  for (let code = PRIVATE_USE_START; code <= PRIVATE_USE_END; code++) {
-    const character = String.fromCharCode(code);
-    if (!source.includes(character)) return character;
-  }
-  return null;
 }
 
 function pipesInMath(characters) {
