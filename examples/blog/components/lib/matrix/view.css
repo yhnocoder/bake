@@ -1,9 +1,9 @@
 .matrix-sketch{display:block;width:100%;height:auto;overflow:visible}
-.matrix-display{display:block;text-align:center;margin:.3em 0 .5em;overflow-x:auto;overflow-y:hidden;max-width:100%}
-.matrix-display>svg{max-width:none}
 .matrix-root{height:100%;content-visibility:auto;contain-intrinsic-block-size:auto var(--component-placeholder-height)}
 .matrix-figure{height:100%;contain:content;content-visibility:auto;contain-intrinsic-block-size:auto var(--component-placeholder-height);font-family:var(--font-ui);color:var(--ink);font-size:14px;line-height:1.6}
-.matrix-figure svg text{font-family:var(--font-mono);font-size:11px;fill:var(--ink-3)}
+.matrix-figure svg text:not(.bk-kit-svg-math-text *, .bk-kit-tick){font-family:var(--font-mono);font-size:11px;fill:var(--ink-3)}
+.matrix-label{font-family:var(--font-ui)}
+.matrix-backdrop path{stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;paint-order:stroke;vector-effect:non-scaling-stroke}
 .matrix-figure .bk-kit-controls{margin:0 0 10px}
 .matrix-actions{display:inline-flex;flex-wrap:wrap;gap:8px}
 .matrix-dx-slider{display:contents;--accent:var(--series-2)}
@@ -15,7 +15,5 @@
 .matrix-gradient{container-type:inline-size}
 .matrix-gradient-stage{display:grid;grid-template-columns:minmax(0,348px) minmax(0,1fr);gap:10px 18px;align-items:start}
 @container (max-width:640px){.matrix-gradient-stage{grid-template-columns:minmax(0,1fr)}.matrix-gradient-slices{max-width:400px;width:100%;justify-self:center}.matrix-gradient-field{max-width:400px;width:100%;justify-self:center}}
-.matrix-tex{opacity:0;transition:opacity .15s var(--ease)}
-.matrix-tex.matrix-tex-ready{opacity:1}
 .matrix-fade{transition:opacity .15s var(--ease)}
-@media (prefers-reduced-motion:reduce){.matrix-tex,.matrix-fade{transition:none}}
+@media (prefers-reduced-motion:reduce){.matrix-fade{transition:none}}

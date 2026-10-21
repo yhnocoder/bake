@@ -1,5 +1,3 @@
-import { labelInSvg, texInSvg } from './tex.js'
-
 let sketchCount = 0
 
 const escapeText = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -47,28 +45,23 @@ export class Sketch {
     return `url(#${id})`
   }
 
-  tex(tex, size, x, y, align, color) {
-    this.labels.push(texInSvg(tex, size, x, y, align, color).then((math) => math.markup))
+  tex(tex, size, x, y, align = 'middle', color = '') {
+    this.labels.push({ tex, size, x, y, align, color })
   }
 
-  texOnBackground(tex, size, x, y, align, color) {
-    this.labels.push(
-      texInSvg(tex, size, x, y, align, color).then(
-        (math) =>
-          `<rect${attributes({ x: math.left - 2, y: math.top - 1, width: math.width + 4, height: math.height + 2, fill: 'var(--surface)' })}/>${math.markup}`,
-      ),
-    )
+  texOnBackground(tex, size, x, y, align = 'middle', color = '') {
+    this.labels.push({ tex, size, x, y, align, color, backdrop: true })
   }
 
   label(text, size, x, y, align = 'middle', color = '') {
-    this.labels.push(labelInSvg(text, size, x, y, align, color).then((label) => label.markup))
+    this.labels.push({ text, size, x, y, align, color })
   }
 
   drawing(viewBox) {
     return {
       viewBox,
       shapes: `<defs>${this.definitions.join('')}</defs>${this.background.join('')}${this.shapes.join('')}`,
-      labels: Promise.all(this.labels).then((parts) => parts.join('')),
+      labels: this.labels,
     }
   }
 }

@@ -1,6 +1,5 @@
 import { For, createSignal } from 'solid-js'
-import { Button, Controls, Segmented, Slider, Tex, createTween } from 'bake/kit'
-import { MathText, SvgTex } from './lib/matrix/view.jsx'
+import { Button, Controls, MathText, Segmented, Slider, SvgTex, Tex, createTween } from 'bake/kit'
 
 export const params = {
   t: { label: 'query 的位置 t', type: 'number', min: 0, max: 20, step: 1, default: 3 },
@@ -115,13 +114,13 @@ export default function RopeRotationPlot(props) {
             {vector(qr(), 'series-1', true)}
             {vector(kr(), 'series-2', true)}
             <g class="matrix-fade" style={{ opacity: moved(t() * theta()) ? 1 : 0 }}>
-              <SvgTex tex="\mathbf{q}" size={15} x={labelAt(Q)[0]} y={labelAt(Q)[1] + 5} color="var(--series-1)" />
+              <SvgTex tex="\mathbf{q}" x={labelAt(Q)[0]} y={labelAt(Q)[1] + 5} anchor="middle" baseline="baseline" style={{ 'font-size': '15px', color: 'var(--series-1)' }} />
             </g>
             <g class="matrix-fade" style={{ opacity: moved(s() * theta()) ? 1 : 0 }}>
-              <SvgTex tex="\mathbf{k}" size={15} x={labelAt(K)[0]} y={labelAt(K)[1] + 5} color="var(--series-2)" />
+              <SvgTex tex="\mathbf{k}" x={labelAt(K)[0]} y={labelAt(K)[1] + 5} anchor="middle" baseline="baseline" style={{ 'font-size': '15px', color: 'var(--series-2)' }} />
             </g>
-            <SvgTex tex="\mathbf{q}R_t" size={15} x={labelAt(qr())[0]} y={labelAt(qr())[1] + 5} color="var(--series-1)" />
-            <SvgTex tex="\mathbf{k}R_s" size={15} x={labelAt(kr())[0]} y={labelAt(kr())[1] + 5} color="var(--series-2)" />
+            <SvgTex tex="\mathbf{q}R_t" x={labelAt(qr())[0]} y={labelAt(qr())[1] + 5} anchor="middle" baseline="baseline" style={{ 'font-size': '15px', color: 'var(--series-1)' }} />
+            <SvgTex tex="\mathbf{k}R_s" x={labelAt(kr())[0]} y={labelAt(kr())[1] + 5} anchor="middle" baseline="baseline" style={{ 'font-size': '15px', color: 'var(--series-2)' }} />
           </svg>
         </div>
         <div class="matrix-readout" style="grid-template-columns:auto auto;gap:6px 16px;justify-content:start">

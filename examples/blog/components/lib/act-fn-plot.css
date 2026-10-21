@@ -1,35 +1,133 @@
-.act-plot {
-  display: flex;
-  flex-direction: column;
+.act-fn-plot {
   font-family: var(--font-ui);
   color: var(--ink);
   -webkit-user-select: none;
   user-select: none;
 }
 
-.act-plot-head {
+.act-fn-legend {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.act-fn-legend-item {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px 24px;
-  margin-bottom: 6px;
+  gap: 7px;
+  height: 24px;
 }
 
-.act-plot-panels {
+.act-fn-faint .bk-kit-swatch {
+  opacity: 0.55;
+}
+
+.act-fn-series-toggle {
+  display: contents;
+}
+
+.act-fn-plot .bk-kit-controls {
+  margin: 0 0 12px;
+}
+
+.act-fn-panels {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   align-content: start;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
 }
 
-.act-plot-panel-title {
+.act-fn-panels.act-fn-single {
+  grid-template-columns: 1fr;
+}
+
+.act-fn-panel {
+  min-width: 0;
+}
+
+.act-fn-panel-title {
   display: flex;
   align-items: flex-end;
-  height: 24px;
-  padding-bottom: 2px;
-  padding-left: 34px;
-  box-sizing: border-box;
+  height: 30px;
   font-size: 13px;
+  color: var(--ink-2);
+}
+
+.act-fn-label {
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.act-fn-label text,
+.act-fn-label path,
+.act-fn-label rect {
+  vector-effect: non-scaling-stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+.act-fn-mark:focus {
+  outline: none;
+}
+
+.act-fn-mark:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.act-fn-mark:not(.act-fn-shown) {
+  pointer-events: none;
+}
+
+.act-fn-fade {
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease);
+}
+
+.act-fn-fade.act-fn-shown {
+  opacity: 1;
+}
+
+.act-fn-band {
+  pointer-events: none;
+}
+
+.act-fn-band.act-fn-shown {
+  opacity: 0.09;
+}
+
+.act-fn-note-layer {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.act-fn-note {
+  display: inline-block;
+  padding: 5px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease);
+}
+
+.act-fn-note.act-fn-shown {
+  opacity: 1;
+}
+
+.act-fn-status {
+  margin: 8px 0 0;
+  font-size: 12px;
   color: var(--ink-2);
 }

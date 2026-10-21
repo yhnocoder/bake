@@ -1,0 +1,12 @@
+.glu-diagram {
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+.glu-diagram-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.glu-diagram-label {
+  font-weight: 500;
+}

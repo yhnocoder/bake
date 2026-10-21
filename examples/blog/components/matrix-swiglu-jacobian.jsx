@@ -1,8 +1,7 @@
-import { For, createSignal, onCleanup } from 'solid-js'
-import { Button } from 'bake/kit'
+import { For, Show, createSignal } from 'solid-js'
+import { Button, MathText, SvgTex, Tex } from 'bake/kit'
 import { Sketch } from './lib/matrix/sketch.js'
-import { mathHtml } from './lib/matrix/tex.js'
-import { MathText, SketchLayer, SvgTex, fadeIn } from './lib/matrix/view.jsx'
+import { SketchLayer, fadeIn } from './lib/matrix/view.jsx'
 import './lib/matrix/steps.css'
 
 export const params = {
@@ -51,14 +50,14 @@ const DIAG_B = '\\underbrace{\\mathrm{diag}(\\mathbf{b})}_{d_{ff} \\times d_{ff}
 const DIAG_SWISH_PRIME = "\\underbrace{\\mathrm{diag}\\big(\\mathrm{Swish}'(\\mathbf{a})\\big)}_{d_{ff} \\times d_{ff}}"
 const DIAG_SWISH = '\\underbrace{\\mathrm{diag}\\big(\\mathrm{Swish}(\\mathbf{a})\\big)}_{d_{ff} \\times d_{ff}}'
 const TEXTS = [
-  '<p><span class="t">前向计算。</span>从 $\\mathbf{x}$ 出发，经过 gate 和 up 两条路径算出 $\\mathbf{u}$，再算出 $\\mathbf{h}$。点击「下一步」，从 $\\mathbf{h}$ 开始反向走回 $\\mathbf{x}$，依次求出 $\\mathbf{h}$ 对沿途各个向量的 Jacobian。</p>',
-  `<p><span class="t">从 $\\mathbf{h}$ 回到 $\\mathbf{u}$。</span>第一个因子是 $\\mathbf{u} \\to \\mathbf{h}$ 这次矩阵乘法的 Jacobian：</p>$$\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{u}} = ${DOWN}$$`,
-  `<p><span class="t">gate 路径：回到 $\\mathrm{Swish}(\\mathbf{a})$。</span>在右边乘上逐元素乘对 $\\mathrm{Swish}(\\mathbf{a})$ 的 Jacobian $\\mathrm{diag}(\\mathbf{b})$，结果 $\\frac{\\partial \\mathbf{h}}{\\partial\\,\\mathrm{Swish}(\\mathbf{a})} \\in \\mathbb{R}^{d \\times d_{ff}}$：</p>$$\\frac{\\partial \\mathbf{h}}{\\partial\\,\\mathrm{Swish}(\\mathbf{a})} = ${DOWN}\\,${DIAG_B}$$`,
-  `<p><span class="t">gate 路径：回到 $\\mathbf{a}$。</span>在右边乘上 Swish 的 Jacobian，结果仍是 $d \\times d_{ff}$：</p>$$\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{a}} = ${DOWN}\\,${DIAG_B}\\,${DIAG_SWISH_PRIME}$$`,
-  `<p><span class="t">gate 路径：回到 $\\mathbf{x}$。</span>在右边乘上 $W_{gate}^{T}$，得到经过 gate 路径的乘积，结果是 $d \\times d$：</p>$$${DOWN}\\,${DIAG_B}\\,${DIAG_SWISH_PRIME}\\,\\underbrace{W_{gate}^{T}}_{d_{ff} \\times d}$$`,
-  `<p><span class="t">up 路径：回到 $\\mathbf{b}$。</span>up 路径从 $\\mathbf{h}$ 到 $\\mathbf{u}$ 的一段与 gate 路径相同，乘积同样从 $W_{down}^{T}$ 开始，再乘上逐元素乘对 $\\mathbf{b}$ 的 Jacobian，结果是 $d \\times d_{ff}$：</p>$$\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{b}} = ${DOWN}\\,${DIAG_SWISH}$$`,
-  `<p><span class="t">up 路径：回到 $\\mathbf{x}$。</span>在右边乘上 $W_{up}^{T}$，得到经过 up 路径的乘积，结果是 $d \\times d$：</p>$$${DOWN}\\,${DIAG_SWISH}\\,\\underbrace{W_{up}^{T}}_{d_{ff} \\times d}$$`,
-  '<p><span class="t">两条路径相加。</span>$\\mathbf{x}$ 同时经过两条路径影响 $\\mathbf{h}$，按全导数链式法则，把两条路径的乘积相加，得到整个 FFN 的 Jacobian：</p>$$\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{x}} = \\underbrace{W_{down}^{T}\\,\\mathrm{diag}(\\mathbf{b})\\,\\mathrm{diag}\\big(\\mathrm{Swish}\'(\\mathbf{a})\\big)\\,W_{gate}^{T}}_{\\text{gate}} + \\underbrace{W_{down}^{T}\\,\\mathrm{diag}\\big(\\mathrm{Swish}(\\mathbf{a})\\big)\\,W_{up}^{T}}_{\\text{up}}$$',
+  { title: '前向计算。', text: '从 $\\mathbf{x}$ 出发，经过 gate 和 up 两条路径算出 $\\mathbf{u}$，再算出 $\\mathbf{h}$。点击「下一步」，从 $\\mathbf{h}$ 开始反向走回 $\\mathbf{x}$，依次求出 $\\mathbf{h}$ 对沿途各个向量的 Jacobian。' },
+  { title: `从 $\\mathbf{h}$ 回到 $\\mathbf{u}$。`, text: `第一个因子是 $\\mathbf{u} \\to \\mathbf{h}$ 这次矩阵乘法的 Jacobian：`, formula: `\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{u}} = ${DOWN}` },
+  { title: `gate 路径：回到 $\\mathrm{Swish}(\\mathbf{a})$。`, text: `在右边乘上逐元素乘对 $\\mathrm{Swish}(\\mathbf{a})$ 的 Jacobian $\\mathrm{diag}(\\mathbf{b})$，结果 $\\frac{\\partial \\mathbf{h}}{\\partial\\,\\mathrm{Swish}(\\mathbf{a})} \\in \\mathbb{R}^{d \\times d_{ff}}$：`, formula: `\\frac{\\partial \\mathbf{h}}{\\partial\\,\\mathrm{Swish}(\\mathbf{a})} = ${DOWN}\\,${DIAG_B}` },
+  { title: `gate 路径：回到 $\\mathbf{a}$。`, text: `在右边乘上 Swish 的 Jacobian，结果仍是 $d \\times d_{ff}$：`, formula: `\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{a}} = ${DOWN}\\,${DIAG_B}\\,${DIAG_SWISH_PRIME}` },
+  { title: `gate 路径：回到 $\\mathbf{x}$。`, text: `在右边乘上 $W_{gate}^{T}$，得到经过 gate 路径的乘积，结果是 $d \\times d$：`, formula: `${DOWN}\\,${DIAG_B}\\,${DIAG_SWISH_PRIME}\\,\\underbrace{W_{gate}^{T}}_{d_{ff} \\times d}` },
+  { title: `up 路径：回到 $\\mathbf{b}$。`, text: `up 路径从 $\\mathbf{h}$ 到 $\\mathbf{u}$ 的一段与 gate 路径相同，乘积同样从 $W_{down}^{T}$ 开始，再乘上逐元素乘对 $\\mathbf{b}$ 的 Jacobian，结果是 $d \\times d_{ff}$：`, formula: `\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{b}} = ${DOWN}\\,${DIAG_SWISH}` },
+  { title: `up 路径：回到 $\\mathbf{x}$。`, text: `在右边乘上 $W_{up}^{T}$，得到经过 up 路径的乘积，结果是 $d \\times d$：`, formula: `${DOWN}\\,${DIAG_SWISH}\\,\\underbrace{W_{up}^{T}}_{d_{ff} \\times d}` },
+  { title: '两条路径相加。', text: '$\\mathbf{x}$ 同时经过两条路径影响 $\\mathbf{h}$，按全导数链式法则，把两条路径的乘积相加，得到整个 FFN 的 Jacobian：', formula: '\\frac{\\partial \\mathbf{h}}{\\partial \\mathbf{x}} = \\underbrace{W_{down}^{T}\\,\\mathrm{diag}(\\mathbf{b})\\,\\mathrm{diag}\\big(\\mathrm{Swish}\'(\\mathbf{a})\\big)\\,W_{gate}^{T}}_{\\text{gate}} + \\underbrace{W_{down}^{T}\\,\\mathrm{diag}\\big(\\mathrm{Swish}(\\mathbf{a})\\big)\\,W_{up}^{T}}_{\\text{up}}' },
 ]
 
 function drawForward() {
@@ -106,18 +105,10 @@ export default function SwigluJacobianSteps(props) {
   const path = () => STEPS[index()].path
   const current = () => (STEPS[index()].last ? null : path()[path().length - 1])
   const opacity = (key) => (path().includes(key) ? 1 : seen().has(key) ? 0.3 : 0)
-  let prepare = 0
-  const prepareNeighbours = () => {
-    clearTimeout(prepare)
-    prepare = setTimeout(() => [index() + 1, index() - 1].filter((i) => TEXTS[i]).forEach((i) => mathHtml(TEXTS[i])), 200)
-  }
-  onCleanup(() => clearTimeout(prepare))
   const go = (step) => {
     setIndex(step)
     fadeIn(text)
-    prepareNeighbours()
   }
-  prepareNeighbours()
 
   return (
     <div class="matrix-figure matrix-steps">
@@ -162,7 +153,7 @@ export default function SwigluJacobianSteps(props) {
                   marker-end={`url(#${id}-${arrow.kind})`}
                   style={{ opacity: arrow.key === current() ? 1 : 0 }}
                 />
-                <SvgTex tex={arrow.tex} size={13} x={arrow.x} y={arrow.y} color={COLORS[arrow.kind]} />
+                <SvgTex tex={arrow.tex} x={arrow.x} y={arrow.y} anchor="middle" baseline="baseline" style={{ 'font-size': '13px', color: COLORS[arrow.kind] }} />
               </g>
             )}
           </For>
@@ -186,7 +177,13 @@ export default function SwigluJacobianSteps(props) {
           <SketchLayer drawing={nodes} />
         </svg>
       </div>
-      <MathText ref={text} class="matrix-steps-text" text={TEXTS[index()]} />
+      <div ref={text} class="matrix-steps-text">
+        <p>
+          <MathText class="t" text={TEXTS[index()].title} />
+          <MathText text={TEXTS[index()].text} />
+        </p>
+        <Show when={TEXTS[index()].formula}>{(formula) => <Tex tex={formula()} display />}</Show>
+      </div>
     </div>
   )
 }

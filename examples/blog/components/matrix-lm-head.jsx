@@ -34,7 +34,7 @@ const CX = 150
 const BW = 230
 const SIDE_LENGTH = 30
 const SIDE_LABEL_WIDTH = 69.33
-const BRACE_LABEL_WIDTH = 67.69
+const BRACE_LABEL_WIDTH = 80
 
 function draw(from, to, brace) {
   const sketch = new Sketch()

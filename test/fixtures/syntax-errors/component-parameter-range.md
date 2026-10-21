@@ -5,5 +5,5 @@ date: 2026-10-19
 category: writing
 ---
 
-:::act-fn-plot{range=20}
+:::act-fn-plot{xmax=200}
 :::

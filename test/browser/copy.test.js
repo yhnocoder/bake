@@ -98,7 +98,7 @@ test('copying from an article gives the Markdown source of the selection', async
   await t.test('a selection inside the caption of a component gives its block and keeps the figure in the HTML', async () => {
     await select(page, { selector: `${copyChapter} figcaption`, text: '任何部分' }, { selector: `${copyChapter} figcaption`, text: '整个', after: true });
     const caption = await copied(page);
-    assert.equal(caption.text, sourceLines(':::act-fn-plot{fn=silu range=6}', ':::'));
+    assert.equal(caption.text, sourceLines(':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}', ':::'));
     assert.match(caption.html, /^<figure><figcaption>任何部分，复制的都是它的整个<\/figcaption><\/figure>$/);
   });
 
@@ -148,7 +148,7 @@ test('copying from an article gives the Markdown source of the selection', async
     await select(page, { selector: '#headings ~ .bk-block .example-source', text: '三级标题' }, { selector: '#headings ~ .bk-block .example-result h3', text: '三级标题', after: true });
     assert.equal((await copied(page)).text, '### 三级标题 {#third-level toc="短标题"}');
     await select(page, { selector: '#components ~ .bk-block .example-source', text: 'width=body}' }, { selector: '#components ~ .bk-block .example-result figure[data-attributes*="body"]', after: true });
-    assert.equal((await copied(page)).text, ':::act-fn-plot{fn=silu range=6 beta=2 width=body}\n:::');
+    assert.equal((await copied(page)).text, ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}\n:::');
   });
 
   await t.test('a selection of only the title of a fold gives the title', async () => {

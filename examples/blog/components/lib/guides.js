@@ -1,5 +1,5 @@
 import { formatNumber } from 'bake/kit'
-import { fn, swish, normalPdf, SWISH_MIN_AT_BETA_1, GELU_MIN_X } from './functions.js'
+import { fn, swish, normalPdf, SWISH_MIN_AT_BETA_1, GELU_MIN_X } from './activations.js'
 
 const LN9 = Math.log(9)
 const band = (a, b, label, extra = {}) => ({ a, b, label, ...extra })
@@ -212,20 +212,4 @@ export function guidesFor(preset, derivative, { series, beta, range }) {
     references: (raw.references ?? []).map((r) => ({ ...r, color: resolve(r.color) })),
     points: (raw.points ?? []).map((p) => ({ ...p, color: resolve(p.color) })),
   }
-}
-
-const CURVE_KINDS = ['relu', 'relu2', 'sigmoid', 'tanh', 'normal', 'silu', 'swish', 'gelu', 'softplus']
-const PRESET_RANGE = [-4, 4]
-
-const labelsOf = (guides) => [
-  guides.left,
-  guides.right,
-  ...[...(guides.bands ?? []), ...(guides.references ?? []), ...(guides.verticals ?? []), ...(guides.points ?? [])].map((item) => item.label ?? ''),
-]
-
-export function guideLabelSources() {
-  return [false, true].flatMap((derivative) => [
-    ...Object.values(presets).flatMap((preset) => labelsOf(preset(derivative))),
-    ...CURVE_KINDS.flatMap((kind) => labelsOf(curveGuides(kind, derivative, { beta: 1, range: PRESET_RANGE }))),
-  ])
 }

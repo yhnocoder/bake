@@ -1,5 +1,6 @@
 import { batch, createContext, createMemo, createSignal, createUniqueId, For, Index, onCleanup, Show, useContext } from 'solid-js';
 import { Swatch } from './legend.jsx';
+import { MathText } from './tex.jsx';
 import { formatNumber, linearScale, niceTicks, samplePath } from './numbers.js';
 import { createElementSize } from './size.js';
 import './plot.css';
@@ -187,7 +188,7 @@ export function Crosshair(props) {
                   <div class="bk-kit-readout-row">
                     <span>
                       <Swatch color={item().color} dashed={item().dashed} />
-                      {item().label}
+                      <MathText text={item().label} />
                     </span>
                     <span class="bk-kit-readout-number">{Number.isFinite(value()) ? formatNumber(value(), props.yDigits ?? 3) : '—'}</span>
                   </div>

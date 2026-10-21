@@ -1,6 +1,6 @@
-import { Show, createSignal } from 'solid-js'
-import { Controls, Slider, Tex, formatNumber } from 'bake/kit'
-import { MathText, fadeIn } from './lib/matrix/view.jsx'
+import { Match, Switch, createSignal } from 'solid-js'
+import { Controls, MathText, Slider, Tex, formatNumber } from 'bake/kit'
+import { fadeIn } from './lib/matrix/view.jsx'
 import { Matrix } from './lib/matrix/matrix.jsx'
 
 export const params = {
@@ -18,15 +18,52 @@ const COLUMNS = [1, 2, 3]
 const outputs = (x) => [0, 1, 2].map((j) => x[0] * W[0][j] + x[1] * W[1][j])
 const fixed2 = (v) => formatNumber(v, 2)
 const fixed3 = (v) => formatNumber(v, 3)
-const inputName = (i) => `<span style="color:var(--series-3)">$x_{${i}}$</span>`
-const outputName = (j) => `<span style="color:var(--series-5)">$z_{${j}}$</span>`
-const outputFormula = (j) =>
-  `${outputName(j)} $= ${W[0][j - 1]}\\,x_1 ${W[1][j - 1] < 0 ? '-' : '+'} ${Math.abs(W[1][j - 1])}\\,x_2$`
+const InputName = (props) => <MathText style="color:var(--series-3)" text={`$x_{${props.i}}$`} />
+const OutputName = (props) => <MathText style="color:var(--series-5)" text={`$z_{${props.j}}$`} />
+const OutputFormula = (props) => (
+  <>
+    <OutputName j={props.j} /> <MathText text={`$= ${W[0][props.j - 1]}\\,x_1 ${W[1][props.j - 1] < 0 ? '-' : '+'} ${Math.abs(W[1][props.j - 1])}\\,x_2$`} />
+  </>
+)
+
+function Message(props) {
+  const say = () => props.say
+  const i = () => say().i
+  const j = () => say().j
+  return (
+    <Switch fallback={<MathText text="移动滑块改变 $\mathbf{x}$，指针停在任意一格上显示该格的含义。" />}>
+      <Match when={say().kind === 'move'}>
+        <InputName i={say().index} /> 变化 <b>{say().dx}</b>，三个输出分别变化 <b>{say().changes}</b>，比值 <b>{say().ratios}</b>，即 <MathText text="$J$" /> 的第 {say().index} 列，也就是{' '}
+        <MathText text="$W$" /> 的第 {say().index} 行。
+      </Match>
+      <Match when={say().kind === 'x'}>
+        <InputName i={i()} /> 变化时三个输出的变化率：<OutputFormula j={1} />，<OutputFormula j={2} />，<OutputFormula j={3} />，其中 <MathText text={`$x_{${i()}}$`} /> 的系数依次是{' '}
+        <b>{W[i() - 1].join('　')}</b>，即 <MathText text="$J$" /> 的第 {i()} 列，也就是 <MathText text="$W$" /> 的第 {i()} 行。这三个数不含 <MathText text="$\mathbf{x}$" />，所以不随滑块变。
+      </Match>
+      <Match when={say().kind === 'w'}>
+        <MathText text={`$W_{${i()}${j()}}$`} /> 是 <OutputFormula j={j()} /> 中 <InputName i={i()} /> 的系数，所以{' '}
+        <MathText text={`$\\partial z_{${j()}} / \\partial x_{${i()}} = W_{${i()}${j()}}$`} /> = <b>{W[i() - 1][j() - 1]}</b>，它位于 <MathText text="$J$" /> 的第 {j()} 行第 {i()} 列。
+      </Match>
+      <Match when={say().kind === 'z'}>
+        <OutputFormula j={j()} /> = {W[0][j() - 1]} × ({fixed2(props.x[0])}) {W[1][j() - 1] < 0 ? '−' : '+'} {Math.abs(W[1][j() - 1])} × ({fixed2(props.x[1])}) ={' '}
+        <b>{fixed3(outputs(props.x)[j() - 1])}</b>。它对 <MathText text="$x_1$" />、<MathText text="$x_2$" /> 的偏导数是 <MathText text="$W$" /> 的第 {j()} 列{' '}
+        <b>
+          {W[0][j() - 1]}　{W[1][j() - 1]}
+        </b>
+        ，也就是 <MathText text={`$z_{${j()}}$`} /> 的梯度，即 <MathText text="$J$" /> 的第 {j()} 行。
+      </Match>
+      <Match when={say().kind === 'j'}>
+        <MathText text={`$\\partial z_{${j()}} / \\partial x_{${i()}} = W_{${i()}${j()}}$`} /> = <b>{W[i() - 1][j() - 1]}</b>：<InputName i={i()} /> 变化时 <OutputName j={j()} /> 的变化率是{' '}
+        {W[i() - 1][j() - 1]}。
+      </Match>
+    </Switch>
+  )
+}
 
 export default function LinearJacobianCells(props) {
   const [x, setX] = createSignal([props.x1, props.x2])
   const [lit, setLit] = createSignal(new Set())
-  const [say, setSay] = createSignal('移动滑块改变 $\\mathbf{x}$，指针停在任意一格上显示该格的含义。')
+  const [say, setSay] = createSignal({ kind: null })
   let say$
   let previous = x()
   let previousZ = outputs(x())
@@ -39,7 +76,7 @@ export default function LinearJacobianCells(props) {
     if (Math.abs(dx) > 1e-9) {
       const changes = z.map((v, j) => fixed3(v - previousZ[j])).join('　')
       const ratios = z.map((v, j) => fixed2((v - previousZ[j]) / dx)).join('　')
-      setSay({ index: index + 1, dx: fixed2(dx), changes, ratios })
+      setSay({ kind: 'move', index: index + 1, dx: fixed2(dx), changes, ratios })
     }
     previous = next
     previousZ = z
@@ -52,30 +89,17 @@ export default function LinearJacobianCells(props) {
       const i = cell.i
       COLUMNS.forEach((j) => light(`w${i}${j}`, `z${j}`))
       light(`j${i}1`, `j${i}2`, `j${i}3`)
-      setSay(
-        `${inputName(i)} 变化时三个输出的变化率：${outputFormula(1)}，${outputFormula(2)}，${outputFormula(3)}，其中 $x_{${i}}$ 的系数依次是 <b>${W[i - 1].join('　')}</b>，即 $J$ 的第 ${i} 列，也就是 $W$ 的第 ${i} 行。这三个数不含 $\\mathbf{x}$，所以不随滑块变。`,
-      )
     } else if (cell.kind === 'w') {
       const { i, j } = cell
       light(`x${i}`, `z${j}`, `j${i}${j}`)
-      setSay(
-        `$W_{${i}${j}}$ 是 ${outputFormula(j)} 中 ${inputName(i)} 的系数，所以 $\\partial z_{${j}} / \\partial x_{${i}} = W_{${i}${j}}$ = <b>${W[i - 1][j - 1]}</b>，它位于 $J$ 的第 ${j} 行第 ${i} 列。`,
-      )
     } else if (cell.kind === 'z') {
       const j = cell.j
-      const z = outputs(x())
       ROWS.forEach((i) => light(`w${i}${j}`, `x${i}`, `j${i}${j}`))
-      setSay(
-        `${outputFormula(j)} = ${W[0][j - 1]} × (${fixed2(x()[0])}) ${W[1][j - 1] < 0 ? '−' : '+'} ${Math.abs(W[1][j - 1])} × (${fixed2(x()[1])}) = <b>${fixed3(z[j - 1])}</b>。` +
-          `它对 $x_1$、$x_2$ 的偏导数是 $W$ 的第 ${j} 列 <b>${W[0][j - 1]}　${W[1][j - 1]}</b>，也就是 $z_{${j}}$ 的梯度，即 $J$ 的第 ${j} 行。`,
-      )
     } else {
       const { i, j } = cell
       light(`w${i}${j}`, `x${i}`, `z${j}`)
-      setSay(
-        `$\\partial z_{${j}} / \\partial x_{${i}} = W_{${i}${j}}$ = <b>${W[i - 1][j - 1]}</b>：${inputName(i)} 变化时 ${outputName(j)} 的变化率是 ${W[i - 1][j - 1]}。`,
-      )
     }
+    setSay(cell)
     setLit(keys)
     fadeIn(say$)
   }
@@ -114,14 +138,9 @@ export default function LinearJacobianCells(props) {
         <MathText class="matrix-name" text="$J = \dfrac{\partial \mathbf{z}}{\partial \mathbf{x}}$ =" />
         {matrix(jacobianCells, 2, 'compact')}
       </div>
-      <Show when={typeof say() === 'object' && say()} fallback={<MathText ref={say$} class="matrix-say" text={say()} />}>
-        {(moved) => (
-          <span class="matrix-say">
-            <MathText text={inputName(moved().index)} /> 变化 <b>{moved().dx}</b>，三个输出分别变化 <b>{moved().changes}</b>，比值{' '}
-            <b>{moved().ratios}</b>，即 <MathText text="$J$" /> 的第 {moved().index} 列，也就是 <MathText text="$W$" /> 的第 {moved().index} 行。
-          </span>
-        )}
-      </Show>
+      <span ref={say$} class="matrix-say">
+        <Message say={say()} x={x()} />
+      </span>
     </div>
   )
 }

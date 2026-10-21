@@ -383,7 +383,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const dir = copyExample(t);
   const file = join(dir, SYNTAX);
   const original = readFileSync(file, 'utf8');
-  const directive = ':::act-fn-plot{fn=silu range=6 beta=2 width=body}';
+  const directive = ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}';
   const line = lineOf(original, directive);
   const server = await startDevServer(dir, { port: 0, print: () => {} });
   t.after(() => server.close());
@@ -402,7 +402,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const bar = frame.locator('bake-param-bar');
   const control = (param) => bar.locator(`.control[data-param="${param}"]`);
   const message = bar.locator('.message');
-  const liveParams = () => page.evaluate((selector) => ({ ...document.querySelector(selector).querySelector('act-fn-plot').params }), frameSelector);
+  const liveParams = () => page.evaluate((selector) => (({ fns, guides, xmax, beta }) => ({ fns, guides, xmax, beta }))(document.querySelector(selector).querySelector('act-fn-plot').params), frameSelector);
   const open = async () => {
     await page.goto(url);
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
@@ -424,8 +424,20 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.deepEqual(
       await bar.locator('.control').evaluateAll((controls) => controls.map((item) => [item.dataset.param, item.querySelector('.label').textContent, [...item.querySelectorAll('input, select')].map((field) => field.type)])),
       [
-        ['fn', '函数', ['select-one']],
-        ['range', '横轴范围', ['range', 'number']],
+        ['fns', '函数（实线）', ['text']],
+        ['dashed', '函数（虚线）', ['text']],
+        ['reference', '参考函数（淡色虚线）', ['text']],
+        ['colors', '颜色编号', ['text']],
+        ['off', '初始不勾选', ['text']],
+        ['xmin', '横轴下限', ['range', 'number']],
+        ['xmax', '横轴上限', ['range', 'number']],
+        ['ymin', 'f(x) 纵轴下限', ['range', 'number']],
+        ['ymax', 'f(x) 纵轴上限', ['range', 'number']],
+        ['dymin', '导数纵轴下限', ['range', 'number']],
+        ['dymax', '导数纵轴上限', ['range', 'number']],
+        ['guides', '标注', ['select-one']],
+        ['toggle', '勾选曲线', ['checkbox']],
+        ['zoom', '横轴缩放滑块', ['checkbox']],
         ['beta', 'β 初始值', ['range', 'number']],
       ],
     );
@@ -446,15 +458,15 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.mouse.move(box.x + box.width * 0.78, box.y + box.height / 2, { steps: 8 });
     await page.mouse.up();
     beta = Number(await control('beta').locator('.number').inputValue());
-    assert.ok(beta > 2 && beta <= 4, `beta is ${beta}`);
-    assert.equal(String(beta), beta.toFixed(String(beta).includes('.') ? 1 : 0));
+    assert.ok(beta > 2 && beta < 5, `beta is ${beta}`);
+    assert.equal(String(beta), String(Number((Math.round(beta / 0.05) * 0.05).toFixed(2))), 'the value is a step of the slider');
     assert.equal(await control('beta').getAttribute('data-changed'), '');
-    assert.equal(await control('range').getAttribute('data-changed'), null);
-    assert.deepEqual(await liveParams(), { fn: 'silu', range: 6, beta });
+    assert.equal(await control('xmax').getAttribute('data-changed'), null);
+    assert.deepEqual(await liveParams(), { fns: 'swish', guides: 'auto', xmax: 6, beta });
     assert.equal(await bar.locator('.write').isDisabled(), false);
   });
 
-  const otherSelector = `figure.component[data-line="${lineOf(original, ':::act-fn-plot{fn=gelu}')}"]`;
+  const otherSelector = `figure.component[data-line="${lineOf(original, ':::act-fn-plot{fns=gelu dashed="gelu-tanh,gelu-quick" zoom}')}"]`;
   const otherControl = (param) => page.locator(`${otherSelector} bake-param-bar .control[data-param="${param}"]`);
   const watchFrames = () =>
     page.evaluate(() => {
@@ -479,13 +491,13 @@ test('bake dev shows a parameter bar on each component of the article that chang
 
   await t.test('Write to file rewrites the line, and the update keeps every component running without a highlight', async () => {
     await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready', otherSelector);
-    await otherControl('range').locator('.number').fill('7');
+    await otherControl('xmax').locator('.number').fill('7');
     await watchFrames();
     await bar.locator('.write').scrollIntoViewIfNeeded();
     const before = await top();
     await bar.locator('.write').click();
     await message.filter({ hasText: `Wrote line ${line} of ${SYNTAX}` }).waitFor();
-    assert.equal(readFileSync(file, 'utf8'), original.replace(directive, `:::act-fn-plot{fn=silu range=6 beta=${beta} width=body}`));
+    assert.equal(readFileSync(file, 'utf8'), original.replace(directive, `:::act-fn-plot{fns=swish beta=${beta} xmin=-6 xmax=6 ymax=6 width=body}`));
     await copiedSource();
     await settle(page);
     assert.deepEqual(await unmarked(), []);
@@ -495,8 +507,8 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal(await control('beta').getAttribute('data-changed'), null);
     assert.equal(Number(await control('beta').locator('.number').inputValue()), beta);
     assert.equal(await bar.locator('.write').isDisabled(), true);
-    assert.deepEqual(await liveParams(), { fn: 'silu', range: 6, beta });
-    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+    assert.deepEqual(await liveParams(), { fns: 'swish', guides: 'auto', xmax: 6, beta });
+    assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
   });
 
   await t.test('an unrelated save keeps the components running and the unsaved values of the bars', async () => {
@@ -505,31 +517,31 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('第一次改'));
     await settle(page);
     assert.deepEqual(await unmarked(), []);
-    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+    assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
   });
 
   await t.test('a bar that a save replaces keeps its unsaved values and gives them to the restarted component', async () => {
     edit('实线是精确 GELU', '实线是精确的 GELU');
     await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('实线是精确的 GELU'), otherSelector);
-    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 7, otherSelector);
-    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.xmax === 7, otherSelector);
+    assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
   });
 
   await t.test('unsaved values stay after a reload and after a save that adds lines above the component', async () => {
     await open();
-    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 7, otherSelector);
-    assert.deepEqual([await otherControl('range').locator('.number').inputValue(), await otherControl('range').getAttribute('data-changed')], ['7', '']);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.xmax === 7, otherSelector);
+    assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
     const otherLine = Number(otherSelector.match(/\d+/)[0]);
     const moved = `figure.component[data-line="${otherLine + 2}"]`;
     edit('这篇文章列出 Bake 的全部写法', '新加的一段。\n\n这篇文章列出 Bake 的全部写法');
-    await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.range === 7, moved);
-    assert.deepEqual(await page.locator(`${moved} bake-param-bar .control[data-param="range"]`).evaluate((item) => [item.querySelector('.number').value, item.hasAttribute('data-changed')]), ['7', true]);
+    await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.xmax === 7, moved);
+    assert.deepEqual(await page.locator(`${moved} bake-param-bar .control[data-param="xmax"]`).evaluate((item) => [item.querySelector('.number').value, item.hasAttribute('data-changed')]), ['7', true]);
     edit('新加的一段。\n\n', '');
-    await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.range === 7, otherSelector);
+    await page.waitForFunction((selector) => document.querySelector(selector)?.querySelector('act-fn-plot')?.params.xmax === 7, otherSelector);
     await page.locator(`${otherSelector} bake-param-bar .reset`).click();
     await open();
-    assert.equal(await otherControl('range').getAttribute('data-changed'), null);
-    assert.notEqual(await otherControl('range').locator('.number').inputValue(), '7');
+    assert.equal(await otherControl('xmax').getAttribute('data-changed'), null);
+    assert.notEqual(await otherControl('xmax').locator('.number').inputValue(), '7');
   });
 
   await t.test('the bar takes its colours from the theme and follows its dark mode', async () => {
@@ -553,32 +565,32 @@ test('bake dev shows a parameter bar on each component of the article that chang
 
   await t.test('a parameter changed in the editor restarts the component and highlights its block once', async () => {
     await watchFrames();
-    edit(`fn=silu range=6 beta=${beta}`, `fn=silu range=5 beta=${beta}`);
-    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.range === 5, frameSelector);
+    edit(`beta=${beta} xmin=-6 xmax=6`, `beta=${beta} xmin=-6 xmax=5`);
+    await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.xmax === 5, frameSelector);
     const block = await page.evaluate((selector) => document.querySelector(selector).closest('.bk-block').dataset.line, frameSelector);
     assert.deepEqual(await page.evaluate(() => window.highlighted), [block]);
-    assert.deepEqual(await liveParams(), { fn: 'silu', range: 5, beta });
+    assert.deepEqual(await liveParams(), { fns: 'swish', guides: 'auto', xmax: 5, beta });
   });
 
   await t.test('Reset goes back to the values in the Markdown', async () => {
-    await control('fn').locator('select').selectOption('relu');
-    assert.equal(await control('fn').getAttribute('data-changed'), '');
-    assert.equal((await liveParams()).fn, 'relu');
+    await control('guides').locator('select').selectOption('none');
+    assert.equal(await control('guides').getAttribute('data-changed'), '');
+    assert.equal((await liveParams()).guides, 'none');
     await bar.locator('.reset').click();
-    assert.equal(await control('fn').locator('select').inputValue(), 'silu');
-    assert.equal(await control('fn').getAttribute('data-changed'), null);
-    assert.equal((await liveParams()).fn, 'silu');
+    assert.equal(await control('guides').locator('select').inputValue(), 'auto');
+    assert.equal(await control('guides').getAttribute('data-changed'), null);
+    assert.equal((await liveParams()).guides, 'auto');
     assert.equal(await bar.locator('.write').isDisabled(), true);
   });
 
   await t.test('Copy puts the rewritten line on the clipboard and leaves the file unchanged', async () => {
     const before = readFileSync(file, 'utf8');
-    await control('range').locator('.number').fill('8');
-    assert.equal(Number(await control('range').locator('.slider').inputValue()), 8);
-    assert.equal((await liveParams()).range, 8);
+    await control('xmax').locator('.number').fill('8');
+    assert.equal(Number(await control('xmax').locator('.slider').inputValue()), 8);
+    assert.equal((await liveParams()).xmax, 8);
     await bar.locator('.copy').click();
     await message.filter({ hasText: 'Copied' }).waitFor();
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `:::act-fn-plot{fn=silu range=8 beta=${beta} width=body}`);
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `:::act-fn-plot{fns=swish beta=${beta} xmin=-6 xmax=8 ymax=6 width=body}`);
     assert.equal(readFileSync(file, 'utf8'), before);
   });
 
@@ -605,7 +617,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
 
   const refused = `${SYNTAX} changed after this page was built; save it in your editor and try again`;
   const refuseThenWrite = async (range, text, waitForRefresh) => {
-    await control('range').locator('.number').fill(String(range));
+    await control('xmax').locator('.number').fill(String(range));
     let edited = null;
     beforeParams = async (route) => {
       edit('全部写法，', `全部写法，${text}，`);
@@ -619,12 +631,12 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.waitForFunction((expected) => document.querySelector('.bk-article').textContent.includes(expected), text);
     await settle(page);
     assert.deepEqual([await message.isVisible(), await message.textContent()], [true, refused]);
-    assert.deepEqual([await control('range').locator('.number').inputValue(), await control('range').getAttribute('data-changed')], [String(range), '']);
-    assert.equal((await liveParams()).range, range);
+    assert.deepEqual([await control('xmax').locator('.number').inputValue(), await control('xmax').getAttribute('data-changed')], [String(range), '']);
+    assert.equal((await liveParams()).xmax, range);
     assert.equal(readFileSync(file, 'utf8'), edited);
     await bar.locator('.write').click();
     await message.filter({ hasText: `Wrote line ${line}` }).waitFor();
-    assert.match(readFileSync(file, 'utf8'), new RegExp(`\\{fn=silu range=${range} beta`));
+    assert.match(readFileSync(file, 'utf8'), new RegExp(`xmin=-6 xmax=${range} ymax=6 width`));
   };
 
   await t.test('Write refuses when the file changed before the page updated, keeps the message and values, and a second Write succeeds', async () => {
@@ -640,9 +652,9 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.locator(selector).scrollIntoViewIfNeeded();
     await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready' && document.querySelector(selector).querySelector('act-fn-plot')?.params !== undefined, selector);
     return {
-      range: await page.locator(`${selector} bake-param-bar .control[data-param="range"] .number`).inputValue(),
+      xmax: await page.locator(`${selector} bake-param-bar .control[data-param="xmax"] .number`).inputValue(),
       unsaved: !(await page.locator(`${selector} bake-param-bar .write`).isDisabled()),
-      live: await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.range, selector),
+      live: await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.xmax, selector),
     };
   };
 
@@ -658,19 +670,19 @@ test('bake dev shows a parameter bar on each component of the article that chang
       await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
     };
 
-    await control('range').locator('.number').fill('9');
-    assert.equal((await liveParams()).range, 9);
+    await control('xmax').locator('.number').fill('20');
+    assert.equal((await liveParams()).xmax, 20);
     const declaration = join(dir, 'components/act-fn-plot.jsx');
-    await reloaded(() => writeFileSync(declaration, readFileSync(declaration, 'utf8').replace('max: 10, step: 1, default: 4', 'max: 8, step: 1, default: 4')));
-    assert.deepEqual(await shown(frameSelector), { range: '3', unsaved: false, live: 3 });
+    await reloaded(() => writeFileSync(declaration, readFileSync(declaration, 'utf8').replace("xmax: { label: '横轴上限', type: 'number', min: -100, max: 100", "xmax: { label: '横轴上限', type: 'number', min: -100, max: 12")));
+    assert.deepEqual(await shown(frameSelector), { xmax: '3', unsaved: false, live: 3 });
 
-    const directive = ':::act-fn-plot{fn=silu range=6}';
+    const directive = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
     const caption = '选中交互组件的任何部分';
     const block = `${directive}\n${caption}，复制的都是它的整个 \`:::\` 块。\n:::\n`;
     assert.ok(readFileSync(file, 'utf8').includes(block));
     const last = plotAt(directive);
     await shown(last);
-    await page.locator(`${last} bake-param-bar .control[data-param="range"] .number`).fill('7');
+    await page.locator(`${last} bake-param-bar .control[data-param="xmax"] .number`).fill('7');
     assert.equal((await shown(last)).unsaved, true);
     edit(block, '');
     await page.waitForFunction((caption) => !document.querySelector('.bk-article').textContent.includes(caption), caption);
@@ -678,31 +690,31 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
     edit('[^copy-notes]: ', `${block}\n[^copy-notes]: `);
     await page.waitForFunction((caption) => document.querySelector('.bk-article').textContent.includes(caption), caption);
-    assert.deepEqual(await shown(plotAt(directive)), { range: '6', unsaved: false, live: 6 });
+    assert.deepEqual(await shown(plotAt(directive)), { xmax: '6', unsaved: false, live: 6 });
     assert.deepEqual(errors, []);
   });
 
   await t.test('removing a component from the middle of the article drops its unsaved value, and the other components of the same name keep theirs', async () => {
-    const middle = ':::act-fn-plot{fn=relu width=70%}';
-    const last = ':::act-fn-plot{fn=silu range=6}';
+    const middle = ':::act-fn-plot{fns=relu width=70%}';
+    const last = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
     const block = `::::example\n${middle}\n:::\n::::\n\n`;
     const after = '像素宽度超过正文栏时';
     assert.ok(readFileSync(file, 'utf8').includes(`${block}${after}`));
     await shown(plotAt(middle));
-    await page.locator(`${plotAt(middle)} bake-param-bar .control[data-param="range"] .number`).fill('5');
+    await page.locator(`${plotAt(middle)} bake-param-bar .control[data-param="xmax"] .number`).fill('5');
     await shown(plotAt(last));
-    await page.locator(`${plotAt(last)} bake-param-bar .control[data-param="range"] .number`).fill('8');
+    await page.locator(`${plotAt(last)} bake-param-bar .control[data-param="xmax"] .number`).fill('8');
     const lastLine = plotAt(last);
     edit(block, '');
     await page.locator(lastLine).waitFor({ state: 'detached' });
-    assert.deepEqual(await shown(plotAt(last)), { range: '8', unsaved: true, live: 8 });
+    assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
     await page.reload();
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    assert.deepEqual(await shown(plotAt(last)), { range: '8', unsaved: true, live: 8 });
+    assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
     edit(after, `${block}${after}`);
     await page.locator(plotAt(middle)).waitFor();
-    assert.deepEqual(await shown(plotAt(middle)), { range: '4', unsaved: false, live: 4 });
-    assert.deepEqual(await shown(plotAt(last)), { range: '8', unsaved: true, live: 8 });
+    assert.deepEqual(await shown(plotAt(middle)), { xmax: '4', unsaved: false, live: 4 });
+    assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
   });
 
   await page.close();

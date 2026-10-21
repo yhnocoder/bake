@@ -8,3 +8,21 @@
   font-size: 13px;
   color: var(--ink-2);
 }
+
+.bk-kit-tex-display {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+  margin: 0.3em 0 0.5em;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.bk-kit-svg-math-text text {
+  white-space: pre;
+}
+
+.bk-kit-math-text .bk-kit-tex:not(.bk-kit-tex-display) {
+  display: inline;
+  min-height: 0;
+}

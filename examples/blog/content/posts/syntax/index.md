@@ -401,17 +401,17 @@ def swiglu(x, w_gate, w_up, w_down):
 交互组件是博客 `components/` 下的 custom element，名字里必须有 `-`。参数写在花括号里，没写的用默认值；开头和结尾之间的文字是图注。组件只有块写法。
 
 ::::example
-:::act-fn-plot{fn=gelu}
-实线是精确 GELU，虚线是两种近似。拖动「横轴范围」查看差异，关掉「近似」只看精确曲线。
+:::act-fn-plot{fns=gelu dashed="gelu-tanh,gelu-quick" zoom}
+实线是精确 GELU，虚线是两种近似。拖动「横轴范围 ±」缩小视野查看差异，指针停在图上读出数值。
 :::
 ::::
 
-这个函数图用 Bake 的部件库 `bake/kit` 写成：函数切换、滑块、开关、坐标轴、曲线、图例和悬停读数都来自部件库。部件库的颜色取主题的 CSS 变量，切换深色模式时跟着变化；公式标签用 `preamble.sty` 里的宏，和正文相同。部件库是可选的：后面的热图是直接写的 custom element，只用了部件库里计算刻度的函数。
+这个函数图用 Bake 的部件库 `bake/kit` 写成：滑块、坐标轴、曲线、悬停读数和公式标签都来自部件库，区间、箭头和标注点是组件自己画的。部件库的颜色取主题的 CSS 变量，切换深色模式时跟着变化；公式标签用 `preamble.sty` 里的宏，和正文相同。部件库是可选的：后面的柱状图是直接写的 custom element，只用了部件库里计算刻度的函数。
 
 不需要图注时，中间空着。组件本身就是 `:::` 块，宽度直接写在花括号里：
 
 ::::example
-:::act-fn-plot{fn=silu range=6 beta=2 width=body}
+:::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}
 :::
 ::::
 
@@ -423,7 +423,7 @@ def swiglu(x, w_gate, w_up, w_down):
 ::::
 
 ::::example
-:::act-fn-plot{fn=relu width=70%}
+:::act-fn-plot{fns=relu width=70%}
 :::
 ::::
 
@@ -434,19 +434,19 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
-参数的类型是文件时，值写文章目录里的文件路径。构建检查这个文件是否存在，组件在浏览器里读取它。下面的热图从 `glu-points.json` 读取两个标注点：
+参数的类型是文件时，值写文章目录里的文件路径。构建检查这个文件是否存在，组件在浏览器里读取它。下面的柱状图从 `ffn-share.json` 读取每个模型的数值：
 
 ::::example
-:::glu-heatmap{points=glu-points.json}
-左边的点门控关闭，输出接近 0；右边的点门控打开，输出接近 $g \cdot u$。
+:::bar-chart{data=ffn-share.json}
+不计 embedding 时 FFN 参数占模型参数的比例。
 :::
 ::::
 
 组件默认和它的内容一样高，加载前先显示一个统一高度的占位框。需要填满固定大小的组件在代码里声明 `layout.height`，写像素数，或写 `{ ratio }` 表示宽度除以高度，每种屏幕宽度都用这个高度，加载前后高度不变。在花括号里写 `height` 时，组件的框用这个像素高度：
 
 ::::example
-:::glu-heatmap{height=420}
-颜色表示 GLU 门控后的输出。
+:::bar-chart{data=ffn-share.json height=320}
+同一个柱状图，框高 320 像素。
 :::
 ::::
 
@@ -492,7 +492,7 @@ def silu(x):
     return x / (1 + math.exp(-x))
 ```
 
-:::act-fn-plot{fn=silu range=6}
+:::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}
 选中交互组件的任何部分，复制的都是它的整个 `:::` 块。
 :::
 
@@ -521,14 +521,14 @@ def silu(x):
 | list-table 各行单元格数不同 | 第二行只有两个单元格 | `list-table row 2 has 2 cells, the header row has 3` |
 | 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
 | 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |
-| 组件参数超出范围 | `:::act-fn-plot{range=20}` | `parameter "range" of act-fn-plot must be between 1 and 10, got 20` |
+| 组件参数超出范围 | `:::act-fn-plot{xmax=200}` | `parameter "xmax" of act-fn-plot must be between -100 and 100, got 200` |
 | 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; components/ has no fn-plot.js or fn-plot.jsx` |
 | 组件宽度取值不对 | `:::glu-heatmap{width=full}` | `width of glu-heatmap must be body, wide, page, auto, a size in pixels such as 560px or a percentage such as 70%, got "full"` |
 | 组件的百分比宽度超过 100% | `:::glu-heatmap{width=120%}` | `width of glu-heatmap is 120%; a percentage width is at most 100% of the body column` |
 | 组件高度带了单位 | `:::glu-heatmap{height=420px}` | `height of glu-heatmap must be a positive number of pixels such as 420, got "420px"` |
 | 组件写了浮动 | `:::glu-heatmap{float=left}` | `float does not apply to components; glu-heatmap is centred in its column` |
 | 用宽度块包住组件 | `::::{width=wide}` 里面写 `:::glu-heatmap` | `write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it` |
-| 文件参数指向文章文件夹以外 | `:::glu-heatmap{points=../glu-points.json}` | `parameter "points" of glu-heatmap must be a file in the article folder, got "../glu-points.json"` |
+| 文件参数指向文章文件夹以外 | `:::bar-chart{data=../ffn-share.json}` | `parameter "data" of bar-chart must be a file in the article folder, got "../ffn-share.json"` |
 | 组件写了锚点或类名 | `:::act-fn-plot{#plot}` | `components take no id or class; remove the id from :::act-fn-plot` |
 | 组件声明不是字面量 | `components/range-plot.js` 写 `params = { n: range('N') }` | `range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |

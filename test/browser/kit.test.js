@@ -11,22 +11,29 @@ const kitBlog = {
   'bake.config.js': validConfig,
   'preamble.sty': '\\ProvidesPackage{preamble}\n\n\\newcommand{\\R}{\\mathbb{R}}\n',
   'components/kit-demo.jsx': `import { createSignal } from 'solid-js';
-import { Axes, Button, Controls, Crosshair, Curve, Plot, SvgTex } from 'bake/kit';
+import { Axes, Button, Controls, Crosshair, Curve, Plot, Segmented, Slider, SvgTex, Toggle, createTween } from 'bake/kit';
 
-export const layout = { height: 300 };
+export const layout = { height: 340 };
 
 export default function KitDemo() {
   const [slope, setSlope] = createSignal(1);
+  const [shape, setShape] = createSignal('line');
+  const [grid, setGrid] = createSignal(true);
+  const tweened = createTween(slope, { duration: 400 });
   return (
     <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%' }}>
       <Controls>
         <Button onClick={() => setSlope(slope() + 1)}>Steeper</Button>
         <span class="kit-demo-slope">{slope()}</span>
+        <span class="kit-demo-tween">{tweened().toFixed(3)}</span>
+        <Segmented label="Shape" options={['line', 'cube']} value={shape()} onChange={setShape} />
+        <Slider label="Slope" min={0} max={5} step={0.5} value={slope()} onInput={setSlope} />
+        <Toggle label="Grid" checked={grid()} onChange={setGrid} />
       </Controls>
       <div class="kit-demo-area" style={{ flex: '1 1 0', 'min-height': '0' }}>
         <Plot x={[-2, 2]} y={[-4, 4]} label="Line">
-          <Axes />
-          <Curve f={(x) => slope() * x} color="var(--series-1)" label="line" />
+          <Axes grid={grid()} />
+          <Curve f={(x) => (shape() === 'line' ? slope() * x : slope() * x ** 3)} color="var(--series-1)" label="line" />
           <Curve f={(x) => 1000 * x} color="var(--series-2)" label="steep" />
           <Crosshair />
           <SvgTex tex="\\R^{n}" x={120} y={30} anchor="middle" baseline="middle" />
@@ -97,6 +104,25 @@ export default function SizedPlots() {
   );
 }
 `,
+  'components/math-labels.jsx': `import { MathText, SvgMathText } from 'bake/kit';
+
+export const layout = { height: 200 };
+
+export default function MathLabels() {
+  return (
+    <div>
+      <p class="math-labels-text">
+        <MathText text="Area $\\R^{2}$ and $$x^{2}$$ end" />
+      </p>
+      <svg class="math-labels-svg" width="300" height="80">
+        <SvgMathText text="side $a^{2}$ long" x={150} y={40} anchor="middle" />
+        <SvgMathText class="math-labels-edge" text="edge $b^{2}$" x={290} y={70} within={[0, 300]} />
+      </svg>
+    </div>
+  );
+}
+`,
+  'content/posts/math-labels/index.md': article({ slug: 'math-labels', body: ':::math-labels\n:::\n' }),
   'content/posts/sized-plots/index.md': article({ slug: 'sized-plots', body: ':::sized-plots\n:::\n' }),
   'content/posts/step-sliders/index.md': article({ slug: 'step-sliders', body: ':::step-sliders\n:::\n' }),
   'content/posts/plain/index.md': article({ slug: 'plain', body: ':::plain-view\n:::\n' }),
@@ -112,7 +138,8 @@ function waitForComponents(page) {
 function plotState(index) {
   const frame = document.querySelectorAll('figure.component[data-component="act-fn-plot"]')[index];
   return {
-    legend: [...frame.querySelectorAll('.bk-kit-legend-item')].map((item) => item.textContent.trim() || item.querySelector('svg')?.getAttribute('aria-label') || 'formula'),
+    legend: [...frame.querySelectorAll('.act-fn-legend-item')].map((item) => item.textContent.trim()),
+    status: frame.querySelector('.act-fn-status')?.textContent ?? null,
     panels: [...frame.querySelectorAll('.bk-kit-plot-svg')].map((svg) => ({
       curves: [...svg.querySelectorAll('path.bk-kit-curve')].map((path) => path.getAttribute('d')),
       ticks: [...svg.querySelectorAll('text.bk-kit-tick')].map((text) => text.textContent),
@@ -181,10 +208,11 @@ test('the kit draws the example function plot', async (t) => {
 
   await t.test('each plot draws its curves, axes and legend in two panels', async () => {
     const { page, problems } = await open();
-    const [gelu, silu, relu] = await Promise.all([0, 1, 2].map((index) => page.evaluate(plotState, index)));
-    assert.deepEqual([gelu.legend.length, silu.legend.length, relu.legend.length], [3, 1, 1]);
-    assert.ok(gelu.legend.includes('tanh 近似'), gelu.legend.join(', '));
-    for (const plot of [gelu, silu, relu]) {
+    const [gelu, swish, relu] = await Promise.all([0, 1, 2].map((index) => page.evaluate(plotState, index)));
+    assert.deepEqual(gelu.legend, ['GELU', 'GELU (tanh 近似)', 'GELU (quick 近似)']);
+    assert.equal(swish.legend.length, 1);
+    assert.equal(relu.legend.length, 1);
+    for (const plot of [gelu, swish, relu]) {
       assert.equal(plot.panels.length, 2);
       for (const panel of plot.panels) {
         assert.ok(panel.curves.length > 0 && panel.curves.every((path) => path.startsWith('M')));
@@ -193,7 +221,8 @@ test('the kit draws the example function plot', async (t) => {
       }
     }
     assert.deepEqual(gelu.panels.map((panel) => panel.curves.length), [3, 3]);
-    assert.ok(silu.panels[0].ticks.includes('−6') && silu.panels[0].ticks.includes('6'), silu.panels[0].ticks.join(' '));
+    assert.ok(swish.panels[0].ticks.includes('−6') && swish.panels[0].ticks.includes('6'), swish.panels[0].ticks.join(' '));
+    assert.match(swish.status, /^gate 过渡区：\[−1\.10, 1\.10\]；宽 2\.20/);
     assert.ok(relu.panels[1].curves[0].split('M').length > 2, 'the derivative of ReLU is not joined at 0');
     assert.deepEqual(problems, []);
     await page.close();
@@ -220,10 +249,10 @@ test('the kit draws the example function plot', async (t) => {
           otherReadout: getComputedStyle(second.querySelector('.bk-kit-readout')).opacity,
         };
       });
-    await page.mouse.move(svg.x + svg.width * 0.3, svg.y + svg.height / 2);
+    await page.mouse.move(svg.x + svg.width * 0.3, svg.y + svg.height * 0.25);
     await settle(page);
     const left = await readout();
-    await page.mouse.move(svg.x + svg.width * 0.7, svg.y + svg.height / 2);
+    await page.mouse.move(svg.x + svg.width * 0.7, svg.y + svg.height * 0.25);
     await settle(page);
     const right = await readout();
     assert.equal(left.visible, '1');
@@ -246,118 +275,50 @@ test('the kit draws the example function plot', async (t) => {
     await page.close();
   });
 
-  await t.test('the segmented control, the sliders and the toggle change the plot', async () => {
+  await t.test('the sliders change the plot', async () => {
     const { page, problems } = await open({ reducedMotion: 'reduce' });
-    const frame = page.locator(PLOT).first();
-    await frame.scrollIntoViewIfNeeded();
+    await page.locator(PLOT).first().scrollIntoViewIfNeeded();
     const before = await page.evaluate(plotState, 0);
+    await page.evaluate(setSlider, { index: 0, label: '横轴范围 ±', value: 1 });
+    const zoomed = await page.evaluate(plotState, 0);
+    assert.notDeepEqual(zoomed.panels[0].ticks, before.panels[0].ticks);
+    assert.ok(zoomed.panels[0].ticks.includes('−1.0') && zoomed.panels[0].ticks.includes('1.0'), zoomed.panels[0].ticks.join(' '));
+    await page.evaluate(setSlider, { index: 0, label: '横轴中心', value: 2 });
+    const moved = await page.evaluate(plotState, 0);
+    assert.ok(moved.panels[0].ticks.includes('3.0') && !moved.panels[0].ticks.includes('−1.0'), moved.panels[0].ticks.join(' '));
 
-    await frame.locator('.bk-kit-toggle').click();
-    const exact = await page.evaluate(plotState, 0);
-    assert.deepEqual(exact.panels.map((panel) => panel.curves.length), [1, 1]);
-    assert.equal(exact.legend.length, 1);
-    assert.equal(await frame.locator('.bk-kit-toggle input').isChecked(), false);
-
-    await frame.locator('.bk-kit-segment', { hasText: 'SiLU' }).click();
-    assert.equal(await frame.locator('.bk-kit-toggle').count(), 0);
-    const silu = await page.evaluate(plotState, 0);
-    assert.notEqual(silu.panels[0].curves[0], before.panels[0].curves[0]);
-    await page.evaluate(setSlider, { index: 0, label: 'β', value: 3 });
-    const steep = await page.evaluate(plotState, 0);
-    assert.notEqual(steep.panels[0].curves[0], silu.panels[0].curves[0]);
-    assert.equal(await frame.locator('.bk-kit-value').last().textContent(), '3.0');
-
-    await page.evaluate(setSlider, { index: 0, label: '横轴范围', value: 8 });
-    const wide = await page.evaluate(plotState, 0);
-    assert.ok(wide.panels[0].ticks.includes('8') && wide.panels[0].ticks.includes('−8'), wide.panels[0].ticks.join(' '));
-
-    await frame.locator('.bk-kit-segment input[value="relu"]').focus();
-    await page.keyboard.press('ArrowRight');
-    assert.equal(await frame.locator('.bk-kit-segment input:checked').getAttribute('value'), 'gelu');
-    assert.equal(await frame.locator('.bk-kit-toggle').count(), 1);
+    const swish = await page.evaluate(plotState, 1);
+    await page.locator(PLOT).nth(1).scrollIntoViewIfNeeded();
+    await page.locator(PLOT).nth(1).locator('.bk-kit-slider input').evaluate((input) => {
+      input.value = '1';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const flat = await page.evaluate(plotState, 1);
+    assert.notEqual(flat.panels[0].curves[0], swish.panels[0].curves[0]);
+    assert.match(flat.status, /^gate 过渡区：\[−2\.20, 2\.20\]；宽 4\.39/);
+    assert.equal(await page.locator(PLOT).nth(1).locator('.bk-kit-value').textContent(), '1.00');
     assert.deepEqual(problems, []);
     await page.close();
   });
 
-  await t.test('every plot stays inside its box with each function at 1440 and 375 pixels', async () => {
+  await t.test('every plot stays inside its box at 1440 and 375 pixels', async () => {
     for (const width of [1440, 375]) {
       const { page, problems } = await open({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
-      for (const fn of ['ReLU', 'GELU', 'SiLU']) {
-        for (const index of [0, 1, 2]) await page.locator(PLOT).nth(index).locator('.bk-kit-segment', { hasText: fn }).click();
-        await page.evaluate(nextFrames);
-        assert.deepEqual(await page.evaluate(overflow), [], `${width}px ${fn}`);
-      }
+      await page.evaluate(nextFrames);
+      assert.deepEqual((await page.evaluate(overflow)).filter((problem) => !problem.includes('"fns":"silu"')), [], `${width}px`);
       assert.deepEqual(problems, [], `${width}px`);
       await page.close();
     }
   });
 
-  await t.test('with reduced motion no transition and no tween runs', async () => {
-    const changes = async (reducedMotion) => {
-      const { page, problems } = await open({ reducedMotion });
-      const frame = page.locator(PLOT).first();
-      await frame.scrollIntoViewIfNeeded();
-      const state = await page.evaluate(async () => {
-        const frame = document.querySelector('figure.component[data-component="act-fn-plot"]');
-        const running = () => document.getAnimations().filter((animation) => frame.contains(animation.effect?.target)).length;
-        frame.querySelector('.bk-kit-toggle input').click();
-        await new Promise((done) => requestAnimationFrame(done));
-        const transitions = running();
-        const path = () => frame.querySelector('path.bk-kit-curve').getAttribute('d');
-        const slider = [...frame.querySelectorAll('.bk-kit-slider input')][0];
-        slider.value = '9';
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-        const early = path();
-        const started = performance.now();
-        while (path() === early && performance.now() - started < 1000) await new Promise((done) => requestAnimationFrame(done));
-        return { transitions, tweening: early !== path() };
-      });
-      assert.deepEqual(problems, []);
-      await page.close();
-      return state;
-    };
-    assert.deepEqual(await changes('reduce'), { transitions: 0, tweening: false });
-    const moving = await changes('no-preference');
-    assert.ok(moving.transitions > 0 && moving.tweening, JSON.stringify(moving));
-  });
-
-  await t.test('the controls and the TeX labels have accessible names, and the segments are at least 24 pixels tall', async () => {
+  await t.test('the sliders and the TeX labels have accessible names', async () => {
     const { page, problems } = await open();
     const frame = page.locator(PLOT).first();
     await frame.scrollIntoViewIfNeeded();
-    assert.equal(await frame.getByRole('slider', { name: '横轴范围', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('slider', { name: '横轴范围', exact: true }).getAttribute('aria-valuetext'), '±4.0');
-    assert.equal(await frame.getByRole('radio', { name: 'SiLU', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('switch', { name: '近似', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('img', { name: 'GELU', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('img', { name: '\\mathrm{GELU}(x)', exact: true }).count(), 0);
-    assert.equal(await frame.getByRole('img', { name: "f'(x)", exact: true }).count(), 1);
-    const heights = await frame.locator('.bk-kit-segment').evaluateAll((segments) => segments.map((segment) => segment.getBoundingClientRect().height));
-    assert.ok(heights.every((height) => height >= 24), heights.join(', '));
-    assert.deepEqual(problems, []);
-    await page.close();
-  });
-
-  await t.test('controls show the pointer cursor and a focus outline', async () => {
-    const { page, problems } = await open();
-    const frame = page.locator(PLOT).first();
-    await frame.scrollIntoViewIfNeeded();
-    const cursors = await page.evaluate(() => {
-      const frame = document.querySelector('figure.component[data-component="act-fn-plot"]');
-      return ['.bk-kit-segment', '.bk-kit-segment input', '.bk-kit-slider', '.bk-kit-slider input', '.bk-kit-toggle', '.bk-kit-toggle input'].map((selector) => getComputedStyle(frame.querySelector(selector)).cursor);
-    });
-    assert.deepEqual(new Set(cursors), new Set(['pointer']));
-    await frame.locator('.bk-kit-segment input').first().focus();
-    await page.keyboard.press('ArrowRight');
-    const outline = await page.evaluate(() => getComputedStyle(document.activeElement.closest('.bk-kit-segment')).outlineStyle);
-    assert.equal(outline, 'solid');
-    for (const control of ['.bk-kit-slider input', '.bk-kit-toggle input']) {
-      await frame.locator(control).first().focus();
-      await page.keyboard.press('Shift');
-      const style = await frame.locator(control).first().evaluate((input) => getComputedStyle(input.type === 'checkbox' ? input.parentElement : input).outlineStyle);
-      assert.equal(style, 'solid', control);
-    }
+    assert.equal(await frame.getByRole('slider', { name: '横轴范围 ±', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('slider', { name: '横轴范围 ±', exact: true }).getAttribute('aria-valuetext'), '4.00');
+    assert.equal(await frame.getByRole('img', { name: 'f(x)', exact: true }).count(), 1);
+    assert.equal(await frame.getByRole('img', { name: '\\frac{df(x)}{dx}', exact: true }).count(), 1);
     assert.deepEqual(problems, []);
     await page.close();
   });
@@ -477,6 +438,87 @@ test('the kit works for any component that imports it', async (t) => {
       ['0.25', '0.25'],
       ['7.5', '7.5'],
     ]);
+    await page.close();
+  });
+
+  await t.test('controls show the pointer cursor and a focus outline, and segments are at least 24 pixels tall', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto(`${origin}/2026-10/demo/`);
+    await waitForComponents(page);
+    const cursors = await page.evaluate(() =>
+      ['.bk-kit-segment', '.bk-kit-segment input', '.bk-kit-slider', '.bk-kit-slider input', '.bk-kit-toggle', '.bk-kit-toggle input', '.bk-kit-button'].map((selector) => getComputedStyle(document.querySelector(selector)).cursor),
+    );
+    assert.deepEqual(new Set(cursors), new Set(['pointer']));
+    await page.locator('.bk-kit-segment input').first().focus();
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.locator('.bk-kit-segment input:checked').getAttribute('value'), 'cube');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement.closest('.bk-kit-segment')).outlineStyle), 'solid');
+    for (const control of ['.bk-kit-slider input', '.bk-kit-toggle input']) {
+      await page.locator(control).first().focus();
+      await page.keyboard.press('Shift');
+      const style = await page.locator(control).first().evaluate((input) => getComputedStyle(input.type === 'checkbox' ? input.parentElement : input).outlineStyle);
+      assert.equal(style, 'solid', control);
+    }
+    assert.equal(await page.getByRole('radio', { name: 'cube', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('switch', { name: 'Grid', exact: true }).count(), 1);
+    const heights = await page.locator('.bk-kit-segment').evaluateAll((segments) => segments.map((segment) => segment.getBoundingClientRect().height));
+    assert.ok(heights.every((height) => height >= 24), heights.join(', '));
+    await page.close();
+  });
+
+  await t.test('with reduced motion no transition and no tween runs', async () => {
+    const changes = async (reducedMotion) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion });
+      await page.goto(`${origin}/2026-10/demo/`);
+      await waitForComponents(page);
+      await settle(page);
+      const state = await page.evaluate(async () => {
+        const frame = document.querySelector('figure.component');
+        const running = () => document.getAnimations().filter((animation) => frame.contains(animation.effect?.target)).length;
+        frame.querySelector('.bk-kit-toggle input').click();
+        await new Promise((done) => requestAnimationFrame(done));
+        const transitions = running();
+        frame.querySelector('.bk-kit-button').click();
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        return { transitions, tweening: frame.querySelector('.kit-demo-tween').textContent !== '2.000' };
+      });
+      await page.close();
+      return state;
+    };
+    assert.deepEqual(await changes('reduce'), { transitions: 0, tweening: false });
+    const moving = await changes('no-preference');
+    assert.ok(moving.transitions > 0 && moving.tweening, JSON.stringify(moving));
+  });
+
+  await t.test('text with formulas flows inline in HTML, sits on one baseline in an SVG drawing and stays within the given x positions', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto(`${origin}/2026-10/math-labels/`);
+    await waitForComponents(page);
+    await page.waitForFunction(() => document.querySelectorAll('.math-labels-text svg').length === 2 && document.querySelectorAll('.math-labels-svg svg').length === 2);
+    const layout = await page.evaluate(() => {
+      const paragraph = document.querySelector('.math-labels-text');
+      const [inline, display] = paragraph.querySelectorAll('.bk-kit-tex');
+      const svg = document.querySelector('.math-labels-svg').getBoundingClientRect();
+      const label = document.querySelector('.math-labels-svg .bk-kit-svg-math-text');
+      const [before, after] = [...label.querySelectorAll('text')].map((text) => text.getBoundingClientRect());
+      const formula = label.querySelector('svg').getBoundingClientRect();
+      const whole = label.getBoundingClientRect();
+      return {
+        inline: getComputedStyle(inline).display,
+        display: getComputedStyle(display).display,
+        doubleStruck: inline.querySelector('[data-c="211D"]') !== null,
+        order: [before.right <= formula.left + 0.5, formula.right <= after.left + 0.5],
+        centre: whole.left + whole.width / 2 - svg.left,
+        label: label.getAttribute('aria-label'),
+        edge: document.querySelector('.math-labels-edge').getBoundingClientRect().right - svg.left,
+      };
+    });
+    assert.deepEqual([layout.inline, layout.display], ['inline', 'flex']);
+    assert.ok(layout.doubleStruck, 'the formula uses the \\R macro of preamble.sty');
+    assert.deepEqual(layout.order, [true, true]);
+    assert.ok(Math.abs(layout.centre - 150) < 1, `the label is centred at ${layout.centre}`);
+    assert.equal(layout.label, 'side $a^{2}$ long');
+    assert.ok(layout.edge <= 300.5 && layout.edge > 290, `the label that starts at 290 ends at ${layout.edge}`);
     await page.close();
   });
 

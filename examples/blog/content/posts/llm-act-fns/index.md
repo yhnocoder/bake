@@ -77,7 +77,7 @@ $\frac{df(z_i)}{dz_i}$ 同时控制两条路径：一条是流向本神经元参
 - ==$f(x)$ 是否严格为零，还是只是趋近零==，以及趋近极限的快慢。严格为零时，这个神经元对应的 $W_2$ 行完全不参与求和，推理时可以跳过这一行的计算，这是激活稀疏性的前提；只是趋近零时，仍有一个很小的输出通过，不能跳过。如果 $f(x)$ 趋近的不是零而是某个非零常数，这个常数会以固定比例把 $W_2$ 的这一行加进输出。
 - ==$\frac{df(x)}{dx}$ 是否为零==。为零时，落在这里的神经元不会因这个 token 得到任何更新；如果一个神经元对所有 token 都落在这里，它的 $w_i$、$b_i$ 收到的梯度恒为零，不会再更新。$\frac{df(x)}{dx}$ 很小但非零时，更新仍在进行，只是缓慢。
 
-:::llm-act-plot{fns="relu,silu,tanh" xmin=-6 xmax=2 ymin=-1.5 ymax=2 dymin=-0.3 dymax=1.2 guides=far-negative}
+:::act-fn-plot{fns="relu,silu,tanh" xmin=-6 xmax=2 ymin=-1.5 ymax=2 dymin=-0.3 dymax=1.2 guides=far-negative}
 三条曲线展示三种不同的极限行为：ReLU 的输出与导数在整个负半轴严格为零；SiLU 的输出从负值一侧趋近零，导数也趋近零，但在有限输入下都不等于零；tanh 的输出趋近 −1 而不是零，导数趋近零。
 :::
 
@@ -87,7 +87,7 @@ $\frac{df(z_i)}{dz_i}$ 同时控制两条路径：一条是流向本神经元参
 - ==$\frac{df}{dx}(0)$ 是多少==：零附近的小扰动以多大比例通过。
 - ==$f$ 在原点是否可导==：如果不可导，数学上这一点的导数没有定义，实现时必须约定一个值，并且 $\frac{df(x)}{dx}$ 在这里跳变，一个神经元的预激活值从零的一侧跨到另一侧时，它收到的梯度会突然改变。
 
-:::llm-act-plot{fns="relu,silu,sigmoid" xmin=-2 xmax=2 ymin=-0.5 ymax=1.5 dymin=-0.2 dymax=1.2 guides=zero}
+:::act-fn-plot{fns="relu,silu,sigmoid" xmin=-2 xmax=2 ymin=-0.5 ymax=1.5 dymin=-0.2 dymax=1.2 guides=zero}
 只看原点附近。$f(x)$ 面板：ReLU 和 SiLU 在原点输出 0，sigmoid 在原点输出 0.5，这个 0.5 与输入无关。$\frac{df(x)}{dx}$ 面板：SiLU 在原点导数为 0.5，sigmoid 为 0.25，两者都连续；ReLU 的导数从左侧的 0 跳到右侧的 1，两个空心圆表示左右极限，原点本身没有导数。
 :::
 
@@ -99,7 +99,7 @@ $\frac{df(z_i)}{dz_i}$ 同时控制两条路径：一条是流向本神经元参
 
 图中的色带标出过渡区的范围，色带的定义随函数改变，见各图图注。
 
-:::llm-act-plot{fns="relu,gelu,sigmoid" ymax=3 dymin=-0.4 dymax=1.6 guides=transition}
+:::act-fn-plot{fns="relu,gelu,sigmoid" ymax=3 dymin=-0.4 dymax=1.6 guides=transition}
 三种过渡方式。ReLU 的过渡集中在 x = 0 这一个点上，竖虚线标出这个位置，$\frac{df(x)}{dx}$ 在这里跳变。sigmoid 的过渡分布在一段宽区间内，单调，导数连续且不超过 0.25。GELU 的过渡集中在色带范围内，导数连续，但函数在负半轴有一个最低点，最低点左侧导数为负，正半轴上导数一度超过 1，两个标记点分别标出导数的最小值与最大值。
 :::
 
@@ -111,7 +111,7 @@ $\frac{df(z_i)}{dz_i}$ 同时控制两条路径：一条是流向本神经元参
 
 图中的虚线表示极限行为，不表示饱和从某个固定位置开始。
 
-:::llm-act-plot{fns="silu,tanh,relu2" colors="1,3,2" xmin=-2 xmax=6 ymin=-1 ymax=7 dymin=-0.3 dymax=3 guides=far-positive}
+:::act-fn-plot{fns="silu,tanh,relu2" colors="1,3,2" xmin=-2 xmax=6 ymin=-1 ymax=7 dymin=-0.3 dymax=3 guides=far-positive}
 淡色区域是正半轴远端。三条曲线展示三种增长方式：SiLU 的输出趋近 x，导数趋近 1，没有上界但增长速度不再增加；tanh 的输出趋近 1，导数趋近 0，有上界；ReLU² 的输出按 x² 增长，导数为 2x，输出和导数都没有上界，曲线在图内就已经超出纵轴范围。
 :::
 
@@ -127,7 +127,7 @@ $\frac{df(z_i)}{dz_i}$ 同时控制两条路径：一条是流向本神经元参
 
 比较各函数的输出、导数和极限行为。
 
-:::llm-act-plot{fns="relu,relu2,gelu,silu,softplus,sigmoid,tanh" colors="1,2,3,4,6,7,8" off="softplus,sigmoid,tanh" dymin=-0.5 dymax=2.5 toggle=true}
+:::act-fn-plot{fns="relu,relu2,gelu,silu,softplus,sigmoid,tanh" colors="1,2,3,4,6,7,8" off="softplus,sigmoid,tanh" dymin=-0.5 dymax=2.5 toggle=true}
 **勾选曲线进行比较**。读图时先看负半轴的输出与斜率，再看原点和过渡宽度，最后看大正输入是近似线性增长、饱和还是加速增长。色带、参考线、关键点和详细定义见各函数的单独图。
 :::
 
@@ -137,7 +137,7 @@ $$
 \sigma(x)=\frac{1}{1+e^{-x}},\qquad \frac{d\sigma(x)}{dx}=\sigma(x)\bigl(1-\sigma(x)\bigr).
 $$
 
-:::llm-act-plot{fns="logistic" xmin=-6 xmax=6 ymin=-0.05 ymax=1.05 dymin=-0.02 dymax=0.45}
+:::act-fn-plot{fns="logistic" xmin=-6 xmax=6 ymin=-0.05 ymax=1.05 dymin=-0.02 dymax=0.45}
 **当输入趋向负无穷**：输出趋近 0，导数趋近 0，进入饱和区。
 
 **原点**：输出 0.5，导数 0.25；零输入对应门控系数 0.5。
@@ -157,7 +157,7 @@ $$
 \Phi(x)=\int_{-\infty}^{x}\frac{e^{-t^2/2}}{\sqrt{2\pi}}\,dt,\qquad \frac{d\Phi(x)}{dx}=p(x)=\frac{e^{-x^2/2}}{\sqrt{2\pi}}.
 $$
 
-:::llm-act-plot{fns="normal-cdf" colors="3" xmin=-6 xmax=6 ymin=-0.05 ymax=1.05 dymin=-0.02 dymax=0.45}
+:::act-fn-plot{fns="normal-cdf" colors="3" xmin=-6 xmax=6 ymin=-0.05 ymax=1.05 dymin=-0.02 dymax=0.45}
 **当输入趋向负无穷**：$\Phi(x)$ 趋近 0，导数趋近 0，门控系数趋近 0。
 
 **原点**：输出 0.5，导数约 0.399；导数就是标准正态密度，在这里最高。
@@ -182,7 +182,7 @@ $$
 \end{aligned}
 $$
 
-:::llm-act-plot{fns="sigmoid,tanh" xmin=-6 xmax=6 ymin=-1.2 ymax=1.2 dymin=-0.1 dymax=1.1 guides=sigmoid-tanh}
+:::act-fn-plot{fns="sigmoid,tanh" xmin=-6 xmax=6 ymin=-1.2 ymax=1.2 dymin=-0.1 dymax=1.1 guides=sigmoid-tanh}
 :::
 
 ==当输入趋向负无穷==：sigmoid 的输出趋近 0，用作门控时会使被乘的信号趋近零；tanh 的输出趋近 −1，保留饱和的负信号。两者的导数都为正，并随输入趋向负无穷而趋近零：输出逐渐不再变化，局部梯度也越来越弱。
@@ -205,7 +205,7 @@ $$
 \mathrm{ReLU}(x)=\max(0,x),\qquad \frac{d\,\mathrm{ReLU}(x)}{dx}=\mathbb{1}[x>0].
 $$
 
-:::llm-act-plot{fns="relu" dymin=-0.2 dymax=1.2}
+:::act-fn-plot{fns="relu" dymin=-0.2 dymax=1.2}
 :::
 
 ==负半轴==：输出和导数严格为零。淡色区域表示整个输出为零的区域，不是过渡区。
@@ -258,7 +258,7 @@ $$
 例如，若某个输入的保留概率为 $0.8$，那么平均输出就是 $0.8x$。ReLU 对应 $P(B=1\mid x)=\mathbb{1}[x>0]$，dropout 对应 $P(B=1\mid x)=p$ 且与 $x$ 无关；GELU 把这个概率改成随 $x$ 单调增加的 $\Phi(x)$，再取期望，就得到确定性的 $x\Phi(x)$。
 :::
 
-:::llm-act-plot{fns="gelu-erf" dashed="gelu-tanh,gelu-quick" guides=gelu-approx zoom=true}
+:::act-fn-plot{fns="gelu-erf" dashed="gelu-tanh,gelu-quick" guides=gelu-approx zoom=true}
 左图是 GELU 的输出 $f(x)$，右图是导数 $\frac{df(x)}{dx}$；实线是精确 GELU，虚线是两种近似。三条曲线在默认视野下几乎重合，拖动“横轴范围”、“横轴中心”查看差异。
 :::
 
@@ -342,7 +342,7 @@ $\beta=1$ 的特例叫 SiLU（Sigmoid Linear Unit）。这个名字由 Hendrycks
 
 [^iclr]: 据作者在论文附录中的说明，最早见于 2016 年的 ICLR 投稿。
 
-:::llm-act-plot{fns="swish" reference="relu" beta=1}
+:::act-fn-plot{fns="swish" reference="relu" beta=1}
 拖动 β，色带和最低点随曲线移动；色带或最低点超出视野时，图下方会给出提示。
 :::
 
@@ -373,7 +373,7 @@ $$
 
 下图对照普通 FFN 与 GLU 的一次前向计算。图中 $T$ 是序列长度。
 
-:::llm-glu-diagram
+:::glu-diagram
 :::
 
 ### SwiGLU 的单个通道 {#swiglu-channel}
@@ -386,7 +386,7 @@ $$
 
 这里的门控系数不局限于 0 到 1。$\mathrm{SiLU}(g_i)$ 可以为负，也可以大于 1，因此它既能减小信号幅度，也能翻转符号或放大信号。下面的热力图展示 $g_i$、$u_i$ 不同组合产生的 $h_i$：横轴改变门控输入 $g_i$，纵轴改变待传递的数值 $u_i$（图中省略下标，记作 g、u）。
 
-:::llm-glu-heatmap{width=600px}
+:::glu-heatmap{width=600px}
 横轴是门控输入 g，纵轴是线性分支 u；每个位置的颜色表示两者相乘后的输出 SiLU(g)·u。
 
 图中左侧颜色较浅，因为较大的负门控输入会减小输出幅度；右侧颜色更鲜明，因为 g 超过约 1.28 时 SiLU(g)>1，线性分支被放大，0<g<1.28 时线性分支仍被缩小。
@@ -474,7 +474,7 @@ $$
 
 Moonshot 对两个分支都使用 tanh soft-capping。gate 分支里 SiLU 的那个 $x$ 换成了 $\beta_1\tanh(x/\beta_1)$，于是 gate 的输出被限制在 $(-\beta_1,\beta_1)$；线性分支同样用 tanh 压到 $(-\beta_2,\beta_2)$；乘积的绝对值上界就是 $\beta_1\beta_2=100$。在原点附近 $\beta\tanh(x/\beta)\approx x$，所以输入远小于 $\beta$ 时它和 SwiGLU 几乎完全一样，主要在输入绝对值较大时发生变化。相比 clamp，tanh soft-capping 的导数处处连续，饱和区域梯度按 $1-\tanh^2$ 衰减，而不是直接归零；代价是每个元素多两次 tanh。在小 batch 解码时，MoE 专家的 GEMM 受带宽限制，两次 tanh 的额外计算通常被访存时间覆盖。Kimi K3 的 `config.json` 里可以直接看到这三个值：`hidden_act: "situ"`、`activation_situ_beta: 4.0`、`activation_situ_linear_beta: 25.0`，以及 `num_experts: 896`、`num_experts_per_token: 16`。
 
-:::llm-act-plot{fns="silu,gpt-oss-gate,situ-gate" xmax=12 ymax=12 dymax=1.5 guides=gate-clamp}
+:::act-fn-plot{fns="silu,gpt-oss-gate,situ-gate" xmax=12 ymax=12 dymax=1.5 guides=gate-clamp}
 **当输入趋向负无穷**：三种 gate 的输出与导数都趋近零，但具体衰减形状不同。
 
 **原点与过渡区**：三者输出均为 0，斜率均为 0.5；淡色带用标准 SiLU 内部 gate 的 10%–90% 区间作参照，各曲线并非完全相同。
@@ -502,7 +502,7 @@ $$
 
 它来自 Google 2021 年的 Primer[@so2021]，那篇工作用进化搜索在 Transformer 的计算图上找改进。论文指出，Primer 的收益主要来自两处简单的修改：把 FFN 的 ReLU 平方，以及在自注意力的 Q、K、V 投影后各加一个 depthwise 卷积；其中平方 ReLU 是效果最明显的一处。它的导数是 $2\max(0,x)$，在原点连续（值为零），比 ReLU 光滑了一阶；正半轴是二次增长，大的输入会被进一步放大，这在功能上与 GLU 的乘积类似，但只需要普通 FFN 的两个矩阵。NVIDIA 从 Nemotron-4 开始一直用它：Nemotron-H 是 Mamba-2、注意力和 FFN 混合的 dense 模型，FFN 用 Squared ReLU；2025 年底的 Nemotron 3 系列改为 MoE，专家仍用 Squared ReLU，路由用 sigmoid[@nemotron]。Nemotron 3 Nano 的配置里写作 `mlp_hidden_act: "relu2"`，128 个路由专家取 top-6，外加 1 个共享专家。它同时保留了 ReLU 的精确零，所以可以采用基于零激活值的稀疏推理方法。
 
-:::llm-act-plot{fns="relu2" reference="relu" xmin=-3 xmax=3 ymin=-0.5 ymax=6 dymin=-0.5 dymax=6}
+:::act-fn-plot{fns="relu2" reference="relu" xmin=-3 xmax=3 ymin=-0.5 ymax=6 dymin=-0.5 dymax=6}
 **负半轴**：输出和导数严格为零，淡色背景表示输出为零的区域。
 
 **原点**：输出和导数都为 0。左右导数相同，函数在原点可导，这一点与 ReLU 不同；但二阶导数左右不同，左侧为 0，右侧为 2。
@@ -522,7 +522,7 @@ $$
 \mathrm{softplus}(x)=\log\bigl(1+e^{x}\bigr),\qquad \frac{d\,\mathrm{softplus}(x)}{dx}=\sigma(x).
 $$
 
-:::llm-act-plot{fns="softplus" reference="relu" xmin=-5 xmax=5 ymin=-0.5 ymax=5 dymin=-0.1 dymax=1.1}
+:::act-fn-plot{fns="softplus" reference="relu" xmin=-5 xmax=5 ymin=-0.5 ymax=5 dymin=-0.1 dymax=1.1}
 **当输入趋向负无穷**：输出从正值一侧趋近零，导数也趋近零；有限输入下输出始终为正。
 
 **原点**：输出 ln 2≈0.693，导数为 0.5。它并不经过坐标原点。

@@ -73,7 +73,8 @@ $$
 
 三个权重矩阵是 $W_{gate}, W_{up} \in \mathbb{R}^{d \times d_{ff}}$ 和 $W_{down} \in \mathbb{R}^{d_{ff} \times d}$。$\otimes$ 表示逐元素相乘。Swish 逐元素作用在向量上，对每个数做的是 $\mathrm{Swish}(z) = z\,\sigma(z)$，其中 $\sigma(z) = \dfrac{1}{1+e^{-z}}$ 是 sigmoid 函数。
 
-:::matrix-swiglu-diagram
+:::glu-diagram
+上图中 $W_g$、$W_u$、$W_d$ 就是 $W_{gate}$、$W_{up}$、$W_{down}$，$\phi$ 是 Swish，$\odot$ 是逐元素相乘 $\otimes$，$X$ 的 $T$ 行是 $T$ 个位置的 $\mathbf{x}$。
 :::
 
 ::::

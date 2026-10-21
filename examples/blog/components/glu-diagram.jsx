@@ -1,15 +1,10 @@
-import { createResource, createUniqueId, Show } from 'solid-js'
-import { createElementSize } from 'bake/kit'
-import { SvgLabel } from './lib/llm/svg-label.jsx'
-import { typesetAll } from './lib/llm/tex.js'
-import './lib/llm/act.css'
-import './lib/llm/diagram.css'
+import { createUniqueId, Show } from 'solid-js'
+import { SvgMathText, createElementSize } from 'bake/kit'
+import './lib/glu-diagram.css'
 
 export const params = {}
 
 export const layout = { width: 'body' }
-
-const NAME = 'llm-glu-diagram'
 
 const UNIT = 42
 const ACT_HEIGHT = 27
@@ -27,13 +22,13 @@ const STYLE = {
   param: { fill: 'var(--series-1)', 'fill-opacity': 0.28, stroke: 'var(--ink-2)' },
 }
 
+function Label(props) {
+  return <SvgMathText class="glu-diagram-label" text={props.text} x={props.x} y={props.y} anchor={props.anchor ?? 'middle'} style={{ 'font-size': `${props.size ?? 10}px`, fill: props.fill ?? 'var(--ink-2)', color: props.fill ?? 'var(--ink-2)' }} />
+}
+
 function canvas(markerId) {
   const items = []
-  const sources = []
-  const text = (t, x, y, options = {}) => {
-    sources.push(t)
-    items.push(() => <SvgLabel text={t} x={x} y={y} anchor="middle" size={10} fill="var(--ink-2)" halo={false} {...options} />)
-  }
+  const text = (t, x, y, options = {}) => items.push(() => <Label text={t} x={x} y={y} {...options} />)
   const box = (x, cy, w, h, kind, name, shape) => {
     items.push(() => <rect x={x} y={cy - h / 2} width={w} height={h} rx="5" stroke-width="1.4" {...STYLE[kind]} />)
     text(name, x + w / 2, cy + 4, { size: 12, fill: 'var(--ink)' })
@@ -42,7 +37,6 @@ function canvas(markerId) {
   }
   return {
     items,
-    sources,
     text,
     box,
     act: (x, cy, w, name, shape) => box(x, cy, w, ACT_HEIGHT, 'act', name, shape),
@@ -100,7 +94,7 @@ function ffn(markerId, narrow) {
   x = c.op(x, '$=$', cy2)
   c.act(x, cy2, UNIT, '$Y$', 'T\\times d')
   c.text('参数合计 $2\\,d\\,d_{ff}$；$d_{ff}=4d$ 时为 $8d^2$', W / 2, H - 8, { size: 10.5 })
-  return { W, H, items: c.items, sources: c.sources }
+  return { W, H, items: c.items }
 }
 
 function glu(markerId, narrow) {
@@ -144,7 +138,7 @@ function glu(markerId, narrow) {
   x = c.op(x, '$=$', cy2)
   c.act(x, cy2, UNIT, '$Y$', 'T\\times d')
   c.text('参数合计 $3\\,d\\,d_{ff}$；$d_{ff}=\\tfrac{8}{3}d$ 时为 $8d^2$', W / 2, H - 8, { size: 10.5 })
-  return { W, H, items: c.items, sources: c.sources }
+  return { W, H, items: c.items }
 }
 
 const TITLE_HEIGHT = 28
@@ -173,13 +167,13 @@ function Diagram(props) {
     top += TITLE_HEIGHT + d.H + (index < drawings.length - 1 ? PANEL_GAP : 0)
     return (
       <g role="img" aria-label={d.label}>
-        <SvgLabel text={d.title} x={0} y={y + 18} size={13} fill="var(--ink-2)" halo={false} />
+        <Label text={d.title} x={0} y={y + 18} size={13} anchor="start" />
         <g transform={`translate(0 ${y + TITLE_HEIGHT})`}>{d.items.map((item) => item())}</g>
       </g>
     )
   })
   return (
-    <svg viewBox={`0 0 ${width} ${top}`} class="llm-diagram-svg">
+    <svg viewBox={`0 0 ${width} ${top}`} class="glu-diagram-svg">
       <defs>
         <marker id={markerId} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" fill="var(--ink-2)" />
@@ -195,15 +189,12 @@ function aspectRatio(narrow) {
   return `${drawings[0].W} / ${drawings.reduce((height, d) => height + TITLE_HEIGHT + d.H, PANEL_GAP * (drawings.length - 1))}`
 }
 
-const texSources = () => [...panels.map((panel) => panel.title), ...[false, true].flatMap((narrow) => panels.flatMap((panel) => panel.draw('', narrow).sources))]
-
 export default function FfnGluDiagram() {
   let root
   const size = createElementSize(() => root)
-  const [ready] = createResource(() => typesetAll(NAME, texSources()))
   return (
-    <div ref={root} class="llm-diagram" style={{ 'aspect-ratio': aspectRatio(size().width < NARROW_BELOW) }}>
-      <Show when={ready() && size().width > 0}>
+    <div ref={root} class="glu-diagram" style={{ 'aspect-ratio': aspectRatio(size().width < NARROW_BELOW) }}>
+      <Show when={size().width > 0}>
         <Show when={size().width < NARROW_BELOW} fallback={<Diagram narrow={false} />}>
           <Diagram narrow />
         </Show>

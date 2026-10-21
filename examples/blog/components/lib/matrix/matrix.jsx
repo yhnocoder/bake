@@ -1,5 +1,5 @@
 import { For } from 'solid-js'
-import { MathText } from './view.jsx'
+import { MathText } from 'bake/kit'
 import './matrix.css'
 
 export function Matrix(props) {

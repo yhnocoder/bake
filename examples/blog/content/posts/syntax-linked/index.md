@@ -27,7 +27,7 @@ $$
 
 门控单元的局部导数就是门控函数的导数，下图画出 SiLU 的形状。
 
-:::act-fn-plot{fn=silu range=4}
+:::act-fn-plot{fns=silu}
 SiLU 在负半轴有一段小于零的区域，导数在零附近平滑变化。
 :::
 

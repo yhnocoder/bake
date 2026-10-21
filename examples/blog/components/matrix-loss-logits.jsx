@@ -1,6 +1,6 @@
 import { For, createMemo, createSignal } from 'solid-js'
-import { Button, Controls, Segmented, createTween, formatNumber } from 'bake/kit'
-import { MathText, fadeIn } from './lib/matrix/view.jsx'
+import { Button, Controls, MathText, Segmented, createTween, formatNumber } from 'bake/kit'
+import { fadeIn } from './lib/matrix/view.jsx'
 import './lib/matrix/loss.css'
 
 export const params = {

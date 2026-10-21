@@ -5,5 +5,5 @@ date: 2026-10-19
 category: writing
 ---
 
-:::glu-heatmap{points=../glu-points.json}
+:::bar-chart{data=../ffn-share.json}
 :::
