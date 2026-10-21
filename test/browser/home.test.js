@@ -170,6 +170,21 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
+  await t.test('on a phone the pet slides out of view while the reader scrolls down and the settings button stays', async () => {
+    const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+    const shown = () => page.evaluate(() => ['start', 'end'].map((name) => getComputedStyle(document.querySelector(`[data-edge="${name}"]`)).visibility === 'visible'));
+    const scroll = async (delta) => {
+      for (let step = 0; step < 5; step += 1) await page.evaluate((amount) => scrollBy(0, amount), delta / 5);
+    };
+    assert.deepEqual(await shown(), [true, true]);
+    await scroll(600);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-edge="end"]')).visibility === 'hidden');
+    assert.deepEqual(await shown(), [true, false]);
+    await scroll(-200);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-edge="end"]')).visibility === 'visible');
+    await context.close();
+  });
+
   await t.test('on a phone a preview in the middle of the screen waits until the scrolling stops', async () => {
     const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
     const jacobian = cardIn('category', '2026-09/jacobian/');
