@@ -81,7 +81,7 @@ test('bake build reports every syntax error fixture at the position in expected.
     writeFiles(dir, { [`${folder}/index.md`]: readFileSync(join(fixtures, name), 'utf8') });
     cpSync(join(fixtures, 'relu.svg'), join(dir, folder, 'relu.svg'));
   }
-  cpSync(join(fixtures, 'component-declaration'), dir, { recursive: true });
+  for (const name of Object.keys(expected).filter((name) => !name.endsWith('.md'))) cpSync(join(fixtures, name), dir, { recursive: true });
   const result = bake(dir, 'build');
   const lines = result.stderr.trimEnd().split('\n');
   assert.equal(lines.pop(), `${Object.keys(expected).length} errors, dist/ was not written`);

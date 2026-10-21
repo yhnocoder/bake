@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -133,7 +133,11 @@ function readBlock(article, node, parent) {
 function readComponent(article, node, attributePosition) {
   const component = article.components.get(node.name);
   if (component === undefined) {
-    article.report(node.position.start, `unknown component "${node.name}"; components/ has no ${node.name}.js or ${node.name}.jsx`);
+    article.report(node.position.start, `unknown component "${node.name}"; there is no ${node.name}.js or ${node.name}.jsx in components/ or in the components/ folder of this article`);
+    return;
+  }
+  if (component.article !== null && component.article !== posix.dirname(article.file)) {
+    article.report(node.position.start, `component "${node.name}" belongs to ${component.article} and works only in that article; move ${component.file} to components/ to use it in other articles`);
     return;
   }
   if (!component.valid) return;

@@ -1,6 +1,6 @@
-import { Sketch } from './lib/matrix/sketch.js'
-import { SketchView } from './lib/matrix/view.jsx'
-import './lib/matrix/pair.css'
+import { Sketch } from './lib/sketch.js'
+import { SketchView } from './lib/view.jsx'
+import './lib/pair.css'
 
 export const params = {}
 export const layout = { width: 'body' }

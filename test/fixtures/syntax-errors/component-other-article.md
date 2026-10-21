@@ -1,9 +1,9 @@
 ---
 title: Error fixture
-slug: component-file-outside
+slug: component-other-article
 date: 2026-10-19
 category: writing
 ---
 
-:::bar-chart{data=../ffn-share.json}
+:::bar-chart
 :::

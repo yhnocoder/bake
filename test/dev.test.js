@@ -368,24 +368,28 @@ describe('updates while bake dev runs', () => {
     assert.ok(lines.includes('No problems'), lines.join('\n'));
   });
 
-  test('bundles a changed component again and reports a broken one', async (t) => {
+  test('bundles a changed component of components/ or of the components/ folder of its article again and reports a broken one', async (t) => {
     const chart = (text) => `export const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = '${text}';\n  }\n}\n`;
-    const { dir, lines, get } = await serve(t, { 'components/demo-chart.js': chart('first text'), 'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }) });
-    const chunk = async () => {
-      const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
-      const name = /demo-chart-[\w-]+\.js/.exec(await (await get(`/${runtime}`)).text())[0];
-      return (await get(`/assets/${name}`)).text();
-    };
-    assert.match(await chunk(), /first text/);
-    await save(dir, { 'components/demo-chart.js': chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
-    await save(dir, { 'components/demo-chart.js': "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
-    assert.equal(lines.at(-2), 'components/demo-chart.js:1:38 demo-chart: layout.frame must be true or false, got "no"');
+    for (const file of ['components/demo-chart.js', 'content/posts/rope/components/demo-chart.js']) {
+      await t.test(file, async (t) => {
+        const { dir, lines, get } = await serve(t, { [file]: chart('first text'), 'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }) });
+        const chunk = async () => {
+          const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
+          const name = /demo-chart-[\w-]+\.js/.exec(await (await get(`/${runtime}`)).text())[0];
+          return (await get(`/assets/${name}`)).text();
+        };
+        assert.match(await chunk(), /first text/);
+        await save(dir, { [file]: chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
+        await save(dir, { [file]: "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
+        assert.equal(lines.at(-2), `${file}:1:38 demo-chart: layout.frame must be true or false, got "no"`);
+      });
+    }
   });
 
   test('checks an article again when a component that it names is added or changes its parameters', async (t) => {
     const chart = (params) => `export const params = { ${params} };\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {}\n`;
     const { dir, lines } = await serve(t, { 'content/posts/rope/index.md': article({ body: ':::demo-chart{size=2}\n:::\n' }) });
-    assert.equal(lines[0], 'content/posts/rope/index.md:7:1 unknown component "demo-chart"; components/ has no demo-chart.js or demo-chart.jsx');
+    assert.equal(lines[0], 'content/posts/rope/index.md:7:1 unknown component "demo-chart"; there is no demo-chart.js or demo-chart.jsx in components/ or in the components/ folder of this article');
     await save(dir, { 'components/demo-chart.js': chart("size: { label: 'Size', type: 'number', default: 1 }") }, () => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
     await save(dir, { 'components/demo-chart.js': chart("scale: { label: 'Scale', type: 'number', default: 1 }") }, () => lines.at(-1) === '1 error', `bake dev printed ${JSON.stringify(lines)}`);
     assert.match(lines.at(-2), /^content\/posts\/rope\/index\.md:7:\d+ .*size/);

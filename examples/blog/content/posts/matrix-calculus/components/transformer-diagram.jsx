@@ -1,8 +1,8 @@
 import { Show } from 'solid-js'
 import { createElementSize } from 'bake/kit'
-import { Sketch } from './lib/matrix/sketch.js'
-import { chainArrows, drawChain } from './lib/matrix/graph.js'
-import { SketchView } from './lib/matrix/view.jsx'
+import { Sketch } from './lib/sketch.js'
+import { chainArrows, drawChain } from './lib/graph.js'
+import { SketchView } from './lib/view.jsx'
 
 export const params = {}
 export const layout = { width: 'body' }

@@ -1,5 +1,5 @@
 import { niceTicks } from 'bake/kit';
-import './lib/bar-chart.css';
+import './bar-chart.css';
 
 export const params = {
   data: { label: '数据文件', type: 'file', default: '' },

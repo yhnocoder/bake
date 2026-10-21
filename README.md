@@ -72,7 +72,8 @@ my-blog/
       2026-10/
         llm-act-fns/
           index.md      one article per folder, with its images and data next to it
-  components/           interactive components, one file each
+          components/   optional: components that only this article uses
+  components/           interactive components that any article can use, one file each
   themes/               optional: the blog's own themes
   public/               copied unchanged to the site root (favicon, CNAME)
   dist/                 build output, not committed
@@ -253,7 +254,9 @@ The curve of SiLU. Drag the slider to change β.
 
 The text between the two lines is the caption under the component, written in Markdown; a component without a caption has nothing between them. A component is always a block of its own and cannot appear inside a paragraph.
 
-The file name is both the custom element name and the block name, so it uses lowercase letters and digits with at least one `-`, such as `act-fn-plot`. A name that HTML reserves, such as `font-face`, the name of a built-in block, such as `aside`, and two files with the same name and different extensions are errors.
+A component that only one article uses can live in a `components/` folder inside the folder of that article, such as `content/posts/2026-10/llm-act-fns/components/glu-heatmap.jsx`. Only that article can show it; a block of it in another article is an error at the block. The files of this folder, with the modules and styles that its components import, are not published with the article. `bake dev` rebuilds the components when a file in it changes, as it does for `components/`.
+
+The file name is both the custom element name and the block name, so it uses lowercase letters and digits with at least one `-`, such as `act-fn-plot`. A name that HTML reserves, such as `font-face`, the name of a built-in block, such as `aside`, and two files with the same name in the whole blog, in `components/` or in the `components/` folder of any article and with the same or a different extension, are errors, reported at each of the files.
 
 ```jsx
 import './act-fn-plot.css';

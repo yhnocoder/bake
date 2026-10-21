@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { Axes, Controls, Curve, MathText, Plot, Segmented, Slider, SvgTex, Tex, createElementSize, formatNumber, usePlot } from 'bake/kit'
-import { fn } from './lib/activations.js'
-import { fadeIn } from './lib/matrix/view.jsx'
+import { fn } from '../../../../components/lib/activations.js'
+import { fadeIn } from './lib/view.jsx'
 
 export const params = {
   fn: { label: '函数', type: 'enum', options: ['cube', 'sin', 'ln', 'swish'], default: 'cube' },

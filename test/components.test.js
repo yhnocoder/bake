@@ -79,7 +79,7 @@ describe('component files', () => {
       'components/syntax-plot.jsx:3:17 syntax-plot: Unexpected token',
       'components/wide-plot.js:1:25 wide-plot: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "120%"',
       'content/posts/rope/index.md:10:14 parameter "size" of grid-view must be between 1 and 9, got 12',
-      'content/posts/rope/index.md:13:1 unknown component "other-view"; components/ has no other-view.js or other-view.jsx',
+      'content/posts/rope/index.md:13:1 unknown component "other-view"; there is no other-view.js or other-view.jsx in components/ or in the components/ folder of this article',
       'content/posts/rope/index.md:16:15 parameter "fn" of const-plot must be one of a or b, got "c"',
       'content/posts/rope/index.md:16:20 parameter "n-max" of const-plot must be at least -2, got -3',
     ];
@@ -139,7 +139,7 @@ describe('component blocks', () => {
   test('reports unknown components, :::{width=…} around a component and keeps the component of a broken file silent', async () => {
     const all = new Map([...components, ...declare({ 'broken-plot': { valid: false } })]);
     assert.deepEqual((await parse(':::fn-plot\n:::\n\n::::{width=wide}\n:::glu-heatmap\n:::\n::::\n\n:::broken-plot{bta=1}\n:::\n', { components: all })).errors, [
-      'index.md:7:1 unknown component "fn-plot"; components/ has no fn-plot.js or fn-plot.jsx',
+      'index.md:7:1 unknown component "fn-plot"; there is no fn-plot.js or fn-plot.jsx in components/ or in the components/ folder of this article',
       'index.md:10:1 write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it',
     ]);
   });
@@ -191,6 +191,44 @@ describe('building components', () => {
     assert.ok(!scripts.some((source) => source.includes('computations created outside')), 'no script contains the development build of Solid');
     const sources = assets.filter((name) => /\.(js|css)$/.test(name) && !name.startsWith('essay-')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
     assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no component asset contains code of bake/kit');
+  });
+
+  test('a component in the components/ folder of an article, at any depth, works in that article and is not published as a file of it', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/shared-view.js': `${height}export default class SharedView extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::rope-plot\n:::\n\n:::shared-view\n:::\n' }),
+      'content/posts/rope/components/rope-plot.js': `import { scale } from './lib/scale.js';\n\n${height}export default class RopePlot extends HTMLElement {\n  connectedCallback() {\n    this.textContent = String(scale);\n  }\n}\n`,
+      'content/posts/rope/components/lib/scale.js': 'export const scale = 2;\n',
+      'content/posts/2026/gelu/index.md': article({ slug: 'gelu', body: ':::gelu-plot\n:::\n' }),
+      'content/posts/2026/gelu/components/gelu-plot.js': `${height}export default class GeluPlot extends HTMLElement {}\n`,
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const assets = readdirSync(join(dir, 'dist/assets'));
+    assert.ok(assets.some((name) => /^rope-plot-[\w-]+\.js$/.test(name)));
+    assert.ok(assets.some((name) => /^gelu-plot-[\w-]+\.js$/.test(name)));
+    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/rope')).sort(), ['index.html', 'index.md']);
+    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/gelu')).sort(), ['index.html', 'index.md']);
+  });
+
+  test('reports a component that another article uses at its use, and a component name defined twice at both files', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/twice-view.js': `${height}export default class TwiceView extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::rope-plot\n:::\n' }),
+      'content/posts/rope/components/rope-plot.js': `${height}export default class RopePlot extends HTMLElement {}\n`,
+      'content/posts/rope/components/twice-view.jsx': `${height}export default function TwiceView() {\n  return null;\n}\n`,
+      'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'Text.\n\n:::rope-plot\n:::\n\n:::twice-view\n:::\n' }),
+    });
+    const result = bake(dir, 'build');
+    const twice = 'twice-view: components/twice-view.js and content/posts/rope/components/twice-view.jsx both define the component; a component name is unique in the blog, so rename or remove all but one of them';
+    assert.deepEqual(result.stderr.trimEnd().split('\n'), [
+      `components/twice-view.js:1:1 ${twice}`,
+      'content/posts/gelu/index.md:9:1 component "rope-plot" belongs to content/posts/rope and works only in that article; move content/posts/rope/components/rope-plot.js to components/ to use it in other articles',
+      `content/posts/rope/components/twice-view.jsx:1:1 ${twice}`,
+      '3 errors, dist/ was not written',
+    ]);
   });
 
   test('bundles the parts of bake/kit and their styles with the components that use them, and the plain helpers without the styles', (t) => {

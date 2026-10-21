@@ -1,8 +1,8 @@
 import { For, Show, createSignal } from 'solid-js'
 import { Button, MathText, SvgTex, Tex } from 'bake/kit'
-import { Sketch } from './lib/matrix/sketch.js'
-import { SketchLayer, fadeIn } from './lib/matrix/view.jsx'
-import './lib/matrix/steps.css'
+import { Sketch } from './lib/sketch.js'
+import { SketchLayer, fadeIn } from './lib/view.jsx'
+import './lib/steps.css'
 
 export const params = {
   step: { label: '初始步骤', type: 'number', min: 1, max: 8, step: 1, default: 1 },

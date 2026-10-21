@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { parseSync } from 'vite';
-import { describeValue, errorAt, fileStart } from '../report.js';
+import { describeValue, errorAt, fileStart, listAll } from '../report.js';
 import { HEIGHT_FUNCTION, REMOVED_LAYOUT_FIELDS, layoutProblems, paramProblems } from './declarations.js';
 
 export const COMPONENTS_DIR = 'components';
@@ -21,39 +21,52 @@ class NotLiteral extends Error {
   }
 }
 
-export function readComponents(root, { builtInBlocks }, errors) {
+// A component in components/ serves every article; one in the components/ folder of an article serves only that article.
+export function readComponents(root, { builtInBlocks, articleDirs }, errors) {
   const components = new Map();
-  for (const [name, file] of componentFiles(root, builtInBlocks, errors)) {
+  const folders = [null, ...articleDirs].map((article) => ({ article, dir: article === null ? COMPONENTS_DIR : posix.join(article, COMPONENTS_DIR) }));
+  for (const { name, file, article, duplicate } of componentFiles(root, folders, builtInBlocks, errors)) {
     const path = join(root, file);
     const source = readFileSync(path, 'utf8');
     const count = errors.length;
     const report = (node, message) => errors.push(errorAt(file, node === null ? fileStart : positionAt(source, node.start), `${name}: ${message}`));
     const { params, layout, solid } = readDeclarations(file, source, report);
-    components.set(name, { name, file, path, params, layout, solid, valid: errors.length === count });
+    components.set(name, { name, file, path, article, params, layout, solid, valid: !duplicate && errors.length === count });
   }
   return components;
 }
 
-function componentFiles(root, builtInBlocks, errors) {
-  const dir = join(root, COMPONENTS_DIR);
-  const entries = statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? readdirSync(dir).sort() : [];
-  const files = new Map();
-  for (const entry of entries) {
-    const extension = COMPONENT_EXTENSIONS.find((candidate) => entry.endsWith(candidate));
-    if (extension === undefined || !statSync(join(dir, entry)).isFile()) continue;
-    const file = posix.join(COMPONENTS_DIR, entry);
-    const name = entry.slice(0, -extension.length);
-    if (!COMPONENT_NAME.test(name)) {
-      errors.push(errorAt(file, fileStart, `the file name of a component is its custom element name and its block name; use lowercase letters and digits with at least one "-", such as act-fn-plot, got "${name}"`));
-    } else if (RESERVED_NAMES.includes(name)) {
-      errors.push(errorAt(file, fileStart, `${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`));
-    } else if (builtInBlocks.includes(name)) {
-      errors.push(errorAt(file, fileStart, `${name}: :::${name} is a built-in block; give the component another name`));
-    } else if (files.has(name)) {
-      errors.push(errorAt(file, fileStart, `${name}: ${files.get(name)} and ${file} both define the component; keep one of them`));
-    } else {
-      files.set(name, file);
+function componentFiles(root, folders, builtInBlocks, errors) {
+  const found = new Map();
+  for (const { article, dir } of folders) {
+    const entries = statSync(join(root, dir), { throwIfNoEntry: false })?.isDirectory() ? readdirSync(join(root, dir)).sort() : [];
+    for (const entry of entries) {
+      const extension = COMPONENT_EXTENSIONS.find((candidate) => entry.endsWith(candidate));
+      if (extension === undefined || !statSync(join(root, dir, entry)).isFile()) continue;
+      const file = posix.join(dir, entry);
+      const name = entry.slice(0, -extension.length);
+      if (!COMPONENT_NAME.test(name)) {
+        errors.push(errorAt(file, fileStart, `the file name of a component is its custom element name and its block name; use lowercase letters and digits with at least one "-", such as act-fn-plot, got "${name}"`));
+      } else if (RESERVED_NAMES.includes(name)) {
+        errors.push(errorAt(file, fileStart, `${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`));
+      } else if (builtInBlocks.includes(name)) {
+        errors.push(errorAt(file, fileStart, `${name}: :::${name} is a built-in block; give the component another name`));
+      } else {
+        found.set(name, [...(found.get(name) ?? []), { name, file, article }]);
+      }
     }
+  }
+  const files = [];
+  for (const [name, defined] of found) {
+    if (defined.length === 1) {
+      files.push(defined[0]);
+      continue;
+    }
+    // why: the name is the custom element name of the whole blog, so two files cannot share it even in different articles
+    const message = `${name}: ${listAll(defined.map(({ file }) => file))} ${defined.length === 2 ? 'both' : 'all'} define the component; a component name is unique in the blog, so rename or remove all but one of them`;
+    for (const { file } of defined) errors.push(errorAt(file, fileStart, message));
+    // why: the first file stays as an invalid component, so that an article that uses the name reports nothing more
+    files.push({ ...defined[0], duplicate: true });
   }
   return files;
 }

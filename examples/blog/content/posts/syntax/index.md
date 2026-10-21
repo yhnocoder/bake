@@ -398,7 +398,7 @@ def swiglu(x, w_gate, w_up, w_down):
 
 ## 交互组件 {#components}
 
-交互组件是博客 `components/` 下的 custom element，名字里必须有 `-`。参数写在花括号里，没写的用默认值；开头和结尾之间的文字是图注。组件只有块写法。
+交互组件是博客 `components/` 下的 custom element，名字里必须有 `-`。只有一篇文章用的组件放在这篇文章目录的 `components/` 下，只有这篇文章能用，也不会作为文章的文件发布。组件名在整个博客里不能重复。参数写在花括号里，没写的用默认值；开头和结尾之间的文字是图注。组件只有块写法。
 
 ::::example
 :::act-fn-plot{fns=gelu dashed="gelu-tanh,gelu-quick" zoom}
@@ -406,7 +406,7 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
-这个函数图用 Bake 的部件库 `bake/kit` 写成：滑块、坐标轴、曲线、悬停读数和公式标签都来自部件库，区间、箭头和标注点是组件自己画的。部件库的颜色取主题的 CSS 变量，切换深色模式时跟着变化；公式标签用 `preamble.sty` 里的宏，和正文相同。部件库是可选的：后面的柱状图是直接写的 custom element，只用了部件库里计算刻度的函数。
+这个函数图用 Bake 的部件库 `bake/kit` 写成：滑块、坐标轴、曲线、悬停读数和公式标签都来自部件库，区间、箭头和标注点是组件自己画的。部件库的颜色取主题的 CSS 变量，切换深色模式时跟着变化；公式标签用 `preamble.sty` 里的宏，和正文相同。部件库是可选的：后面的柱状图是直接写的 custom element，只用了部件库里计算刻度的函数，它只在这篇文章里用，所以放在这篇文章目录的 `components/bar-chart.js`。
 
 不需要图注时，中间空着。组件本身就是 `:::` 块，宽度直接写在花括号里：
 
@@ -522,13 +522,14 @@ def silu(x):
 | 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
 | 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |
 | 组件参数超出范围 | `:::act-fn-plot{xmax=200}` | `parameter "xmax" of act-fn-plot must be between -100 and 100, got 200` |
-| 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; components/ has no fn-plot.js or fn-plot.jsx` |
+| 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; there is no fn-plot.js or fn-plot.jsx in components/ or in the components/ folder of this article` |
 | 组件宽度取值不对 | `:::glu-heatmap{width=full}` | `width of glu-heatmap must be body, wide, page, auto, a size in pixels such as 560px or a percentage such as 70%, got "full"` |
 | 组件的百分比宽度超过 100% | `:::glu-heatmap{width=120%}` | `width of glu-heatmap is 120%; a percentage width is at most 100% of the body column` |
 | 组件高度带了单位 | `:::glu-heatmap{height=420px}` | `height of glu-heatmap must be a positive number of pixels such as 420, got "420px"` |
 | 组件写了浮动 | `:::glu-heatmap{float=left}` | `float does not apply to components; glu-heatmap is centred in its column` |
 | 用宽度块包住组件 | `::::{width=wide}` 里面写 `:::glu-heatmap` | `write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it` |
-| 文件参数指向文章文件夹以外 | `:::bar-chart{data=../ffn-share.json}` | `parameter "data" of bar-chart must be a file in the article folder, got "../ffn-share.json"` |
+| 文件参数指向文章文件夹以外 | `:::points-plot{data=../points.json}` | `parameter "data" of points-plot must be a file in the article folder, got "../points.json"` |
+| 用了另一篇文章的组件 | 在别的文章里写 `:::bar-chart` | `component "bar-chart" belongs to content/posts/syntax and works only in that article; move content/posts/syntax/components/bar-chart.js to components/ to use it in other articles` |
 | 组件写了锚点或类名 | `:::act-fn-plot{#plot}` | `components take no id or class; remove the id from :::act-fn-plot` |
 | 组件声明不是字面量 | `components/range-plot.js` 写 `params = { n: range('N') }` | `range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |

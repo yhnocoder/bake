@@ -39,13 +39,13 @@ export function createSite(root, { drafts = false, base, shareImages = false, pr
 export async function updateSite(site, changedPaths = null) {
   const { root } = site;
   for (const cache of [site.results, site.articles, site.themes]) forgetChanged(cache, changedPaths);
-  site.settings = await siteSettings(site);
+  const found = findArticles(root);
+  site.settings = await siteSettings(site, found);
   const { settings } = site;
   if (settings.errors.length > 0) return { errors: sortErrors(settings.errors), articles: [], pages: [], siteFiles: [], assetFiles: [], assetSources: new Map(), shareImages: [], publicFiles: [] };
   const { config } = settings;
   // why: a failure is reported when compileThemes asks for the theme again after the article loop
   themeOf(site, config.theme, true).catch(() => {});
-  const found = findArticles(root);
   for (const file of site.articles.keys()) if (!found.some((article) => article.file === file)) site.articles.delete(file);
   const articles = [];
   for (const article of found) articles.push(await articleOf(site, article));
@@ -105,7 +105,7 @@ function cached(cache, name, key, compute) {
   return next.value;
 }
 
-async function siteSettings(site) {
+async function siteSettings(site, found) {
   const { root } = site;
   const themeNames = availableThemes(root);
   const settings = await cached(site.results, 'settings', themeNames.join('\n'), async () => {
@@ -115,9 +115,11 @@ async function siteSettings(site) {
     return { value, inputs: [CONFIG_FILE, PREAMBLE_FILE, ...BUILT_IN_THEMES.map((name) => posix.join(THEMES_DIR, name)), ...options, ...(pet === null ? [] : [pet])] };
   });
   if (settings.errors.length > 0) return settings;
-  const components = await cached(site.results, 'components', '', async () => {
+  const articleDirs = found.map((article) => article.dir);
+  const components = await cached(site.results, 'components', articleDirs.join('\n'), async () => {
     const errors = [];
-    return { value: { components: readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors), errors }, inputs: [COMPONENTS_DIR] };
+    const value = { components: readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES, articleDirs }, errors), errors };
+    return { value, inputs: [COMPONENTS_DIR, ...articleDirs.map((dir) => posix.join(dir, COMPONENTS_DIR))] };
   });
   return { ...settings, components: components.components, componentErrors: components.errors };
 }
@@ -222,7 +224,8 @@ async function compileComponents(site, published, errors) {
   const result = await cached(site.results, 'bundle', JSON.stringify([names, settings.preamble]), async () => {
     const bundleErrors = [];
     const components = names.map((name) => settings.components.get(name));
-    return { value: { bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors }, inputs: [COMPONENTS_DIR] };
+    const folders = components.map((component) => (component.article === null ? COMPONENTS_DIR : posix.join(component.article, COMPONENTS_DIR)));
+    return { value: { bundle: await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch }), errors: bundleErrors }, inputs: [...new Set([COMPONENTS_DIR, ...folders])] };
   });
   errors.push(...result.errors);
   return result.bundle;

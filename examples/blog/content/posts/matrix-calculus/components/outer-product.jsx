@@ -1,7 +1,7 @@
 import { For, Match, Switch, createSignal } from 'solid-js'
 import { MathText, formatNumber } from 'bake/kit'
-import { fadeIn } from './lib/matrix/view.jsx'
-import { Matrix } from './lib/matrix/matrix.jsx'
+import { fadeIn } from './lib/view.jsx'
+import { Matrix } from './lib/matrix.jsx'
 
 export const params = {}
 export const layout = { width: 'body' }

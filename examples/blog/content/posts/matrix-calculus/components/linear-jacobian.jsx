@@ -1,7 +1,7 @@
 import { Match, Switch, createSignal } from 'solid-js'
 import { Controls, MathText, Slider, Tex, formatNumber } from 'bake/kit'
-import { fadeIn } from './lib/matrix/view.jsx'
-import { Matrix } from './lib/matrix/matrix.jsx'
+import { fadeIn } from './lib/view.jsx'
+import { Matrix } from './lib/matrix.jsx'
 
 export const params = {
   x1: { label: 'x₁ 的初始值', type: 'number', min: -2, max: 2, step: 0.01, default: 1 },

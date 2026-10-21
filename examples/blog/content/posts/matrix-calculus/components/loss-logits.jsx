@@ -1,7 +1,7 @@
 import { For, createMemo, createSignal } from 'solid-js'
 import { Button, Controls, MathText, Segmented, createTween, formatNumber } from 'bake/kit'
-import { fadeIn } from './lib/matrix/view.jsx'
-import './lib/matrix/loss.css'
+import { fadeIn } from './lib/view.jsx'
+import './lib/loss.css'
 
 export const params = {
   vocab: { label: 'Vocab size', type: 'enum', options: ['5', '6', '7', '8'], default: '6' },

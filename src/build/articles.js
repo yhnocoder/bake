@@ -1,4 +1,5 @@
 import { join, posix } from 'node:path';
+import { COMPONENTS_DIR } from '../components/read.js';
 import { listFiles } from './files.js';
 
 export const POSTS_DIR = 'content/posts';
@@ -13,7 +14,7 @@ export function findArticles(root) {
       file: posix.join(POSTS_DIR, prefix, 'index.md'),
       dir: posix.join(POSTS_DIR, dir),
       files: files
-        .filter((file) => file.startsWith(prefix) && file !== `${prefix}index.md` && !nested.some((other) => file.startsWith(other)))
+        .filter((file) => file.startsWith(prefix) && file !== `${prefix}index.md` && !file.startsWith(`${prefix}${COMPONENTS_DIR}/`) && !nested.some((other) => file.startsWith(other)))
         .map((file) => file.slice(prefix.length)),
     };
   });

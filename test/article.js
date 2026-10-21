@@ -63,7 +63,7 @@ export function withoutCopySource(value) {
 }
 
 export function components(declarations) {
-  return new Map(Object.entries(declarations).map(([name, { params = {}, layout = { height: 100 }, valid = true }]) => [name, { name, valid, params, layout }]));
+  return new Map(Object.entries(declarations).map(([name, { params = {}, layout = { height: 100 }, valid = true }]) => [name, { name, article: null, valid, params, layout }]));
 }
 
 export function folder(path) {

@@ -1,5 +1,5 @@
-import { Sketch } from './lib/matrix/sketch.js'
-import { SketchView } from './lib/matrix/view.jsx'
+import { Sketch } from './lib/sketch.js'
+import { SketchView } from './lib/view.jsx'
 
 export const params = {
   paths: {

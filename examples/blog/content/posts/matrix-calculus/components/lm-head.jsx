@@ -1,6 +1,6 @@
-import { Sketch, ink } from './lib/matrix/sketch.js'
-import { chainArrows, drawChain } from './lib/matrix/graph.js'
-import { SketchView } from './lib/matrix/view.jsx'
+import { Sketch, ink } from './lib/sketch.js'
+import { chainArrows, drawChain } from './lib/graph.js'
+import { SketchView } from './lib/view.jsx'
 
 const steps = ['x', 'head', 'z', 'softmax', 'p', 'ce', 'loss']
 
