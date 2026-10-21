@@ -1,0 +1,56 @@
+{
+  "name": "bake",
+  "displayName": "Bake",
+  "description": "Preview the articles of a Bake blog next to the editor, with problems, completions and highlighting for Bake's Markdown syntax",
+  "version": "0.1.0",
+  "publisher": "yhnocoder",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yhnocoder/bake.git",
+    "directory": "editors/vscode"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "files": [
+    "extension.js",
+    "completions.js",
+    "syntaxes"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "bake.openPreview",
+        "title": "Open Preview to the Side",
+        "category": "Bake",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "bake.openPreview",
+          "when": "resourceFilename == index.md",
+          "group": "navigation"
+        }
+      ]
+    },
+    "grammars": [
+      {
+        "scopeName": "markdown.bake.injection",
+        "path": "./syntaxes/bake.json",
+        "injectTo": [
+          "text.html.markdown"
+        ]
+      }
+    ]
+  }
+}

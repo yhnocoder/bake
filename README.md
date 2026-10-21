@@ -52,11 +52,33 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 
 Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While the blog has errors, every page keeps showing the last version without errors, and the pages update again when the errors are fixed. When `bake dev` starts on a blog whose articles have errors, it shows the pages with those errors.
 
-Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
+Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts. In the preview of the [VS Code extension](#editing-in-visual-studio-code), it moves the editor to that line.
 
 Every component of the article shows a parameter bar above it, with one control per parameter. Moving a control changes the running component at once, and a control whose value differs from the Markdown is marked orange. Write to file changes the attributes of the component's `:::` line in `index.md` and leaves the rest of the file as it is; parameters set back to their default are removed from the line. Copy puts that line on the clipboard without changing the file, and Reset goes back to the values in the Markdown. When `index.md` changed after the page was built, Write to file refuses and asks you to save the file and try again. The Parameter bars switch at the top of the problems list hides and shows the bars.
 
 A draft shows the label Draft, or 草稿 on a Chinese site, next to its date on its page and on its card on the homepage. An address without a page lists every article with a link, drafts included.
+
+### Editing in Visual Studio Code
+
+The folder `editors/vscode/` of the Bake repository holds an extension for Visual Studio Code that shows the article next to the editor while you write it. Install it from a clone of the repository:
+
+```bash
+git clone https://github.com/yhnocoder/bake.git
+cd bake/editors/vscode
+npx @vscode/vsce package --skip-license --out bake.vsix
+code --install-extension bake.vsix
+```
+
+When you open the `index.md` of an article in a blog whose npm packages are installed, the extension starts `bake dev --no-open` for that blog with the `node` command, from `node_modules/@yhnocoder/bake`, and stops it when VS Code closes. The Bake channel of the Output panel shows what `bake dev` prints, such as the address it serves. The extension then adds these features to the article:
+
+- **Bake: Open Preview to the Side**, also a button at the top of the editor, shows the page of the article next to the editor as `bake dev` serves it, with its components and their parameter bars. When you switch to the editor of another article, the preview shows that article.
+- Scrolling the editor scrolls the preview to the block that starts at the top line of the editor, and double-clicking a block in the preview moves the editor to the line where the block starts.
+- While the preview is open, it shows the text of the editor as you type, a moment after you stop, without saving. The problems then refer to the unsaved text, and Write to file in a parameter bar refuses until you save. Saving the file, or closing it without saving, goes back to the file on disk.
+- The problems that `bake dev` reports appear in the Problems panel and are underlined in the editor.
+- Completions: after `:::` at the start of a line, the blocks of Bake, the blocks of the theme of the article and the components that the article can use; when the next line is empty, the completion also adds the closing `:::` line. Inside the braces of a `:::` line, the attributes and parameters that the block takes, and after `=` the values of an enum or a boolean. After `[@` the keys of `:::references`, after `[^` the footnotes of the article, and after `\eqref{` the labels of its equations.
+- Highlighting of `:::` lines and their attributes, heading attributes such as `{#act-fns toc="Activation functions"}`, paragraph anchors such as `^gelu-cost`, citations and `\eqref`.
+
+`bake dev` lets only its own pages and VS Code show its pages in a frame.
 
 ## A blog repository
 

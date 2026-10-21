@@ -34,7 +34,7 @@ const processor = unified()
 
 const TITLE = { text: 'text in quotes, for example title="Notes"' };
 const WIDTH = { choices: WIDTHS };
-const BUILT_IN_BLOCKS = {
+export const BUILT_IN_BLOCKS = {
   aside: { title: TITLE },
   fold: { title: TITLE },
   recap: {},

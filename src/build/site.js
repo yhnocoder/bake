@@ -33,7 +33,7 @@ const QUERY = /\?.*$/;
 
 export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
   // why: Vite reports module paths with symbolic links resolved, and they are compared with paths under the root
-  return { root: realpathSync(root), drafts, base, shareImages, prefetch, settings: null, results: new Map(), articles: new Map(), themes: new Map() };
+  return { root: realpathSync(root), drafts, base, shareImages, prefetch, settings: null, results: new Map(), articles: new Map(), themes: new Map(), unsaved: new Map() };
 }
 
 export async function updateSite(site, changedPaths = null) {
@@ -279,14 +279,14 @@ async function articleOf(site, found) {
       return settings.components.get(name);
     },
   };
-  const article = await loadArticle(root, found, { ...settings, components });
+  const source = site.unsaved.get(found.file) ?? readFileSync(join(root, found.file), 'utf8');
+  const article = await loadArticle(root, found, source, { ...settings, components });
   site.articles.set(found.file, { article, lookups: [...lookups], key: key([...lookups]), inputs: [found.file, ...found.files.map((file) => posix.join(found.dir, file))] });
   return article;
 }
 
-async function loadArticle(root, article, { rules, preamble, components, markdown }) {
+async function loadArticle(root, article, source, { rules, preamble, components, markdown }) {
   const errors = [];
-  const source = readFileSync(join(root, article.file), 'utf8');
   const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
   const fields = frontMatter?.fields ?? null;
   const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;

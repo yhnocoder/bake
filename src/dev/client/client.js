@@ -6,6 +6,8 @@ const { source, missing, file, token } = script.dataset;
 const scrollKey = `bake-dev-scroll:${location.pathname}`;
 const pagePath = location.pathname.replace(/index\.html$/, '');
 const BARS_KEY = 'bake-dev-param-bars';
+// why: the preview of the Bake extension for VS Code shows this page in a frame and talks to it with messages
+const editor = window.parent === window ? null : window.parent;
 
 let pristine = null;
 let outline = JSON.parse(script.dataset.outline ?? '[]');
@@ -30,6 +32,10 @@ const loaded =
 const connected = connect();
 Promise.all([loaded, connected]).then(overlay.ready);
 document.addEventListener('dblclick', openInEditor);
+if (editor !== null) {
+  addEventListener('message', answerEditor);
+  editor.postMessage({ bake: 'ready', file: file ?? null }, '*');
+}
 
 function connect() {
   const events = new EventSource('/__bake/events');
@@ -281,5 +287,25 @@ function openInEditor(event) {
   if (event.composedPath().some((target) => target instanceof Element && target.matches('bake-param-bar'))) return;
   const block = event.target.closest(BLOCKS);
   if (block === null) return;
-  window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
+  if (editor === null) window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
+  else editor.postMessage({ bake: 'open', file, line: Number(block.dataset.line) }, '*');
+}
+
+function answerEditor(event) {
+  if (event.source !== editor) return;
+  const { bake, line, text } = event.data ?? {};
+  if (bake === 'reveal' && Number.isInteger(line)) reveal(line);
+  if (bake === 'source' && token !== undefined && (typeof text === 'string' || text === null)) {
+    fetch('/__bake/source', { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token }, body: JSON.stringify({ file: event.data.file, text }) });
+  }
+}
+
+function reveal(line) {
+  let target = null;
+  for (const block of document.querySelectorAll(BLOCKS)) {
+    const start = Number(block.dataset.line);
+    if (start <= line && (target === null || start > Number(target.dataset.line)) && isShown(block)) target = block;
+  }
+  if (target === null) scrollTo({ top: 0, behavior: 'instant' });
+  else target.scrollIntoView({ block: 'start', behavior: 'instant' });
 }

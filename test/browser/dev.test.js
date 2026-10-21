@@ -381,6 +381,35 @@ test('bake dev updates a page with a save that it made while the event stream wa
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
+test('bake dev in a frame of an editor scrolls to the line the editor names, sends a double-clicked block to the editor and shows the unsaved text', async (t) => {
+  const source = article({ title: 'Live', slug: 'live', body });
+  const editor = '<!doctype html><title>Editor</title><iframe src="/2026-10/live/" style="width: 1200px; height: 800px"></iframe><script>window.messages = []; addEventListener("message", (event) => window.messages.push(event.data));</script>\n';
+  const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: source, 'public/editor.html': editor });
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const browser = await launchBrowser();
+  const page = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+  t.after(() => page.close());
+  await page.goto(`${server.url}editor.html`);
+  await page.waitForFunction(() => window.messages.some((message) => message.bake === 'ready'));
+  assert.deepEqual(await page.evaluate(() => window.messages.find((message) => message.bake === 'ready')), { bake: 'ready', file: ARTICLE });
+  const frame = page.frameLocator('iframe');
+  const send = (message) => page.evaluate((data) => document.querySelector('iframe').contentWindow.postMessage(data, '*'), message);
+
+  await send({ bake: 'reveal', line: lineOf(source, 'Paragraph 2 about the distance') + 1 });
+  const far = frame.locator('.bk-block', { hasText: 'Paragraph 2 about the distance' });
+  const top = () => far.evaluate((element) => element.getBoundingClientRect().top);
+  await until(async () => (await top()) >= 0 && (await top()) < 50, 'the paragraph at the named line is not at the top of the frame');
+
+  await frame.locator('.bk-block', { hasText: 'The edited paragraph' }).dblclick();
+  await until(() => page.evaluate(() => window.messages.some((message) => message.bake === 'open')), 'the double-click sent nothing to the editor');
+  assert.deepEqual(await page.evaluate(() => window.messages.find((message) => message.bake === 'open')), { bake: 'open', file: ARTICLE, line: lineOf(source, 'The edited paragraph') });
+
+  await send({ bake: 'source', file: ARTICLE, text: source.replace('says hello', 'says goodbye before saving') });
+  await frame.locator('.bk-block', { hasText: 'says goodbye before saving' }).waitFor();
+  assert.equal(readFileSync(join(dir, ARTICLE), 'utf8'), source);
+});
+
 test('bake dev shows a parameter bar on each component of the article that changes, writes, copies and resets its parameters', async (t) => {
   const dir = copyExample(t);
   const file = join(dir, SYNTAX);
