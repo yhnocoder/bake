@@ -387,8 +387,8 @@ describe('updates while bake dev runs', () => {
     };
     assert.match(await chunk(), /first text/);
     await saveUntil(dir, { 'components/demo-chart.js': chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
-    await saveUntil(dir, { 'components/demo-chart.js': 'export default class DemoChart extends HTMLElement {}\n' }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
-    assert.equal(lines.at(-2), 'components/demo-chart.js:1:1 demo-chart: layout must be an object with at least height, for example export const layout = { height: 360 }, got undefined');
+    await saveUntil(dir, { 'components/demo-chart.js': "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
+    assert.equal(lines.at(-2), 'components/demo-chart.js:1:38 demo-chart: layout.frame must be true or false, got "no"');
   });
 
   test('keeps every page while bake.config.js has problems and uses the fixed configuration', async (t) => {

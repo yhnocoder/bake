@@ -103,7 +103,7 @@ async function readSettings(root) {
   const preamble = await readMathPreamble(root, errors);
   const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const componentErrors = [];
-  const components = errors.length > 0 ? new Map() : await readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
+  const components = errors.length > 0 ? new Map() : readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id), theme: config.theme, options: themeOptions, optionProblem };
   return { errors, config, preamble, pet, components, componentErrors, rules };
 }

@@ -11,8 +11,8 @@ export const params = {
 }
 export const layout = {
   width: 'body',
-  height: (params) => (params.brace ? 320 : 400),
-  narrowHeight: (params) => (params.brace ? 295 : 376),
+  height: 400,
+  narrowHeight: 376,
 }
 
 const chain = [

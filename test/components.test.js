@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, symlinkSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import { components as declare, parse, parsed } from './article.js';
 import { article, bake, createBlog, validConfig } from './blog.js';
@@ -25,14 +24,14 @@ describe('component files', () => {
     const reserved = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
-      'components/lib/size.js': 'export const unit = 8;\n\nexport const screen = window.innerWidth;\n',
-      'components/lib-plot.js': `import { screen } from './lib/size.js';\n\n${height}export default function LibPlot() {\n  return screen;\n}\n`,
-      'components/top-plot.js': `${height}const dark = matchMedia('(prefers-color-scheme: dark)');\n${component}`,
-      'components/agent-plot.js': `${height}export const agent = navigator.userAgent;\n${component}`,
-      'components/store-plot.js': `${height}  const saved = localStorage.getItem('x');\n${component}`,
+      'components/lib/names.js': "export const names = ['a', 'b'];\n",
+      'components/top-plot.js': `${height}export const dark = matchMedia('(prefers-color-scheme: dark)');\nthrow new Error('no data');\n${component}`,
       'components/syntax-plot.jsx': `${height}export default function SyntaxPlot() {\n  return <div>{</div>;\n}\n`,
-      'components/import-plot.js': `import missing from 'not-a-package';\n${height}${component}`,
-      'components/throw-plot.js': `${height}throw new Error('no data');\n${component}`,
+      'components/const-plot.js': `const OPTIONS = ['a', 'b'];\nconst HEIGHT = 120;\nexport const params = {\n  fn: { label: \`F\`, type: 'enum', options: OPTIONS, default: 'b' },\n  'n-max': { label: 'N', type: 'number', min: -2, default: -1.5 },\n};\nexport const layout = { height: HEIGHT, frame: false };\n${component}`,
+      'components/call-plot.js': `const range = (label) => ({ label, type: 'number', default: 1 });\nexport const params = { n: range('N'), m: { label: \`M \${1}\`, type: 'text', default: '' } };\n${height}${component}`,
+      'components/name-plot.js': `import { names } from './lib/names.js';\n\nexport const params = { fn: { label: 'F', type: 'enum', options: names, default: 'a' } };\n${height}${component}`,
+      'components/function-plot.js': `export const layout = { height: (params) => 100 };\n${component}`,
+      'components/let-plot.js': `export let layout = { height: 100 };\n${component}`,
       ...Object.fromEntries(reserved.map((name) => [`components/${name}.js`, `${height}${component}`])),
       'components/bad-type.js': `export const params = { n: { label: 'N', type: 'integer', default: 1 } };\n${height}${component}`,
       'components/reserved-name.js': `export const params = { width: { label: 'W', type: 'number', default: 1 } };\n${height}${component}`,
@@ -46,43 +45,46 @@ describe('component files', () => {
       'components/list-table.js': component,
       'components/grid-view.js': `export const params = { size: { label: 'Size', type: 'number', min: 1, max: 9, default: 3 } };\n${height}${component}`,
       'components/README.md': 'Not a component.\n',
-      'content/posts/rope/index.md': article({ body: ':::top-plot\n:::\n\n:::grid-view{size=12}\n:::\n\n:::other-view\n:::\n' }),
+      'content/posts/rope/index.md': article({ body: ':::top-plot\n:::\n\n:::grid-view{size=12}\n:::\n\n:::other-view\n:::\n\n:::const-plot{fn=c n-max=-3}\n:::\n' }),
     });
     const result = bake(dir, 'build');
     const lines = result.stderr.trimEnd().split('\n');
-    const reason = 'at the top level; the build reads params and layout in Node, so use it inside the component code';
+    const literals = 'strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value';
     const expected = [
-      `components/agent-plot.js:2:22 agent-plot: components/agent-plot.js uses the browser API navigator ${reason}`,
-      `components/lib/size.js:3:23 lib-plot: components/lib-plot.js uses the browser API window ${reason}`,
-      `components/store-plot.js:2:17 store-plot: components/store-plot.js uses the browser API localStorage ${reason}`,
-      `components/top-plot.js:2:14 top-plot: components/top-plot.js uses the browser API matchMedia ${reason}`,
-      "components/import-plot.js:1:1 import-plot: components/import-plot.js cannot be read in Node: Cannot find module 'not-a-package' imported from 'components/import-plot.js'",
-      'components/syntax-plot.jsx:3:17 syntax-plot: Unexpected token',
-      'components/throw-plot.js:2:7 throw-plot: components/throw-plot.js cannot be read in Node: no data',
       ...reserved.map((name) => `components/${name}.js:1:1 ${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`),
       'components/Plot_Name.js:1:1 the file name of a component is its custom element name and its block name; use lowercase letters and digits with at least one "-", such as act-fn-plot, got "Plot_Name"',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "n" must be between 1 and 10, got 20',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "on" must be true or false, got "yes"',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "fn" must be one of a or b, got "c"',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "t" must be text, got 3',
-      'components/bad-field.js:1:1 bad-field: parameter "n" has the unknown field "optons"; the fields of a text parameter are label, type and default',
-      'components/bad-field.js:1:1 bad-field: parameter "m" needs a label, the text shown next to its control',
-      'components/bad-field.js:1:1 bad-field: parameter "k" needs a default, the value used when the article does not set it',
-      'components/bad-layout.js:1:1 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight, autoHeight and frame',
-      'components/bad-layout.js:1:1 bad-layout: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "full"',
-      'components/bad-layout.js:1:1 bad-layout: layout.height must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got "300px"',
-      'components/bad-layout.js:1:1 bad-layout: layout.narrowHeight must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got an object',
-      'components/bad-layout.js:1:1 bad-layout: layout.autoHeight must be true or false, got 1',
-      'components/bad-layout.js:1:1 bad-layout: layout.frame must be true or false, got "no"',
-      'components/bad-type.js:1:1 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
-      "components/empty-enum.js:1:1 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
+      'components/bad-default.js:1:25 bad-default: the default of parameter "n" must be between 1 and 10, got 20',
+      'components/bad-default.js:1:90 bad-default: the default of parameter "on" must be true or false, got "yes"',
+      'components/bad-default.js:1:144 bad-default: the default of parameter "fn" must be one of a or b, got "c"',
+      'components/bad-default.js:1:213 bad-default: the default of parameter "t" must be text, got 3',
+      'components/bad-field.js:1:25 bad-field: parameter "n" has the unknown field "optons"; the fields of a text parameter are label, type and default',
+      'components/bad-field.js:1:83 bad-field: parameter "m" needs a label, the text shown next to its control',
+      'components/bad-field.js:1:118 bad-field: parameter "k" needs a default, the value used when the article does not set it',
+      'components/bad-layout.js:1:25 bad-layout: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "full"',
+      'components/bad-layout.js:1:40 bad-layout: layout.height must be a number of pixels or { ratio }, the width divided by the height, such as { ratio: 1.5 }, got "300px"',
+      'components/bad-layout.js:1:57 bad-layout: layout.narrowHeight must be a number of pixels or { ratio }, the width divided by the height, such as { ratio: 1.5 }, got an object',
+      'components/bad-layout.js:1:86 bad-layout: layout.frame must be true or false, got "no"',
+      'components/bad-layout.js:1:99 bad-layout: layout.autoHeight must be true or false, got 1',
+      'components/bad-layout.js:1:114 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight, autoHeight and frame',
+      'components/bad-type.js:1:25 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
+      `components/call-plot.js:2:28 call-plot: the build reads params without running the file, so write it with ${literals}; got a call`,
+      `components/call-plot.js:2:52 call-plot: the build reads params without running the file, so write it with ${literals}; got a template string with \${…}`,
+      "components/empty-enum.js:1:25 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
+      'components/function-plot.js:1:23 function-plot: layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 1.5 }',
+      `components/function-plot.js:1:33 function-plot: the build reads layout without running the file, so write it with ${literals}; got a function`,
+      'components/let-plot.js:1:1 let-plot: layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 1.5 }',
+      'components/let-plot.js:1:12 let-plot: declare layout as export const layout = { … }, which the build reads without running the file',
       'components/list-table.js:1:1 list-table: :::list-table is a built-in block; give the component another name',
+      `components/name-plot.js:3:66 name-plot: the build reads params without running the file, so write it with ${literals}; got "names", which is not a constant of this file with such a value`,
       'components/no-default-export.js:1:1 no-default-export: the default export must be a SolidJS component or a class that extends HTMLElement',
-      'components/no-height.js:1:1 no-height: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "120%"',
-      'components/no-height.js:1:1 no-height: layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 16 / 9 }',
-      'components/reserved-name.js:1:1 reserved-name: parameter "width" uses a name reserved for Bake; a component cannot declare width, height, id or class',
+      'components/no-height.js:1:23 no-height: layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 1.5 }',
+      'components/no-height.js:1:25 no-height: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "120%"',
+      'components/reserved-name.js:1:25 reserved-name: parameter "width" uses a name reserved for Bake; a component cannot declare width, height, id or class',
+      'components/syntax-plot.jsx:3:17 syntax-plot: Unexpected token',
       'content/posts/rope/index.md:10:14 parameter "size" of grid-view must be between 1 and 9, got 12',
       'content/posts/rope/index.md:13:1 unknown component "other-view"; components/ has no other-view.js or other-view.jsx',
+      'content/posts/rope/index.md:16:15 parameter "fn" of const-plot must be one of a or b, got "c"',
+      'content/posts/rope/index.md:16:20 parameter "n-max" of const-plot must be at least -2, got -3',
     ];
     assert.equal(lines.pop(), `${expected.length} errors, dist/ was not written`);
     assert.deepEqual(lines.toSorted(), expected.toSorted());
@@ -135,17 +137,6 @@ describe('component blocks', () => {
       'index.md:10:1 parameter "data" of act-fn-plot defaults to "data.csv", which is not a file in the article folder',
       'index.md:13:16 parameter "data" of act-fn-plot must be a file in the article folder, got "../grid.json"',
     ]);
-  });
-
-  test('reports layout height functions that throw or return an invalid height at the block', async () => {
-    const broken = (heightOf) => declare({ 'act-fn-plot': { params: plot, layout: { height: heightOf } } });
-    assert.deepEqual((await parse(':::act-fn-plot{range=3}\n:::\n', { components: broken(() => '300px') })).errors, [
-      'index.md:7:1 act-fn-plot: layout.height returns "300px" for these parameters; it must return a number of pixels or { ratio: width / height }',
-    ]);
-    const throwing = () => {
-      throw new Error('unknown range');
-    };
-    assert.deepEqual((await parse(':::act-fn-plot\n:::\n', { components: broken(throwing) })).errors, ['index.md:7:1 act-fn-plot: layout.height throws for these parameters: unknown range']);
   });
 
   test('reports unknown components, :::{width=…} around a component and keeps the component of a broken file silent', async () => {
@@ -220,19 +211,5 @@ describe('building components', () => {
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);
     assert.match(readFileSync(join(dir, 'dist/assets', assets.find((name) => /^line-plot-[\w-]+\.css$/.test(name))), 'utf8'), /\.bk-kit-slider/);
     assert.ok(!assets.some((name) => name.startsWith('tick-list') && name.endsWith('.css')), assets.join(', '));
-  });
-
-  test('builds formulas after reading a component library that replaces the module loader of MathJax, also with an empty preamble.sty', (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'preamble.sty': '',
-      'components/lib/tex.js': "import { mathjax } from '@mathjax/src/js/mathjax.js';\n\nmathjax.asyncLoad = (name) => import(name);\n\nexport const ready = 'ready';\n",
-      'components/tex-box.js': `import { ready } from './lib/tex.js';\n\n${height}export default class TexBox extends HTMLElement {\n  connectedCallback() {\n    this.textContent = ready;\n  }\n}\n`,
-      'content/posts/rope/index.md': article({ body: '$$\nx \\in \\mathbb{R}\n$$\n\n:::tex-box\n:::\n' }),
-    });
-    symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), join(dir, 'node_modules'), 'dir');
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
-    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\mathbb{R}">/);
   });
 });

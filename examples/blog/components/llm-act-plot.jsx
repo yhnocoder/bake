@@ -1,12 +1,10 @@
 import { createMemo, createResource, createSignal, For, Show, untrack } from 'solid-js'
 import { Controls, createElementSize, formatNumber, Slider, Swatch, Toggle } from 'bake/kit'
 import { catalog, swish, SWISH_MIN_AT_BETA_1 } from './lib/llm/functions.js'
-import { guideLabelSources, guidesFor, presetNames } from './lib/llm/guides.js'
+import { guideLabelSources, guidesFor } from './lib/llm/guides.js'
 import { FunctionPanel } from './lib/llm/function-panel.jsx'
 import { richNodes, typesetAll, typesetLater } from './lib/llm/tex.js'
 import './lib/llm/act.css'
-
-const range = (label, value) => ({ label, type: 'number', min: -100, max: 100, step: 0.01, default: value })
 
 export const params = {
   fns: { label: '函数（实线）', type: 'text', default: 'gelu' },
@@ -14,13 +12,13 @@ export const params = {
   reference: { label: '参考函数（淡色虚线）', type: 'text', default: '' },
   colors: { label: '颜色编号', type: 'text', default: '' },
   off: { label: '初始不勾选', type: 'text', default: '' },
-  xmin: range('横轴下限', -4),
-  xmax: range('横轴上限', 4),
-  ymin: range('f(x) 纵轴下限', -1),
-  ymax: range('f(x) 纵轴上限', 4),
-  dymin: range('导数纵轴下限', -0.3),
-  dymax: range('导数纵轴上限', 1.3),
-  guides: { label: '标注', type: 'enum', options: presetNames, default: 'auto' },
+  xmin: { label: '横轴下限', type: 'number', min: -100, max: 100, step: 0.01, default: -4 },
+  xmax: { label: '横轴上限', type: 'number', min: -100, max: 100, step: 0.01, default: 4 },
+  ymin: { label: 'f(x) 纵轴下限', type: 'number', min: -100, max: 100, step: 0.01, default: -1 },
+  ymax: { label: 'f(x) 纵轴上限', type: 'number', min: -100, max: 100, step: 0.01, default: 4 },
+  dymin: { label: '导数纵轴下限', type: 'number', min: -100, max: 100, step: 0.01, default: -0.3 },
+  dymax: { label: '导数纵轴上限', type: 'number', min: -100, max: 100, step: 0.01, default: 1.3 },
+  guides: { label: '标注', type: 'enum', options: ['auto', 'none', 'far-negative', 'zero', 'transition', 'far-positive', 'sigmoid-tanh', 'gelu-approx', 'gate-clamp'], default: 'auto' },
   toggle: { label: '勾选曲线', type: 'boolean', default: false },
   zoom: { label: '横轴缩放滑块', type: 'boolean', default: false },
   beta: { label: 'β 初始值', type: 'number', min: 0.1, max: 5, step: 0.05, default: 1 },
@@ -28,8 +26,8 @@ export const params = {
 
 export const layout = {
   width: 'body',
-  height: (params) => (params.toggle ? 365 : params.zoom ? 400 : keyList(params.fns).includes('swish') ? 430 : 360),
-  narrowHeight: (params) => (params.toggle ? 572 : params.zoom ? 600 : keyList(params.fns).includes('swish') ? 566 : 500),
+  height: 360,
+  narrowHeight: 500,
 }
 
 const NAME = 'llm-act-plot'

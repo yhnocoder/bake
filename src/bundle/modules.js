@@ -28,8 +28,8 @@ export const PUBLIC_MODULES = Object.freeze([
 
 const PUBLIC_STYLES = Object.freeze([{ name: 'bake/theme/styles/', folder: join(SRC_DIR, 'theme/styles/') }, ...BUILT_IN_THEMES.map((theme) => ({ name: `bake/themes/${theme}/styles/`, folder: join(SRC_DIR, `themes/${theme}/styles/`) }))]);
 
-export function publicModules(importer, replacements = {}) {
-  const modules = PUBLIC_MODULES.filter((module) => module.importers.includes(importer)).map(({ name, file }) => ({ find: new RegExp(`^${name}$`), replacement: replacements[name] ?? file }));
+export function publicModules(importer) {
+  const modules = PUBLIC_MODULES.filter((module) => module.importers.includes(importer)).map(({ name, file }) => ({ find: new RegExp(`^${name}$`), replacement: file }));
   return importer === 'themes' ? [...modules, ...PUBLIC_STYLES.map(({ name, folder }) => ({ find: new RegExp(`^${name}`), replacement: folder }))] : modules;
 }
 

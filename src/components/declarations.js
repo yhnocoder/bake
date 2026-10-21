@@ -12,19 +12,7 @@ const COMMON_FIELDS = ['label', 'type', 'default'];
 const TYPE_FIELDS = { number: ['min', 'max', 'step'], text: [], boolean: [], enum: ['options'], file: [] };
 const LAYOUT_FIELDS = ['width', 'height', 'narrowHeight', 'autoHeight', 'frame'];
 const LAYOUT_WIDTH_CHOICES = 'body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%';
-const HEIGHT_FORMS = 'a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them';
-
-export function checkDeclarations(module) {
-  const problems = [];
-  const params = isPlainObject(module.params) ? module.params : {};
-  if (module.params !== undefined && !isPlainObject(module.params)) problems.push(`params must be an object that maps each parameter name to its declaration, got ${describeValue(module.params)}`);
-  for (const [name, declaration] of Object.entries(params)) problems.push(...paramProblems(name, declaration));
-  const layout = isPlainObject(module.layout) ? module.layout : null;
-  if (layout === null) problems.push(`layout must be an object with at least height, for example export const layout = { height: 360 }, got ${describeValue(module.layout)}`);
-  else problems.push(...layoutProblems(layout));
-  if (typeof module.default !== 'function') problems.push('the default export must be a SolidJS component or a class that extends HTMLElement');
-  return { params, layout: layout ?? {}, problems };
-}
+const HEIGHT_FORMS = 'a number of pixels or { ratio }, the width divided by the height, such as { ratio: 1.5 }';
 
 const PARAMETER = { noun: 'parameter', reserved: RESERVED_PARAMS, written: 'as a Markdown attribute', setter: 'the article' };
 
@@ -62,19 +50,20 @@ export function paramProblems(name, declaration, { noun, reserved, written, sett
   return problem === null ? [] : [`the default of ${subject} ${problem}`];
 }
 
-function layoutProblems(layout) {
+export function layoutProblems(layout) {
   const problems = [];
+  const report = (field, message) => problems.push({ field, message });
   for (const field of Object.keys(layout)) {
-    if (!LAYOUT_FIELDS.includes(field)) problems.push(`layout has the unknown field "${field}"; the fields of layout are ${listAll(LAYOUT_FIELDS)}`);
+    if (!LAYOUT_FIELDS.includes(field)) report(field, `layout has the unknown field "${field}"; the fields of layout are ${listAll(LAYOUT_FIELDS)}`);
   }
-  if (layout.width !== undefined && readWidth(layout.width) === null) problems.push(`layout.width must be ${LAYOUT_WIDTH_CHOICES}, got ${describeValue(layout.width)}`);
-  if (layout.height === undefined) problems.push('layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 16 / 9 }');
+  if (layout.width !== undefined && readWidth(layout.width) === null) report('width', `layout.width must be ${LAYOUT_WIDTH_CHOICES}, got ${describeValue(layout.width)}`);
+  if (layout.height === undefined) report(undefined, 'layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 1.5 }');
   for (const field of ['height', 'narrowHeight']) {
     const value = layout[field];
-    if (value !== undefined && typeof value !== 'function' && readHeight(value) === null) problems.push(`layout.${field} must be ${HEIGHT_FORMS}, got ${describeValue(value)}`);
+    if (value !== undefined && readHeight(value) === null) report(field, `layout.${field} must be ${HEIGHT_FORMS}, got ${describeValue(value)}`);
   }
-  if (layout.autoHeight !== undefined && typeof layout.autoHeight !== 'boolean') problems.push(`layout.autoHeight must be true or false, got ${describeValue(layout.autoHeight)}`);
-  if (layout.frame !== undefined && typeof layout.frame !== 'boolean') problems.push(`layout.frame must be true or false, got ${describeValue(layout.frame)}`);
+  if (layout.autoHeight !== undefined && typeof layout.autoHeight !== 'boolean') report('autoHeight', `layout.autoHeight must be true or false, got ${describeValue(layout.autoHeight)}`);
+  if (layout.frame !== undefined && typeof layout.frame !== 'boolean') report('frame', `layout.frame must be true or false, got ${describeValue(layout.frame)}`);
   return problems;
 }
 
@@ -105,7 +94,7 @@ export function resolveComponent(name, component, attributes, files) {
     else report(undefined, `parameter "${param}" of ${name} defaults to ${describeValue(params[param])}, which is not a file in the article folder`);
   }
   const width = componentWidth(name, component.layout, attributes.width, report);
-  const heights = componentHeights(name, component.layout, attributes.height, params, report);
+  const heights = componentHeights(name, component.layout, attributes.height, report);
   const fileParams = Object.keys(component.params).filter((param) => component.params[param].type === 'file');
   const autoHeight = component.layout.autoHeight === true && attributes.height === undefined;
   return { params, fileParams, ...width, ...heights, autoHeight, frame: component.layout.frame !== false, problems };
@@ -133,7 +122,7 @@ function readWidth(value) {
   return size.unit === 'px' ? { naturalWidth: value, frameWidth: value } : { width: 'body', frameWidth: value };
 }
 
-function componentHeights(name, layout, written, params, report) {
+function componentHeights(name, layout, written, report) {
   if (written !== undefined) {
     if (typeof written === 'string' && PIXELS.test(written) && Number(written) > 0) {
       const height = readHeight(Number(written));
@@ -141,24 +130,8 @@ function componentHeights(name, layout, written, params, report) {
     }
     report('height', `height of ${name} must be a positive number of pixels such as 420, got ${describeAttribute(written)}`);
   }
-  const height = declaredHeight(name, 'height', layout.height, params, report);
-  const narrowHeight = layout.narrowHeight === undefined ? height : declaredHeight(name, 'narrowHeight', layout.narrowHeight, params, report);
-  return { height, narrowHeight };
-}
-
-function declaredHeight(name, field, declared, params, report) {
-  const fallback = { height: 'auto', ratio: 'auto' };
-  if (typeof declared !== 'function') return readHeight(declared) ?? fallback;
-  let value;
-  try {
-    value = declared(Object.freeze({ ...params }));
-  } catch (error) {
-    report(undefined, `${name}: layout.${field} throws for these parameters: ${error instanceof Error ? error.message : String(error)}`);
-    return fallback;
-  }
-  const height = readHeight(value);
-  if (height === null) report(undefined, `${name}: layout.${field} returns ${describeValue(value)} for these parameters; it must return a number of pixels or { ratio: width / height }`);
-  return height ?? fallback;
+  const height = readHeight(layout.height);
+  return { height, narrowHeight: layout.narrowHeight === undefined ? height : readHeight(layout.narrowHeight) };
 }
 
 function readHeight(value) {

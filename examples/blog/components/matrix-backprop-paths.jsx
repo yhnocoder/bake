@@ -11,8 +11,8 @@ export const params = {
 }
 export const layout = {
   width: 'body',
-  height: (params) => (params.paths === 'chain' ? 110 : 200),
-  narrowHeight: (params) => ({ ratio: params.paths === 'chain' ? 5 : 2.6 }),
+  height: 110,
+  narrowHeight: { ratio: 5 },
 }
 
 const descriptions = {

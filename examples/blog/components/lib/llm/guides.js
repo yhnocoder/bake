@@ -190,8 +190,6 @@ function curveGuides(kind, derivative, { beta, range, mainColor, referenceColor 
   return result
 }
 
-export const presetNames = ['auto', 'none', ...Object.keys(presets)]
-
 export function guidesFor(preset, derivative, { series, beta, range }) {
   const colorOf = (key) => series.find((s) => s.key === key)?.color
   const resolve = (color) => (color === undefined ? undefined : colorOf(color) ?? color)

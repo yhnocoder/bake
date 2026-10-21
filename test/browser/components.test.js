@@ -20,7 +20,7 @@ export const params = {
   count: { label: 'Count', type: 'number', min: 0, max: 9, default: 1 },
   on: { label: 'On', type: 'boolean', default: false },
 };
-export const layout = { height: 240, narrowHeight: (params) => (params.on ? 320 : 300) };
+export const layout = { height: 240, narrowHeight: 300 };
 
 export default function CountView(props) {
   const [themes, setThemes] = createSignal(0);

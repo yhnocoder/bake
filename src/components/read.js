@@ -1,66 +1,35 @@
-import { readdirSync, statSync } from 'node:fs';
-import { join, posix, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import solid from 'vite-plugin-solid';
-import { publicModules } from '../bundle/modules.js';
-import { blogPath, compileProblem, isInBlog, viteConfig } from '../bundle/vite.js';
-import { errorAt, fileStart } from '../report.js';
-import { checkDeclarations } from './declarations.js';
-import { NODE_MATH_FILE } from './modules.js';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, posix } from 'node:path';
+import { parseSync } from 'vite';
+import { describeValue, errorAt, fileStart } from '../report.js';
+import { layoutProblems, paramProblems } from './declarations.js';
 
 export const COMPONENTS_DIR = 'components';
-export const BROWSER_GLOBALS = Object.freeze([
-  'window',
-  'document',
-  'navigator',
-  'location',
-  'localStorage',
-  'sessionStorage',
-  'customElements',
-  'matchMedia',
-  'getComputedStyle',
-  'requestAnimationFrame',
-  'ResizeObserver',
-  'IntersectionObserver',
-]);
 
 const COMPONENT_EXTENSIONS = ['.js', '.jsx'];
 const COMPONENT_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/;
 const RESERVED_NAMES = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
-const UNDEFINED_NAME = /^(\S+) is not defined$/;
-// why: modules that ssrLoadModule cached from an earlier component extend the HTMLElement of that load, so every load uses the same class
-const NODE_HTML_ELEMENT = class HTMLElement {};
-const STACK_LOCATION = /\(?((?:file:\/\/)?[^\s()]+):(\d+):(\d+)\)?$/;
+const DECLARATIONS = ['params', 'layout'];
+const LITERALS = 'strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value';
+const FUNCTIONS = ['ArrowFunctionExpression', 'FunctionExpression'];
+const CLASSES = ['ClassDeclaration', 'ClassExpression'];
 
-export async function readComponents(root, { builtInBlocks }, errors) {
-  const files = componentFiles(root, builtInBlocks, errors);
+class NotLiteral extends Error {
+  constructor(node) {
+    super('not a literal');
+    this.node = node;
+  }
+}
+
+export function readComponents(root, { builtInBlocks }, errors) {
   const components = new Map();
-  if (files.size === 0) return components;
-  // why: the Vite dev server sets NODE_ENV to development, and later builds in this process would then bundle Solid's development build
-  const environment = process.env.NODE_ENV;
-  const server = await createServer({
-    ...viteConfig({ plugins: [solid({ ssr: true })], alias: publicModules('components', { 'bake/math': NODE_MATH_FILE }) }),
-    appType: 'custom',
-    server: { middlewareMode: true, hmr: false, watch: null, ws: false },
-  });
-  try {
-    for (const [name, file] of files) {
-      const path = join(root, file);
-      const module = await loadModule(server, path);
-      if (module.error !== undefined) {
-        errors.push(loadError(server, root, name, file, module.error));
-        components.set(name, { name, file, path, valid: false });
-        continue;
-      }
-      const { params, layout, problems } = checkDeclarations(module.exports);
-      for (const problem of problems) errors.push(errorAt(file, fileStart, `${name}: ${problem}`));
-      components.set(name, { name, file, path, params, layout, solid: !module.customElement, valid: problems.length === 0 });
-    }
-  } finally {
-    await server.close();
-    if (environment === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = environment;
+  for (const [name, file] of componentFiles(root, builtInBlocks, errors)) {
+    const path = join(root, file);
+    const source = readFileSync(path, 'utf8');
+    const count = errors.length;
+    const report = (node, message) => errors.push(errorAt(file, node === null ? fileStart : positionAt(source, node.start), `${name}: ${message}`));
+    const { params, layout, solid } = readDeclarations(file, source, report);
+    components.set(name, { name, file, path, params, layout, solid, valid: errors.length === count });
   }
   return components;
 }
@@ -89,45 +58,140 @@ function componentFiles(root, builtInBlocks, errors) {
   return files;
 }
 
-async function loadModule(server, path) {
-  const hidden = BROWSER_GLOBALS.filter((name) => Object.hasOwn(globalThis, name)).map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
-  const stubbed = !Object.hasOwn(globalThis, 'HTMLElement');
-  for (const [name] of hidden) delete globalThis[name];
-  if (stubbed) globalThis.HTMLElement = NODE_HTML_ELEMENT;
+function readDeclarations(file, source, report) {
+  const { program, errors } = parseSync(file, source);
+  if (errors.length > 0) {
+    for (const error of errors) report({ start: error.labels[0]?.start ?? 0 }, error.message);
+    return { params: {}, layout: {}, solid: false };
+  }
+  const constants = new Map();
+  const classes = new Set();
+  const exported = new Map();
+  for (const statement of program.body) {
+    const declaration = ['ExportNamedDeclaration', 'ExportDefaultDeclaration'].includes(statement.type) ? statement.declaration : statement;
+    if (declaration?.type === 'VariableDeclaration' && declaration.kind === 'const') {
+      for (const { id, init } of declaration.declarations) if (id.type === 'Identifier' && init !== null) constants.set(id.name, init);
+    }
+    if (declaration?.type === 'ClassDeclaration' && declaration.id !== null) classes.add(declaration.id.name);
+    if (statement.type === 'ExportDefaultDeclaration') exported.set('default', statement.declaration);
+    if (statement.type !== 'ExportNamedDeclaration') continue;
+    for (const { id, init } of declaration?.type === 'VariableDeclaration' ? declaration.declarations : []) {
+      if (!DECLARATIONS.includes(id.name)) continue;
+      if (declaration.kind === 'const' && init !== null) exported.set(id.name, init);
+      else report(id, `declare ${id.name} as export const ${id.name} = { … }, which the build reads without running the file`);
+    }
+    for (const specifier of statement.specifiers) {
+      const name = specifier.exported.name ?? specifier.exported.value;
+      if (name === 'default') exported.set('default', specifier.local);
+      else if (DECLARATIONS.includes(name)) report(specifier, `declare ${name} as export const ${name} = { … }, which the build reads without running the file`);
+    }
+  }
+  const main = exported.get('default');
+  if (main === undefined) report(null, 'the default export must be a SolidJS component or a class that extends HTMLElement');
+  const customElement = CLASSES.includes(main?.type) || (main?.type === 'Identifier' && classes.has(main.name));
+  const fields = (name) => objectFields(exported.get(name), name, constants, report);
+  const params = {};
+  for (const { name, key, value } of fields('params')) {
+    params[name] = value;
+    for (const problem of paramProblems(name, value)) report(key, problem);
+  }
+  const layout = {};
+  const keys = new Map();
+  for (const { name, key, value } of fields('layout')) {
+    layout[name] = value;
+    keys.set(name, key);
+  }
+  for (const { field, message } of layoutProblems(layout)) report(keys.get(field) ?? exported.get('layout') ?? null, message);
+  return { params, layout, solid: main !== undefined && !customElement };
+}
+
+function objectFields(node, name, constants, report) {
+  if (node === undefined) return [];
+  const object = resolved(node, constants);
+  if (object.type !== 'ObjectExpression') {
+    const value = readLiteral(node, name, constants, report);
+    if (value !== undefined) report(node, `${name} must be an object that maps each name to its declaration, got ${describeValue(value)}`);
+    return [];
+  }
+  const fields = [];
+  for (const property of object.properties) {
+    if (property.type !== 'Property' || property.kind !== 'init' || property.computed || property.method) {
+      report(property, notLiteral(name, property));
+      continue;
+    }
+    const value = readLiteral(property.value, name, constants, report);
+    if (value !== undefined) fields.push({ name: propertyName(property.key), key: property.key, value });
+  }
+  return fields;
+}
+
+function readLiteral(node, name, constants, report) {
   try {
-    const exports = await server.ssrLoadModule(path);
-    return { exports, customElement: exports.default?.prototype instanceof HTMLElement };
+    return literal(node, constants, new Set());
   } catch (error) {
-    return { error };
-  } finally {
-    if (stubbed) delete globalThis.HTMLElement;
-    for (const [name, descriptor] of hidden) Object.defineProperty(globalThis, name, descriptor);
+    if (!(error instanceof NotLiteral)) throw error;
+    report(error.node, notLiteral(name, error.node));
+    return undefined;
   }
 }
 
-function loadError(server, root, name, file, error) {
-  if (error.loc !== undefined || error.errors !== undefined) {
-    const problem = compileProblem(root, error);
-    return errorAt(problem.file ?? file, problem.position, `${name}: ${problem.message}`);
+function literal(node, constants, seen) {
+  switch (node.type) {
+    case 'Literal':
+      if (node.regex !== undefined || typeof node.value === 'bigint') throw new NotLiteral(node);
+      return node.value;
+    case 'TemplateLiteral':
+      if (node.expressions.length > 0) throw new NotLiteral(node);
+      return node.quasis[0].value.cooked;
+    case 'UnaryExpression':
+      if (!['-', '+'].includes(node.operator) || node.argument.type !== 'Literal' || typeof node.argument.value !== 'number') throw new NotLiteral(node);
+      return node.operator === '-' ? -node.argument.value : node.argument.value;
+    case 'ParenthesizedExpression':
+      return literal(node.expression, constants, seen);
+    case 'ArrayExpression':
+      return node.elements.map((element) => {
+        if (element === null || element.type === 'SpreadElement') throw new NotLiteral(element ?? node);
+        return literal(element, constants, seen);
+      });
+    case 'ObjectExpression':
+      return Object.fromEntries(
+        node.properties.map((property) => {
+          if (property.type !== 'Property' || property.kind !== 'init' || property.computed || property.method) throw new NotLiteral(property);
+          return [propertyName(property.key), literal(property.value, constants, seen)];
+        }),
+      );
+    case 'Identifier':
+      if (!constants.has(node.name) || seen.has(node.name)) throw new NotLiteral(node);
+      return literal(constants.get(node.name), constants, new Set([...seen, node.name]));
+    default:
+      throw new NotLiteral(node);
   }
-  if (error instanceof Error) server.ssrFixStacktrace(error);
-  const location = stackLocation(root, error);
-  const global = error instanceof ReferenceError ? UNDEFINED_NAME.exec(error.message)?.[1] : undefined;
-  const where = location === null ? errorAt(file, fileStart, '') : location;
-  if (BROWSER_GLOBALS.includes(global)) {
-    return { ...where, message: `${name}: ${file} uses the browser API ${global} at the top level; the build reads params and layout in Node, so use it inside the component code` };
-  }
-  const message = (error instanceof Error ? error.message : String(error)).replaceAll(`${resolve(root)}${sep}`, '');
-  return { ...where, message: `${name}: ${file} cannot be read in Node: ${message}` };
 }
 
-function stackLocation(root, error) {
-  const lines = typeof error?.stack === 'string' ? error.stack.split('\n').slice(1) : [];
-  for (const line of lines) {
-    const match = STACK_LOCATION.exec(line.trim());
-    if (match === null) continue;
-    const path = match[1].startsWith('file://') ? fileURLToPath(match[1]) : match[1];
-    if (isInBlog(root, path)) return errorAt(blogPath(root, path), { line: Number(match[2]), column: Number(match[3]) }, '');
-  }
-  return null;
+function resolved(node, constants, seen = new Set()) {
+  if (node.type !== 'Identifier' || !constants.has(node.name) || seen.has(node.name)) return node;
+  return resolved(constants.get(node.name), constants, new Set([...seen, node.name]));
+}
+
+function notLiteral(name, node) {
+  return `the build reads ${name} without running the file, so write it with ${LITERALS}; got ${describeNode(node)}`;
+}
+
+function describeNode(node) {
+  if (FUNCTIONS.includes(node.type) || node.method || ['get', 'set'].includes(node.kind)) return 'a function';
+  if (['CallExpression', 'NewExpression'].includes(node.type)) return 'a call';
+  if (node.type === 'Identifier') return `"${node.name}", which is not a constant of this file with such a value`;
+  if (node.type === 'TemplateLiteral') return 'a template string with ${…}';
+  if (node.type === 'SpreadElement') return 'a spread';
+  if (node.computed) return 'a computed key';
+  return 'an expression';
+}
+
+function propertyName(key) {
+  return key.type === 'Identifier' ? key.name : String(key.value);
+}
+
+function positionAt(source, offset) {
+  const lines = source.slice(0, offset).split('\n');
+  return { line: lines.length, column: lines.at(-1).length + 1 };
 }

@@ -7,7 +7,7 @@ import './lib/llm/diagram.css'
 
 export const params = {}
 
-export const layout = { width: 'body', height: { ratio: 720 / 502 }, narrowHeight: { ratio: 380 / 698 } }
+export const layout = { width: 'body', height: { ratio: 1.4343 }, narrowHeight: { ratio: 0.5444 } }
 
 const NAME = 'llm-glu-diagram'
 

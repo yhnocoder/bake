@@ -2,7 +2,6 @@ import { join, posix } from 'node:path';
 import { MATHJAX_CHUNK, lazyImports, mathModules, virtualModules } from '../bundle/modules.js';
 
 export const RUNTIME_FILE = join(import.meta.dirname, 'runtime.js');
-export const NODE_MATH_FILE = join(import.meta.dirname, 'node-math.js');
 const SOLID_ELEMENT_FILE = join(import.meta.dirname, 'solid-element.js');
 
 const KIT_DIR = join(import.meta.dirname, '../kit');

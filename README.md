@@ -240,6 +240,10 @@ Bake reads every image at build time and writes its width and height into the pa
 
 `:::example` shows the Markdown source of its content next to the rendered result; on a narrow screen the source is above the result. Headings inside an example do not enter the table of contents or the section numbering. Sidenotes, citations and equation numbers inside an example are numbered together with the rest of the article.
 
+### Components
+
+A component is a file `components/<name>.js` or `components/<name>.jsx` whose default export is a SolidJS component or a class that extends `HTMLElement`, and an article shows it with a block such as `:::act-fn-plot{fn=gelu}`. The file may export `params`, the parameters that an article sets as attributes, and `layout`, the width, height and frame of the component. Bake reads both at build time without running the file, so each is written as `export const` with a literal value: strings, numbers, `true`, `false`, `null`, lists, objects, template strings without `${…}`, and names of `const` declarations of the same file with such a value. Anything else, such as a function call, an arithmetic expression or an imported name, is an error at its position. The rest of the file runs only in the browser; an error at its top level shows the component as failed on the page.
+
 ### Sidenotes and citations
 
 Footnotes become numbered sidenotes, numbered in the order in which the text first refers to them:
