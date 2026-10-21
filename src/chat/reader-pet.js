@@ -1,6 +1,6 @@
 import { PET_FRAME, PET_JSON_MAX_BYTES, PET_MAX_BYTES, PET_SHEET_HEIGHTS, PET_SHEET_WIDTH } from './pet-format.js';
 
-export const READER_PET_KEY = 'bk-chat-pet';
+const READER_PET_KEY = 'bk-chat-pet';
 
 const REQUEST = { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' };
 const TIMEOUT = 30_000;

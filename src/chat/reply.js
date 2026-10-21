@@ -63,3 +63,10 @@ function clean(node, root, base) {
   if (target.external) Object.assign(node.properties, { target: '_blank', rel: ['noopener', 'noreferrer'] });
   return node;
 }
+
+export function replyText(content, root) {
+  const element = document.createElement('div');
+  element.innerHTML = replyHtml(content, { root });
+  for (const math of element.querySelectorAll(`.${MATH_CLASS}`)) math.textContent = math.dataset.tex;
+  return element.textContent.trim();
+}

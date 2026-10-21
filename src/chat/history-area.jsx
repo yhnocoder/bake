@@ -1,7 +1,45 @@
-import { For, Show } from 'solid-js';
-import { localDate } from './history.js';
+import { For, Show, createSignal } from 'solid-js';
+import { deleteConversation, historyGroups, localDate, readHistory } from './history.js';
 
-export function HistoryList(props) {
+export function HistoryArea(props) {
+  const { labels, root } = props;
+  const [items, setItems] = createSignal([]);
+  let first;
+  const toggle = () => {
+    if (props.open) return props.onToggle(false);
+    setItems(readHistory(root).filter((item) => item.id !== props.current()));
+    props.onToggle(true);
+    requestAnimationFrame(() => first?.focus({ preventScroll: true }));
+  };
+  const forget = (item) => {
+    deleteConversation(root, item.id);
+    setItems(items().filter((other) => other.id !== item.id));
+    first?.focus({ preventScroll: true });
+  };
+  return (
+    <div class="bk-chat-pop-area">
+      <button type="button" class="bk-chat-icon" aria-label={labels.history} title={labels.history} aria-expanded={String(props.open)} onClick={toggle}>
+        <svg viewBox="0 0 16 16" aria-hidden="true" data-stroke>
+          <circle cx="8" cy="8" r="6" />
+          <path d="M8 4.6V8l2.3 1.5" />
+        </svg>
+      </button>
+      <Show when={props.open}>
+        <HistoryList
+          labels={labels}
+          home={props.home}
+          groups={historyGroups(items(), { address: props.address, home: props.home })}
+          newRef={(element) => (first = element)}
+          onNew={props.onNew}
+          onOpen={props.onOpen}
+          onDelete={forget}
+        />
+      </Show>
+    </div>
+  );
+}
+
+function HistoryList(props) {
   const { labels } = props;
   const day = (date) => {
     const today = localDate();

@@ -1,5 +1,5 @@
-export const INSTRUCTIONS_KEY = 'bk-chat-instructions';
-export const RULES_KEYS = { chat: 'bk-chat-rules', note: 'bk-chat-note-rules' };
+const INSTRUCTIONS_KEY = 'bk-chat-instructions';
+const RULES_KEYS = { chat: 'bk-chat-rules', note: 'bk-chat-note-rules' };
 export const MAX_INSTRUCTIONS = 2000;
 export const MAX_RULES = 8000;
 

@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { BUILT_IN_PETS, isUrl, petFolder } from '../config/pet.js';
 import { PET_FRAME, PET_JSON_MAX_BYTES, PET_MAX_BYTES, PET_ROW_COUNT, PET_SHEET_HEIGHTS, PET_SHEET_WIDTH } from './pet-format.js';
 
-export const PET_DIR = '_bake/pet';
+const PET_DIR = '_bake/pet';
 
 const BUILT_IN_DIR = join(import.meta.dirname, 'pets');
 const SHEET_FORMATS = ['png', 'webp'];

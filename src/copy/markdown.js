@@ -1,10 +1,9 @@
 import { fragmentOf, idOfFragment } from '../fragments.js';
 import { writeAttribute } from '../markdown/attributes.js';
 import { serializeMarkdown } from '../markdown/serialize.js';
+import { UI } from '../regions.js';
 
 const ATTRIBUTE_NAME = /^[A-Za-z_][\w-]*$/;
-
-export const UI = '[data-ui]';
 
 export const NOTE = '[data-sidenote][data-line]';
 export const NOT_CONTENT = `${UI}, ${NOTE}, .component-box, .embed-source, script, template, button, input, svg`;
