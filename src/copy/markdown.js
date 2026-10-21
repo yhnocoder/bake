@@ -1,26 +1,18 @@
-import { fragmentOf, idOfFragment } from '../fragments.js';
-import { writeAttribute } from '../markdown/attributes.js';
-import { serializeMarkdown } from '../markdown/serialize.js';
-
-const ATTRIBUTE_NAME = /^[A-Za-z_][\w-]*$/;
-
-export const UI = '[data-ui]';
+import { UI } from '../regions.js';
 
 export const NOTE = '[data-sidenote][data-line]';
 export const NOT_CONTENT = `${UI}, ${NOTE}, .component-box, .embed-source, script, template, button, input, svg`;
-const UNIT = '[data-line][data-end-line]';
-const ATOMIC = 'mjx-container, img, svg, input, .component-box';
-const INLINE_LEAF = 'p, h1, h2, h3, h4, h5, h6, td, th, figcaption, summary, li, dt, dd';
-const BLOCK =
-  'address, article, aside, blockquote, details, dialog, div, dl, dt, dd, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, summary, table, thead, tbody, tfoot, tr, td, th, ul, mjx-container[display="true"]';
-const HEADING = 'h1, h2, h3, h4, h5, h6';
-const ALIGNMENTS = new Set(['left', 'center', 'right']);
-const ATTENTION = [
-  ['mark', 'highlight'],
-  ['strong, b', 'strong'],
-  ['em, i, cite', 'emphasis'],
-  ['del, s', 'delete'],
-];
+const SKIPPED = `${NOT_CONTENT}, .example-source`;
+const EMBEDDED = '[data-markdown]';
+// why: the text of these elements is not the text of their source, so a selection takes them whole
+const WHOLE = 'figure.component, .embed, mjx-container, sup.sidenote-ref, a.citation, a.eqref';
+// why: a part of a heading or a table row is not valid Markdown
+const WHOLE_WHEN_CUT = 'h1, h2, h3, h4, h5, h6, tr';
+const REFERENCE = 'sup.sidenote-ref[data-sidenote][data-src]';
+const IMAGE_ADDRESS = /^(!\[[\s\S]*?\]\()(?:<[^>]*>|[^\s)]*)/;
+const CHARACTER_REFERENCE = /^&(?:#[xX][\da-fA-F]{1,6}|#\d{1,7}|[A-Za-z][A-Za-z\d]{1,31});/;
+const ESCAPABLE = /^[!-/:-@[-`{-~]$/;
+const WHITESPACE = /\s/;
 
 export function sidenoteElement(article, number) {
   return [...article.querySelectorAll(NOTE)].find((note) => note.dataset.sidenote === String(number) && note.closest(UI) === null) ?? null;
@@ -33,420 +25,232 @@ export function isUi(element, article) {
   return note === null || note.contains(ui);
 }
 
-export class MarkdownWriter {
-  constructor(range, article, lines) {
-    this.range = range;
-    this.article = article;
-    this.lines = lines;
-    this.notes = [];
-    this.copied = [];
+export function sourceMarkdown(range, article, articleSource) {
+  const root = sourceRoot(range, article);
+  const source = sourceOf(root, articleSource);
+  const start = escaped(range.startContainer, range.startOffset, 'start', range.endContainer, root);
+  const end = escaped(range.endContainer, range.endOffset, 'end', range.startContainer, root);
+  const from = offsetAt(start, 'start', root, source);
+  const to = offsetAt(end, 'end', root, source);
+  if (from >= to) return '';
+  const between = document.createRange();
+  between.setStart(start.node, start.offset);
+  between.setEnd(end.node, end.offset);
+  const common = positionedAncestor(between.commonAncestorContainer, root, source);
+  let text = root.matches(EMBEDDED) ? withPublishedImages(root, source, from, to) : source.slice(from, to);
+  for (const element of positionedAncestors(start.node, common, source)) text = `${markup(element, root, source).opening}${text}`;
+  for (const element of positionedAncestors(end.node, common, source)) text = `${text}${markup(element, root, source).closing}`;
+  if (common !== root && text.includes('\n') && positionedChildren(common, source).filter(([first, last]) => first < to && last > from).length > 1) {
+    const { opening, closing } = markup(common, root, source);
+    text = `${opening}${text}${closing}`;
   }
+  const definitions = root.matches(EMBEDDED) ? [] : footnoteDefinitions(article, source, from, to);
+  return tidy([text, ...definitions].join('\n\n'));
+}
 
-  write() {
-    const common = this.range.commonAncestorContainer;
-    const start = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
-    const selection = this.selection(start);
-    const footnotes = this.footnotes().map(verbatim);
-    return tidy(serializeMarkdown({ type: 'root', children: [...selection, ...footnotes] }));
-  }
+function sourceRoot(range, article) {
+  const common = range.commonAncestorContainer;
+  const root = (common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement).closest(`${NOTE}, ${EMBEDDED}`);
+  return root !== null && article.contains(root) ? root : article;
+}
 
-  selection(start) {
-    const unit = start.closest(UNIT);
-    if (unit !== null && this.article.contains(unit) && this.isWhole(unit)) return [this.unitSource(unit)];
-    const pre = start.closest('pre');
-    if (pre !== null) return [verbatim(this.selectedText(pre))];
-    const math = start.closest('mjx-container[data-tex]');
-    if (math !== null) return [this.math(math)];
-    const leaf = start.closest(INLINE_LEAF);
-    if (leaf !== null && this.article.contains(leaf) && !this.hasSelectedBlock(leaf)) return paragraph(this.inline(leaf));
-    return this.block(start.closest('table') ?? start);
-  }
+function sourceOf(root, articleSource) {
+  const embedded = root.matches(EMBEDDED);
+  const text = embedded ? root.dataset.markdown : articleSource;
+  const base = embedded ? Number(root.dataset.src.split(' ')[0]) : 0;
+  let lineStarts = null;
+  const range = (element) => {
+    if (element.dataset.src !== undefined) return element.dataset.src.split(' ').map(Number);
+    if (element.dataset.line === undefined || element.dataset.endLine === undefined) return null;
+    lineStarts ??= [0, ...[...text.matchAll(/\n/g)].map((match) => match.index + 1)];
+    const next = lineStarts[Number(element.dataset.endLine)];
+    return [lineStarts[Number(element.dataset.line) - 1], next === undefined ? text.length : next - 1];
+  };
+  return {
+    slice: (start, end) => text.slice(start - base, end - base),
+    range: (element) => (element === root && !embedded && range(element) === null ? [0, text.length] : range(element)),
+  };
+}
 
-  isWhole(unit) {
-    const component = unit.querySelector('figure.component');
-    if (component !== null && this.leaves(unit).every((leaf) => component.contains(leaf))) return this.hasSelection(unit);
-    return this.covers(unit);
-  }
-
-  unitSource(unit) {
-    const line = Number(unit.dataset.line);
-    const endLine = Number(unit.dataset.endLine);
-    this.copied.push([line, endLine]);
-    for (const reference of unit.querySelectorAll('sup.sidenote-ref[data-sidenote]')) this.addNote(reference.dataset.sidenote);
-    const text = this.lines.slice(line - 1, endLine).join('\n');
-    return verbatim(unit.matches(NOTE) ? noteBody(text, unit.dataset.label) : text);
-  }
-
-  leaves(element) {
-    const found = [];
-    const visit = (node) => {
-      for (const child of node.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE) {
-          if (child.data.trim() !== '') found.push(child);
-          continue;
-        }
-        if (child.nodeType !== Node.ELEMENT_NODE || child.matches(UI) || child.matches(NOTE)) continue;
-        if (child.matches(ATOMIC)) found.push(child);
-        else visit(child);
-      }
-    };
-    visit(element);
-    return found;
-  }
-
-  covers(element) {
-    const leaves = this.leaves(element);
-    if (leaves.length === 0) return this.range.intersectsNode(element);
-    const first = leaves[0];
-    const last = leaves.at(-1);
-    const [startNode, startOffset] = first.nodeType === Node.TEXT_NODE ? [first, first.data.search(/\S/)] : [first.parentNode, indexOf(first)];
-    const [endNode, endOffset] = last.nodeType === Node.TEXT_NODE ? [last, last.data.trimEnd().length] : [last.parentNode, indexOf(last) + 1];
-    return this.range.comparePoint(startNode, startOffset) === 0 && this.range.comparePoint(endNode, endOffset) === 0;
-  }
-
-  hasSelection(element) {
-    if (!this.range.intersectsNode(element)) return false;
-    if (element.nodeType === Node.TEXT_NODE) return this.textPart(element).trim() !== '';
-    if (element.matches(ATOMIC)) return true;
-    return this.leaves(element).some((leaf) => (leaf.nodeType === Node.TEXT_NODE ? this.textPart(leaf).trim() !== '' : this.range.intersectsNode(leaf)));
-  }
-
-  hasSelectedBlock(element) {
-    return [...element.children].some((child) => child.matches(BLOCK) && !child.matches(UI) && this.hasSelection(child));
-  }
-
-  textPart(text) {
-    if (!this.range.intersectsNode(text)) return '';
-    const start = this.range.startContainer === text ? this.range.startOffset : 0;
-    const end = this.range.endContainer === text ? this.range.endOffset : text.data.length;
-    return text.data.slice(start, end);
-  }
-
-  selectedText(element) {
-    let text = '';
-    const visit = (node) => {
-      for (const child of node.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE) text += this.textPart(child);
-        else if (child.nodeType === Node.ELEMENT_NODE && !child.matches(UI)) visit(child);
-      }
-    };
-    visit(element);
-    return text;
-  }
-
-  whole(element, write) {
-    const saved = this.range;
-    this.range = document.createRange();
-    this.range.selectNodeContents(element);
-    try {
-      return write();
-    } finally {
-      this.range = saved;
+function escaped(node, offset, side, other, root) {
+  let point = { node, offset };
+  for (let element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement; element !== root; element = element.parentElement) {
+    if (element.matches(SKIPPED) || element.matches(WHOLE) || (element.matches(WHOLE_WHEN_CUT) && !element.contains(other))) {
+      point = { node: element.parentNode, offset: [...element.parentNode.childNodes].indexOf(element) + (side === 'start' ? 0 : 1) };
     }
   }
+  return point;
+}
 
-  blocks(parent) {
-    const nodes = [];
-    let run = [];
-    const flush = () => {
-      nodes.push(...paragraph(run));
-      run = [];
-    };
-    for (const child of parent.childNodes) {
+function positionedAncestor(node, root, source) {
+  let element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  while (element !== root && source.range(element) === null) element = element.parentElement;
+  return element;
+}
+
+function positionedAncestors(node, common, source) {
+  const found = [];
+  for (let element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement; element !== common; element = element.parentElement) {
+    if (source.range(element) !== null) found.push(element);
+  }
+  return found;
+}
+
+function positionedChildren(element, source) {
+  return [...element.children].flatMap((child) => {
+    if (child.matches(SKIPPED)) return [];
+    return source.range(child) === null ? positionedChildren(child, source) : [source.range(child)];
+  });
+}
+
+function markup(element, root, source) {
+  const [, last] = source.range(element);
+  // why: rows of a pipe table are no table without the header and delimiter rows, which stand before the body
+  const [first] = element.matches('tbody') ? source.range(element.parentElement) : source.range(element);
+  const content = { start: offsetAt({ node: element, offset: 0 }, 'start', root, source), end: offsetAt({ node: element, offset: element.childNodes.length }, 'end', root, source) };
+  return { opening: source.slice(first, content.start), closing: source.slice(content.end, last) };
+}
+
+// A point maps through the closest element with a source range. Its own text covers the source between its positioned
+// children, maps character by character where it matches that source, and otherwise moves the point to the nearer edge.
+function offsetAt(point, side, root, source) {
+  const host = positionedAncestor(point.node, root, source);
+  const [first, last] = source.range(host);
+  const items = [{ mark: first }];
+  let at = null;
+  const visit = (parent) => {
+    parent.childNodes.forEach((child, index) => {
+      if (parent === point.node && index === point.offset) at = items.length;
       if (child.nodeType === Node.TEXT_NODE) {
-        run.push(text(this.textPart(child)));
-        continue;
+        if (child === point.node) at = items.length + point.offset;
+        for (let index = 0; index < child.data.length; index += 1) items.push({ character: child.data[index] });
+        return;
       }
-      if (child.nodeType !== Node.ELEMENT_NODE || child.matches(UI) || child.matches(NOTE) || !this.hasSelection(child)) continue;
-      if (!child.matches(BLOCK)) {
-        run.push(...this.inlineElement(child));
-        continue;
-      }
-      flush();
-      nodes.push(...this.block(child));
+      if (child.nodeType !== Node.ELEMENT_NODE || child.matches(SKIPPED)) return;
+      const range = source.range(child);
+      if (range === null) visit(child);
+      else items.push({ mark: range[0] }, { mark: range[1] });
+    });
+    if (parent === point.node && point.offset === parent.childNodes.length) at = items.length;
+  };
+  visit(host);
+  items.push({ mark: last });
+  alignRuns(items, source);
+  if (side === 'start') {
+    for (let index = at; ; index += 1) {
+      const item = items[index];
+      if (item.mark !== undefined) return item.mark;
+      if (item.run !== undefined) return nearerEdge(item.run, item.index);
+      if (!WHITESPACE.test(item.character)) return item.start;
     }
-    flush();
-    return nodes;
   }
-
-  block(element) {
-    if (element.matches(UNIT) && (this.isWhole(element) || element.matches(HEADING))) return [this.unitSource(element)];
-    if (element.matches('summary, .aside-title, .embed-source')) return [];
-    if (element.matches('p')) return paragraph(this.inline(element));
-    if (element.matches(HEADING)) return [{ type: 'heading', depth: Number(element.tagName[1]), children: trimPhrasing(this.inline(element)), attributes: writtenAttributes(element) }];
-    if (element.matches('.example-source')) return [verbatim(this.selectedText(element).replace(/\n+$/, ''))];
-    if (element.matches('pre')) return [this.code(element)];
-    if (element.matches('mjx-container[data-tex]')) return [this.math(element)];
-    if (element.matches('ul, ol')) return isReferenceList(element) ? [this.references(element)] : this.list(element);
-    if (element.matches('blockquote')) return [{ type: 'blockquote', children: this.blocks(element) }];
-    if (element.matches('figure.quote')) return [this.quoteWithSource(element)];
-    if (element.matches('figure.figure')) return this.figure(element);
-    if (element.matches('figure.component')) return [this.component(element)];
-    if (element.matches('table')) return element.matches('.list-table') ? [this.listTable(element)] : this.table(element);
-    if (element.matches('aside.aside')) return [this.aside(element)];
-    if (element.matches('details.fold')) return this.fold(element);
-    if (element.matches('.recap')) return [bakeBlock('recap', {}, this.blocks(element))];
-    if (element.matches('div[data-width]:not([data-line])')) return [bakeBlock('', { width: element.dataset.width }, this.blocks(element))];
-    if (element.matches('hr')) return [{ type: 'thematicBreak' }];
-    return this.blocks(element);
+  for (let index = at - 1; ; index -= 1) {
+    const item = items[index];
+    if (item.mark !== undefined) return item.mark;
+    if (item.run !== undefined) return nearerEdge(item.run, item.index + 1);
+    if (!WHITESPACE.test(item.character)) return item.end;
   }
+}
 
-  inline(element) {
-    const nodes = [];
-    for (const child of element.childNodes) {
-      if (!this.range.intersectsNode(child)) continue;
-      if (child.nodeType === Node.TEXT_NODE) nodes.push(text(this.textPart(child)));
-      else if (child.nodeType === Node.ELEMENT_NODE) nodes.push(...this.inlineElement(child));
+function alignRuns(items, source) {
+  for (let start = 1; start < items.length; start += 1) {
+    if (items[start].character === undefined) continue;
+    let end = start;
+    while (items[end].character !== undefined) end += 1;
+    const run = items.slice(start, end);
+    const gap = { start: items[start - 1].mark, end: items[end].mark };
+    const units = alignText(run.map((item) => item.character).join(''), source.slice(gap.start, gap.end));
+    run.forEach((item, index) => {
+      if (units === null) Object.assign(item, { run: { ...gap, length: run.length }, index });
+      else Object.assign(item, { start: gap.start + units[index][0], end: gap.start + units[index][1] });
+    });
+    start = end;
+  }
+}
+
+function nearerEdge(run, index) {
+  return index * 2 <= run.length ? run.start : run.end;
+}
+
+function alignText(text, source) {
+  const exact = source.indexOf(text);
+  if (exact !== -1 && !isEscaped(source, exact)) return Array.from(text, (_, index) => [exact + index, exact + index + 1]);
+  const units = [];
+  let at = 0;
+  for (let index = 0; index < text.length; ) {
+    if (at >= source.length) return null;
+    const reference = source[at] === '&' ? CHARACTER_REFERENCE.exec(source.slice(at))?.[0] : undefined;
+    const decoded = reference === undefined ? null : decodeReference(reference);
+    if (source[at] === '\\' && source[at + 1] === text[index] && ESCAPABLE.test(text[index])) {
+      units.push([at, at + 2]);
+      index += 1;
+      at += 2;
+    } else if (source[at] === text[index]) {
+      units.push([at, at + 1]);
+      index += 1;
+      at += 1;
+    } else if (decoded !== null && decoded !== '' && text.startsWith(decoded, index)) {
+      for (let unit = 0; unit < decoded.length; unit += 1) units.push([at, at + reference.length]);
+      index += decoded.length;
+      at += reference.length;
+    } else if (source[at] === '<') {
+      return null;
+    } else {
+      at += 1;
     }
-    return nodes;
   }
-
-  inlineElement(element) {
-    if (element.matches(NOT_CONTENT)) return [];
-    if (element.matches('mjx-container[data-tex]')) return [{ type: 'inlineMath', value: element.dataset.tex.trim() }];
-    if (element.matches('sup.sidenote-ref[data-sidenote]')) {
-      const label = this.addNote(element.dataset.sidenote);
-      return [{ type: 'footnoteReference', identifier: label, label }];
-    }
-    if (element.matches('a.citation[data-key]')) return [{ type: 'citation', key: element.dataset.key }];
-    if (element.matches('a.eqref')) return [{ type: 'eqref', label: idOfFragment(hashOf(element.getAttribute('href'))) }];
-    if (element.matches('br')) return [{ type: 'break' }];
-    if (element.matches('img')) return [image(element)];
-    if (element.matches('code')) return [{ type: 'inlineCode', value: this.selectedText(element) }];
-    const inner = this.inline(element);
-    if (inner.every(isBlank)) return inner;
-    const attention = ATTENTION.find(([selector]) => element.matches(selector));
-    if (attention !== undefined) return hoistWhitespace(inner, (children) => ({ type: attention[1], children }));
-    if (element.matches('a[href]')) return [{ type: 'link', url: element.dataset.target === undefined ? element.getAttribute('href') : siteAddress(element.dataset.target), children: inner }];
-    return inner;
-  }
-
-  math(element) {
-    const value = element.dataset.tex.trim();
-    return element.getAttribute('display') === 'true' ? { type: 'math', value } : { type: 'paragraph', children: [{ type: 'inlineMath', value }] };
-  }
-
-  code(pre) {
-    return { type: 'code', lang: pre.dataset.language ?? null, value: this.selectedText(pre).replace(/\n$/, '') };
-  }
-
-  list(element) {
-    const ordered = element.matches('ol');
-    const first = Number(element.getAttribute('start') ?? 1);
-    const items = [...element.children].filter((child) => child.matches('li'));
-    const spread = items.some((item) => [...item.children].some((child) => child.matches('p')));
-    const selected = items.filter((item) => this.hasSelection(item));
-    if (selected.length === 0) return [];
-    const children = selected.map((item) => ({ type: 'listItem', spread, checked: checkedOf(item), children: this.blocks(item) }));
-    return [{ type: 'list', ordered, start: first + items.indexOf(selected[0]), spread, children }];
-  }
-
-  references(element) {
-    const items = [...element.children]
-      .filter((item) => item.matches('li') && this.hasSelection(item))
-      .map((item) => listItem([{ type: 'paragraph', children: [{ type: 'citation', key: item.dataset.key }, text(' '), ...trimPhrasing(this.inline(item.querySelector('p') ?? item))] }]));
-    return bakeBlock('references', {}, [tightList(items)]);
-  }
-
-  quoteWithSource(figure) {
-    const children = [];
-    const blockquote = figure.querySelector(':scope > blockquote');
-    const caption = figure.querySelector(':scope > figcaption');
-    if (blockquote !== null && this.hasSelection(blockquote)) children.push(...this.blocks(blockquote));
-    if (caption !== null && this.hasSelection(caption)) children.push(...paragraph([text('— '), ...trimPhrasing(this.inline(caption))]));
-    return { type: 'blockquote', children };
-  }
-
-  figure(figure) {
-    const element = figure.querySelector('img');
-    const caption = figure.querySelector(':scope > figcaption');
-    if (element === null) return this.blocks(figure);
-    const title = caption === null ? null : tidy(serializeMarkdown({ type: 'root', children: paragraph(this.whole(caption, () => this.inline(caption))) }));
-    return [{ type: 'paragraph', children: [{ ...image(element), title }] }];
-  }
-
-  fold(details) {
-    const summary = details.querySelector(':scope > summary');
-    const body = this.blocks(details);
-    if (body.length === 0 && summary !== null && this.hasSelection(summary)) return paragraph(this.inline(summary));
-    return [bakeBlock('fold', { title: summary?.textContent ?? '' }, body)];
-  }
-
-  component(figure) {
-    const caption = figure.querySelector(':scope > figcaption');
-    return bakeBlock(figure.dataset.component, writtenAttributes(figure), caption === null ? [] : this.whole(caption, () => this.blocks(caption)));
-  }
-
-  aside(element) {
-    const title = element.querySelector(':scope > .aside-title');
-    return bakeBlock('aside', title === null ? {} : { title: title.textContent }, this.blocks(element));
-  }
-
-  table(table) {
-    const rows = [...table.rows];
-    const header = table.tHead?.rows[0] ?? rows[0];
-    if (header === undefined) return [];
-    const tableRow = (row) => ({ type: 'tableRow', children: [...row.cells].map((cell) => ({ type: 'tableCell', children: singleLine(trimPhrasing(this.whole(cell, () => this.inline(cell)))) })) });
-    const align = [...header.cells].map((cell) => alignmentOf(cell.getAttribute('align') ?? cell.style.textAlign));
-    return [{ type: 'table', align, children: [tableRow(header), ...rows.filter((row) => row !== header && this.hasSelection(row)).map(tableRow)] }];
-  }
-
-  listTable(table) {
-    const header = table.tHead?.rows[0];
-    const rows = [header, ...[...(table.tBodies[0]?.rows ?? [])].filter((row) => this.hasSelection(row))].filter((row) => row !== undefined);
-    const cells = (row) => tightList([...row.cells].map((cell) => listItem(this.whole(cell, () => this.blocks(cell)))));
-    return bakeBlock('list-table', {}, [tightList(rows.map((row) => listItem([cells(row)])))]);
-  }
-
-  addNote(number) {
-    if (!this.notes.includes(number)) this.notes.push(number);
-    return sidenoteElement(this.article, number)?.dataset.label ?? number;
-  }
-
-  footnotes() {
-    const definitions = [];
-    for (let index = 0; index < this.notes.length; index += 1) {
-      const number = this.notes[index];
-      const note = sidenoteElement(this.article, number);
-      if (note === null) continue;
-      const line = Number(note.dataset.line);
-      if (this.copied.some(([start, end]) => line >= start && line <= end)) continue;
-      for (const reference of note.querySelectorAll('sup.sidenote-ref[data-sidenote]')) this.addNote(reference.dataset.sidenote);
-      definitions.push(dedentDefinition(this.lines.slice(line - 1, Number(note.dataset.endLine))));
-    }
-    return definitions;
-  }
+  return units;
 }
 
-function indexOf(node) {
-  return [...node.parentNode.childNodes].indexOf(node);
+function isEscaped(text, index) {
+  let backslashes = 0;
+  while (text[index - 1 - backslashes] === '\\') backslashes += 1;
+  return backslashes % 2 === 1;
 }
 
-function isReferenceList(list) {
-  return list.matches('.references') && [...list.children].every((item) => item.dataset.key !== undefined);
+function decodeReference(reference) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = reference;
+  return textarea.value === reference ? null : textarea.value;
 }
 
-function hashOf(href) {
-  return href.slice(href.indexOf('#'));
-}
-
-function siteAddress(target) {
-  const hash = target.indexOf('#');
-  return hash === -1 ? target : `${target.slice(0, hash)}${fragmentOf(target.slice(hash + 1))}`;
-}
-
-function text(value) {
-  return { type: 'text', value };
-}
-
-function verbatim(value) {
-  return { type: 'verbatim', value };
-}
-
-function bakeBlock(name, attributes, children) {
-  return { type: 'bakeBlock', name, attributes, children };
-}
-
-function listItem(children) {
-  return { type: 'listItem', spread: false, children };
-}
-
-function tightList(children) {
-  return { type: 'list', ordered: false, spread: false, children };
-}
-
-function image(element) {
-  const url = element.dataset.src ?? new URL(element.getAttribute('src'), element.baseURI).href;
-  return { type: 'image', url, alt: element.getAttribute('alt') ?? '', attributes: writtenAttributes(element) };
-}
-
-function paragraph(nodes) {
-  const children = trimPhrasing(nodes);
-  return children.length === 0 ? [] : [{ type: 'paragraph', children }];
-}
-
-function isBlank(node) {
-  return node.type === 'text' && node.value.trim() === '';
-}
-
-function trimPhrasing(nodes) {
-  const children = nodes.filter((node) => node.type !== 'text' || node.value !== '');
-  while (children[0]?.type === 'text') {
-    const value = children[0].value.trimStart();
-    if (value !== '') {
-      children[0] = text(value);
-      break;
-    }
-    children.shift();
+function withPublishedImages(root, source, from, to) {
+  const images = [...root.querySelectorAll('img[data-src]')]
+    .map((image) => ({ image, range: source.range(image) }))
+    .filter(({ range: [first, last] }) => first >= from && last <= to)
+    .reverse();
+  let text = source.slice(from, to);
+  for (const { image, range: [first, last] } of images) {
+    const address = new URL(image.getAttribute('src'), image.baseURI).href;
+    text = `${text.slice(0, first - from)}${source.slice(first, last).replace(IMAGE_ADDRESS, (written, before) => `${before}${address}`)}${text.slice(last - from)}`;
   }
-  while (children.at(-1)?.type === 'text') {
-    const value = children.at(-1).value.trimEnd();
-    if (value !== '') {
-      children[children.length - 1] = text(value);
-      break;
-    }
-    children.pop();
+  return text;
+}
+
+function footnoteDefinitions(article, source, from, to) {
+  const references = [...article.querySelectorAll(REFERENCE)].map((reference) => ({ number: reference.dataset.sidenote, range: source.range(reference) }));
+  const numbers = [];
+  const add = (first, last) => {
+    const inside = references.filter(({ range }) => range[0] >= first && range[1] <= last).sort((a, b) => a.range[0] - b.range[0]);
+    for (const { number } of inside) if (!numbers.includes(number)) numbers.push(number);
+  };
+  add(from, to);
+  const definitions = [];
+  for (let index = 0; index < numbers.length; index += 1) {
+    const note = sidenoteElement(article, numbers[index]);
+    if (note === null) continue;
+    const [first, last] = source.range(note);
+    if (first >= from && last <= to) continue;
+    add(first, last);
+    definitions.push(dedentDefinition(source.slice(first, last)));
   }
-  return children;
+  return definitions;
 }
 
-function hoistWhitespace(nodes, wrap) {
-  const children = [...nodes];
-  const before = [];
-  const after = [];
-  const [leading] = children[0]?.type === 'text' ? /^\s*/.exec(children[0].value) : [''];
-  if (leading !== '') {
-    before.push(text(leading));
-    children[0] = text(children[0].value.slice(leading.length));
-  }
-  const [trailing] = children.at(-1)?.type === 'text' ? /\s*$/.exec(children.at(-1).value) : [''];
-  if (trailing !== '') {
-    after.push(text(trailing));
-    children[children.length - 1] = text(children.at(-1).value.slice(0, -trailing.length));
-  }
-  return [...before, wrap(children.filter((node) => node.type !== 'text' || node.value !== '')), ...after];
-}
-
-function singleLine(nodes) {
-  return nodes.map((node) => (node.type === 'text' ? text(node.value.replaceAll('\n', ' ')) : node));
-}
-
-function checkedOf(item) {
-  const box = item.querySelector(':scope > input[type="checkbox"], :scope > p:first-child > input[type="checkbox"]');
-  return box === null ? null : box.checked;
-}
-
-function alignmentOf(align) {
-  return ALIGNMENTS.has(align) ? align : null;
-}
-
-function writtenAttributes(element) {
-  let attributes;
-  try {
-    attributes = JSON.parse(element.dataset.attributes ?? '{}');
-  } catch {
-    return {};
-  }
-  if (attributes === null || typeof attributes !== 'object' || Array.isArray(attributes)) return {};
-  return Object.fromEntries(Object.entries(attributes).filter(([name, value]) => ATTRIBUTE_NAME.test(name) && (value === true || typeof value === 'string') && writeAttribute(name, value) !== null));
-}
-
-function dedentDefinition(lines) {
+function dedentDefinition(definition) {
+  const lines = definition.split('\n');
   const prefix = lines[0].slice(0, Math.max(0, lines[0].indexOf('[^')));
-  return lines
-    .map((line, index) => {
-      if (index === 0 || line.startsWith(prefix)) return line.slice(prefix.length);
-      return line.replace(new RegExp(`^[ \\t>]{0,${prefix.length}}`), '');
-    })
-    .join('\n');
-}
-
-function noteBody(definition, label) {
-  const [first, ...rest] = dedentDefinition(definition.split('\n')).split('\n');
-  const body = first.slice(`[^${label}]:`.length).replace(/^[ \t]/, '');
-  const indents = rest.filter((line) => line.trim() !== '').map((line) => /^[ \t]*/.exec(line)[0].length);
-  const common = indents.length === 0 ? 0 : Math.min(...indents);
-  return [body, ...rest.map((line) => line.slice(common))].join('\n');
+  return lines.map((line, index) => (index === 0 || line.startsWith(prefix) ? line.slice(prefix.length) : line.replace(new RegExp(`^[ \\t>]{0,${prefix.length}}`), ''))).join('\n');
 }
 
 function tidy(text) {

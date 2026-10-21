@@ -1,7 +1,8 @@
-import { CONTENT_EVENT, LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, labelsFor, leftColumnScreen, notesColumnScreen, oncePerFrame } from 'bake/theme/client';
+import { LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, leftColumnScreen, notesColumnScreen, oncePerFrame, requestLayout } from 'bake/theme/client';
+import { essayLabels } from '../labels.js';
 import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
-import { bottomReserve, createCardHost, outlineKey, readOutline } from './toc-card.js';
+import { bottomReserve, createCardHost, readOutline } from './toc-card.js';
 import { DOTS_CARD, dotsView } from './toc-dots.js';
 import { RAIL_CARD, notesView, railView } from './toc-notes.js';
 import { TABS_CARD, tabsView } from './toc-tabs.js';
@@ -21,15 +22,18 @@ const STYLES = {
   ticks: { left: TICKS, notes: TICKS, phone: DRAWER },
 };
 
+// why: bake dev starts the table of contents again after each partial update, and the drawer stays open where the reader left it
+let keptDrawer = null;
+
 export function startToc(article) {
   const nav = document.querySelector('.bk-toc');
-  if (nav === null) return;
+  if (nav === null) return () => {};
   const root = document.documentElement;
   const host = document.createElement('div');
   host.className = 'bk-toc-ui';
   document.body.insertBefore(host, document.querySelector('.bk-shell'));
   const outline = readOutline(nav);
-  const labels = labelsFor(root.lang);
+  const labels = essayLabels(root.lang);
   let jumping = false;
   let state = null;
   let mounted = null;
@@ -69,12 +73,7 @@ export function startToc(article) {
     crossing = blocksCrossing(view.columns ?? [], currentLayout(article));
     draw();
   };
-  const mount = (again = false) => {
-    const style = root.dataset.toc in STYLES ? root.dataset.toc : 'notes';
-    const screen = leftColumnScreen.matches ? 'left' : notesColumnScreen.matches ? 'notes' : 'phone';
-    const spec = STYLES[style][screen];
-    const key = spec === DRAWER ? `${style} drawer` : spec;
-    if (key === mounted && !again) return;
+  const unmount = () => {
     view?.destroy();
     card?.destroy();
     for (const element of document.querySelectorAll('.is-yielding')) {
@@ -82,6 +81,14 @@ export function startToc(article) {
       element.inert = false;
     }
     yielded = false;
+  };
+  const mount = () => {
+    const style = root.dataset.toc in STYLES ? root.dataset.toc : 'notes';
+    const screen = leftColumnScreen.matches ? 'left' : notesColumnScreen.matches ? 'notes' : 'phone';
+    const spec = STYLES[style][screen];
+    const key = spec === DRAWER ? `${style} drawer` : spec;
+    if (key === mounted) return;
+    unmount();
     mounted = key;
     state = readingState(outline, currentLayout(article));
     card = spec.card === undefined ? null : createCardHost(spec.card);
@@ -98,34 +105,34 @@ export function startToc(article) {
     event.preventDefault();
     go(link.getAttribute('href'));
   };
-  nav.addEventListener('click', onClick);
-  host.addEventListener('click', onClick);
-  const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add('is-ready')));
-  const reread = () => {
-    const next = readOutline(nav);
-    const same = outlineKey(next) === outlineKey(outline);
-    Object.assign(outline, next);
-    if (same) {
-      card?.refresh();
-      view.refresh?.();
-      return;
-    }
-    nav.classList.remove('is-ready');
-    const saved = view.saved?.() ?? null;
-    mount(true);
-    if (saved !== null) view.restore(saved);
-    settle();
-  };
   mount();
-  settle();
-  addEventListener('scroll', update, { passive: true });
-  document.addEventListener(LAYOUT_EVENT, layout);
-  document.addEventListener(CONTENT_EVENT, reread);
-  leftColumnScreen.addEventListener('change', () => mount());
-  notesColumnScreen.addEventListener('change', () => mount());
-  document.addEventListener(SETTING_EVENT, (event) => {
-    if (event.detail.name === 'toc') mount();
-  });
+  if (keptDrawer !== null) view.restore(keptDrawer);
+  keptDrawer = null;
+  requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add('is-ready')));
+  const controller = new AbortController();
+  const { signal } = controller;
+  nav.addEventListener('click', onClick, { signal });
+  host.addEventListener('click', onClick);
+  addEventListener('scroll', update, { passive: true, signal });
+  document.addEventListener(LAYOUT_EVENT, layout, { signal });
+  leftColumnScreen.addEventListener('change', mount, { signal });
+  notesColumnScreen.addEventListener('change', mount, { signal });
+  document.addEventListener(
+    SETTING_EVENT,
+    (event) => {
+      if (event.detail.name !== 'toc') return;
+      mount();
+      requestLayout();
+    },
+    { signal },
+  );
+  return () => {
+    controller.abort();
+    keptDrawer = view.saved?.() ?? null;
+    unmount();
+    host.remove();
+    nav.classList.remove('is-ready');
+  };
 }
 
 function readingState(outline, measured) {

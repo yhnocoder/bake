@@ -22,14 +22,13 @@ export function createOverlay() {
   host.dataset.bakeDev = '';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = [
-    '<link rel="stylesheet" href="/__bake/overlay.css"><link rel="stylesheet" href="/__bake/switch.css">',
-    '<div class="marks"></div>',
+    '<link rel="stylesheet" href="/__bake/overlay.css"><link rel="stylesheet" href="/__bake/controls.css">',
     '<div class="bar">',
     '<button type="button" class="notice" hidden></button>',
     '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',
     '<section class="problems" data-state="clear" hidden aria-label="Problems">',
     '<header><span class="status" aria-hidden="true"></span><span class="title">No problems</span>',
-    '<label class="bars" hidden><input type="checkbox" role="switch" class="switch">Parameter bars</label>',
+    '<label class="bars" hidden><span class="bk-kit-switch"><input type="checkbox" role="switch"></span>Parameter bars</label>',
     '<button type="button" class="copy-all" hidden>Copy all</button>',
     '<button type="button" class="close" aria-label="Close the problems list" title="Close">',
     '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -38,11 +37,22 @@ export function createOverlay() {
     '</section>',
     '</div>',
   ].join('');
-  document.body.append(host);
+  const edge = document.querySelector('[data-edge="end"]');
+  // why: pages that no theme renders, such as HTML files in an article folder and the page for a missing address, have no edge areas
+  if (edge === null) {
+    host.dataset.alone = '';
+    document.body.append(host);
+  } else edge.prepend(host);
+  const marksHost = document.createElement('div');
+  marksHost.id = 'bake-dev-marks';
+  marksHost.dataset.bakeDev = '';
+  const marksShadow = marksHost.attachShadow({ mode: 'open' });
+  marksShadow.innerHTML = '<link rel="stylesheet" href="/__bake/overlay.css"><div class="marks"></div>';
+  document.body.append(marksHost);
   const panel = shadow.querySelector('.problems');
   const title = shadow.querySelector('.title');
   const list = shadow.querySelector('.list');
-  const marks = shadow.querySelector('.marks');
+  const marks = marksShadow.querySelector('.marks');
   const copyAll = shadow.querySelector('.copy-all');
   const dot = shadow.querySelector('.dot');
   const notice = shadow.querySelector('.notice');

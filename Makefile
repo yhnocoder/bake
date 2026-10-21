@@ -1,8 +1,6 @@
-.PHONY: check browser example dev screenshots perf
+.PHONY: check browser example dev perf perf-dev
 
-BASE ?= origin/main
-
-check:
+check: node_modules
 	scripts/test.sh
 
 node_modules: package.json package-lock.json
@@ -14,16 +12,18 @@ browser: node_modules
 
 example: node_modules
 	cd examples/blog && node ../../src/cli.js build
-	python3 -m http.server --directory examples/blog/dist --bind 127.0.0.1 8000
+	node --input-type=module -e "const { serveStatic } = await import('./scripts/static-server.js'); const { origin } = await serveStatic('examples/blog/dist'); console.log(origin.replace('127.0.0.1', 'localhost') + '/');"
 
 dev: node_modules
 	cd examples/blog && node ../../src/cli.js dev
-
-screenshots: node_modules
-	scripts/screenshots.sh $(BASE)
 
 perf: node_modules
 	cd examples/blog && node ../../src/cli.js build
 	mkdir -p test-out/perf
 	node scripts/measure-pages.js examples/blog/dist --out test-out/perf/report.json
 	node scripts/check-budgets.js test-out/perf/report.json
+
+perf-dev: node_modules
+	mkdir -p test-out/perf
+	node scripts/measure-dev.js --out test-out/perf/dev.json
+	node scripts/check-budgets.js test-out/perf/dev.json

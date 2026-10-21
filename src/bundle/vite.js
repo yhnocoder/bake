@@ -65,7 +65,7 @@ export function blogPath(root, file) {
   return relative(root, file).split(sep).join('/');
 }
 
-export function isInBlog(root, file) {
+function isInBlog(root, file) {
   return typeof file === 'string' && isAbsolute(file) && resolve(file).startsWith(`${resolve(root)}${sep}`);
 }
 

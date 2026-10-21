@@ -1,61 +1,61 @@
 {
-  "measured": "Two runs of scripts/measure-pages.js on examples/blog built from commit 00d3839, on the Linux development container on 2026-10-20",
+  "measured": "Provisional: two runs of scripts/measure-pages.js without throttling on examples/blog built from commit 8ac17fe, and two runs of scripts/measure-dev.js on commit 26a530f, on a Mac with a load average of 1.8 to 6.1 from other work, on 2026-10-21. The final measurement of the cleanup replaces these limits.",
   "limits": {
     "transferBytes": {
-      "limit": 1800000,
-      "basis": "The largest value measured, 1488198 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 2100000,
+      "basis": "The largest value measured, 1686153 bytes on /2026-09/matrix-calculus/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "firstScreenTransferBytes": {
-      "limit": 1600000,
-      "basis": "The largest value measured, 1331098 bytes on /2026-10/syntax-linked/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 2000000,
+      "basis": "The largest value measured, 1656028 bytes on /2026-09/matrix-calculus/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "htmlBytes": {
-      "limit": 64000,
-      "basis": "The largest value measured, 51248 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 256000,
+      "basis": "The largest gzip size of a built page of examples/blog after copying as Markdown added the source offsets to the HTML, 212996 bytes for /2026-09/matrix-calculus/, measured with Node's zlib at its default level, plus 20 percent, rounded up"
     },
     "cssBytes": {
       "limit": 100000,
-      "basis": "The largest value measured, 81497 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "basis": "The largest value measured, 82904 bytes on /2026-10/syntax-linked/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "themeScriptBytes": {
-      "limit": 33000,
-      "basis": "The largest value measured, 26984 bytes on / at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 30000,
+      "basis": "The largest value measured, 24383 bytes on / at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "componentScriptBytes": {
-      "limit": 610000,
-      "basis": "The largest value measured, 505794 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 650000,
+      "basis": "The largest value measured, 534297 bytes on /2026-09/matrix-calculus/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "chatScriptBytes": {
-      "limit": 10000,
-      "basis": "The largest value measured, 7860 bytes on / at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 17000,
+      "basis": "The largest value measured, 13605 bytes on / at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "previewScriptBytes": {
-      "limit": 1500,
+      "limit": 1400,
       "basis": "The largest value measured, 1096 bytes on / at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "fontBytes": {
       "limit": 980000,
-      "basis": "The largest value measured, 810418 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "basis": "The largest value measured, 810894 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "fontFiles": {
       "limit": 21,
       "basis": "The largest value measured, 17 files on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "imageBytes": {
-      "limit": 5000,
-      "basis": "The largest value measured, 4087 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 21000,
+      "basis": "The largest value measured, 17463 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "firstContentfulPaintMs": {
-      "limit": 4200,
-      "basis": "The largest value measured, 2076 ms on /2026-10/syntax/ at 1440 pixels wide, times 2, rounded up, because timings vary between runs and between machines"
+      "limit": 400,
+      "basis": "The largest value measured, 156 ms on /2026-09/llm-act-fns/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
     },
     "largestContentfulPaintMs": {
-      "limit": 4200,
-      "basis": "The largest value measured, 2076 ms on /2026-10/syntax/ at 1440 pixels wide, times 2, rounded up, because timings vary between runs and between machines"
+      "limit": 400,
+      "basis": "The largest value measured, 156 ms on /2026-09/llm-act-fns/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
     },
     "componentsReadyMs": {
-      "limit": 5900,
-      "basis": "The largest value measured, 2926 ms on /2026-10/activations/ at 1440 pixels wide, times 2, rounded up, because timings vary between runs and between machines"
+      "limit": 300,
+      "basis": "The largest value measured, 126 ms on /2026-10/activations/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
     },
     "otherScriptBytes": {
       "limit": 0,
@@ -72,6 +72,22 @@
     "failedRequests": {
       "limit": 0,
       "basis": "A published page must not request a missing file"
+    },
+    "devStartupMs": {
+      "limit": 4300,
+      "basis": "The largest median measured, 2117 ms, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
+    },
+    "articleUpdateMs": {
+      "limit": 1500,
+      "basis": "The largest median measured, 710 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
+    },
+    "componentUpdateMs": {
+      "limit": 2000,
+      "basis": "The largest median measured, 992 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
+    },
+    "configUpdateMs": {
+      "limit": 1200,
+      "basis": "The largest median measured, 559 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
     }
   }
 }

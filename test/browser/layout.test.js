@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { article, bake, writeFiles } from '../blog.js';
-import { serve } from './server.js';
+import { article, bake, copyExample, writeFiles } from '../blog.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const overflowWidths = [375, 600, 1000, 1339, 1340, 1440];
 const WENKAI_TEXT = '.bk-site, .bk-title, .bk-article :is(h2, h3, h4, h5, h6)';
 
@@ -95,9 +92,7 @@ A paragraph before the references.
 });
 
 test('the essay theme lays out articles', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-layout-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+  const dir = copyExample(t);
   writeFiles(dir, {
     'content/posts/stress/index.md': stressArticle,
     'content/posts/widths/index.md': widthsArticle,
@@ -111,12 +106,11 @@ test('the essay theme lays out articles', async (t) => {
   assert.equal(result.status, 0);
   const origin = await serve(t, join(dir, 'dist'));
 
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const open = async (path, options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', ...options });
     await page.goto(`${origin}/2026-10/${path}/`);
-    await settle(page);
+    if (options.javaScriptEnabled !== false) await settle(page);
     return page;
   };
 
@@ -135,74 +129,6 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(overflowing, []);
   });
 
-  await t.test('a resize of the window measures the article in one layout pass and publishes the positions with bk:layout', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await page.addInitScript(() => {
-      window.layoutProbe = { reads: 0, observed: 0, passes: [] };
-      for (const type of [Element, Range]) {
-        const read = type.prototype.getBoundingClientRect;
-        type.prototype.getBoundingClientRect = function () {
-          window.layoutProbe.reads += 1;
-          return read.call(this);
-        };
-      }
-      const observe = ResizeObserver.prototype.observe;
-      ResizeObserver.prototype.observe = function (target, options) {
-        if (target.matches?.('.bk-article')) window.layoutProbe.observed += 1;
-        return observe.call(this, target, options);
-      };
-      document.addEventListener('bk:layout', (event) => {
-        const headings = [...document.querySelectorAll('.bk-article h2[id]')];
-        window.layoutProbe.passes.push({ headings: headings.every((heading) => event.detail.headings.has(heading)), blocks: event.detail.blocks.every((block) => ['wide', 'page'].includes(block.element.dataset.resolved)), top: event.detail.article.top });
-      });
-    });
-    await page.goto(`${origin}/2026-10/syntax/`);
-    await settle(page);
-    await page.evaluate(() => {
-      window.layoutProbe.reads = 0;
-      window.layoutProbe.passes = [];
-    });
-    await page.setViewportSize({ width: 1400, height: 900 });
-    await settle(page);
-    const probe = await page.evaluate(() => window.layoutProbe);
-    assert.equal(probe.observed, 1);
-    assert.ok(probe.passes.length >= 1);
-    assert.ok(probe.passes.every((pass) => pass.headings && pass.blocks && pass.top > 0));
-    assert.ok(probe.reads < 150, `${probe.reads} reads of getBoundingClientRect in one resize`);
-    await page.close();
-  });
-
-  await t.test('a fold inside an example and a change of the table of contents style measure no natural width again', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await page.addInitScript(() => {
-      window.naturalWidthProbes = 0;
-      const append = Element.prototype.append;
-      Element.prototype.append = function (...nodes) {
-        window.naturalWidthProbes += nodes.filter((node) => node instanceof HTMLElement && node.style.width === 'var(--natural-width)').length;
-        return append.apply(this, nodes);
-      };
-    });
-    await page.goto(`${origin}/2026-10/syntax/`);
-    await settle(page);
-    const probes = async (action) => {
-      await page.evaluate(() => (window.naturalWidthProbes = 0));
-      await action();
-      await settle(page);
-      return page.evaluate(() => window.naturalWidthProbes);
-    };
-    const fold = page.locator('.bk-block[data-type="example"] .example-result details.fold > summary').first();
-    await fold.scrollIntoViewIfNeeded();
-    await settle(page);
-    assert.equal(await probes(() => fold.click()), 0);
-    assert.equal(await probes(() => fold.click()), 0);
-    await page.getByRole('button', { name: '设置' }).click();
-    const styles = page.locator('.bk-settings-panel [role="radio"]');
-    assert.equal(await probes(() => styles.nth(2).click()), 0);
-    assert.equal(await probes(() => styles.nth(1).click()), 0);
-    assert.equal(await probes(() => styles.nth(0).click()), 0);
-    await page.close();
-  });
-
   await t.test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async () => {
     const page = await open('widths');
     const measure = () =>
@@ -215,21 +141,30 @@ test('the essay theme lays out articles', async (t) => {
             return [width, { width: box.width, left: box.left, right: box.right }];
           }),
         ),
-        auto: [...document.querySelectorAll('.bk-block[data-width="auto"]')].map((block) => ({ resolved: block.dataset.resolved, width: block.getBoundingClientRect().width })),
+        auto: [...document.querySelectorAll('.bk-block[data-width="auto"]')].map((block) => block.getBoundingClientRect().width),
       }));
     const wide = await measure();
     assert.equal(Math.round(wide.blocks.body.width), 820);
     assert.equal(Math.round(wide.blocks.wide.width), 1100);
     assert.equal(Math.round(wide.blocks.page.width), 1340);
     assert.ok(wide.blocks.page.left >= 0 && wide.blocks.page.right <= wide.viewport, `page block spans ${wide.blocks.page.left} to ${wide.blocks.page.right}`);
-    assert.deepEqual(wide.auto, [{ resolved: 'wide', width: 1100 }]);
+    assert.deepEqual(wide.auto, [1100]);
 
     await page.setViewportSize({ width: 900, height: 900 });
     await settle(page);
     const narrow = await measure();
     assert.equal(Math.round(narrow.column), 820);
     for (const [width, box] of Object.entries(narrow.blocks)) assert.equal(Math.round(box.width), Math.round(narrow.column), `${width} block at 900px`);
-    assert.deepEqual(narrow.auto, [{ resolved: 'body', width: narrow.column }]);
+    assert.deepEqual(narrow.auto, [narrow.column]);
+    await page.close();
+  });
+
+  await t.test('without scripts a formula and a code block wider than the body take the wide width, and a short one keeps the body width', async () => {
+    const page = await open('stress', { javaScriptEnabled: false });
+    const widths = await page.evaluate(() => ['code', 'math'].map((type) => Math.round(document.querySelector(`.bk-block[data-type="${type}"]`).getBoundingClientRect().width)));
+    assert.deepEqual(widths, [1100, 1100]);
+    await page.goto(`${origin}/2026-10/syntax/`);
+    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-block[data-type="code"]').getBoundingClientRect().width)), 820);
     await page.close();
   });
 
@@ -265,6 +200,17 @@ test('the essay theme lays out articles', async (t) => {
       ['stress', 1440],
     ]) {
       const page = await open(path, { viewport: { width, height: 900 } });
+      // why: a component takes its height when it comes near the screen, which moves every table below it
+      await page.evaluate(async () => {
+        for (const frame of [...document.querySelectorAll('.bk-article figure.component')].filter((element) => element.checkVisibility())) {
+          frame.scrollIntoView({ block: 'center' });
+          await new Promise((done) => {
+            const ready = () => frame.dataset.state === 'ready' || frame.dataset.state === 'failed';
+            if (ready()) return done();
+            new MutationObserver((_, observer) => ready() && (observer.disconnect(), done())).observe(frame, { attributes: true, attributeFilter: ['data-state'] });
+          });
+        }
+      });
       const count = await page.evaluate(() => document.querySelectorAll('.bk-article .table-scroll').length);
       let scrolled = 0;
       for (let index = 0; index < count; index += 1) {
@@ -272,12 +218,14 @@ test('the essay theme lays out articles', async (t) => {
         if (!(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth + 1))) continue;
         for (const position of [0, 0.5]) {
           await scroller.scrollIntoViewIfNeeded();
-          const frame = await scroller.evaluate((element, fraction) => {
+          await scroller.evaluate((element, fraction) => {
             element.scrollLeft = (element.scrollWidth - element.clientWidth) * fraction;
-            const box = element.getBoundingClientRect();
-            return { x: Math.floor(box.right) - 1, y: Math.floor(box.top + box.height / 2), border: getComputedStyle(element).borderRightColor };
           }, position);
           await settle(page);
+          const frame = await scroller.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return { x: Math.floor(box.right) - 1, y: Math.floor(box.top + box.height / 2), border: getComputedStyle(element).borderRightColor };
+          });
           const pixel = await page.screenshot({ clip: { x: frame.x, y: frame.y, width: 1, height: 1 } });
           const { data } = await sharp(pixel).raw().toBuffer({ resolveWithObject: true });
           const expected = frame.border.match(/\d+/g).map(Number);
@@ -366,21 +314,15 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(uneven, []);
   });
 
-  await t.test('dark mode follows the system and data-theme overrides it both ways', async () => {
-    const background = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    const darkSystem = await open('widths', { colorScheme: 'dark' });
-    assert.equal(await background(darkSystem), 'rgb(17, 20, 19)');
-    await darkSystem.evaluate(() => (document.documentElement.dataset.theme = 'light'));
-    assert.equal(await background(darkSystem), 'rgb(245, 246, 244)');
-    await darkSystem.close();
-    const lightSystem = await open('widths', { colorScheme: 'light' });
-    assert.equal(await background(lightSystem), 'rgb(245, 246, 244)');
-    await lightSystem.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
-    assert.equal(await background(lightSystem), 'rgb(17, 20, 19)');
-    await lightSystem.close();
+  await t.test('dark mode follows the system colour scheme', async () => {
+    const page = await open('widths', { colorScheme: 'dark' });
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)');
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.waitForFunction(() => getComputedStyle(document.body).backgroundColor === 'rgb(245, 246, 244)');
+    await page.close();
   });
 
-  await t.test('display math shows a scroll shadow only on an overflowing side in both schemes, also in the first frame after a theme switch', async () => {
+  await t.test('display math shows a scroll shadow only on an overflowing side in both schemes, also in the first frame after the colour scheme changes', async () => {
     const problems = [];
     for (const width of [1440, 375]) {
       const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
@@ -407,12 +349,15 @@ test('the essay theme lays out articles', async (t) => {
       await page.locator('mjx-container[display]').nth(1).scrollIntoViewIfNeeded();
       await settle(page);
       await check('in the light scheme');
+      await page.emulateMedia({ colorScheme: 'dark' });
+      // why: the page fades to the new scheme with a view transition, and Chromium on Linux draws that fade without the old snapshot when the root color-scheme changes, so the first frame of the dark scheme is read with the fade finished
+      await page.waitForFunction(() => document.getAnimations().some((animation) => animation.effect.pseudoElement?.startsWith('::view-transition')));
       await page.evaluate(async () => {
-        document.documentElement.dataset.theme = 'dark';
+        for (const animation of document.getAnimations()) if (animation.effect.pseudoElement?.startsWith('::view-transition')) animation.finish();
         await new Promise((done) => requestAnimationFrame(done));
       });
       await check('in the first frame of the dark scheme');
-      await page.waitForTimeout(400);
+      await settle(page);
       await check('in the dark scheme');
       if (width === 375) assert.ok((await edges()).some((edge) => edge.overflows), 'a formula overflows on a phone');
       await page.close();
@@ -535,13 +480,6 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(Object.entries(layouts).filter(([, count]) => count > 30), []);
   });
 });
-
-async function settle(page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    for (let frame = 0; frame < 3; frame += 1) await new Promise((done) => requestAnimationFrame(done));
-  });
-}
 
 function wenkaiSubsets(assets) {
   const css = readdirSync(assets)

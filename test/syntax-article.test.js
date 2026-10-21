@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { cpSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { bake, copyExample, writeFiles } from './blog.js';
 
 const articlePath = new URL('../examples/blog/content/posts/syntax/index.md', import.meta.url);
 const fixturesDir = new URL('./fixtures/syntax-errors/', import.meta.url);
@@ -66,4 +69,21 @@ test('syntax error appendix matches the error fixtures', () => {
   assert.deepEqual(Object.keys(expected).sort(), fixtureFiles);
   const fixtureMessages = Object.values(expected).map((line) => line.replace(/^\S+:\d+:\d+ /, '')).sort();
   assert.deepEqual(appendixMessages(article).sort(), fixtureMessages);
+});
+
+test('bake build reports every syntax error fixture at the position in expected.json', (t) => {
+  const expected = JSON.parse(readFileSync(new URL('expected.json', fixturesDir), 'utf8'));
+  const fixtures = fileURLToPath(fixturesDir);
+  const dir = copyExample(t);
+  const articles = Object.keys(expected).filter((name) => name.endsWith('.md'));
+  for (const name of articles) {
+    const folder = `content/posts/fixtures/${name.replace('.md', '')}`;
+    writeFiles(dir, { [`${folder}/index.md`]: readFileSync(join(fixtures, name), 'utf8') });
+    cpSync(join(fixtures, 'relu.svg'), join(dir, folder, 'relu.svg'));
+  }
+  for (const name of Object.keys(expected).filter((name) => !name.endsWith('.md'))) cpSync(join(fixtures, name), dir, { recursive: true });
+  const result = bake(dir, 'build');
+  const lines = result.stderr.trimEnd().split('\n');
+  assert.equal(lines.pop(), `${Object.keys(expected).length} errors, dist/ was not written`);
+  assert.deepEqual(lines.map((line) => line.replace(/^content\/posts\/fixtures\/([\w-]+)\/index\.md/, '$1.md')).sort(), Object.values(expected).sort());
 });

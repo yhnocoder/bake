@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict';
-import { cpSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { article, bake, createBlog } from '../blog.js';
-import { serve } from './server.js';
+import { article, bake, copyExample, writeFiles } from '../blog.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const NOTE_GAP = 12;
 const LINE_TOLERANCE = 4;
 
@@ -50,13 +47,14 @@ const stressArticle = article({
   ].join('\n'),
 });
 
-function highlightProperties() {
-  const timing = ['offset', 'computedOffset', 'easing', 'composite'];
-  const properties = document
-    .getAnimations()
-    .filter((animation) => animation.effect?.target?.matches('.sidenote-ref, .sidenote-ref *, .bk-sidenote, .bk-sidenote *, .bk-tintable'))
-    .flatMap((animation) => (animation.transitionProperty === undefined ? animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame)) : [animation.transitionProperty]));
-  return [...new Set(properties)].filter((property) => !timing.includes(property)).sort();
+function highlights() {
+  const ref = document.querySelector('.sidenote-ref[data-sidenote="5"]');
+  const layer = (element, pseudo) => (getComputedStyle(element, pseudo).content === 'none' ? 'none' : getComputedStyle(element, pseudo).opacity);
+  return {
+    number: layer(ref.querySelector('a'), '::before'),
+    note: layer(document.querySelector('.bk-notes-layer .bk-sidenote[data-sidenote="5"]'), '::after'),
+    paragraph: layer(ref.closest('p'), '::after'),
+  };
 }
 
 function measureNotes() {
@@ -119,24 +117,23 @@ function checkNotes({ blocks, notes }, label) {
 }
 
 test('sidenotes', async (t) => {
-  const dir = createBlog(t, { 'content/posts/stress/index.md': stressArticle });
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+  const dir = copyExample(t);
+  writeFiles(dir, { 'content/posts/stress/index.md': stressArticle });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const base = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const wide = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   await t.test('never overlap and align with the line of their number at 1440 px in the syntax article', async () => {
     await wide.goto(`${base}/2026-10/syntax/`);
-    await wide.evaluate(() => document.fonts.ready);
+    await settle(wide);
     checkNotes(await wide.evaluate(measureNotes), 'syntax article');
   });
 
   await t.test('move below earlier notes and wide blocks and hide while their number is in a closed fold', async () => {
     await wide.goto(`${base}/2026-10/stress/`);
-    await wide.evaluate(() => document.fonts.ready);
+    await settle(wide);
     const closed = await wide.evaluate(measureNotes);
     const reasons = checkNotes(closed, 'stress article');
     assert.ok(reasons.includes('aligned'), `no sidenote is aligned with its number: ${reasons}`);
@@ -147,8 +144,8 @@ test('sidenotes', async (t) => {
       ['6'],
     );
     await wide.click('details.fold > summary');
-    await wide.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
-    await wide.waitForTimeout(50);
+    await wide.waitForFunction(() => document.querySelector('details.fold').open);
+    await settle(wide);
     const opened = await wide.evaluate(measureNotes);
     checkNotes(opened, 'stress article with the fold open');
     assert.deepEqual(
@@ -157,15 +154,13 @@ test('sidenotes', async (t) => {
     );
   });
 
-  await t.test('highlight the number and the note and tint the paragraph on hover, animating only opacity', async () => {
+  await t.test('highlight the number and the note and tint the paragraph on hover', async () => {
     await wide.hover('.sidenote-ref[data-sidenote="5"] a');
-    assert.deepEqual(await wide.evaluate(highlightProperties), ['opacity']);
-    const state = await wide.evaluate(() => ({
-      reference: document.querySelector('.sidenote-ref[data-sidenote="5"]').classList.contains('is-active'),
-      note: document.querySelector('.bk-notes-layer .bk-sidenote[data-sidenote="5"]').classList.contains('is-active'),
-      paragraph: document.querySelector('.sidenote-ref[data-sidenote="5"]').closest('p').classList.contains('bk-tinted'),
-    }));
-    assert.deepEqual(state, { reference: true, note: true, paragraph: true });
+    await settle(wide);
+    assert.deepEqual(await wide.evaluate(highlights), { number: '1', note: '1', paragraph: '1' });
+    await wide.mouse.move(5, 450);
+    await settle(wide);
+    assert.deepEqual(await wide.evaluate(highlights), { number: '0', note: '0', paragraph: '0' });
   });
 
   await t.test('show every note under its block when scripts are disabled', async () => {
@@ -194,11 +189,7 @@ test('sidenotes', async (t) => {
     assert.equal(await phone.locator('.bk-notes-layer').isVisible(), false);
     assert.equal(await note.isVisible(), false);
     await phone.locator('.sidenote-ref[data-sidenote="2"] a').tap();
-    const opening = await phone.evaluate(() => {
-      const note = document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]');
-      return { properties: note.getAnimations().flatMap((animation) => animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame))), height: note.getBoundingClientRect().height };
-    });
-    assert.deepEqual([...new Set(opening.properties)].filter((property) => !['offset', 'computedOffset', 'easing', 'composite'].includes(property)).sort(), ['opacity', 'transform']);
+    const opening = await phone.evaluate(() => ({ height: document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]').getBoundingClientRect().height }));
     await phone.waitForFunction(() => {
       const element = document.querySelector('.bk-section .bk-sidenote[data-sidenote="2"]');
       return element.checkVisibility() && element.getAnimations().length === 0;

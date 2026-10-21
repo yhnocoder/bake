@@ -1,4 +1,4 @@
-import { currentLayout } from 'bake/theme/client';
+import { currentLayout, markCurrent } from 'bake/theme/client';
 import { ENTRY_GAP, clamp, createElement, tocLink, withoutTransition } from './toc-card.js';
 
 export const DOTS_CARD = { variant: 'dots', showDelay: 90 };
@@ -69,7 +69,7 @@ export function dotsView({ outline, labels, host, article, reserve, jumping }) {
       const next = Math.max(0, state.chapter);
       items.forEach((entry, index) => {
         entry.item.classList.toggle('is-read', index < next);
-        entry.item.classList.toggle('is-current', index === next);
+        markCurrent(entry.item, index === next);
         const progress = index === next && state.chapter >= 0 ? state.progress.toFixed(4) : '0';
         if (progress === entry.progress) return;
         entry.progress = progress;

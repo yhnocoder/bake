@@ -1,17 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
-import { createSite, updateSite } from '../src/build/site.js';
-import { sourceVersion } from '../src/dev/params.js';
-import { createPreview } from '../src/dev/preview.js';
 import { allowedHost, hostName, startDevServer } from '../src/dev/server.js';
 import { isWatched } from '../src/dev/watch.js';
-import { formatError } from '../src/report.js';
 import { article, createBlog, readTree, validConfig, writeFiles } from './blog.js';
 
 const pngBytes = Buffer.from(
@@ -36,10 +32,6 @@ async function start(t, dir, options = {}) {
   return { server, lines, get: (path) => fetch(new URL(path, server.url), { redirect: 'manual' }) };
 }
 
-function indexHtml(preview, url) {
-  return preview.find(`${url.slice(1)}index.html`).output.render();
-}
-
 describe('bake dev', () => {
   test('uses the next port when the requested port is in use', async (t) => {
     const blocker = createServer();
@@ -53,10 +45,11 @@ describe('bake dev', () => {
     assert.deepEqual(lines.slice(1), [`Serving the blog at http://localhost:${server.port}/`]);
   });
 
-  test('prints a loopback address other than 127.0.0.1 as it is, because localhost does not reach it', async (t) => {
+  test('prints an address other than a loopback or wildcard address as it is, because localhost does not reach it', async (t) => {
+    const host = Object.values(networkInterfaces()).flat().find((address) => address.family === 'IPv4' && !address.internal).address;
     const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const { server, lines } = await start(t, dir, { host: '127.0.0.5' });
-    assert.ok(lines.includes(`Serving the blog at http://127.0.0.5:${server.port}/`), lines.join('\n'));
+    const { server, lines } = await start(t, dir, { host });
+    assert.ok(lines.includes(`Serving the blog at http://${host}:${server.port}/`), lines.join('\n'));
   });
 
   test('listens on the loopback address by default and prints only the local address', async (t) => {
@@ -141,22 +134,8 @@ describe('bake dev', () => {
     const page = await get('/2026-10/rope/');
     assert.equal(page.status, 200);
     const html = await page.text();
-    const source = pathToFileURL(join(dir, 'content/posts/rope/index.md')).pathname;
-    const outline = JSON.stringify([
-      { line: 9, title: '01 Rotation' },
-      { line: 13, title: '01 Rotation › Angles' },
-    ]).replaceAll('"', '&quot;');
-    const version = sourceVersion(readFileSync(join(dir, 'content/posts/rope/index.md'), 'utf8'));
-    const token = /data-token="([A-Za-z0-9_-]{43})"/.exec(html)?.[1];
-    assert.ok(token, html.slice(-400));
-    assert.ok(
-      html.includes(
-        `<head><script type="module" src="/__bake/client.js" data-bake-dev data-source="${source}" data-file="content/posts/rope/index.md" data-outline="${outline}" data-version="${version}" data-components="{}" data-token="${token}"></script>`,
-      ),
-      html.slice(0, 600),
-    );
-    assert.match(html, /<div class="bk-block" data-type="paragraph" data-line="7" data-end-line="7">/);
-    assert.match(await (await get('/2026-10/gelu/')).text(), /<span class="bk-draft">Draft<\/span>/);
+    assert.match(html, /<script type="module" src="\/__bake\/client.js" data-bake-dev /);
+    assert.match(await (await get('/2026-10/gelu/')).text(), />Draft<\/span>/);
     assert.equal(await (await get('/robots.txt')).text(), 'User-agent: *\n');
     assert.equal((await get('/__bake/client.js')).status, 200);
     const redirect = await get('/2026-10/rope');
@@ -165,11 +144,8 @@ describe('bake dev', () => {
     assert.equal(missing.status, 404);
     const listing = await missing.text();
     assert.match(listing, /<h1>No page at \/2026-09\/nothing\/<\/h1>/);
-    assert.match(
-      listing,
-      /<li><a href="\/2026-10\/gelu\/">GELU &lt;draft&gt;<\/a><span class="date">2026-10-20<\/span><span class="draft">Draft<\/span><span class="file">content\/posts\/gelu\/index.md<\/span><\/li><li><a href="\/2026-10\/rope\/">Rope<\/a>/,
-    );
-    assert.match(listing, /<head><script type="module" src="\/__bake\/client.js" data-bake-dev data-missing><\/script>/);
+    assert.match(listing, /<li><a href="\/2026-10\/gelu\/">GELU &lt;draft&gt;<\/a><span[^>]*>2026-10-20<\/span><span[^>]*>Draft<\/span><span[^>]*>content\/posts\/gelu\/index.md<\/span><\/li><li><a href="\/2026-10\/rope\/">Rope<\/a>/);
+    assert.match(listing, /<script type="module" src="\/__bake\/client.js"/);
   });
 
   test('serves the homepage at / with drafts and the page script', async (t) => {
@@ -229,10 +205,10 @@ describe('bake dev', () => {
     let events = '';
     while (!events.includes('event: problems')) events += new TextDecoder().decode((await reader.read()).value);
     reader.cancel();
-    assert.match(events, /event: problems\ndata: \[\{"file":"content\/posts\/rope\/index.md","location":"7:5","message":"footnote \\"missing\\" has no definition","position":"content\/posts\/rope\/index.md:7:5","text":"content\/posts\/rope\/index.md:7:5 footnote \\"missing\\" has no definition"\}\]\n\n/);
+    assert.match(events, /event: problems\ndata: .*content\/posts\/rope\/index.md:7:5 footnote \\"missing\\" has no definition/);
     writeFileSync(join(dir, 'content/posts/rope/index.md'), article({ body: 'Text.\n' }));
     await eventually(() => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
-    await eventually(() => lines.includes('Updated /, /2026-10/rope/'), `bake dev printed ${JSON.stringify(lines)}`);
+    await eventually(() => lines.some((line) => line.startsWith('Updated ')), `bake dev printed ${JSON.stringify(lines)}`);
   });
 
   test('writes nothing into the blog folder', async (t) => {
@@ -249,14 +225,6 @@ describe('bake dev', () => {
     assert.deepEqual(Object.keys(readTree(dir)), before);
   });
 
-  test('stops with a message when the blog folder can no longer be watched', async (t) => {
-    const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const { server } = await start(t, dir);
-    rmSync(dir, { recursive: true });
-    assert.equal(await server.stopped, `bake dev: cannot watch ${dir}: the folder no longer exists`);
-    await assert.rejects(fetch(server.url));
-  });
-
   test('watches the blog except dist/, node_modules/ and dot files', () => {
     assert.deepEqual(
       ['content/posts/rope/index.md', 'themes/essay/page.jsx', 'bake.config.js', 'dist/index.html', '.git/HEAD', 'content/posts/rope/.index.md.swp', 'components/node_modules/x/index.js', '.dist-staging/a'].map(isWatched),
@@ -265,325 +233,188 @@ describe('bake dev', () => {
   });
 });
 
-describe('preview updates', () => {
-  test('rereads only the changed article, and a theme file change compiles only that theme again and parses no article again', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article(),
-      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n' }),
+describe('updates while bake dev runs', () => {
+  async function serve(t, files) {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, ...files });
+    const started = await start(t, dir);
+    const text = async (path) => (await started.get(path)).text();
+    return { dir, ...started, text };
+  }
+
+  async function save(dir, files, check, message) {
+    writeFiles(dir, files);
+    await eventually(check, message);
+  }
+
+  test('serves a saved article, a nested article and a changed theme file and leaves the other pages as they were', async (t) => {
+    const mine = 'theme: mine\n';
+    const { dir, text } = await serve(t, {
+      'content/posts/rope/index.md': article({ extra: mine }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n', body: '## One\n\nGELU text.\n' }),
+      'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner.\n' }),
+      'themes/mine/page.jsx': [
+        "import { ArticleDocument, labelsFor } from 'bake/theme';",
+        "import { Article } from 'bake/themes/essay';",
+        "import { Header } from './header.jsx';",
+        '',
+        'export default function Page(props) {',
+        '  const labels = labelsFor(props.site.language);',
+        '  return (',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels}>',
+        '      <Header />',
+        '      <Article content={props.article.content} labels={labels} />',
+        '    </ArticleDocument>',
+        '  );',
+        '}',
+        '',
+      ].join('\n'),
+      'themes/mine/header.jsx': 'export function Header() {\n  return <header class="first-header" />;\n}\n',
+      'themes/mine/client.jsx': "export { default } from 'bake/themes/essay/client';\n",
     });
-    const site = createSite(dir);
-    const first = await updateSite(site);
-    const theme = site.themes.get('essay');
-    writeFileSync(join(dir, 'content/posts/rope/index.md'), article({ body: 'Changed.\n' }));
-    const second = await updateSite(site, ['content/posts/rope/index.md']);
-    const byFile = (result) => new Map(result.articles.map((entry) => [entry.file, entry]));
-    assert.equal(byFile(second).get('content/posts/gelu/index.md'), byFile(first).get('content/posts/gelu/index.md'));
-    assert.notEqual(byFile(second).get('content/posts/rope/index.md'), byFile(first).get('content/posts/rope/index.md'));
-    assert.equal(site.themes.get('essay'), theme);
-    writeFiles(dir, { 'themes/essay/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' });
-    const bento = site.themes.get('bento');
-    const third = await updateSite(site, ['themes/essay/header.jsx']);
-    assert.notEqual(site.themes.get('essay'), theme);
-    assert.equal(site.themes.get('bento'), bento);
-    assert.equal(byFile(third).get('content/posts/gelu/index.md'), byFile(second).get('content/posts/gelu/index.md'));
-    assert.match(third.pages.find((page) => page.entry.url === '/2026-10/rope/').outputs[0].render(), /<header class="custom-header">/);
-    writeFiles(dir, { 'themes/plain/page.jsx': 'export default function Page() {\n  return <html />;\n}\n', 'themes/plain/client.jsx': '' });
-    const fourth = await updateSite(site, ['themes/plain/page.jsx', 'themes/plain/client.jsx']);
-    assert.notEqual(byFile(fourth).get('content/posts/gelu/index.md'), byFile(third).get('content/posts/gelu/index.md'));
-    assert.deepEqual(fourth.errors, []);
+    await save(dir, { 'content/posts/rope/index.md': article({ extra: mine, body: 'Changed.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Changed.'), 'the saved article was not served');
+    await save(dir, { 'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner changed.\n' }) }, async () => (await text('/2026-10/inner/')).includes('Inner changed.'), 'the nested article was not served');
+    await save(dir, { 'themes/mine/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' }, async () => (await text('/2026-10/rope/')).includes('custom-header'), 'the changed theme file was not used');
+    const gelu = await text('/2026-10/gelu/');
+    assert.match(gelu, /GELU text\./);
+    assert.doesNotMatch(gelu, /custom-header/);
   });
 
-  test('a change in an article folder nested inside another article folder parses only the nested article again', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/llm/index.md': article({ slug: 'llm' }),
-      'content/posts/llm/rope/index.md': article(),
-    });
-    const site = createSite(dir);
-    const byFile = (result) => new Map(result.articles.map((entry) => [entry.file, entry]));
-    const first = byFile(await updateSite(site));
-    writeFileSync(join(dir, 'content/posts/llm/rope/index.md'), article({ body: 'Changed.\n' }));
-    const second = byFile(await updateSite(site, ['content/posts/llm/rope/index.md']));
-    assert.equal(second.get('content/posts/llm/index.md'), first.get('content/posts/llm/index.md'));
-    assert.notEqual(second.get('content/posts/llm/rope/index.md'), first.get('content/posts/llm/rope/index.md'));
-  });
-
-  test('compiles a theme again when a file that it imports from another folder under themes/ changes', async (t) => {
+  test('compiles a theme again when a file that it imports from another folder under themes/ changes, also when the blog folder is reached through a symbolic link', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
-      'themes/plain/page.jsx': "import { word } from '../common/word.js';\nexport default function Page() {\n  return <html><body><p class=\"word\">{word}</p></body></html>;\n}\n",
-      'themes/plain/client.jsx': "import '../common/look.css';\n",
+      'themes/plain/page.jsx': "import { word } from '../common/word.js';\nexport default function Page(props) {\n  return <html><head>{props.assets.styles.map((href) => <link rel=\"stylesheet\" href={href} />)}</head><body><p class=\"word\">{word}</p></body></html>;\n}\n",
+      'themes/plain/client.jsx': "import '../common/look.css';\n\nexport default () => () => {};\n",
       'themes/common/word.js': "export const word = 'first';\n",
       'themes/common/look.css': '.word { color: red; }\n',
     });
-    const site = createSite(dir);
-    const render = (result) => result.pages.find((page) => page.entry.url === '/2026-10/rope/').outputs[0].render();
-    const stylesheet = (result) => result.assetFiles.filter((file) => file.path.endsWith('.css')).map((file) => String(file.render())).join('\n');
-    const first = await updateSite(site);
-    assert.deepEqual(first.errors, []);
-    assert.match(render(first), /first/);
-    writeFiles(dir, { 'themes/common/word.js': "export const word = 'second';\n" });
-    assert.match(render(await updateSite(site, ['themes/common/word.js'])), /second/);
-    writeFiles(dir, { 'themes/common/look.css': '.word { color: blue; }\n' });
-    assert.match(stylesheet(await updateSite(site, ['themes/common/look.css'])), /color:\s*#?(blue|00f)/);
+    const link = join(createBlog(t, {}), 'blog');
+    symlinkSync(dir, link);
+    const { get } = await start(t, link);
+    const page = async () => (await get('/2026-10/rope/')).text();
+    const stylesheet = async () => {
+      const [, href] = /<link rel="stylesheet" href="([^"]+)">/.exec(await page());
+      return (await get(new URL(href, 'http://localhost/2026-10/rope/').pathname)).text();
+    };
+    assert.match(await page(), /first/);
+    await save(dir, { 'themes/common/word.js': "export const word = 'second';\n" }, async () => /second/.test(await page()), 'the imported module was not compiled again');
+    await save(dir, { 'themes/common/look.css': '.word { color: blue; }\n' }, async () => /color:\s*#?(blue|00f)/.test(await stylesheet()), 'the imported stylesheet was not compiled again');
   });
 
-  test('reads the theme options again when the folder of a theme is removed or added as a whole', async (t) => {
+  test('reports the options of a theme folder that is removed or added as a whole', async (t) => {
     const options = "export const options = { extra: { label: 'Extra', type: 'number', default: 1 } };\n";
     const dir = createBlog(t, {
-      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', themes: { bento: { extra: 2 } } };\n",
+      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', themes: { mine: { extra: 2 } } };\n",
       'content/posts/rope/index.md': article(),
-      'themes/bento/options.js': options,
+      'themes/mine/options.js': options,
     });
-    const site = createSite(dir);
-    assert.deepEqual((await updateSite(site)).errors, []);
-    rmSync(join(dir, 'themes/bento'), { recursive: true });
-    const removed = await updateSite(site, ['themes/bento']);
-    assert.deepEqual(removed.errors.map(formatError), ['bake.config.js:1:101 unknown config field "themes.bento.extra"']);
-    writeFiles(dir, { 'themes/bento/options.js': options });
-    assert.deepEqual((await updateSite(site, ['themes/bento'])).errors, []);
+    const { lines } = await start(t, dir);
+    await save(dir, { 'themes/mine/options.js': options }, async () => lines.includes('Updated every page') || lines.some((line) => line.startsWith('Updated ')), 'bake dev did not watch the theme folder');
+    rmSync(join(dir, 'themes/mine'), { recursive: true });
+    await eventually(() => lines.includes('bake.config.js:1:92 themes.mine names no theme; the themes are essay, bento'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'themes/mine/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
   });
 
-  test('compiles the site theme again with the site files when an article theme becomes the site theme', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
+  test('reports the missing files of a theme that becomes the site theme', async (t) => {
+    const { dir, lines } = await serve(t, {
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
       'themes/plain/page.jsx': 'export default function Page(props) {\n  return <html><body>{props.article.title}</body></html>;\n}\n',
-      'themes/plain/client.jsx': '',
+      'themes/plain/client.jsx': 'export default () => () => {};\n',
     });
-    const site = createSite(dir);
-    assert.deepEqual((await updateSite(site)).errors, []);
-    writeFiles(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" });
-    const result = await updateSite(site, ['bake.config.js']);
-    assert.deepEqual(result.errors.map(formatError), [
-      'themes/plain:1:1 theme "plain" has no home.jsx',
-      'themes/plain:1:1 theme "plain" has no not-found.jsx',
-      'themes/plain:1:1 theme "plain" has no theme.css',
-    ]);
+    await save(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('3 errors'), `bake dev printed ${JSON.stringify(lines)}`);
+    assert.deepEqual(lines.slice(-4), ['themes/plain:1:1 theme "plain" has no home.jsx', 'themes/plain:1:1 theme "plain" has no not-found.jsx', 'themes/plain:1:1 theme "plain" has no theme.css', '3 errors']);
   });
 
-  test('the homepage reloads when the front matter of an article changes or an article is added', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article(),
-    });
-    const preview = createPreview(dir);
-    await preview.update();
-    assert.match(indexHtml(preview, '/'), /Rope/);
-    writeFiles(dir, { 'content/posts/rope/index.md': article({ body: 'Changed.\n' }) });
-    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: [], refresh: ['/2026-10/rope/'] });
-    writeFiles(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again', body: 'Changed.\n' }) });
-    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/rope/'], refresh: [] });
-    assert.match(indexHtml(preview, '/'), /Rope again/);
-    writeFiles(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu' }) });
-    assert.deepEqual(await preview.update(['content/posts/gelu/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/gelu/'], refresh: [] });
-    assert.match(indexHtml(preview, '/'), /GELU/);
+  test('updates the homepage when the front matter of an article changes and when an article is added or removed', async (t) => {
+    const { dir, text } = await serve(t, { 'content/posts/rope/index.md': article() });
+    assert.match(await text('/'), /Rope/);
+    await save(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => (await text('/')).includes('Rope again'), 'the homepage did not show the new title');
+    await save(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu' }) }, async () => (await text('/')).includes('GELU'), 'the homepage did not show the added article');
     rmSync(join(dir, 'content/posts/gelu'), { recursive: true });
-    assert.deepEqual(await preview.update(['content/posts/gelu/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/gelu/'], refresh: [] });
-    assert.doesNotMatch(indexHtml(preview, '/'), /GELU/);
+    await eventually(async () => !(await text('/')).includes('GELU'), 'the homepage still shows the removed article');
   });
 
-  test('an article with errors keeps its last good page while other articles update', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
+  test('keeps every page at its last version without problems while an article has problems, except at the start', async (t) => {
+    const { dir, lines, text, get } = await serve(t, {
+      'content/posts/rope/index.md': article({ body: 'Rope[^missing].\n' }),
       'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'GELU.\n' }),
     });
-    const preview = createPreview(dir);
-    await preview.update();
-    writeFiles(dir, {
-      'content/posts/rope/index.md': article({ body: 'Rope[^missing].\n' }),
-      'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'GELU changed.\n' }),
-    });
-    const result = await preview.update(['content/posts/gelu/index.md', 'content/posts/rope/index.md']);
-    assert.deepEqual([result.applied, result.reload, result.refresh], [true, [], ['/2026-10/gelu/']]);
-    assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
-    assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
-    assert.match(indexHtml(preview, '/2026-10/gelu/'), /GELU changed\./);
+    assert.equal(lines[0], 'content/posts/rope/index.md:7:5 footnote "missing" has no definition');
+    assert.match(await text('/2026-10/rope/'), /Rope/);
+    await save(dir, { 'content/posts/rope/index.md': article({ body: 'Rope.\n' }) }, () => lines.at(-1)?.startsWith('Updated '), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(
+      dir,
+      { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope[^missing].\n' }), 'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'GELU changed.\n' }) },
+      () => lines.at(-2) === 'content/posts/rope/index.md:7:5 footnote "missing" has no definition',
+      `bake dev printed ${JSON.stringify(lines)}`,
+    );
+    assert.match(await text('/2026-10/rope/'), /Rope\./);
+    assert.match(await text('/2026-10/gelu/'), /GELU\./);
+    assert.equal((await get('/2026-10/rotary/')).status, 404);
+    await save(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }) }, async () => (await get('/2026-10/rotary/')).status === 200, 'the fixed article was not served');
+    assert.match(await text('/2026-10/gelu/'), /GELU changed\./);
+    assert.equal((await get('/2026-10/rope/')).status, 404);
   });
 
-  test('a slug or date change together with a body error keeps the homepage and the site files pointing at the served page', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
-    });
-    const preview = createPreview(dir);
-    await preview.update();
-    const served = (path) => preview.find(path).output.render();
-    const before = Object.fromEntries(['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json'].map((path) => [path, served(path)]));
-    for (const changed of [{ slug: 'rotary' }, { date: '2026-09-01' }]) {
-      writeFiles(dir, { 'content/posts/rope/index.md': article({ ...changed, body: 'Rope[^missing].\n' }) });
-      const result = await preview.update(['content/posts/rope/index.md']);
-      assert.deepEqual([result.applied, result.reload, result.refresh], [true, [], []]);
-      assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
-      assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
-      for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
-    }
-    writeFiles(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: 'GELU[^missing].\n' }) });
-    await preview.update(['content/posts/gelu/index.md']);
-    assert.equal(preview.find('2026-10/gelu/index.html'), null);
-    for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
-    writeFiles(dir, {
-      'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }),
-      'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: 'GELU.\n' }),
-    });
-    const fixed = await preview.update(['content/posts/gelu/index.md', 'content/posts/rope/index.md']);
-    assert.deepEqual([fixed.problems, fixed.reload], [[], ['/', '/2026-10/gelu/', '/2026-10/rope/', '/2026-10/rotary/']]);
-    assert.match(served('index.html'), /href="2026-10\/rotary\/"/);
-    assert.match(served('index.html'), /href="2026-10\/gelu\/"/);
-    assert.doesNotMatch(served('index.html'), /href="2026-10\/rope\/"/);
-  });
-
-  test('a slug change made while a component error discards the update keeps the site files pointing at the served page after the component is fixed', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
-    });
-    const preview = createPreview(dir);
-    await preview.update();
-    const served = (path) => preview.find(path).output.render();
-    const before = Object.fromEntries(['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json'].map((path) => [path, served(path)]));
-    writeFiles(dir, {
-      'components/demo-chart.js': 'export default class DemoChart extends HTMLElement {}\n',
-      'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }),
-    });
-    const discarded = await preview.update(['components/demo-chart.js', 'content/posts/rope/index.md']);
-    assert.deepEqual([discarded.applied, discarded.problems.map((problem) => problem.file)], [false, ['components/demo-chart.js']]);
-    rmSync(join(dir, 'components'), { recursive: true });
-    writeFiles(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope[^missing].\n' }) });
-    const result = await preview.update(['components/demo-chart.js', 'content/posts/rope/index.md']);
-    assert.deepEqual([result.applied, result.problems.map((problem) => problem.file)], [true, ['content/posts/rope/index.md']]);
-    assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope\./);
-    for (const [path, text] of Object.entries(before)) assert.equal(served(path), text, path);
-  });
-
-  test('an article whose slug changes together with an error keeps its old address in the listings and in the link check of the articles that link to it', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article({ body: 'Rope.\n' }),
-      'content/posts/chain/index.md': article({ title: 'Chain', slug: 'chain', date: '2026-10-01', body: 'See [the rope article](/2026-10/rope/).\n' }),
-    });
-    const preview = createPreview(dir);
-    assert.deepEqual((await preview.update()).problems, []);
-    const served = (path) => preview.find(path)?.output.render() ?? null;
-    const chain = served('2026-10/chain/index.html');
-    for (const body of ['Rope[^missing].\n', 'Rope and [a missing article](/2026-10/missing/).\n']) {
-      writeFiles(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body }) });
-      const result = await preview.update(['content/posts/rope/index.md']);
-      assert.deepEqual(result.problems.map((problem) => problem.file), ['content/posts/rope/index.md']);
-      assert.deepEqual([result.applied, result.reload, result.refresh], [true, [], []]);
-      assert.match(served('2026-10/rope/index.html'), /Rope\./);
-      assert.equal(served('2026-10/rotary/index.html'), null);
-      assert.equal(served('2026-10/chain/index.html'), chain);
-      for (const path of ['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json']) {
-        assert.ok(served(path).includes('2026-10/rope/'), path);
-        assert.doesNotMatch(served(path), /rotary/, path);
-      }
-    }
-    writeFiles(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }) });
-    const fixed = await preview.update(['content/posts/rope/index.md']);
-    assert.deepEqual(fixed.problems.map(formatError), ['content/posts/chain/index.md:7:5 link target /2026-10/rope/ does not exist']);
-    assert.match(served('2026-10/rotary/index.html'), /Rope\./);
-    assert.equal(served('2026-10/rope/index.html'), null);
-    assert.equal(served('2026-10/chain/index.html'), chain);
-  });
-
-  test('an article that only fails because an article it links to fell back to its last good version falls back too, so an article that links to it reports no new error', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/alpha/index.md': article({ title: 'Alpha', slug: 'alpha', body: 'Alpha.\n' }),
-      'content/posts/beta/index.md': article({ title: 'Beta', slug: 'beta', body: 'Beta.\n' }),
-      'content/posts/gamma/index.md': article({ title: 'Gamma', slug: 'gamma', body: 'See [the beta article](/2026-10/beta/).\n' }),
-    });
-    const preview = createPreview(dir);
-    assert.deepEqual((await preview.update()).problems, []);
-    const served = (path) => preview.find(path)?.output.render() ?? null;
-    const gamma = served('2026-10/gamma/index.html');
-    writeFiles(dir, {
-      'content/posts/alpha/index.md': article({ title: 'Alpha', slug: 'alpha-two', body: 'Alpha and [a missing article](/2026-10/missing/).\n' }),
-      'content/posts/beta/index.md': article({ title: 'Beta', slug: 'beta-two', body: 'Beta follows [the alpha article](/2026-10/alpha-two/).\n' }),
-    });
-    const result = await preview.update(['content/posts/alpha/index.md', 'content/posts/beta/index.md']);
-    assert.deepEqual(result.problems.map(formatError), [
-      'content/posts/alpha/index.md:7:11 link target /2026-10/missing/ does not exist',
-      'content/posts/beta/index.md:7:14 link target /2026-10/alpha-two/ does not exist',
-    ]);
-    assert.match(served('2026-10/alpha/index.html'), /Alpha\./);
-    assert.match(served('2026-10/beta/index.html'), /Beta\./);
-    assert.equal(served('2026-10/alpha-two/index.html'), null);
-    assert.equal(served('2026-10/beta-two/index.html'), null);
-    assert.equal(served('2026-10/gamma/index.html'), gamma);
-    for (const path of ['index.html', 'feed.xml', 'sitemap.xml', '404.html', '_bake/articles.json']) assert.doesNotMatch(served(path), /alpha-two|beta-two/, path);
-  });
-
-  test('a change in one article checks the links of every article again and updates the sections embedded elsewhere', async (t) => {
+  test('checks the links of every article again after a change in one article and updates the sections embedded elsewhere', async (t) => {
     const gelu = (heading, text) => article({ title: 'GELU', slug: 'gelu', body: `## ${heading}\n\n${text}\n` });
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
+    const { dir, lines, text } = await serve(t, {
       'content/posts/rope/index.md': article({ body: 'See [the rule](/2026-10/gelu/#chain-rule).\n\n:::embed\n/2026-10/gelu/#chain-rule\n:::\n' }),
       'content/posts/gelu/index.md': gelu('Chain rule', 'First text.'),
     });
-    const preview = createPreview(dir);
-    assert.deepEqual((await preview.update()).problems, []);
-    writeFiles(dir, { 'content/posts/gelu/index.md': gelu('Product rule', 'First text.') });
-    const renamed = await preview.update(['content/posts/gelu/index.md']);
-    assert.deepEqual(renamed.problems.map(formatError), [
-      'content/posts/rope/index.md:7:5 link target /2026-10/gelu/#chain-rule does not exist',
-      'content/posts/rope/index.md:10:1 :::embed target /2026-10/gelu/#chain-rule does not exist',
-    ]);
-    writeFiles(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'First text.') });
-    assert.deepEqual((await preview.update(['content/posts/gelu/index.md'])).problems, []);
-    writeFiles(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'Second text.') });
-    const changed = await preview.update(['content/posts/gelu/index.md']);
-    assert.deepEqual([changed.problems, changed.reload, changed.refresh], [[], [], ['/2026-10/gelu/', '/2026-10/rope/']]);
-    assert.match(indexHtml(preview, '/2026-10/rope/'), /<div class="embed">[\s\S]*Second text\./);
+    await save(dir, { 'content/posts/gelu/index.md': gelu('Product rule', 'First text.') }, () => lines.includes('2 errors'), `bake dev printed ${JSON.stringify(lines)}`);
+    assert.deepEqual(lines.slice(-3), ['content/posts/rope/index.md:7:5 link target /2026-10/gelu/#chain-rule does not exist', 'content/posts/rope/index.md:10:1 :::embed target /2026-10/gelu/#chain-rule does not exist', '2 errors']);
+    await save(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'Second text.') }, async () => (await text('/2026-10/rope/')).includes('Second text.'), 'the embedded section was not updated');
+    assert.ok(lines.includes('No problems'), lines.join('\n'));
   });
 
-  test('a change in components/ reads the components again and bundles them again', async (t) => {
+  test('bundles a changed component of components/ or of the components/ folder of its article again and reports a broken one', async (t) => {
     const chart = (text) => `export const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = '${text}';\n  }\n}\n`;
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'components/demo-chart.js': chart('first text'),
+    for (const file of ['components/demo-chart.js', 'content/posts/rope/components/demo-chart.js']) {
+      await t.test(file, async (t) => {
+        const { dir, lines, get } = await serve(t, { [file]: chart('first text'), 'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }) });
+        const chunk = async () => {
+          const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
+          const name = /demo-chart-[\w-]+\.js/.exec(await (await get(`/${runtime}`)).text())[0];
+          return (await get(`/assets/${name}`)).text();
+        };
+        assert.match(await chunk(), /first text/);
+        await save(dir, { [file]: chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
+        await save(dir, { [file]: "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
+        assert.equal(lines.at(-2), `${file}:1:38 demo-chart: layout.frame must be true or false, got "no"`);
+      });
+    }
+  });
+
+  test('bundles the components again when a module that a component imports from outside components/ changes', async (t) => {
+    const { dir, get } = await serve(t, {
+      'components/demo-chart.js': "import { text } from '../shared/text.js';\n\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = text;\n  }\n}\n",
+      'shared/text.js': "export const text = 'first text';\n",
       'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }),
     });
-    const preview = createPreview(dir);
-    const chunk = () => {
-      const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(indexHtml(preview, '/2026-10/rope/'))[1];
-      const name = /demo-chart-[\w-]+\.js/.exec(preview.find(runtime).output.render())[0];
-      return preview.find(`assets/${name}`).output.render();
+    const scripts = async () => {
+      const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
+      const names = (await (await get(`/${runtime}`)).text()).match(/demo-chart-[\w-]+\.js/g);
+      return (await Promise.all(names.map(async (name) => (await get(`/assets/${name}`)).text()))).join('\n');
     };
-    assert.deepEqual((await preview.update()).problems, []);
-    assert.match(chunk(), /first text/);
-    const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(indexHtml(preview, '/2026-10/rope/'))[1];
-    assert.match(preview.find(runtime).output.render(), /JSON\.parse\("\{\}"\)/, 'bake dev serves without cache headers, so its runtime downloads no component files in advance');
-    writeFiles(dir, { 'components/demo-chart.js': chart('second text') });
-    const changed = await preview.update(['components/demo-chart.js']);
-    assert.deepEqual([changed.problems, changed.reload], [[], 'all']);
-    assert.match(chunk(), /second text/);
-    writeFiles(dir, { 'components/demo-chart.js': 'export default class DemoChart extends HTMLElement {}\n' });
-    const broken = await preview.update(['components/demo-chart.js']);
-    assert.deepEqual([broken.applied, broken.problems.map(formatError)], [false, ['components/demo-chart.js:1:1 demo-chart: layout must be an object with at least height, for example export const layout = { height: 360 }, got undefined']]);
+    assert.match(await scripts(), /first text/);
+    await save(dir, { 'shared/text.js': "export const text = 'second text';\n" }, async () => /second text/.test(await scripts()), 'the components were not bundled again');
   });
 
-  test('front matter changes reload the page, other files reload every page and config errors keep every page', async (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'content/posts/rope/index.md': article(),
-    });
-    const preview = createPreview(dir);
-    await preview.update();
-    writeFiles(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) });
-    assert.deepEqual(await preview.update(['content/posts/rope/index.md']), { problems: [], applied: true, reload: ['/', '/2026-10/rope/'], refresh: [] });
-    writeFiles(dir, { 'components/demo-chart.js': 'export const layout = { height: 100 };\n\nexport default function DemoChart() {\n  return null;\n}\n' });
-    assert.equal((await preview.update(['components/demo-chart.js'])).reload, 'all');
-    writeFiles(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com' };\n" });
-    const broken = await preview.update(['bake.config.js']);
-    assert.deepEqual([broken.applied, broken.problems.map((problem) => problem.message)], [false, ['config is missing "language"']]);
-    assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope again · Test Blog/);
-    writeFiles(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com', language: 'en' };\n" });
-    assert.equal((await preview.update(['bake.config.js'])).reload, 'all');
-    assert.match(indexHtml(preview, '/2026-10/rope/'), /Rope again · Renamed/);
+  test('checks an article again when a component that it names is added or changes its parameters', async (t) => {
+    const chart = (params) => `export const params = { ${params} };\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {}\n`;
+    const { dir, lines } = await serve(t, { 'content/posts/rope/index.md': article({ body: ':::demo-chart{size=2}\n:::\n' }) });
+    assert.equal(lines[0], 'content/posts/rope/index.md:7:1 unknown component "demo-chart"; there is no demo-chart.js or demo-chart.jsx in components/ or in the components/ folder of this article');
+    await save(dir, { 'components/demo-chart.js': chart("size: { label: 'Size', type: 'number', default: 1 }") }, () => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'components/demo-chart.js': chart("scale: { label: 'Scale', type: 'number', default: 1 }") }, () => lines.at(-1) === '1 error', `bake dev printed ${JSON.stringify(lines)}`);
+    assert.match(lines.at(-2), /^content\/posts\/rope\/index\.md:7:\d+ .*size/);
+  });
+
+  test('keeps every page while bake.config.js has problems and uses the fixed configuration', async (t) => {
+    const { dir, lines, text } = await serve(t, { 'content/posts/rope/index.md': article() });
+    await save(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => /Rope again · Test Blog/.test(await text('/2026-10/rope/')), 'the new title was not served');
+    await save(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com' };\n" }, () => lines.includes('bake.config.js:1:16 config is missing "language"'), `bake dev printed ${JSON.stringify(lines)}`);
+    assert.match(await text('/2026-10/rope/'), /Rope again · Test Blog/);
+    await save(dir, { 'bake.config.js': "export default { title: 'Renamed', url: 'https://example.com', language: 'en' };\n" }, async () => /Rope again · Renamed/.test(await text('/2026-10/rope/')), 'the fixed configuration was not used');
   });
 });

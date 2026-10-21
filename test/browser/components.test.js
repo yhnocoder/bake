@@ -1,14 +1,9 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { PNG } from 'pngjs';
-import { article, bake, createBlog, validConfig } from '../blog.js';
-import { serve } from './server.js';
+import { article, bake, createBlog, decodeImage, exampleBuild, validConfig } from '../blog.js';
+import { launchBrowser, serve, settle } from './browser.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
 
 const blog = {
@@ -24,8 +19,6 @@ export const params = {
   count: { label: 'Count', type: 'number', min: 0, max: 9, default: 1 },
   on: { label: 'On', type: 'boolean', default: false },
 };
-export const layout = { height: 240, narrowHeight: (params) => (params.on ? 320 : 300) };
-
 export default function CountView(props) {
   const [themes, setThemes] = createSignal(0);
   const redraw = () => setThemes(themes() + 1);
@@ -65,7 +58,7 @@ export default class TexView extends HTMLElement {
 
 export default class TextView extends HTMLElement {
   connectedCallback() {
-    this.innerHTML = '<h3>Title</h3><p>Text with <code>code</code> and <a href="#top">a link</a>.</p>';
+    this.innerHTML = '<h3>Title</h3><p>Text with <code>code</code> and <a href="#top">a link</a>.</p><ul><li>An item</li></ul>';
   }
 }
 `,
@@ -115,7 +108,7 @@ ${spacer}
   'content/posts/broken/index.md': article({ slug: 'broken', body: ':::broken-view\n:::\n\n:::broken-solid\n:::\n\n:::grid-view\n:::\n' }),
   'content/posts/source/index.md': article({ slug: 'source', body: '## Grid {#grid}\n\n:::grid-view{mode=far}\n:::\n' }),
   'content/posts/embedder/index.md': article({ slug: 'embedder', body: 'An article without components of its own.\n\n:::embed\n/2026-10/source/#grid\n:::\n' }),
-  'content/posts/text/index.md': article({ slug: 'text', body: 'An article paragraph.\n\n### An article heading\n\n:::text-view\n:::\n' }),
+  'content/posts/text/index.md': article({ slug: 'text', body: 'An article paragraph.\n\n- An article item\n\n### An article heading\n\n:::text-view\n:::\n' }),
 };
 
 function frameHeights() {
@@ -153,8 +146,7 @@ test('components run in the browser', async (t) => {
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
   const open = async (path, options = {}) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 800 }, ...options });
     const problems = [];
@@ -201,11 +193,8 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
-  await t.test('the frame keeps its height when the component loads, at 1440 and 375 pixels', async () => {
-    for (const [width, expected] of [
-      [1440, 240],
-      [375, 300],
-    ]) {
+  await t.test('a component without layout.height shows the placeholder height until it loads and then the height of its content, and a box with a ratio keeps its height, at 1440 and 375 pixels', async () => {
+    for (const width of [1440, 375]) {
       const page = await open(null, { viewport: { width, height: 800 } });
       let release;
       const held = new Promise((done) => {
@@ -222,8 +211,11 @@ test('components run in the browser', async (t) => {
       await waitForReady(page, 2);
       const after = await page.evaluate(frameHeights);
       const elements = await page.evaluate(() => ['count-view', 'grid-view'].map((name) => document.querySelector(name).getBoundingClientRect().height));
-      assert.deepEqual(after, before, `${width}px`);
-      assert.equal(Math.round(before[0].box), expected, `${width}px: count-view placeholder height`);
+      const placeholder = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--component-placeholder-height')));
+      const text = await page.evaluate(() => document.querySelector('.count-view-text').getBoundingClientRect().height);
+      assert.equal(before[0].box, placeholder, `${width}px: count-view placeholder height`);
+      assert.equal(after[0].box, text, `${width}px: count-view takes the height of its content`);
+      assert.deepEqual(after[1], before[1], `${width}px: grid-view keeps its box`);
       assert.ok(Math.abs(before[1].box - before[1].width / 2) < 1, `${width}px: grid-view keeps the ratio 2, ${before[1].width}x${before[1].box}`);
       assert.deepEqual(
         elements.map(Math.round),
@@ -326,7 +318,7 @@ test('components run in the browser', async (t) => {
     await waitForReady(page, 1);
     const pattern = { count: /[/](count-view|solid-element)-[\w-]{8}\.(js|css)$/, tex: /[/](tex-view|math)-[\w-]{8}\.js$/ };
     await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => /[/]tex-view-[\w-]{8}\.js$/.test(entry.name) && entry.responseEnd > 0));
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     const entries = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name, startTime, responseEnd }) => ({ name, startTime, responseEnd })));
     const count = entries.filter((entry) => pattern.count.test(entry.name));
     const tex = entries.filter((entry) => pattern.tex.test(entry.name));
@@ -348,7 +340,7 @@ test('components run in the browser', async (t) => {
       if (delayed) return route.continue();
       delayed = true;
       firstRequest();
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await page.waitForEvent('requestfailed', (request) => request === route.request());
       await route.continue().catch(() => {});
     });
     await page.goto(`${origin}/2026-10/later/`);
@@ -372,7 +364,7 @@ test('components run in the browser', async (t) => {
       }, distance);
     const lastState = () => page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state ?? null);
     await scrollToDistance(1000);
-    await page.waitForTimeout(300);
+    await settle(page);
     assert.equal(await lastState(), null);
     await scrollToDistance(700);
     await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
@@ -387,7 +379,7 @@ test('components run in the browser', async (t) => {
       page.on('request', (request) => requests.push(request.url()));
       await page.goto(`${origin}/2026-10/below/`, { waitUntil: 'load' });
       await waitForReady(page, 1);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       assert.deepEqual(requests.filter((url) => /[/]text-view-[\w-]{8}\.js$/.test(url)), [], JSON.stringify(connection));
       await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
       await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].at(-1).dataset.state === 'ready');
@@ -398,19 +390,11 @@ test('components run in the browser', async (t) => {
   await t.test('a component far below the screen starts when its code could not be loaded right after the page loaded', async () => {
     const page = await open(null);
     let blocked = true;
-    let aborted;
-    const firstAbort = new Promise((resolve) => {
-      aborted = resolve;
-    });
-    await page.route(/[/]text-view-[\w-]{8}\.js$/, async (route) => {
-      if (!blocked) return route.continue();
-      await route.abort();
-      aborted();
-    });
+    await page.route(/[/]text-view-[\w-]{8}\.js$/, (route) => (blocked ? route.abort() : route.continue()));
+    const failed = page.waitForEvent('requestfailed', (request) => /[/]text-view-[\w-]{8}\.js$/.test(request.url()));
     await page.goto(`${origin}/2026-10/below/`);
     await waitForReady(page, 1);
-    await firstAbort;
-    await page.waitForTimeout(200);
+    await failed;
     blocked = false;
     await page.evaluate(() => [...document.querySelectorAll('figure.component')].at(-1).scrollIntoView());
     await page.waitForFunction(() => ['ready', 'failed'].includes([...document.querySelectorAll('figure.component')].at(-1).dataset.state));
@@ -418,7 +402,7 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
-  await t.test('the article styles of the essay theme do not reach the content of a component', async () => {
+  await t.test('the article styles of the essay theme do not reach the headings, paragraphs, code, links and lists of a component', async () => {
     const page = await open('text');
     await waitForReady(page);
     const styles = await page.evaluate(() => {
@@ -432,24 +416,28 @@ test('components run in the browser', async (t) => {
           color: style.color,
           background: style.backgroundColor,
           decoration: style.textDecorationThickness,
+          paddingLeft: style.paddingLeft,
         };
       };
       const component = document.querySelector('text-view');
       const host = document.createElement('div');
       host.attachShadow({ mode: 'open' }).innerHTML = component.innerHTML;
       component.append(host);
-      const reference = ['h3', 'p', 'code', 'a'].map((tag) => read(host.shadowRoot.querySelector(tag)));
+      const tags = ['h3', 'p', 'code', 'a', 'ul', 'li'];
+      const reference = tags.map((tag) => read(host.shadowRoot.querySelector(tag)));
       host.remove();
       return {
-        component: ['h3', 'p', 'code', 'a'].map((tag) => read(document.querySelector(`text-view ${tag}`))),
+        component: tags.map((tag) => read(document.querySelector(`text-view ${tag}`))),
         reference,
-        article: [read(document.querySelector('.bk-article > h3, .bk-article h3')), read(document.querySelector('.bk-article p'))],
+        article: ['h3', 'p', 'ul', 'li'].map((tag) => read(document.querySelector(`.bk-article ${tag}`))),
       };
     });
     assert.deepEqual(styles.component, styles.reference);
     assert.notEqual(styles.component[0].marginTop, styles.article[0].marginTop);
     assert.notEqual(styles.component[0].fontSize, styles.article[0].fontSize);
     assert.notEqual(styles.component[1].marginTop, styles.article[1].marginTop);
+    assert.notEqual(styles.component[4].paddingLeft, styles.article[2].paddingLeft);
+    assert.notEqual(styles.component[5].marginTop, styles.article[3].marginTop);
     await page.close();
   });
 
@@ -511,30 +499,24 @@ function formulaShifts() {
   return shifts;
 }
 
-async function sectionScreenshot(page, top, height, width) {
-  const image = new PNG({ width, height });
+async function sectionColors(page, top, height, width) {
+  const colors = new Set();
   const viewport = page.viewportSize().height;
-  for (let offset = 0; offset < height; offset += viewport) {
+  for (let offset = 0; offset < height && colors.size < 2; offset += viewport) {
     const scrolled = await page.evaluate((y) => {
       scrollTo({ top: y, behavior: 'instant' });
       return scrollY;
     }, top + offset);
     const slice = Math.min(viewport, height - offset);
-    const shot = PNG.sync.read(await page.screenshot({ clip: { x: 0, y: top + offset - scrolled, width, height: slice } }));
-    PNG.bitblt(shot, image, 0, 0, width, slice, 0, offset);
+    const { data } = await decodeImage(await page.screenshot({ clip: { x: 0, y: top + offset - scrolled, width, height: slice } }));
+    for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
   }
-  return image;
-}
-
-function distinctColors({ data }) {
-  const colors = new Set();
-  for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
   return colors.size;
 }
 
 async function contentHeights() {
-  const frames = [...document.querySelectorAll('figure.component[data-height="auto"]')];
-  if (frames.length === 0) return ['the page has no component with autoHeight'];
+  const frames = [...document.querySelectorAll('figure.component')].filter((frame) => !frame.querySelector('.component-box').hasAttribute('style'));
+  if (frames.length === 0) return ['the page has no component without layout.height'];
   const problems = [];
   for (const frame of frames) {
     frame.scrollIntoView({ block: 'center' });
@@ -576,14 +558,9 @@ function componentOverflow() {
 }
 
 test('the example components run on the syntax page', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-components-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  const dir = exampleBuild();
   const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const browser = await launchBrowser();
 
   const start = async (options, path = '2026-10/syntax/') => {
     const page = await browser.newPage(options);
@@ -624,7 +601,7 @@ test('the example components run on the syntax page', async (t) => {
     }
   });
 
-  await t.test('a component with autoHeight is as tall as its content at 1440, 800, 600 and 375 pixels', async () => {
+  await t.test('a component without layout.height is as tall as its content at 1440, 800, 600 and 375 pixels', async () => {
     for (const width of [1440, 800, 600, 375]) {
       const { page, problems } = await start({ viewport: { width, height: 900 } }, '2026-09/matrix-calculus/');
       assert.deepEqual(await page.evaluate(contentHeights), [], `${width}px`);
@@ -634,8 +611,6 @@ test('the example components run on the syntax page', async (t) => {
   });
 
   await t.test('every chapter of the syntax article renders a screenshot with content at 1440 and 375 pixels', async () => {
-    const screenshotDir = process.env.BAKE_SECTION_SCREENSHOTS ?? join(dir, 'section-screenshots');
-    mkdirSync(screenshotDir, { recursive: true });
     for (const width of [1440, 375]) {
       const { page, problems } = await start({ viewport: { width, height: 900 } });
       const sections = await page.evaluate(() =>
@@ -647,9 +622,7 @@ test('the example components run on the syntax page', async (t) => {
       assert.equal(sections.length, 16);
       for (const { id, top, width: sectionWidth, height } of sections) {
         assert.ok(sectionWidth > 0 && height > 0, `${width}px ${id}: the section is ${sectionWidth}x${height}`);
-        const image = await sectionScreenshot(page, Math.round(top), Math.round(height), width);
-        writeFileSync(join(screenshotDir, `${width}-${id}.png`), PNG.sync.write(image));
-        assert.ok(distinctColors(image) > 1, `${width}px ${id}: the screenshot has one color`);
+        assert.ok((await sectionColors(page, Math.round(top), Math.round(height), width)) > 1, `${width}px ${id}: the screenshot has one color`);
       }
       assert.deepEqual(problems, [], `${width}px`);
       await page.close();

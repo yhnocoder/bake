@@ -1,4 +1,4 @@
-import { reducedMotion } from 'bake/theme/client';
+import { markCurrent, reducedMotion } from 'bake/theme/client';
 import { createElement, withoutTransition } from './toc-card.js';
 import { ticksColumn } from './toc-ticks.js';
 
@@ -128,13 +128,14 @@ function notesList(list, outline) {
       chapters.forEach((chapter, chapterIndex) => {
         const relation = chapterIndex < state.chapter ? 'read' : chapterIndex === state.chapter ? 'current' : 'ahead';
         if (chapter.box.dataset.state !== relation) chapter.box.dataset.state = relation;
-        chapter.box.toggleAttribute('data-here', relation === 'current' && state.section === -1);
+        markCurrent(chapter.title, relation === 'current' && state.section === -1);
         const first = outline.chapters[chapterIndex].index;
         chapter.recap?.classList.toggle('is-read', state.read[first]);
         chapter.sections.forEach((row, sectionIndex) => {
           const index = first + 1 + sectionIndex;
           const rowState = index === state.entry ? 'current' : index < state.entry ? 'read' : 'ahead';
           if (row.dataset.state !== rowState) row.dataset.state = rowState;
+          markCurrent(row.querySelector('.bk-toc-section-title'), rowState === 'current');
           row.classList.toggle('is-read', state.read[index]);
         });
       });

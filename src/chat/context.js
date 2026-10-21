@@ -1,9 +1,9 @@
 import { escapeMarkup } from '../escape.js';
 import { articleSource } from '../copy/copy.js';
+import { REGIONS, UI, regionSelector } from '../regions.js';
 import { instructionLines } from './instructions.js';
 
-export const CATALOG_PATH = '_bake/articles.json';
-export const ARTICLE_REGION = '[data-region="article"]';
+const CATALOG_PATH = '_bake/articles.json';
 export const READ_ARTICLE = 'read_article';
 
 const MAX_TOOL_TEXT = 120000;
@@ -14,7 +14,6 @@ export const CHAT_RULES = [
   'Base your answers on the articles. Say so when they do not cover something, and mark what you add from outside the blog.',
   'Do not describe content you have not read.',
 ].join('\n');
-const UI = '[data-ui]';
 
 export const chatTools = [
   {
@@ -33,7 +32,7 @@ export const chatTools = [
 
 export function currentPage(root) {
   const source = articleSource();
-  const article = document.querySelector(ARTICLE_REGION);
+  const article = document.querySelector(regionSelector(REGIONS.article));
   return {
     address: pageAddress(root, location.pathname),
     site: meta('og:site_name') ?? location.hostname,
@@ -59,7 +58,7 @@ function meta(property) {
   return document.querySelector(`meta[property="${property}"]`)?.content ?? null;
 }
 
-export function outlineOf(article) {
+function outlineOf(article) {
   return [...article.querySelectorAll('h2[id], h3[id]')].map((heading) => {
     const copy = heading.cloneNode(true);
     for (const ui of copy.querySelectorAll(UI)) ui.remove();

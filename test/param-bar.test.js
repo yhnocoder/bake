@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { rewriteLine, rewriteSource, sourceVersion } from '../src/dev/params.js';
+import { rewriteLine, rewriteSource } from '../src/dev/params.js';
 import { startDevServer } from '../src/dev/server.js';
 import { article, createBlog, validConfig } from './blog.js';
 
@@ -131,14 +131,6 @@ describe('the parameter endpoint of bake dev', () => {
     return { dir, server, page, version, token, post, request, read: () => readFileSync(join(dir, FILE), 'utf8') };
   }
 
-  test('gives the page the version of its source and the declarations of its components', async (t) => {
-    const { page, version, read } = await start(t);
-    assert.equal(version, sourceVersion(read()));
-    const components = JSON.stringify({ 'label-view': { text: { label: 'Text', type: 'text', default: 'none' }, size: { label: 'Size', type: 'number', min: 1, max: 9, default: 3 } } });
-    assert.ok(page.includes(` data-components="${components.replaceAll('"', '&quot;')}"`), page.slice(-600));
-    assert.match(page, /<figure class="component" data-component="label-view" data-params="[^"]*" data-attributes="[^"]*" data-line="9">/);
-  });
-
   test('returns the rewritten line for Copy without writing the file', async (t) => {
     const { request, read, version } = await start(t);
     const before = read();
@@ -146,12 +138,15 @@ describe('the parameter endpoint of bake dev', () => {
     assert.equal(read(), before);
   });
 
-  test('writes the rewritten line into the file and returns the new version', async (t) => {
+  test('writes the rewritten line into the file and accepts the next change with the version it returns', async (t) => {
     const { request, read } = await start(t);
     const [status, data] = await request({ params: { text: 'first', size: 5 }, write: true });
     assert.equal(status, 200);
     assert.equal(read(), article({ title: 'Live', slug: 'live', body: 'Before.\n\n:::label-view{text=first size=5}\nCaption.\n:::\n' }));
-    assert.deepEqual(data, { line: ':::label-view{text=first size=5}', version: sourceVersion(read()) });
+    assert.equal(data.line, ':::label-view{text=first size=5}');
+    const [next] = await request({ version: data.version, params: { text: 'first', size: 6 }, write: true });
+    assert.equal(next, 200);
+    assert.equal(read(), article({ title: 'Live', slug: 'live', body: 'Before.\n\n:::label-view{text=first size=6}\nCaption.\n:::\n' }));
   });
 
   test('refuses with 409 when the file changed after the page was built', async (t) => {

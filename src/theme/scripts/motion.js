@@ -1,7 +1,5 @@
 export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-export const CONTENT_EVENT = 'bake:content';
-
 export const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
 export function oncePerFrame(callback) {

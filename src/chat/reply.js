@@ -13,7 +13,7 @@ const SCHEME = /^([a-z][a-z\d+.-]*):/i;
 const OPEN_SCHEMES = new Set(['http', 'https', 'mailto']);
 
 export function markdownTree(markdown) {
-  return processor.runSync(parseWithPipesInMath(processor, markdown).tree);
+  return processor.runSync(parseWithPipesInMath(processor, markdown));
 }
 
 export function replyHtml(markdown, { root, base }) {
@@ -62,4 +62,11 @@ function clean(node, root, base) {
   node.properties.href = target.href;
   if (target.external) Object.assign(node.properties, { target: '_blank', rel: ['noopener', 'noreferrer'] });
   return node;
+}
+
+export function replyText(content, root) {
+  const element = document.createElement('div');
+  element.innerHTML = replyHtml(content, { root });
+  for (const math of element.querySelectorAll(`.${MATH_CLASS}`)) math.textContent = math.dataset.tex;
+  return element.textContent.trim();
 }

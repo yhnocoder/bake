@@ -1,0 +1,24 @@
+.matrix-equation{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;margin:6px 0 14px;font-size:15px}
+.matrix-equation .matrix-op{font-size:18px;color:var(--ink-2)}
+.matrix-name{font-size:15px;margin-right:2px}
+.matrix-matrix{--cell-accent:var(--accent);position:relative;display:inline-grid;gap:3px;padding:5px 8px;border-left:1.5px solid var(--ink-2);border-right:1.5px solid var(--ink-2)}
+.matrix-matrix::before,.matrix-matrix::after{content:"";position:absolute;top:0;bottom:0;width:6px;border-top:1.5px solid var(--ink-2);border-bottom:1.5px solid var(--ink-2)}
+.matrix-matrix::before{left:0}
+.matrix-matrix::after{right:0}
+.matrix-cell{position:relative;isolation:isolate;min-width:64px;padding:6px 8px;border-radius:5px;text-align:center;font-family:var(--font-mono);font-size:14px;font-variant-numeric:tabular-nums;background:var(--surface-2);cursor:pointer;box-sizing:border-box}
+.matrix-cell::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--mark);box-shadow:inset 0 0 0 1.5px var(--cell-accent);opacity:0;transition:opacity .15s var(--ease);pointer-events:none}
+.matrix-cell.on::after{opacity:1}
+.matrix-cell b{font-weight:500;color:var(--ink)}
+.matrix-cell small{display:block;font-size:11px;color:var(--ink-3);margin-top:1px}
+.matrix-matrix.input{--cell-accent:var(--series-3)}
+.matrix-matrix.output{--cell-accent:var(--series-5)}
+.matrix-matrix.input .matrix-cell small{color:var(--series-3);opacity:.75}
+.matrix-matrix.output .matrix-cell small{color:var(--series-5);opacity:.75}
+.matrix-matrix.compact .matrix-cell{min-width:56px;padding:4px 6px}
+.matrix-matrix.small .matrix-cell{min-width:44px;padding:4px 6px;font-size:13px}
+.matrix-block{display:flex;flex-direction:column;align-items:center;gap:4px}
+.matrix-block-caption{font-size:13px;color:var(--ink-2)}
+.matrix-matrix-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 6px}
+@media (max-width:720px){.matrix-cell{min-width:54px;padding:5px 6px;font-size:13px}}
+.matrix-input-slider{display:contents;--accent:var(--series-3)}
+@media (prefers-reduced-motion:reduce){.matrix-cell::after{transition:none}}

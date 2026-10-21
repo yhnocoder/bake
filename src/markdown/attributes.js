@@ -39,17 +39,6 @@ export function parseAttributes(text) {
   return error === undefined ? { attributes, offsets } : { error, attributes, offsets };
 }
 
-export function writeAttributes(attributes) {
-  const entries = Object.entries(attributes);
-  if (entries.length === 0) return '';
-  const written = entries.map(([name, value]) => {
-    const text = writeAttribute(name, value);
-    if (text === null) throw new Error(`the attribute ${name} cannot be written, because its value contains both quote characters`);
-    return text;
-  });
-  return `{${written.join(' ')}}`;
-}
-
 export function writeAttribute(name, value) {
   if (value === true) return name;
   const text = String(value);

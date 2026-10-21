@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createSignal, onMount } from 'solid-js';
+import { composing } from '../keys.js';
 import { exportMarkdown, markdownText, noteFileName, noteHtml, noteTitle } from './note.js';
 import { typesetMath } from './typeset.js';
 
@@ -132,7 +133,7 @@ export function NoteCard(props) {
         inert={!props.redo}
         onSubmit={submit}
         on:keydown={(event) => {
-          if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
+          if (event.key !== 'Escape' || composing(event)) return;
           event.preventDefault();
           event.stopPropagation();
           closeRedo();
@@ -145,7 +146,7 @@ export function NoteCard(props) {
           placeholder={labels.redoPlaceholder}
           ref={request}
           on:keydown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+            if (event.key === 'Enter' && !event.shiftKey && !composing(event)) {
               event.preventDefault();
               event.currentTarget.form.requestSubmit();
             }

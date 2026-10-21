@@ -7,12 +7,12 @@ import { RUNTIME_FILE, browserModules } from './modules.js';
 
 export async function bundleComponents(root, components, preamble, errors, { prefetch }) {
   try {
-    const { entry, files } = await browserBuild({
+    const { entry, files, modules } = await browserBuild({
       input: { components: RUNTIME_FILE },
       plugins: [...browserModules({ preamble, components, prefetch }), solid()],
       alias: publicModules('components'),
     });
-    return { runtime: entry, files };
+    return { runtime: entry, files, modules };
   } catch (error) {
     const { message, file, position } = compileProblem(root, error);
     errors.push(file === null ? errorAt(COMPONENTS_DIR, fileStart, `the components cannot be built: ${message}`) : errorAt(file, position, message));

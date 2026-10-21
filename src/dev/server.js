@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { isIP, isIPv6 } from 'node:net';
+import { connect, isIP, isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,15 +13,15 @@ import { rewriteSource, sourceVersion } from './params.js';
 import { createPreview } from './preview.js';
 import { watchBlog } from './watch.js';
 
-export const DEFAULT_PORT = 4321;
-export const DEFAULT_HOST = '127.0.0.1';
+const DEFAULT_PORT = 4321;
+const DEFAULT_HOST = '127.0.0.1';
 const WILDCARD_HOSTS = new Set(['0.0.0.0', '::']);
 const TOKEN_HEADER = 'x-bake-token';
 const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
 const MAX_REQUEST_BYTES = 1024 * 1024;
 const CLIENT_DIR = join(import.meta.dirname, 'client');
-const CLIENT_FILES = new Set(readdirSync(CLIENT_DIR));
+const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, join(CLIENT_DIR, file)]), ['controls.css', join(import.meta.dirname, '../kit/controls.css')]]);
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
@@ -48,8 +48,6 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     for (const client of clients) send(client, event, data);
   };
 
-  printProblems((await preview.update()).problems);
-
   const server = createServer((request, response) => {
     respond(request, response).catch((error) => {
       if (!response.headersSent) response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
@@ -69,7 +67,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
     if (clientFile !== null && CLIENT_FILES.has(clientFile)) {
       response.writeHead(200, { 'content-type': contentType(clientFile), 'cache-control': 'no-store' });
-      return response.end(readFileSync(join(CLIENT_DIR, clientFile)));
+      return response.end(readFileSync(CLIENT_FILES.get(clientFile)));
     }
     let path;
     try {
@@ -115,26 +113,26 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
 
   let waiting = [];
   let updating = null;
+  async function applyChanges() {
+    while (waiting.length > 0) {
+      const batch = [...new Set(waiting)];
+      waiting = [];
+      try {
+        const result = await preview.update(batch);
+        report(result);
+        broadcast('problems', problemsData(result.problems));
+        if (result.applied) broadcast('update', { reload: result.reload, refresh: result.refresh });
+      } catch (error) {
+        print(`bake dev could not update the preview: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    updating = null;
+  }
   const changed = (paths) => {
     waiting.push(...paths);
-    updating ??= (async () => {
-      while (waiting.length > 0) {
-        const batch = [...new Set(waiting)];
-        waiting = [];
-        try {
-          const result = await preview.update(batch);
-          report(result);
-          broadcast('problems', problemsData(result.problems));
-          if (result.applied) broadcast('update', { reload: result.reload, refresh: result.refresh });
-        } catch (error) {
-          print(`bake dev could not update the preview: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      updating = null;
-    })();
+    updating ??= applyChanges();
   };
 
-  const listenedPort = await listen(server, port, host);
   let stop;
   const stopped = new Promise((done) => {
     stop = done;
@@ -146,9 +144,20 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     server.closeAllConnections();
     return new Promise((done) => server.close(() => done()));
   };
+  // why: macOS reports changes only from a moment after fs.watch returns, so watching starts before the first build, which also catches a file saved during that build
   const stopWatching = watchBlog(root, changed, (error) => {
     close().then(() => stop(`bake dev: cannot watch ${root}: ${error.message}`));
   });
+  let listenedPort;
+  try {
+    updating = preview.update();
+    printProblems((await updating).problems);
+    updating = waiting.length > 0 ? applyChanges() : null;
+    listenedPort = await listen(server, port, host);
+  } catch (error) {
+    stopWatching();
+    throw error;
+  }
   const url = `http://${addressHost(host)}:${listenedPort}/`;
   if (listenedPort !== port && port !== 0) print(`Port ${port} is in use, using port ${listenedPort}`);
   const network = WILDCARD_HOSTS.has(host) ? networkAddresses().map((address) => `On the local network: http://${address}:${listenedPort}/`) : [];
@@ -199,21 +208,38 @@ function sameToken(sent, token) {
 
 async function listen(server, port, host) {
   const last = port === 0 ? 0 : port + PORT_ATTEMPTS - 1;
+  const printsLocalhost = addressHost(host) === 'localhost';
   for (let candidate = port; ; candidate += 1) {
     try {
-      await new Promise((done, fail) => {
-        server.once('error', fail);
-        server.listen(candidate, host, () => {
-          server.off('error', fail);
-          done();
+      if (candidate === 0 || !printsLocalhost || !(await answersOnLocalhost(candidate))) {
+        await new Promise((done, fail) => {
+          server.once('error', fail);
+          server.listen(candidate, host, () => {
+            server.off('error', fail);
+            done();
+          });
         });
-      });
-      return server.address().port;
+        return server.address().port;
+      }
     } catch (error) {
       if (error.code !== 'EADDRINUSE') throw error;
-      if (candidate >= last) throw new Error(`bake dev: ports ${port} to ${last} are all in use, choose another one with --port`);
     }
+    if (candidate >= last) throw new Error(`bake dev: ports ${port} to ${last} are all in use, choose another one with --port`);
   }
+}
+
+// why: the printed localhost address can reach another server on ::1 or on a wildcard address, and macOS lets 127.0.0.1 be bound next to a server on a wildcard address
+async function answersOnLocalhost(port) {
+  const answers = (address) =>
+    new Promise((done) => {
+      const socket = connect({ host: address, port });
+      socket.once('connect', () => {
+        socket.destroy();
+        done(true);
+      });
+      socket.once('error', () => done(false));
+    });
+  return (await Promise.all(['127.0.0.1', '::1'].map(answers))).some(Boolean);
 }
 
 function clientData(root, page, token) {

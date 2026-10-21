@@ -1,5 +1,12 @@
+@property --bt-unit {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 .bt-page {
-  --bt-gutter: 104px;
+  --bt-wide-gutter: 104px;
+  --bt-gutter: var(--bt-wide-gutter);
   --bt-gap: 6px;
   --bt-measure: 46em;
   --bt-padding-top: 22px;
@@ -14,11 +21,6 @@
 }
 
 .bt-shell {
-  --body-left: 0px;
-  --body-width: 100%;
-  --wide-width: 100%;
-  --page-width: 100%;
-  --page-shift: 0px;
   width: min(1340px, 100% - 2 * var(--bt-gutter));
   min-height: 100vh;
   margin: 0 auto;
@@ -37,78 +39,86 @@
   margin-bottom: 36px;
 }
 
-.bt-intro > :last-child:where(:not(.component-box *)) {
-  margin-bottom: 0;
+@scope (.bk-article) to (.component-box) {
+  .bt-intro > :last-child {
+    margin-bottom: 0;
+  }
 }
 
 .bt-grid {
-  --bt-cols: var(--bt-columns);
+  /* why: below 1000 pixels a card is as wide as its span in the columns that the grid has on a screen 1000 pixels wide, before its row shares the free width */
+  --bt-unit: calc((1000px - 2 * var(--bt-wide-gutter) - (var(--bt-columns) - 1) * var(--bt-gap)) / var(--bt-columns));
   display: grid;
-  grid-template-columns: repeat(var(--bt-cols), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--bt-columns), minmax(0, 1fr));
   gap: var(--bt-gap);
   align-items: start;
 }
 
 .bt-grid > .bt-card {
-  grid-column: span min(var(--bt-span), var(--bt-cols));
+  grid-column: span min(var(--bt-span), var(--bt-columns));
 }
 
-.bt-grid[data-packed] {
-  display: block;
-  position: relative;
-}
+@media screen {
+  .bt-grid[data-packed] {
+    display: block;
+    position: relative;
+    height: var(--bt-height);
+  }
 
-.bt-grid[data-packed] > .bt-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
+  .bt-grid[data-packed] > .bt-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--bt-width);
+    transform: translate(var(--bt-x), var(--bt-y));
+  }
 
-.bt-grid[data-packed] > .bt-card[data-rows] {
-  height: calc(var(--bt-rows) * var(--bt-row-height) + (var(--bt-rows) - 1) * var(--bt-gap));
-  overflow: hidden;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
-  transition: outline-color 0.15s var(--ease-out);
-}
+  .bt-grid[data-packed] > .bt-card[data-rows] {
+    height: calc(var(--bt-rows) * var(--bt-row-height) + (var(--bt-rows) - 1) * var(--bt-gap));
+    overflow: hidden;
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color var(--motion-fast) var(--ease);
+  }
 
-.bt-grid[data-packed] > .bt-card[data-rows][data-active] {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  outline-color: var(--accent);
-}
+  .bt-grid[data-packed] > .bt-card[data-rows][data-active] {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    outline-color: var(--accent);
+  }
 
-.bt-grid[data-packed] > .bt-card[data-overflow]::after {
-  content: '';
-  position: sticky;
-  bottom: calc(-1 * var(--bt-padding-bottom));
-  display: block;
-  height: var(--bt-fade);
-  margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
-  background: linear-gradient(to bottom, transparent, var(--surface));
-  pointer-events: none;
-  transition: opacity 0.2s var(--ease-out);
-}
+  .bt-grid[data-packed] > .bt-card[data-overflow]::after {
+    content: '';
+    position: sticky;
+    bottom: calc(-1 * var(--bt-padding-bottom));
+    display: block;
+    height: var(--bt-fade);
+    margin: calc(-1 * var(--bt-fade)) calc(-1 * var(--bt-padding-x)) 0;
+    background: linear-gradient(to bottom, transparent, var(--surface));
+    pointer-events: none;
+    transition: opacity var(--motion) var(--ease);
+  }
 
-.bt-grid[data-packed] > .bt-card[data-overflow][data-end]::after {
-  opacity: 0;
-}
+  .bt-grid[data-packed] > .bt-card[data-overflow][data-end]::after {
+    opacity: 0;
+  }
 
-.bt-grid[data-packed] > .bt-card[data-hint]::before {
-  content: attr(data-hint);
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  z-index: 1;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--surface-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--accent);
-  pointer-events: none;
+  .bt-grid[data-packed] > .bt-card[data-hint]::before {
+    content: attr(data-hint);
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--accent);
+    pointer-events: none;
+  }
 }
 
 .bt-card {
@@ -118,6 +128,16 @@
   border: 1px solid var(--line);
   border-radius: var(--bt-radius);
   --scroll-cover: var(--surface);
+  --block-margin: 18px 0 20px;
+  --formula-margin: 10px 0 14px;
+  --frame-padding: 0;
+  --frame-border: 0;
+  --frame-radius: 0;
+  --frame-background: none;
+  --frame-shadow: none;
+  --code-white-space: pre-wrap;
+  --code-overflow-wrap: anywhere;
+  --cell-white-space: normal;
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: calc(var(--bt-text-size) * var(--reader-scale));
@@ -129,114 +149,160 @@
   line-height: var(--bt-leading);
 }
 
-.bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
-.bt-card > .bk-block[data-type='math'][data-width='auto'] {
-  max-width: var(--bt-measure);
-}
-
-.bt-card > h2:where(:not(.component-box *)) {
-  margin: 0 0 14px;
-  font-size: calc(var(--bt-title-size) * var(--reader-scale));
-  line-height: var(--bt-title-leading);
-}
-
-.bt-card > h2 > .bk-chapter-number {
-  margin-bottom: 4px;
-  font-size: calc(12px * var(--reader-scale));
-}
-
-.bt-card > h2 > .bk-heading-link {
-  left: -1em;
-  font-size: calc(18px * var(--reader-scale));
-}
-
-.bt-card > h3:where(:not(.component-box *)) {
-  margin: 26px 0 8px;
-  font-size: calc((var(--bt-title-size) - 3px) * var(--reader-scale));
-  line-height: var(--bt-title-leading);
-}
-
-.bt-card > :is(h4, h5, h6):where(:not(.component-box *)) {
-  margin: 22px 0 6px;
-  font-size: calc(15.5px * var(--reader-scale));
-}
-
-.bt-card > .bt-recap:where(:not(.component-box *)) {
-  margin: -4px 0 16px;
-}
-
-.bt-card > h2 + .bt-recap:where(:not(.component-box *)) {
-  margin: -6px 0 18px;
-  padding-left: 0;
-  border-left: 0;
-  font-size: calc(14.5px * var(--reader-scale));
-  line-height: 1.7;
-  color: var(--recap);
-  text-wrap: pretty;
-}
-
-.bt-card > .bt-recap > :last-child:where(:not(.component-box *)) {
-  margin-bottom: 0;
-}
-
-.bt-card .embed h2:where(:not(.component-box *)) {
-  font-size: calc(18px * var(--reader-scale));
-  line-height: 1.5;
-}
-
-.bt-card .bk-block[data-width]:where(:not(.component-box *)) {
-  margin: 18px 0 20px;
-}
-
-.bt-card .bk-block[data-type='math']:where(:not(.component-box *)) {
-  margin: 10px 0 14px;
-}
-
-.bt-card :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
-  background-position:
-    left center,
-    right center,
-    left 1px center,
-    right 1px center;
-  background-size:
-    40px 200%,
-    40px 200%,
-    16px calc(100% - 2px),
-    16px calc(100% - 2px);
-}
-
-.bt-card :is(.figure, .component:not([data-frame='none'])):where(:not(.component-box *)) {
-  padding: 0;
+.bt-sticker {
+  display: grid;
+  align-content: center;
+  padding: 6px;
   border: 0;
-  border-radius: 0;
   background: none;
   box-shadow: none;
+  font-family: var(--font-heading);
+  font-size: calc(19px * var(--reader-scale));
+  line-height: 1.4;
+  text-align: center;
+  color: var(--accent);
+  text-wrap: balance;
 }
 
-.bt-card > .bk-block > pre.shiki:where(:not(.component-box *)) {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.bt-sticker[data-emoji] {
+  font-size: calc(46px * var(--reader-scale));
+  line-height: 1.15;
 }
 
-.bt-card > .bk-block > pre.shiki .line:where(:not(.component-box *)) {
-  display: inline-block;
-  width: 100%;
-  padding-left: 4ch;
-  text-indent: -4ch;
+.bt-sticker > .bt-block-body {
+  padding: 16px 18px;
+  border-radius: 20px;
+  --scroll-cover: var(--accent-soft);
+  background: var(--accent-soft);
+  box-shadow:
+    0 0 0 4px var(--surface),
+    0 0 0 5px var(--line),
+    0 10px 18px -10px var(--scroll-shadow);
+  rotate: var(--bt-tilt);
 }
 
-.bt-card :is(th, td):where(:not(.component-box *)) {
-  white-space: normal;
+.bt-note {
+  --bt-note: var(--series-4);
+  --scroll-cover: color-mix(in srgb, var(--bt-note) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--bt-note) 30%, var(--surface));
+  border-radius: 6px var(--bt-radius) var(--bt-radius) var(--bt-radius);
+  background: var(--scroll-cover);
+  font-size: calc((var(--bt-text-size) - 1px) * var(--reader-scale));
 }
 
-.bt-card > .bk-references {
-  margin-top: 8px;
+.bt-note[data-color='green'] {
+  --bt-note: var(--series-3);
 }
 
-.bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)):where(:not(.component-box *)),
-.bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)) > :last-child:where(:not(.component-box *)),
-.bt-card > .bk-references:is(:last-child, :nth-last-child(2):has(+ .bt-notes)) .bk-references-list > :last-child > li:last-child {
-  margin-bottom: 0;
+.bt-note[data-color='blue'] {
+  --bt-note: var(--series-1);
+}
+
+.bt-note[data-color='pink'] {
+  --bt-note: var(--series-5);
+}
+
+@scope (.bk-article) to (.component-box) {
+  .bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
+  .bt-card > .bk-block[data-type='math'][data-width='auto'] {
+    max-width: var(--bt-measure);
+  }
+
+  .bt-card > h2 {
+    margin: 0 0 14px;
+    font-size: calc(var(--bt-title-size) * var(--reader-scale));
+    line-height: var(--bt-title-leading);
+  }
+
+  .bt-card > h2 > .bk-chapter-number {
+    margin-bottom: 4px;
+    font-size: calc(12px * var(--reader-scale));
+  }
+
+  .bt-card > h2 > .bk-heading-link {
+    left: -1em;
+    font-size: calc(18px * var(--reader-scale));
+  }
+
+  .bt-card > h3 {
+    margin: 26px 0 8px;
+    font-size: calc((var(--bt-title-size) - 3px) * var(--reader-scale));
+    line-height: var(--bt-title-leading);
+  }
+
+  .bt-card > :is(h4, h5, h6) {
+    margin: 22px 0 6px;
+    font-size: calc(15.5px * var(--reader-scale));
+  }
+
+  .bt-card > .bt-recap {
+    margin: -4px 0 16px;
+  }
+
+  .bt-card > h2 + .bt-recap {
+    margin: -6px 0 18px;
+    padding-left: 0;
+    border-left: 0;
+    font-size: calc(14.5px * var(--reader-scale));
+    line-height: 1.7;
+    color: var(--recap);
+    text-wrap: pretty;
+  }
+
+  .bt-card > .bt-recap > :last-child,
+  .bt-block-body > :last-child {
+    margin-bottom: 0;
+  }
+
+  .bt-block-body > :first-child {
+    margin-top: 0;
+  }
+
+  .bt-sticker img {
+    max-width: 100%;
+    max-height: 160px;
+    width: auto;
+    height: auto;
+  }
+
+  .bt-sticker .figure {
+    margin: 0;
+  }
+
+  .bt-card .embed h2 {
+    font-size: calc(18px * var(--reader-scale));
+    line-height: 1.5;
+  }
+
+  .bt-card :is(pre.shiki, .table-scroll, mjx-container[display]) {
+    background-position:
+      left center,
+      right center,
+      left 1px center,
+      right 1px center;
+    background-size:
+      40px 200%,
+      40px 200%,
+      16px calc(100% - 2px),
+      16px calc(100% - 2px);
+  }
+
+  .bt-card > .bk-block > pre.shiki .line {
+    display: inline-block;
+    width: 100%;
+    padding-left: 4ch;
+    text-indent: -4ch;
+  }
+
+  .bt-card > .bk-references {
+    margin-top: 8px;
+  }
+
+  .bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)),
+  .bt-card > :is(:last-child, :nth-last-child(2):has(+ .bt-notes)) > :last-child,
+  .bt-card > .bk-references:is(:last-child, :nth-last-child(2):has(+ .bt-notes)) .bk-references-list > :last-child > li:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .bt-notes {
@@ -251,26 +317,7 @@
   border-top: 1px solid var(--line-2);
 }
 
-.bt-article .sidenote-ref {
-  font-family: var(--font-mono);
-  font-size: calc(11px * var(--reader-scale));
-  font-style: normal;
-  font-weight: 400;
-  line-height: 0;
-  vertical-align: super;
-  margin: 0 1px;
-}
-
-.bt-article .sidenote-ref a {
-  position: relative;
-  isolation: isolate;
-  color: var(--accent);
-  text-decoration: none;
-  border-radius: 3px;
-  padding: 0 2px;
-}
-
-.bt-article :is(.sidenote-ref a, .bk-sidenote-number)::before,
+.bt-article .bk-sidenote-number::before,
 .bt-notes .bk-sidenote::before {
   content: '';
   position: absolute;
@@ -280,13 +327,13 @@
   background: var(--mark);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease-out;
+  transition: opacity var(--motion-slow) ease-out;
 }
 
-.bt-article :is(.sidenote-ref.is-active a, .bk-sidenote.is-active .bk-sidenote-number)::before,
+.bt-article .bk-sidenote.is-active .bk-sidenote-number::before,
 .bt-notes .bk-sidenote.is-active::before {
   opacity: 1;
-  transition-duration: 0.15s;
+  transition-duration: var(--motion-fast);
 }
 
 .bt-notes .bk-sidenote {
@@ -317,25 +364,8 @@
 .bt-article .bk-sidenote-number {
   position: relative;
   isolation: isolate;
-  margin-right: 6px;
   border-radius: 3px;
   padding: 0 2px;
-  font-family: var(--font-mono);
-  font-size: calc(11px * var(--reader-scale));
-  color: var(--accent);
-}
-
-.bt-article .bk-sidenote-body,
-.bt-article .bk-sidenote-body > :first-child {
-  display: inline;
-}
-
-.bt-article .bk-sidenote-body p {
-  margin: 0 0 6px;
-}
-
-.bt-article .bk-sidenote-body > :last-child {
-  margin-bottom: 0;
 }
 
 @media (max-width: 1339.98px) {
@@ -357,7 +387,14 @@
   }
 
   .bt-grid {
-    --bt-cols: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .bt-grid > .bt-card {
+    flex: 1 1 var(--bt-basis, 100%);
+    min-width: 0;
   }
 
   .bt-page .bk-header {
@@ -375,36 +412,41 @@
     padding: 0;
   }
 
-  .bt-grid,
-  .bt-grid[data-packed] {
+  .bt-grid {
     display: block;
-    height: auto !important;
   }
 
-  .bt-card,
-  .bt-grid[data-packed] > .bt-card,
-  .bt-grid[data-packed] > .bt-card[data-rows] {
-    position: static;
-    width: auto !important;
-    height: auto;
+  .bt-card {
     margin-bottom: 16px;
-    overflow: visible;
+    padding: 0;
     border: 0;
     box-shadow: none;
-    padding: 0;
-    transform: none !important;
   }
 
-  .bt-grid[data-packed] > .bt-card::after,
-  .bt-grid[data-packed] > .bt-card::before {
-    display: none;
+  .bt-note,
+  .bt-sticker > .bt-block-body {
+    padding: 8px 12px;
+    border: 1px solid var(--line-2);
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .bt-sticker {
+    display: inline-grid;
+    margin-right: 12px;
+  }
+
+  .bt-sticker > .bt-block-body {
+    rotate: none;
   }
 }
 
 @media (min-width: 1000px) {
-  .bt-card mjx-container[display]:not([width='full']) > svg:where(:not(.component-box *)) {
-    flex: 0 1 auto;
-    max-width: 100%;
-    height: auto;
+  @scope (.bk-article) to (.component-box) {
+    .bt-card mjx-container[display]:not([width='full']) > svg {
+      flex: 0 1 auto;
+      max-width: 100%;
+      height: auto;
+    }
   }
 }

@@ -5,12 +5,12 @@ import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
 import { DEFAULT_PET, petSourceProblem } from './pet.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { HOME_COLUMNS, TOC_STYLES } from '../choices.js';
+import { HOME_COLUMNS } from '../choices.js';
 import { characterProblem, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
 
-const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'toc', 'themes', 'home', 'categories', 'chat'];
+const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'themes', 'home', 'categories', 'chat'];
 const CHAT_FIELDS = ['pet'];
 const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
@@ -40,8 +40,10 @@ export async function loadBakeConfig(root, themes, optionProblem, errors) {
     return null;
   }
   const packageFile = nearestPackageFile(root);
-  if (packageFile && packageType(packageFile) === 'commonjs') {
-    errors.push(errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} is an ES module, but ${relative(root, packageFile)} sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there or remove the field`));
+  const type = packageFile === null ? 'module' : packageType(packageFile);
+  if (type !== 'module') {
+    const reason = type === undefined ? 'has no "type" field, so Node prints a warning while it detects that the file is an ES module' : `sets "type": ${JSON.stringify(type)}, so Node reads it as CommonJS`;
+    errors.push(errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} is an ES module, but ${relative(root, packageFile)} ${reason}; set "type": "module" there`));
     return null;
   }
   let exported;
@@ -82,7 +84,7 @@ function validateConfig(value, themes, optionProblem, report) {
     report([], 'value', `the default export of ${CONFIG_FILE} must be an object, got ${describeValue(value)}`);
     return null;
   }
-  reportUnknownFields(value, FIELDS, [], report, { bento: 'theme options are written under themes, such as themes: { bento: { columns: 4 } }' });
+  reportUnknownFields(value, FIELDS, [], report, { bento: 'theme options are written under themes, such as themes: { bento: { columns: 4 } }', ...optionHints(themes) });
   const field = (path, problem) => {
     if (problem) report(path, 'value', problem);
   };
@@ -96,8 +98,6 @@ function validateConfig(value, themes, optionProblem, report) {
   required('language', (language) => textProblem('language', language));
   const theme = value.theme ?? 'essay';
   field(['theme'], choiceProblem('theme', [...themes.keys()], theme));
-  const toc = value.toc ?? 'notes';
-  field(['toc'], choiceProblem('toc', TOC_STYLES, toc));
   const categories = validateCategories(value.categories ?? [], report);
   const options = validateThemeOptions(value, themes, optionProblem, report);
   const chat = section(value, 'chat', CHAT_FIELDS, report);
@@ -117,7 +117,6 @@ function validateConfig(value, themes, optionProblem, report) {
     url: value.url,
     language: value.language,
     theme,
-    toc,
     themes: options,
     home: { columns: homeColumns, groupBy },
     categories,
@@ -144,6 +143,17 @@ function validateThemeOptions(config, themes, optionProblem, report) {
       return [name, options];
     }),
   );
+}
+
+function optionHints(themes) {
+  const hints = {};
+  for (const [name, declarations] of themes) {
+    for (const [option, declaration] of Object.entries(declarations ?? {})) {
+      const example = typeof declaration.default === 'string' ? `'${declaration.default}'` : JSON.stringify(declaration.default);
+      hints[option] ??= `${option} is an option of the ${name} theme, written as themes.${name}.${option}, such as themes: { ${name}: { ${option}: ${example} } }`;
+    }
+  }
+  return hints;
 }
 
 function section(config, name, fields, report, unknown) {

@@ -1,19 +1,22 @@
+import { REGIONS } from 'bake/regions';
 import { FontLinks } from './font-links.jsx';
 import { PageMeta } from './meta.jsx';
 import { PreviewTemplates } from './previews.jsx';
-import { lightWenkaiSteps, prepaintScript, settingAttributes } from './settings.js';
+import { READING_SETTINGS, lightWenkaiSteps, prepaintScript, settingAttributes, settingDefaults } from './settings.js';
 
 export function ArticleDocument(props) {
   const { site, article, assets, labels } = props;
+  const settings = { ...READING_SETTINGS, ...props.settings };
+  const defaults = settingDefaults(settings, props.options);
   return (
-    <html lang={site.language} {...settingAttributes(props.settings, article)} {...props.attributes}>
+    <html lang={site.language} {...settingAttributes(defaults)}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{`${article.title} · ${site.title}`}</title>
         {article.summary === undefined ? null : <meta name="description" content={article.summary} />}
         <PageMeta site={site} type="article" title={article.title} description={article.summary} link={article.link} image={article.shareImage} root={assets.root} />
-        <script innerHTML={prepaintScript(lightWenkaiSteps(assets.lazyStyles['wenkai-light']))} />
+        <script innerHTML={prepaintScript(settings, lightWenkaiSteps(assets.lazyStyles['wenkai-light']))} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}
@@ -24,17 +27,20 @@ export function ArticleDocument(props) {
         ))}
       </head>
       <body class={props.bodyClass} style={labelStyle(labels)}>
-        {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region="glyphs" innerHTML={article.content.glyphs} />}
+        {article.content.glyphs === undefined ? null : <div class="bk-glyphs" data-region={REGIONS.glyphs} innerHTML={article.content.glyphs} />}
         {props.children}
         <PreviewTemplates previews={article.content.previews} labels={labels} />
-        <script type="application/json" class="bk-source" data-region="source" innerHTML={sourceJson(article.content.source)} />
+        <script type="application/json" class="bk-source" data-region={REGIONS.source} innerHTML={scriptJson(article.content.source)} />
+        <script type="application/json" class="bk-setting-defaults" innerHTML={scriptJson(defaults)} />
+        <div data-edge="start" />
+        <div data-edge="end" />
       </body>
     </html>
   );
 }
 
-function sourceJson(source) {
-  return JSON.stringify(source).replaceAll('<', '\\u003c');
+function scriptJson(value) {
+  return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
 function labelStyle(labels) {

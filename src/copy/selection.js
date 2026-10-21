@@ -1,4 +1,4 @@
-import { MarkdownWriter, NOT_CONTENT, isUi, sidenoteElement } from './markdown.js';
+import { NOT_CONTENT, isUi, sidenoteElement, sourceMarkdown } from './markdown.js';
 
 const KEPT_ELEMENTS = new Set(
   'p h1 h2 h3 h4 h5 h6 ul ol li blockquote pre code table thead tbody tfoot tr th td figure figcaption img a strong b em i mark del s sup sub br hr cite kbd'.split(' '),
@@ -15,8 +15,7 @@ const KEPT_ATTRIBUTES = {
 export function copiedSelection(range, article, source) {
   const clamped = clampTo(range, article);
   if (clamped === null) return null;
-  const lines = source.split('\n').map((line) => line.replace(/\r$/, ''));
-  const markdown = new MarkdownWriter(clamped, article, lines).write();
+  const markdown = sourceMarkdown(clamped, article, source);
   if (markdown.trim() === '') return null;
   return { markdown, html: selectionHtml(clamped, article) };
 }

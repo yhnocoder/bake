@@ -1,16 +1,62 @@
+@import '../../kit/controls.css';
+
 :root {
   --ui-bottom: 16px;
-  --chat-bottom: var(--ui-bottom);
   --ui-button-height: 34px;
   --ui-stack-gap: 8px;
   --ui-reserve: calc(var(--ui-bottom) + var(--ui-button-height) + var(--ui-stack-gap));
 }
 
-.bk-settings {
+[data-edge] {
   position: fixed;
-  left: 16px;
   bottom: var(--ui-bottom);
-  z-index: var(--layer-settings);
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  transition:
+    translate var(--motion) var(--ease),
+    opacity var(--fade),
+    visibility 0s;
+}
+
+[data-edge] > * {
+  pointer-events: auto;
+}
+
+[data-edge='start'] {
+  left: 16px;
+  z-index: var(--layer-edge-start);
+  align-items: flex-start;
+  gap: 10px;
+}
+
+[data-edge='end'] {
+  right: 16px;
+  z-index: var(--layer-edge-end);
+  align-items: flex-end;
+  gap: var(--ui-stack-gap);
+}
+
+[data-edge][data-hidden] {
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, var(--fade);
+}
+
+[data-edge][data-hidden] > * {
+  pointer-events: none;
+}
+
+[data-edge='start'][data-hidden] {
+  translate: calc(-110% * var(--motion-distance)) 0;
+}
+
+[data-edge='end'][data-hidden] {
+  translate: calc((100% + 24px) * var(--motion-distance)) 0;
+}
+
+.bk-settings {
+  position: relative;
   font-family: var(--font-ui);
   font-size: 12px;
   line-height: 1.5;
@@ -39,8 +85,8 @@
     0 0 0 0.5px var(--hair),
     var(--button-shadow);
   transition:
-    color 0.15s,
-    scale 0.12s;
+    color var(--motion-fast),
+    scale var(--motion-fast);
 }
 
 .bk-settings-toggle:active {
@@ -71,13 +117,13 @@
   font-size: 13px;
   color: var(--ink);
   opacity: 0;
-  translate: 0 6px;
+  translate: 0 calc(6px * var(--motion-distance));
   visibility: hidden;
   transform-origin: 0 100%;
   transition:
-    opacity 0.14s,
-    translate 0.18s var(--ease-out),
-    visibility 0s 0.18s;
+    opacity var(--fade),
+    translate var(--motion) var(--ease),
+    visibility 0s var(--fade);
 }
 
 .bk-settings.is-open .bk-settings-panel {
@@ -85,8 +131,8 @@
   translate: 0 0;
   visibility: visible;
   transition:
-    opacity 0.14s,
-    translate 0.18s var(--ease-out);
+    opacity var(--fade),
+    translate var(--motion) var(--ease);
 }
 
 .bk-settings-label {
@@ -113,7 +159,7 @@
   background: none;
   color: var(--ink);
   text-align: left;
-  transition: background-color 0.12s;
+  transition: background-color var(--motion-fast);
 }
 
 .bk-settings-choice:hover {
@@ -143,52 +189,16 @@
   color: var(--ink-3);
 }
 
-.bk-settings-options {
+.bk-settings .bk-settings-options {
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--surface-2);
 }
 
 .bk-settings-options button {
-  position: relative;
-  isolation: isolate;
   flex: 1;
   padding: 4px 0;
   border: 0;
-  border-radius: 6px;
   background: none;
-  color: var(--ink-2);
   font-size: 12.5px;
-  white-space: nowrap;
-  transition: color 0.12s;
-}
-
-.bk-settings-options button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--surface);
-  box-shadow:
-    0 0 0 0.5px var(--hair),
-    var(--segment-shadow);
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-
-.bk-settings-options button:hover {
-  color: var(--ink);
-}
-
-.bk-settings-options button[aria-pressed='true'] {
-  color: var(--ink);
-}
-
-.bk-settings-options button[aria-pressed='true']::before {
-  opacity: 1;
 }
 
 .bk-settings-row[data-setting='size'] button {
@@ -224,43 +234,6 @@
   text-align: left;
 }
 
-.bk-settings-switch i {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 18px;
-  border-radius: 9px;
-  background: var(--line-2);
-  transition: background-color 0.2s;
-}
-
-.bk-settings-switch i::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 7px;
-  background: var(--surface);
-  box-shadow: var(--switch-thumb-shadow);
-  transition: transform 0.2s var(--ease-out);
-}
-
-.bk-settings-switch[aria-checked='true'] i {
-  background: var(--accent);
-}
-
-.bk-settings-switch[aria-checked='true'] i::after {
-  transform: translateX(12px);
-}
-
-@media (min-width: 1000px) {
-  .bk-settings-row[data-setting='buttons'] {
-    display: none;
-  }
-}
-
 .bk-toast {
   position: fixed;
   left: 50%;
@@ -279,11 +252,11 @@
   font: 12.5px/1.5 var(--font-ui);
   overflow-wrap: anywhere;
   opacity: 0;
-  transform: translate(-50%, 6px);
+  transform: translate(-50%, calc(6px * var(--motion-distance)));
   pointer-events: none;
   transition:
-    opacity 0.16s,
-    transform 0.2s var(--ease-out);
+    opacity var(--fade),
+    transform var(--motion) var(--ease);
 }
 
 .bk-toast.is-on {
@@ -296,7 +269,7 @@
     top: 16px;
     bottom: auto;
     max-width: calc(100vw - 32px);
-    transform: translate(-50%, -6px);
+    transform: translate(-50%, calc(-6px * var(--motion-distance)));
   }
 
   .bk-toast.is-on {
@@ -305,7 +278,7 @@
 }
 
 .bk-flash {
-  animation: bk-flash 0.9s ease-out;
+  animation: bk-flash calc(var(--motion-slow) * 3) ease-out;
 }
 
 @keyframes bk-flash {
@@ -334,12 +307,12 @@
   font-size: 14px;
   line-height: 1.7;
   opacity: 0;
-  translate: 0 4px;
+  translate: 0 calc(4px * var(--motion-distance));
   visibility: hidden;
   transition:
-    opacity 0.09s,
-    translate 0.09s,
-    visibility 0s 0.09s;
+    opacity var(--motion-fast),
+    translate var(--motion-fast),
+    visibility 0s var(--motion-fast);
 }
 
 .bk-preview.is-on {
@@ -347,8 +320,8 @@
   translate: 0 0;
   visibility: visible;
   transition:
-    opacity 0.14s var(--ease-out),
-    translate 0.16s var(--ease-out);
+    opacity var(--motion-fast) var(--ease),
+    translate var(--motion) var(--ease);
 }
 
 .bk-preview-number {
@@ -498,11 +471,11 @@
 
 .bk-preview .bk-preview-hint::after {
   content: '→';
-  transition: transform 0.2s var(--ease-out);
+  transition: transform var(--motion) var(--ease);
 }
 
 .bk-preview:hover .bk-preview-hint::after {
-  transform: translateX(3px);
+  transform: translateX(calc(3px * var(--motion-distance)));
 }
 
 @media (max-width: 999.98px) {
@@ -511,12 +484,8 @@
     --ui-button-height: 38px;
   }
 
-  .bk-settings {
+  [data-edge='start'] {
     left: 0;
-    transition:
-      transform 0.25s var(--ease-out),
-      opacity 0.2s,
-      visibility 0.25s;
   }
 
   .bk-settings-toggle {
@@ -528,30 +497,5 @@
   .bk-settings-panel {
     left: 10px;
   }
-
-  .bk-toc-ui:has(> .bk-toc-handle) ~ * .bk-settings-panel {
-    --panel-bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
-  }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .bk-settings-panel,
-  .bk-preview {
-    translate: 0 0;
-  }
-
-  .bk-toast {
-    transform: translate(-50%, 0);
-  }
-
-  .bk-preview,
-  .bk-preview.is-on,
-  .bk-settings-options button,
-  .bk-settings-options button::before {
-    transition: none;
-  }
-
-  .bk-preview:hover .bk-preview-hint::after {
-    transform: none;
-  }
-}

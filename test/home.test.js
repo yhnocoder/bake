@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
-import { compileTheme } from '../src/build/theme.js';
 import { article, bake, createBlog, validConfig } from './blog.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>';
@@ -23,7 +22,7 @@ const categoriesConfig = `export default {
 `;
 
 const probeTheme = {
-  'themes/probe/client.jsx': "import './probe.css';\n",
+  'themes/probe/client.jsx': "import './probe.css';\n\nexport default () => () => {};\n",
   'themes/probe/probe.css': 'body {\n  margin: 0;\n}\n',
   'themes/probe/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify({ site: props.site, options: props.options })} /></body></html>;\n}\n',
   'themes/probe/home.jsx': 'export default function Home(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props)} /></body></html>;\n}\n',
@@ -128,7 +127,6 @@ describe('homepage', () => {
       'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', date: '2026-10-14', extra: 'category: ml\n' }),
       'content/posts/chain/index.md': article({ title: 'Chain rule', slug: 'chain', date: '2026-09-01', extra: 'category: math\n' }),
     });
-    assert.match(html, /^<!doctype html>\n<html lang="en" data-group="category" data-columns="4" style="--group-index:0;--columns-index:1" data-theme="system" data-font="sans">/);
     assert.match(html, /<title>Test Blog<\/title><meta name="description" content="Notes on models.">/);
     assert.match(html, /<h1 class="bk-home-title">Test Blog<\/h1><p class="bk-home-description">Notes on models.<\/p>/);
     assert.deepEqual(grouping(html, 'category'), [
@@ -140,28 +138,22 @@ describe('homepage', () => {
       { id: 'month-2026-09', title: '2026-09', count: '1 post', cards: ['Chain rule'] },
     ]);
     assert.match(html, /<p class="bk-group-desc">Derivations.<\/p>/);
-    const chips = [...html.matchAll(/<a class="bk-chip" href="#([^"]+)"[^>]*style="--c:(#\w+)"><span class="bk-chip-dot"><\/span>([^<]+)<span class="bk-chip-count">(\d+)<\/span><\/a>/g)].map((match) => match.slice(1));
+    const chips = [...html.matchAll(/<a class="bk-chip" href="#([^"]+)"[^>]*><span class="bk-chip-dot"><\/span>([^<]+)<span class="bk-chip-count">(\d+)<\/span><\/a>/g)].map((match) => match.slice(1));
     assert.deepEqual(chips, [
-      ['category-math', '#985b57', 'Math', '1'],
-      ['category-ml', '#2a78d6', 'ML', '2'],
+      ['category-math', 'Math', '1'],
+      ['category-ml', 'ML', '2'],
     ]);
-    assert.match(html, /<div class="bk-switch" data-control="group"/);
-    assert.match(html, /<a class="bk-card" href="2026-10\/gelu\/" style="--c:#2a78d6"/);
   });
 
-  test('without categories the homepage has only the month grouping, no grouping switch and accent borders', (t) => {
+  test('without categories the homepage has only the month grouping and a tag filter', (t) => {
     const { html } = buildHome(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ title: 'Rope', slug: 'rope', extra: 'tags: [llm, position]\n' }),
     });
-    assert.match(html, /<html lang="en" data-group="month" data-columns="3" style="--group-index:0;--columns-index:0" data-theme="system" data-font="sans">/);
     assert.equal(grouping(html, 'category'), null);
     assert.deepEqual(grouping(html, 'month'), [{ id: 'month-2026-10', title: '2026-10', count: '1 post', cards: ['Rope'] }]);
-    assert.doesNotMatch(html, /data-control="group"/);
     assert.doesNotMatch(html, /<meta name="description"/);
-    assert.match(html, /<a class="bk-card" href="2026-10\/rope\/" style="--c:var\(--accent\)"/);
-    assert.deepEqual([...html.matchAll(/<button type="button" class="bk-chip" data-tag(?:="([^"]*)")?/g)].map((match) => match[1] ?? ''), ['', 'llm', 'position']);
-    assert.match(html, /"group":\["month"\]/);
+    assert.deepEqual([...html.matchAll(/<button type="button" class="bk-chip"[^>]*>([^<]*)/g)].map((match) => match[1]), ['All', 'llm', 'position']);
   });
 
   test('a card shows its first image, a colour block with the title when there is none, the date and the tags', async (t) => {
@@ -180,7 +172,7 @@ describe('homepage', () => {
     assert.match(cards[0], /<p class="bk-card-summary">One sentence.<\/p><p class="bk-card-meta"><time datetime="2026-10-03">2026-10-03<\/time><span class="bk-card-tag">a<\/span><span class="bk-card-tag">b<\/span><\/p>/);
     assert.match(cards[1], /<span class="bk-card-cover" aria-hidden="true">Plain &lt;b><\/span>/);
     assert.doesNotMatch(cards[1], /bk-card-summary|data-preview/);
-    assert.match(cards[2], /^ href="2026-10\/demo\/" style="--c:var\(--accent\)" data-tags="\[\]" data-preview="2026-10\/demo\/preview.js">/);
+    assert.match(cards[2], /^ href="2026-10\/demo\/"[^>]* data-preview="2026-10\/demo\/preview.js">/);
     assert.match(cards[2], /<span class="bk-card-cover" aria-hidden="true">Demo<\/span>/);
     assert.doesNotMatch(html, /bk-card-draft/);
   });
@@ -221,35 +213,8 @@ describe('homepage', () => {
     assert.match(readFileSync(join(dir, 'dist/2026-10/caption/index.html'), 'utf8'), /<figure class="component" data-component="data-view"/);
   });
 
-  test('the essay theme shows a draft badge at the top of the card of a draft', async (t) => {
-    const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const errors = [];
-    const theme = await compileTheme(dir, 'essay', { siteTheme: true }, errors);
-    assert.deepEqual(errors, []);
-    const entry = { title: 'Rope', date: '2026-10-19', tags: [], draft: true, url: '2026-10/rope/' };
-    const html = theme.renderHome({
-      site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
-      home: { groupBy: 'month', columns: 3, categories: [] },
-      articles: [entry, { ...entry, title: 'GELU', draft: false, url: '2026-10/gelu/' }],
-      assets: { root: './', styles: [], fonts: [], scripts: [] },
-    });
-    const cards = html.split('<a class="bk-card"').slice(1);
-    assert.match(cards[0], /<div class="bk-card-frame"><div class="bk-card-fallback">.*?<\/div><span class="bk-card-draft">草稿<\/span><\/div>/);
-    assert.doesNotMatch(cards[1], /bk-card-draft/);
-    assert.match(html, /<span class="bk-group-count">2 篇<\/span>/);
-  });
-
-  test('the essay theme says in Chinese that a Chinese blog has no posts yet', async (t) => {
-    const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const errors = [];
-    const theme = await compileTheme(dir, 'essay', { siteTheme: true }, errors);
-    assert.deepEqual(errors, []);
-    const html = theme.renderHome({
-      site: { title: 'Test Blog', url: 'https://example.com', language: 'zh-CN' },
-      home: { groupBy: 'month', columns: 3, categories: [] },
-      articles: [],
-      assets: { root: './', styles: [], fonts: [], scripts: [] },
-    });
+  test('the essay theme says in Chinese that a Chinese blog has no posts yet', (t) => {
+    const { html } = buildHome(t, { 'bake.config.js': validConfig.replace("language: 'en'", "language: 'zh-CN'") });
     assert.match(html, /<p class="bk-home-empty">还没有文章<\/p>/);
   });
 

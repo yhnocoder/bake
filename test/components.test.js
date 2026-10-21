@@ -1,161 +1,91 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, symlinkSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
-import sharp from 'sharp';
-import { readComponents } from '../src/components/read.js';
-import { BUILT_IN_BLOCK_NAMES } from '../src/markdown/article.js';
-import { formatError, sortErrors } from '../src/report.js';
-import { folder, parse, parsed } from './article.js';
+import { components as declare, parse, parsed } from './article.js';
 import { article, bake, createBlog, validConfig } from './blog.js';
 
 const component = "export default function Component() {\n  return null;\n}\n";
 const height = 'export const layout = { height: 100 };\n';
 
-async function read(t, files) {
-  const dir = createBlog(t, files);
-  const errors = [];
-  const components = await readComponents(dir, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors);
-  return { components, errors: sortErrors(errors).map(formatError) };
-}
-
 const plot = {
-  name: 'act-fn-plot',
-  valid: true,
-  params: {
-    fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu', 'silu'], default: 'gelu' },
-    range: { label: 'Range', type: 'number', min: 1, max: 10, default: 4 },
-    beta: { label: 'Beta', type: 'number', min: 0, default: 1 },
-    gamma: { label: 'Gamma', type: 'number', max: 4, default: 1 },
-    toggle: { label: 'Toggle', type: 'boolean', default: false },
-    title: { label: 'Title', type: 'text', default: '' },
-    data: { label: 'Data', type: 'file', default: '' },
-  },
-  layout: { height: 360, narrowHeight: (params) => (params.toggle ? 520 : 480) },
+  fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu', 'silu'], default: 'gelu' },
+  range: { label: 'Range', type: 'number', min: 1, max: 10, default: 4 },
+  beta: { label: 'Beta', type: 'number', min: 0, default: 1 },
+  gamma: { label: 'Gamma', type: 'number', max: 4, default: 1 },
+  toggle: { label: 'Toggle', type: 'boolean', default: false },
+  title: { label: 'Title', type: 'text', default: '' },
+  data: { label: 'Data', type: 'file', default: '' },
 };
-const heatmap = { name: 'glu-heatmap', valid: true, params: {}, layout: { width: 'wide', height: { ratio: 16 / 9 }, frame: false } };
-const components = new Map([
-  ['act-fn-plot', plot],
-  ['glu-heatmap', heatmap],
-]);
+const components = declare({ 'act-fn-plot': { params: plot }, 'glu-heatmap': {} });
 
-describe('reading components', () => {
-  test('reads params and layout of a SolidJS component and of a class that extends HTMLElement at the top level', async (t) => {
-    const { components: read_, errors } = await read(t, {
-      'components/lib/shared.js': 'export const initial = 4;\nexport const guard = typeof window === "undefined" ? "node" : "browser";\n',
-      'components/lib/plot.css': '.plot-line { stroke: red; }\n',
-      'components/fn-plot.jsx':
-        "import { initial } from './lib/shared.js';\nimport './lib/plot.css';\n\nexport const params = { range: { label: 'Range', type: 'number', min: 1, max: 10, default: initial } };\nexport const layout = { width: 'wide', height: (params) => params.range * 100 };\n\nexport default function FnPlot(props) {\n  return <svg class=\"plot-line\">{props.range}</svg>;\n}\n",
-      'components/glu-heatmap.js':
-        "import { guard } from './lib/shared.js';\n\nexport const layout = { height: { ratio: 2 }, frame: false };\n\nexport default class GluHeatmap extends HTMLElement {\n  connectedCallback() {\n    this.textContent = guard;\n  }\n}\n",
-      'components/README.md': 'Not a component.\n',
-    });
-    assert.deepEqual(errors, []);
-    assert.deepEqual([...read_.keys()], ['fn-plot', 'glu-heatmap']);
-    const fnPlot = read_.get('fn-plot');
-    assert.deepEqual([fnPlot.file, fnPlot.valid, fnPlot.params], ['components/fn-plot.jsx', true, { range: { label: 'Range', type: 'number', min: 1, max: 10, default: 4 } }]);
-    assert.equal(fnPlot.layout.height({ range: 3 }), 300);
-    assert.deepEqual([read_.get('glu-heatmap').params, read_.get('glu-heatmap').layout], [{}, { height: { ratio: 2 }, frame: false }]);
-    assert.equal(typeof navigator, 'object');
-    assert.equal(globalThis.HTMLElement, undefined);
-  });
-
-  test('reads a component that imports bake/kit in Node', async (t) => {
-    const { components: read_, errors } = await read(t, {
-      'components/kit-plot.jsx':
-        "import { Axes, Curve, Plot, niceTicks } from 'bake/kit';\n\nexport const layout = { height: niceTicks(0, 4, 4).length * 100 };\n\nexport default function KitPlot() {\n  return <Plot x={[0, 1]} y={[0, 1]}><Axes /><Curve f={(x) => x} color=\"var(--series-1)\" /></Plot>;\n}\n",
-    });
-    assert.deepEqual(errors, []);
-    assert.deepEqual([read_.get('kit-plot').valid, read_.get('kit-plot').layout], [true, { height: 500 }]);
-  });
-
-  test('reports a browser API used at the top level at its position, also inside components/lib/', async (t) => {
-    const { errors } = await read(t, {
-      'components/lib/size.js': 'export const unit = 8;\n\nexport const screen = window.innerWidth;\n',
-      'components/lib-plot.js': `import { screen } from './lib/size.js';\n\n${height}export default function LibPlot() {\n  return screen;\n}\n`,
-      'components/top-plot.js': `${height}const dark = matchMedia('(prefers-color-scheme: dark)');\n${component}`,
-      'components/agent-plot.js': `${height}export const agent = navigator.userAgent;\n${component}`,
-      'components/store-plot.js': `${height}  const saved = localStorage.getItem('x');\n${component}`,
-    });
-    const reason = 'at the top level; the build reads params and layout in Node, so use it inside the component code';
-    assert.deepEqual(errors, [
-      `components/agent-plot.js:2:22 agent-plot: components/agent-plot.js uses the browser API navigator ${reason}`,
-      `components/lib/size.js:3:23 lib-plot: components/lib-plot.js uses the browser API window ${reason}`,
-      `components/store-plot.js:2:17 store-plot: components/store-plot.js uses the browser API localStorage ${reason}`,
-      `components/top-plot.js:2:14 top-plot: components/top-plot.js uses the browser API matchMedia ${reason}`,
-    ]);
-    assert.equal(typeof navigator, 'object');
-  });
-
-  test('the browser API fixture in test/fixtures/syntax-errors/ reports the line in expected.json', async () => {
-    const fixtures = new URL('./fixtures/syntax-errors/', import.meta.url);
-    const expected = JSON.parse(readFileSync(new URL('expected.json', fixtures), 'utf8'));
-    const errors = [];
-    await readComponents(fileURLToPath(new URL('component-browser-api/', fixtures)), { builtInBlocks: BUILT_IN_BLOCK_NAMES }, errors);
-    assert.deepEqual(errors.map(formatError), [expected['component-browser-api']]);
-  });
-
-  test('reports syntax errors, failing imports and errors thrown at the top level', async (t) => {
-    const { errors } = await read(t, {
-      'components/syntax-plot.jsx': `${height}export default function SyntaxPlot() {\n  return <div>{</div>;\n}\n`,
-      'components/import-plot.js': `import missing from 'not-a-package';\n${height}${component}`,
-      'components/throw-plot.js': `${height}throw new Error('no data');\n${component}`,
-    });
-    assert.deepEqual(errors, [
-      "components/import-plot.js:1:1 import-plot: components/import-plot.js cannot be read in Node: Cannot find module 'not-a-package' imported from 'components/import-plot.js'",
-      'components/syntax-plot.jsx:3:17 syntax-plot: Unexpected token',
-      'components/throw-plot.js:2:7 throw-plot: components/throw-plot.js cannot be read in Node: no data',
-    ]);
-  });
-
-  test('reports a component file named after a custom element name that the HTML standard reserves', async (t) => {
+describe('component files', () => {
+  test('reports every problem of the component files together with the problems of the articles and writes nothing', (t) => {
     const reserved = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
-    const { errors, components: read_ } = await read(t, Object.fromEntries(reserved.map((name) => [`components/${name}.js`, `${height}${component}`])));
-    assert.deepEqual(
-      errors,
-      reserved.map((name) => `components/${name}.js:1:1 ${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`).sort(),
-    );
-    assert.equal(read_.size, 0);
-  });
-
-  test('reports problems in params and layout declarations at the start of the component file', async (t) => {
-    const { errors, components: read_ } = await read(t, {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/lib/names.js': "export const names = ['a', 'b'];\n",
+      'components/top-plot.js': `${height}export const dark = matchMedia('(prefers-color-scheme: dark)');\nthrow new Error('no data');\n${component}`,
+      'components/syntax-plot.jsx': `${height}export default function SyntaxPlot() {\n  return <div>{</div>;\n}\n`,
+      'components/const-plot.js': `const OPTIONS = ['a', 'b'];\nconst HEIGHT = 120;\nexport const params = {\n  fn: { label: \`F\`, type: 'enum', options: OPTIONS, default: 'b' },\n  'n-max': { label: 'N', type: 'number', min: -2, default: -1.5 },\n};\nexport const layout = { height: HEIGHT, frame: false };\n${component}`,
+      'components/call-plot.js': `const range = (label) => ({ label, type: 'number', default: 1 });\nexport const params = { n: range('N'), m: { label: \`M \${1}\`, type: 'text', default: '' } };\n${height}${component}`,
+      'components/name-plot.js': `import { names } from './lib/names.js';\n\nexport const params = { fn: { label: 'F', type: 'enum', options: names, default: 'a' } };\n${height}${component}`,
+      'components/function-plot.js': `export const layout = { height: (params) => 100 };\n${component}`,
+      'components/let-plot.js': `export let layout = { height: 100 };\n${component}`,
+      ...Object.fromEntries(reserved.map((name) => [`components/${name}.js`, `${height}${component}`])),
       'components/bad-type.js': `export const params = { n: { label: 'N', type: 'integer', default: 1 } };\n${height}${component}`,
       'components/reserved-name.js': `export const params = { width: { label: 'W', type: 'number', default: 1 } };\n${height}${component}`,
       'components/empty-enum.js': `export const params = { fn: { label: 'F', type: 'enum', default: 'a' } };\n${height}${component}`,
       'components/bad-default.js': `export const params = { n: { label: 'N', type: 'number', min: 1, max: 10, default: 20 }, on: { label: 'On', type: 'boolean', default: 'yes' }, fn: { label: 'F', type: 'enum', options: ['a', 'b'], default: 'c' }, t: { label: 'T', type: 'text', default: 3 } };\n${height}${component}`,
       'components/bad-field.js': `export const params = { n: { label: 'N', type: 'text', default: '', optons: [] }, m: { type: 'number', default: 1 }, k: { label: 'K', type: 'number' } };\n${height}${component}`,
-      'components/bad-layout.js': `export const layout = { width: 'full', height: '300px', narrowHeight: { ratio: -1 }, frame: 'no', autoHeight: 1, heigth: 3 };\n${component}`,
-      'components/no-height.js': `export const layout = { width: '120%' };\n${component}`,
+      'components/bad-layout.js': `export const layout = { width: 'full', height: '300px', narrowHeight: (params) => 300, frame: 'no', autoHeight: true, heigth: 3 };\n${component}`,
+      'components/wide-plot.js': `export const layout = { width: '120%' };\n${component}`,
       'components/no-default-export.js': height,
       'components/Plot_Name.js': component,
       'components/list-table.js': component,
+      'components/grid-view.js': `export const params = { size: { label: 'Size', type: 'number', min: 1, max: 9, default: 3 } };\n${height}${component}`,
+      'components/README.md': 'Not a component.\n',
+      'content/posts/rope/index.md': article({ body: ':::top-plot\n:::\n\n:::grid-view{size=12}\n:::\n\n:::other-view\n:::\n\n:::const-plot{fn=c n-max=-3}\n:::\n' }),
     });
-    assert.deepEqual(errors, [
+    const result = bake(dir, 'build');
+    const lines = result.stderr.trimEnd().split('\n');
+    const literals = 'strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value';
+    const expected = [
+      ...reserved.map((name) => `components/${name}.js:1:1 ${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`),
       'components/Plot_Name.js:1:1 the file name of a component is its custom element name and its block name; use lowercase letters and digits with at least one "-", such as act-fn-plot, got "Plot_Name"',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "n" must be between 1 and 10, got 20',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "on" must be true or false, got "yes"',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "fn" must be one of a or b, got "c"',
-      'components/bad-default.js:1:1 bad-default: the default of parameter "t" must be text, got 3',
-      'components/bad-field.js:1:1 bad-field: parameter "n" has the unknown field "optons"; the fields of a text parameter are label, type and default',
-      'components/bad-field.js:1:1 bad-field: parameter "m" needs a label, the text shown next to its control',
-      'components/bad-field.js:1:1 bad-field: parameter "k" needs a default, the value used when the article does not set it',
-      'components/bad-layout.js:1:1 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, narrowHeight, autoHeight and frame',
-      'components/bad-layout.js:1:1 bad-layout: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "full"',
-      'components/bad-layout.js:1:1 bad-layout: layout.height must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got "300px"',
-      'components/bad-layout.js:1:1 bad-layout: layout.narrowHeight must be a number of pixels, { ratio: width / height } or a function of the parameters that returns one of them, got an object',
-      'components/bad-layout.js:1:1 bad-layout: layout.autoHeight must be true or false, got 1',
-      'components/bad-layout.js:1:1 bad-layout: layout.frame must be true or false, got "no"',
-      'components/bad-type.js:1:1 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
-      "components/empty-enum.js:1:1 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
+      'components/bad-default.js:1:25 bad-default: the default of parameter "n" must be between 1 and 10, got 20',
+      'components/bad-default.js:1:90 bad-default: the default of parameter "on" must be true or false, got "yes"',
+      'components/bad-default.js:1:144 bad-default: the default of parameter "fn" must be one of a or b, got "c"',
+      'components/bad-default.js:1:213 bad-default: the default of parameter "t" must be text, got 3',
+      'components/bad-field.js:1:25 bad-field: parameter "n" has the unknown field "optons"; the fields of a text parameter are label, type and default',
+      'components/bad-field.js:1:83 bad-field: parameter "m" needs a label, the text shown next to its control',
+      'components/bad-field.js:1:118 bad-field: parameter "k" needs a default, the value used when the article does not set it',
+      'components/bad-layout.js:1:25 bad-layout: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "full"',
+      'components/bad-layout.js:1:40 bad-layout: layout.height must be a number of pixels or { ratio }, the width divided by the height, such as { ratio: 1.5 }, got "300px"',
+      'components/bad-layout.js:1:57 bad-layout: layout.narrowHeight no longer exists: a component without layout.height takes the height of its content at every screen width, and layout.height applies at every screen width; delete narrowHeight',
+      'components/bad-layout.js:1:88 bad-layout: layout.frame must be true or false, got "no"',
+      'components/bad-layout.js:1:101 bad-layout: layout.autoHeight no longer exists: a component without layout.height takes the height of its content; delete autoHeight and height',
+      'components/bad-layout.js:1:119 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height and frame',
+      'components/bad-type.js:1:25 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
+      `components/call-plot.js:2:28 call-plot: the build reads params without running the file, so write it with ${literals}; got a call`,
+      `components/call-plot.js:2:52 call-plot: the build reads params without running the file, so write it with ${literals}; got a template string with \${…}`,
+      "components/empty-enum.js:1:25 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
+      'components/function-plot.js:1:33 function-plot: layout.height cannot be a function of the parameters; delete height so that the component takes the height of its content, or write a number of pixels or { ratio } for a box of that size',
+      'components/let-plot.js:1:12 let-plot: declare layout as export const layout = { … }, which the build reads without running the file',
       'components/list-table.js:1:1 list-table: :::list-table is a built-in block; give the component another name',
+      `components/name-plot.js:3:66 name-plot: the build reads params without running the file, so write it with ${literals}; got "names", which is not a constant of this file with such a value`,
       'components/no-default-export.js:1:1 no-default-export: the default export must be a SolidJS component or a class that extends HTMLElement',
-      'components/no-height.js:1:1 no-height: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "120%"',
-      'components/no-height.js:1:1 no-height: layout.height is missing; it is the height of the placeholder before the component loads, for example 360 or { ratio: 16 / 9 }',
-      'components/reserved-name.js:1:1 reserved-name: parameter "width" uses a name reserved for Bake; a component cannot declare width, height, id or class',
-    ]);
-    assert.equal(read_.get('bad-type').valid, false);
+      'components/reserved-name.js:1:25 reserved-name: parameter "width" uses a name reserved for Bake; a component cannot declare width, height, id or class',
+      'components/syntax-plot.jsx:3:17 syntax-plot: Unexpected token',
+      'components/wide-plot.js:1:25 wide-plot: layout.width must be body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%, got "120%"',
+      'content/posts/rope/index.md:10:14 parameter "size" of grid-view must be between 1 and 9, got 12',
+      'content/posts/rope/index.md:13:1 unknown component "other-view"; there is no other-view.js or other-view.jsx in components/ or in the components/ folder of this article',
+      'content/posts/rope/index.md:16:15 parameter "fn" of const-plot must be one of a or b, got "c"',
+      'content/posts/rope/index.md:16:20 parameter "n-max" of const-plot must be at least -2, got -3',
+    ];
+    assert.equal(lines.pop(), `${expected.length} errors, dist/ was not written`);
+    assert.deepEqual(lines.toSorted(), expected.toSorted());
+    assert.equal(result.status, 1);
   });
 });
 
@@ -194,9 +124,9 @@ describe('component blocks', () => {
     ]);
   });
 
-  test('checks that a file parameter names a file in the article folder', async (t) => {
-    const withDefault = { ...plot, params: { data: { label: 'Data', type: 'file', default: 'data.csv' } } };
-    const options = { components: new Map([['act-fn-plot', withDefault]]), folder: { path: '/blog/post', files: ['grid.json', 'data/angles.csv'] } };
+  test('checks that a file parameter names a file in the article folder', async () => {
+    const withDefault = declare({ 'act-fn-plot': { params: { data: { label: 'Data', type: 'file', default: 'data.csv' } } } });
+    const options = { components: withDefault, folder: { path: '/blog/post', files: ['grid.json', 'data/angles.csv'] } };
     const [block] = (await parsed(':::act-fn-plot{data=./data/angles.csv}\n:::\n', options)).intro;
     assert.equal(block.params.data, './data/angles.csv');
     assert.deepEqual((await parse(':::act-fn-plot{data=missing.csv}\n:::\n\n:::act-fn-plot\n:::\n\n:::act-fn-plot{data=../grid.json}\n:::\n', options)).errors, [
@@ -204,87 +134,20 @@ describe('component blocks', () => {
       'index.md:10:1 parameter "data" of act-fn-plot defaults to "data.csv", which is not a file in the article folder',
       'index.md:13:16 parameter "data" of act-fn-plot must be a file in the article folder, got "../grid.json"',
     ]);
-    const image = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
-    const dir = createBlog(t, { 'plot.png': image, 'scatterplot.png': image });
-    const linked = await parsed('![](plot.png)\n\n:::act-fn-plot{data=./plot.png}\n:::\n', { components: options.components, folder: folder(dir) });
-    assert.deepEqual(linked.images.map((entry) => [entry.source, entry.keepSource]), [['plot.png', true]]);
-    const longer = await parsed('![](plot.png)\n\n:::act-fn-plot{data=scatterplot.png}\n:::\n', { components: options.components, folder: folder(dir) });
-    assert.deepEqual(longer.images.map((entry) => [entry.source, entry.keepSource]), [['plot.png', false]]);
-  });
-
-  test('reports layout height functions that throw or return an invalid height at the block', async () => {
-    const broken = (heightOf) => new Map([['act-fn-plot', { ...plot, layout: { height: heightOf } }]]);
-    assert.deepEqual((await parse(':::act-fn-plot{range=3}\n:::\n', { components: broken(() => '300px') })).errors, [
-      'index.md:7:1 act-fn-plot: layout.height returns "300px" for these parameters; it must return a number of pixels or { ratio: width / height }',
-    ]);
-    const throwing = () => {
-      throw new Error('unknown range');
-    };
-    assert.deepEqual((await parse(':::act-fn-plot\n:::\n', { components: broken(throwing) })).errors, ['index.md:7:1 act-fn-plot: layout.height throws for these parameters: unknown range']);
   });
 
   test('reports unknown components, :::{width=…} around a component and keeps the component of a broken file silent', async () => {
-    const broken = new Map([['act-fn-plot', { name: 'act-fn-plot', valid: false }]]);
-    assert.deepEqual((await parse(':::fn-plot\n:::\n\n::::{width=wide}\n:::glu-heatmap\n:::\n::::\n\n:::act-fn-plot{bta=1}\n:::\n', { components: new Map([...components, ...broken]) })).errors, [
-      'index.md:7:1 unknown component "fn-plot"; components/ has no fn-plot.js or fn-plot.jsx',
+    const all = new Map([...components, ...declare({ 'broken-plot': { valid: false } })]);
+    assert.deepEqual((await parse(':::fn-plot\n:::\n\n::::{width=wide}\n:::glu-heatmap\n:::\n::::\n\n:::broken-plot{bta=1}\n:::\n', { components: all })).errors, [
+      'index.md:7:1 unknown component "fn-plot"; there is no fn-plot.js or fn-plot.jsx in components/ or in the components/ folder of this article',
       'index.md:10:1 write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it',
     ]);
   });
 
-  test('outputs the frame, the placeholder box and the caption', async () => {
-    const article = await parsed(':::act-fn-plot{fn=silu toggle width=560px}\nThe *curve* of SiLU.\n:::\n\n:::glu-heatmap{width=70%}\n:::\n\n:::glu-heatmap{width=auto height=420}\n:::\n\n:::act-fn-plot{width=page}\nOne.\n\nTwo.\n:::\n', { components });
-    const [first, second, third, fourth] = article.intro;
-    assert.equal(
-      first.html,
-      '<figure class="component" data-component="act-fn-plot" data-params="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;range&#x22;:4,&#x22;beta&#x22;:1,&#x22;gamma&#x22;:1,&#x22;toggle&#x22;:true,&#x22;title&#x22;:&#x22;&#x22;,&#x22;data&#x22;:&#x22;&#x22;}" data-attributes="{&#x22;fn&#x22;:&#x22;silu&#x22;,&#x22;toggle&#x22;:true,&#x22;width&#x22;:&#x22;560px&#x22;}" data-line="7" style="width:560px">' +
-        '<div class="component-box" style="--component-height:360px;--component-ratio:auto;--component-narrow-height:520px;--component-narrow-ratio:auto"></div>' +
-        '<figcaption>The <em>curve</em> of SiLU.</figcaption></figure>',
-    );
-    assert.deepEqual([first.type, first.width, first.naturalWidth, first.name, first.attributes], ['component', undefined, '560px', 'act-fn-plot', { fn: 'silu', toggle: true, width: '560px' }]);
-    assert.equal(
-      second.html,
-      '<figure class="component" data-component="glu-heatmap" data-params="{}" data-attributes="{&#x22;width&#x22;:&#x22;70%&#x22;}" data-line="11" data-frame="none" style="width:70%"><div class="component-box" style="--component-height:auto;--component-ratio:1.7778;--component-narrow-height:auto;--component-narrow-ratio:1.7778"></div></figure>',
-    );
-    assert.deepEqual([second.width, second.naturalWidth], ['body', undefined]);
-    assert.match(third.html, /style="--component-height:420px;--component-ratio:auto;--component-narrow-height:420px;--component-narrow-ratio:auto"/);
-    assert.equal(third.width, 'wide');
-    assert.match(fourth.html, /<figcaption>\n<p>One.<\/p>\n<p>Two.<\/p>\n<\/figcaption>/);
-    assert.equal(fourth.width, 'page');
-    assert.deepEqual(article.components, ['act-fn-plot', 'glu-heatmap']);
-  });
-
-  test('marks the frame of a component with autoHeight unless the article sets its height', async () => {
-    const growing = { ...heatmap, name: 'grow-view', layout: { height: 300, narrowHeight: 500, autoHeight: true } };
-    const article = await parsed(':::grow-view\n:::\n\n:::grow-view{height=420}\n:::\n', { components: new Map([['grow-view', growing]]) });
-    const [auto, fixed] = article.intro;
-    assert.match(auto.html, /^<figure class="component" data-component="grow-view" data-params="\{\}" data-line="7" data-height="auto"><div class="component-box" style="--component-height:300px;--component-ratio:auto;--component-narrow-height:500px;--component-narrow-ratio:auto"><\/div><\/figure>$/);
-    assert.doesNotMatch(fixed.html, /data-height/);
-  });
-
-  test('gives a component the URL-encoded path of a file parameter whose name holds #, ? or %', async () => {
-    const options = { components, folder: { path: '/blog/post', files: ['data#1.json', 'a?b.json', 'tables/100%.json'] } };
-    const article = await parsed(':::act-fn-plot{data=data#1.json}\n:::\n\n:::act-fn-plot{data="a?b.json"}\n:::\n\n:::act-fn-plot{data=tables/100%.json}\n:::\n', options);
-    const files = article.intro.map((block) => JSON.parse(/data-params="([^"]*)"/.exec(block.html)[1].replaceAll('&#x22;', '"')).data);
-    assert.deepEqual(files, ['data%231.json', 'a%3Fb.json', 'tables/100%25.json']);
-    assert.deepEqual(article.intro.map((block) => block.params.data), ['data#1.json', 'a?b.json', 'tables/100%.json']);
-  });
-
-  test('marks an example whose result holds a component or a figure with a pixel width with those widths', async () => {
-    const options = { components, folder: folder(join(import.meta.dirname, 'fixtures/syntax-errors')) };
-    const article = await parsed(
-      [
-        '::::example\n:::act-fn-plot{width=560px}\n:::\n\n:::act-fn-plot\n:::\n::::',
-        '::::example\n:::glu-heatmap\n:::\n\n![Graph](relu.svg){width=900px}\n::::',
-        ':::example\nText with **bold**.\n:::',
-      ].join('\n\n'),
-      options,
-    );
-    const fields = article.intro.map(({ resultWidths, naturalWidth, width, html }) => ({ resultWidths, naturalWidth, width, marked: /^<div class="example"( data-result-widths="[^"]*")?>/.exec(html)[1] }));
-    assert.deepEqual(fields, [
-      { resultWidths: ['560px', 'body'], naturalWidth: '560px', width: undefined, marked: ' data-result-widths="560px body"' },
-      { resultWidths: ['wide', '900px'], naturalWidth: '900px', width: 'wide', marked: ' data-result-widths="wide 900px"' },
-      { resultWidths: undefined, naturalWidth: undefined, width: undefined, marked: undefined },
-    ]);
+  test('shows the caption of a component with its inline and block Markdown below the component', async () => {
+    const [inline, blocks] = (await parsed(':::act-fn-plot{fn=silu}\nThe *curve* of SiLU.\n:::\n\n:::act-fn-plot{width=page}\nOne.\n\nTwo.\n:::\n', { components })).intro;
+    assert.match(inline.html, /<\/div><figcaption>The <em>curve<\/em> of SiLU\.<\/figcaption><\/figure>$/);
+    assert.match(blocks.html, /<figcaption>\n<p>One.<\/p>\n<p>Two.<\/p>\n<\/figcaption><\/figure>$/);
   });
 
   test('validates and renders components inside other blocks', async () => {
@@ -292,12 +155,11 @@ describe('component blocks', () => {
     assert.deepEqual(errors, ['index.md:8:16 parameter "range" of act-fn-plot must be between 1 and 10, got 20']);
     const article = await parsed('::::fold{title=Plot}\n:::glu-heatmap\nCells.\n:::\n::::\n', { components });
     assert.match(article.intro[0].html, /^<details class="fold"><summary>Plot<\/summary>\n<figure class="component" data-component="glu-heatmap"/);
-    assert.deepEqual(article.components, ['glu-heatmap']);
   });
 });
 
 describe('building components', () => {
-  test('bundles only the components that published articles use and loads the runtime only on pages with components', (t) => {
+  test('publishes only the components that published articles use and loads the component runtime only on pages with components', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'components/lib/shared.js': 'export const scale = 2;\n',
@@ -324,19 +186,49 @@ describe('building components', () => {
     assert.ok(assets.some((name) => /^fn-plot-[\w-]+\.css$/.test(name)));
     assert.ok(assets.some((name) => /^grid-view-[\w-]+\.js$/.test(name)));
     assert.ok(!assets.some((name) => name.startsWith('unused-view')));
-    const runtimeSource = readFileSync(join(dir, 'dist/assets', runtime), 'utf8');
-    assert.match(runtimeSource, /fn-plot-[\w-]+\.js/);
-    assert.doesNotMatch(runtimeSource, /unused-view/);
-    const files = JSON.parse(JSON.parse(/JSON\.parse\(("(?:[^"\\]|\\.)*")\)/.exec(runtimeSource)[1]));
-    assert.deepEqual(Object.keys(files).sort(), ['fn-plot', 'grid-view', 'left-view', 'right-view']);
-    for (const file of Object.values(files).flat()) assert.ok(assets.includes(file), `${file} is published`);
-    const kinds = (name) => files[name].map((file) => file.replace(/-[\w-]{8}\.(js|css)$/, '.$1')).sort();
-    assert.ok(kinds('fn-plot').includes('fn-plot.js') && kinds('fn-plot').includes('fn-plot.css') && kinds('fn-plot').includes('solid-element.js'), kinds('fn-plot').join(', '));
-    for (const name of ['grid-view', 'left-view', 'right-view']) assert.ok(kinds(name).includes(`${name}.js`) && !kinds(name).includes('solid-element.js'), `${name}: ${kinds(name).join(', ')}`);
+    assert.doesNotMatch(readFileSync(join(dir, 'dist/assets', runtime), 'utf8'), /unused-view/);
     const scripts = assets.filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
     assert.ok(!scripts.some((source) => source.includes('computations created outside')), 'no script contains the development build of Solid');
-    const sources = assets.filter((name) => /\.(js|css)$/.test(name)).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
-    assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no asset contains code of bake/kit');
+    const sources = assets.filter((name) => /\.(js|css)$/.test(name) && !name.startsWith('essay-')).map((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8'));
+    assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no component asset contains code of bake/kit');
+  });
+
+  test('a component in the components/ folder of an article, at any depth, works in that article and is not published as a file of it', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/shared-view.js': `${height}export default class SharedView extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::rope-plot\n:::\n\n:::shared-view\n:::\n' }),
+      'content/posts/rope/components/rope-plot.js': `import { scale } from './lib/scale.js';\n\n${height}export default class RopePlot extends HTMLElement {\n  connectedCallback() {\n    this.textContent = String(scale);\n  }\n}\n`,
+      'content/posts/rope/components/lib/scale.js': 'export const scale = 2;\n',
+      'content/posts/2026/gelu/index.md': article({ slug: 'gelu', body: ':::gelu-plot\n:::\n' }),
+      'content/posts/2026/gelu/components/gelu-plot.js': `${height}export default class GeluPlot extends HTMLElement {}\n`,
+    });
+    const result = bake(dir, 'build');
+    assert.equal(result.stderr, '');
+    const assets = readdirSync(join(dir, 'dist/assets'));
+    assert.ok(assets.some((name) => /^rope-plot-[\w-]+\.js$/.test(name)));
+    assert.ok(assets.some((name) => /^gelu-plot-[\w-]+\.js$/.test(name)));
+    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/rope')).sort(), ['index.html', 'index.md']);
+    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/gelu')).sort(), ['index.html', 'index.md']);
+  });
+
+  test('reports a component that another article uses at its use, and a component name defined twice at both files', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/twice-view.js': `${height}export default class TwiceView extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::rope-plot\n:::\n' }),
+      'content/posts/rope/components/rope-plot.js': `${height}export default class RopePlot extends HTMLElement {}\n`,
+      'content/posts/rope/components/twice-view.jsx': `${height}export default function TwiceView() {\n  return null;\n}\n`,
+      'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'Text.\n\n:::rope-plot\n:::\n\n:::twice-view\n:::\n' }),
+    });
+    const result = bake(dir, 'build');
+    const twice = 'twice-view: components/twice-view.js and content/posts/rope/components/twice-view.jsx both define the component; a component name is unique in the blog, so rename or remove all but one of them';
+    assert.deepEqual(result.stderr.trimEnd().split('\n'), [
+      `components/twice-view.js:1:1 ${twice}`,
+      'content/posts/gelu/index.md:9:1 component "rope-plot" belongs to content/posts/rope and works only in that article; move content/posts/rope/components/rope-plot.js to components/ to use it in other articles',
+      `content/posts/rope/components/twice-view.jsx:1:1 ${twice}`,
+      '3 errors, dist/ was not written',
+    ]);
   });
 
   test('bundles the parts of bake/kit and their styles with the components that use them, and the plain helpers without the styles', (t) => {
@@ -349,62 +241,10 @@ describe('building components', () => {
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    const assets = readdirSync(join(dir, 'dist/assets')).filter((name) => /\.(js|css)$/.test(name));
+    const assets = readdirSync(join(dir, 'dist/assets')).filter((name) => /\.(js|css)$/.test(name) && !name.startsWith('essay-'));
     const withKit = assets.filter((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8').includes('bk-kit-')).map((name) => name.replace(/-[\w-]{8}\./, '.'));
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);
     assert.match(readFileSync(join(dir, 'dist/assets', assets.find((name) => /^line-plot-[\w-]+\.css$/.test(name))), 'utf8'), /\.bk-kit-slider/);
     assert.ok(!assets.some((name) => name.startsWith('tick-list') && name.endsWith('.css')), assets.join(', '));
-  });
-
-  test('builds formulas after reading a component library that replaces the module loader of MathJax, also with an empty preamble.sty', (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'preamble.sty': '',
-      'components/lib/tex.js': "import { mathjax } from '@mathjax/src/js/mathjax.js';\n\nmathjax.asyncLoad = (name) => import(name);\n\nexport const ready = 'ready';\n",
-      'components/tex-box.js': `import { ready } from './lib/tex.js';\n\n${height}export default class TexBox extends HTMLElement {\n  connectedCallback() {\n    this.textContent = ready;\n  }\n}\n`,
-      'content/posts/rope/index.md': article({ body: '$$\nx \\in \\mathbb{R}\n$$\n\n:::tex-box\n:::\n' }),
-    });
-    symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), join(dir, 'node_modules'), 'dir');
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
-    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\mathbb{R}">/);
-  });
-
-  test('marks the frames of the article itself with their line and the frames of embedded content without one', (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'components/grid-view.js': `${height}export default class GridView extends HTMLElement {}\n`,
-      'content/posts/rope/index.md': article({ body: '## Grid {#grid}\n\n:::grid-view\n:::\n' }),
-      'content/posts/gelu/index.md': article({ slug: 'gelu', body: '> :::grid-view\n> :::\n\n:::embed\n/2026-10/rope/#grid\n:::\n' }),
-    });
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
-    const frames = (path) => readFileSync(join(dir, path), 'utf8').match(/<figure class="component"[^>]*>/g);
-    assert.deepEqual(frames('dist/2026-10/rope/index.html'), ['<figure class="component" data-component="grid-view" data-params="{}" data-line="9">']);
-    assert.deepEqual(frames('dist/2026-10/gelu/index.html'), [
-      '<figure class="component" data-component="grid-view" data-params="{}" data-line="7">',
-      '<figure class="component" data-component="grid-view" data-params="{}">',
-    ]);
-    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<div class="embed-part"><h2 data-attributes="[^"]*">Grid<\/h2>\n<figure class="component" data-component="grid-view" data-params="{}">/);
-  });
-
-  test('reports component errors with the article errors and writes nothing', (t) => {
-    const dir = createBlog(t, {
-      'bake.config.js': validConfig,
-      'components/fn-plot.js': `${height}const width = window.innerWidth;\n${component}`,
-      'components/grid-view.js': `export const params = { size: { label: 'Size', type: 'number', min: 1, max: 9, default: 3 } };\n${height}${component}`,
-      'content/posts/rope/index.md': article({ body: ':::fn-plot\n:::\n\n:::grid-view{size=12}\n:::\n\n:::other-view\n:::\n' }),
-    });
-    const result = bake(dir, 'build');
-    assert.equal(
-      result.stderr,
-      [
-        'components/fn-plot.js:2:15 fn-plot: components/fn-plot.js uses the browser API window at the top level; the build reads params and layout in Node, so use it inside the component code',
-        'content/posts/rope/index.md:10:14 parameter "size" of grid-view must be between 1 and 9, got 12',
-        'content/posts/rope/index.md:13:1 unknown component "other-view"; components/ has no other-view.js or other-view.jsx',
-        '3 errors, dist/ was not written',
-        '',
-      ].join('\n'),
-    );
   });
 });

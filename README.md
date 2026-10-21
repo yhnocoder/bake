@@ -16,7 +16,7 @@ npx bake init
 npx bake dev
 ```
 
-`bake.config.js` is an ES module, so the `package.json` of the blog sets `"type": "module"` or has no `type` field. `npm init -y` writes `"type": "commonjs"`, which `npm pkg set type=module` replaces; `bake build` reports a blog whose `package.json` sets `"type": "commonjs"` at `bake.config.js`. `npx playwright install chromium` downloads the browser that `bake build` draws the share images with, see [Share images](#share-images). The command `bake` comes with the package, so `npx bake` runs it from the blog folder, and the scripts in `package.json` can call it as `bake`.
+`bake.config.js` is an ES module, so the `package.json` of the blog sets `"type": "module"`. `npm init -y` writes `"type": "commonjs"`, which `npm pkg set type=module` replaces; Bake reports an error at `bake.config.js` when the nearest `package.json` sets another type or none. `npx playwright install chromium` downloads the browser that `bake build` draws the share images with, see [Share images](#share-images). The command `bake` comes with the package, so `npx bake` runs it from the blog folder, and the scripts in `package.json` can call it as `bake`.
 
 ## Example blog
 
@@ -50,7 +50,7 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 - Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
 - The homepage at http://localhost:4321/ shows every article, drafts included, and reloads when the front matter of an article changes or an article is added or removed.
 
-Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While an article has errors, its page keeps showing the last version without errors, and the other articles keep updating. Errors outside the articles, such as in `bake.config.js`, `preamble.sty` or a theme, stop all updates until they are fixed.
+Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While the blog has errors, every page keeps showing the last version without errors, and the pages update again when the errors are fixed. When `bake dev` starts on a blog whose articles have errors, it shows the pages with those errors.
 
 Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
 
@@ -64,7 +64,7 @@ A blog is an ordinary repository. Bake reads it from the blog root:
 
 ```
 my-blog/
-  bake.config.js        site title, URL, language, default theme and table of contents style
+  bake.config.js        site title, URL, language, default theme and theme options
   preamble.sty          math macros shared by every article
   package.json          Bake and the npm packages that components use
   content/
@@ -72,8 +72,9 @@ my-blog/
       2026-10/
         llm-act-fns/
           index.md      one article per folder, with its images and data next to it
-  components/           interactive components, one file each
-  themes/               optional: new themes or overrides of the built-in ones
+          components/   optional: components that only this article uses
+  components/           interactive components that any article can use, one file each
+  themes/               optional: the blog's own themes
   public/               copied unchanged to the site root (favicon, CNAME)
   dist/                 build output, not committed
 ```
@@ -89,7 +90,7 @@ export default {
   url: 'https://example.github.io',
   language: 'en',
   theme: 'essay',
-  toc: 'notes',
+  themes: { essay: { toc: 'notes' } },
 };
 ```
 
@@ -100,8 +101,7 @@ export default {
 | `url` | yes | Absolute `http` or `https` address of the published site. |
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
-| `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
-| `themes` | no | The options of each theme, keyed by the theme name. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default, written as `themes: { bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
+| `themes` | no | The options of each theme, keyed by the theme name. The `essay` theme has one option: `toc`, the table of contents style, `notes`, `tabs`, `dots` or `ticks`, `notes` by default. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default. Both are written as `themes: { essay: { toc: 'dots' }, bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `chat` | no | `{ pet }`: the pet of the AI chat, described in "The pet" below. The default is `crt-monitor`. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
@@ -133,11 +133,10 @@ tags: [LLM]
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of a PNG, JPEG, GIF, WebP, AVIF or SVG image in the article folder that becomes the share image in place of the card Bake draws, see [Share images](#share-images). |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
-| `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. It has no effect in the `bento` theme, which has no table of contents. |
 | `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
 | `page` | no | Path of an HTML file in the article folder. Bake publishes the folder unchanged and serves this file as the article's `index.html`. An `index.md` with `page` has no text after the front matter. |
 
-Any other field is an error, and two articles cannot have the same URL.
+The front matter can also set the options of the article's theme by their names, such as `toc: dots` in an `essay` article or `columns: 4` in a `bento` article; a value written in the front matter replaces the one in `themes` of `bake.config.js` for this article. Any other field is an error, and two articles cannot have the same URL.
 
 ## Writing an article
 
@@ -150,16 +149,17 @@ The text after the front matter is Markdown: CommonMark with GitHub tables, foot
 Braces at the end of a heading set its attributes:
 
 ```markdown
-## Activation functions in transformers {#act-fns toc="Activation functions" width=wide}
+## Activation functions in transformers {#act-fns toc="Activation functions"}
 ```
 
-| Attribute | Meaning |
-|---|---|
-| `#id` | The anchor of the heading. Without it, the anchor is made from the heading text. |
-| `toc` | A shorter title for the table of contents. It has no effect in the `bento` theme. |
-| `width` | Only for `##` headings: the card width of the section in the `bento` theme, `body`, `wide` or `page`. |
-| `cols` | Only for `##` headings: the number of card columns of the section in the `bento` theme, a whole number from 1 to 6. It wins over `width`. |
-| `rows` | Only for `##` headings: the height of the card of the section in the `bento` theme, as a number of rows, a whole number from 1 to 200. |
+`#id` is the anchor of the heading in every theme; without it, the anchor is made from the heading text. The other attributes belong to the theme of the article, and an attribute that the theme does not declare is an error, so `cols` in an `essay` article and `toc` in a `bento` article are errors:
+
+| Theme | Attribute | Meaning |
+|---|---|---|
+| `essay` | `toc` | A shorter title for the table of contents. |
+| `bento` | `width` | Only for `##` headings: the card width of the section, `body`, `wide` or `page`. |
+| `bento` | `cols` | Only for `##` headings: the number of card columns of the section, a whole number from 1 to 6. It wins over `width`. |
+| `bento` | `rows` | Only for `##` headings: the height of the card of the section, as a number of rows, a whole number from 1 to 200. |
 
 A paragraph that ends with `^name` gets the anchor `name`; the marker is not shown. Two anchors with the same name in one article are an error.
 
@@ -190,7 +190,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 | `:::embed` | Shows sections or paragraphs of other articles, see [Embedding other articles](#embedding-other-articles). |
 | `:::{width=wide}` | Sets the width of the one block inside it to `body`, `wide` or `page`. |
 
-Any other block name without a `-` is an error, and so is an attribute the block does not know. A name with a `-` is an interactive component.
+A name with a `-` is an interactive component. Any other name is a block of the theme of the article, such as `:::sticker` and `:::note` of the `bento` theme, see [Themes](#themes); a name that the theme does not declare is an error, and so is an attribute the block does not know. A block of the theme holds ordinary Markdown, with math, links, footnotes and citations, and stands at the top level of the article, outside other blocks, lists and quotes.
 
 ### Math
 
@@ -236,11 +236,82 @@ Bake reads every image at build time and writes its width and height into the pa
 
 ### Widths
 
-`:::{width=body}`, `:::{width=wide}` and `:::{width=page}` set the width of the one block inside them, such as a formula, a code block, a table, an image or a component. `body` is the width of the text, `wide` extends into the margin and `page` uses the whole page. The theme decides how each width is laid out. A block without a width is placed automatically: it has the width of the text when it fits, extends to `wide` when it does not, and scrolls horizontally when it is wider still. For formulas, code blocks and figures with a pixel width Bake records the natural width at build time; for tables and components the page measures it. A figure without a size stays at the width of the text.
+`:::{width=body}`, `:::{width=wide}` and `:::{width=page}` set the width of the one block inside them, such as a formula, a code block, a table, an image or a component. `body` is the width of the text, `wide` extends into the margin and `page` uses the whole page. The theme decides how each width is laid out. A block without a width is placed automatically: it has the width of the text when it fits, extends to `wide` when it does not, and scrolls horizontally when it is wider still. For formulas, code blocks, and figures and components with a pixel width, Bake records the natural width at build time, and the stylesheet sizes these blocks, also without scripts and at every text size the reader chooses; for tables and components without a pixel width the page measures it. A figure without a size stays at the width of the text.
 
 ### Examples
 
 `:::example` shows the Markdown source of its content next to the rendered result; on a narrow screen the source is above the result. Headings inside an example do not enter the table of contents or the section numbering. Sidenotes, citations and equation numbers inside an example are numbered together with the rest of the article.
+
+### Components
+
+A component is an interactive figure that the blog writes in JavaScript. It is a file `components/<name>.js` or `components/<name>.jsx` in the blog root, and an article shows it with a block of that name:
+
+```markdown
+:::act-fn-plot{fn=silu range=6}
+The curve of SiLU. Drag the slider to change β.
+:::
+```
+
+The text between the two lines is the caption under the component, written in Markdown; a component without a caption has nothing between them. A component is always a block of its own and cannot appear inside a paragraph.
+
+A component that only one article uses can live in a `components/` folder inside the folder of that article, such as `content/posts/2026-10/llm-act-fns/components/glu-heatmap.jsx`. Only that article can show it; a block of it in another article is an error at the block. The files of this folder, with the modules and styles that its components import, are not published with the article. `bake dev` rebuilds the components when a file in it changes, as it does for `components/`.
+
+The file name is both the custom element name and the block name, so it uses lowercase letters and digits with at least one `-`, such as `act-fn-plot`. A name that HTML reserves, such as `font-face`, the name of a built-in block, such as `aside`, and two files with the same name in the whole blog, in `components/` or in the `components/` folder of any article and with the same or a different extension, are errors, reported at each of the files.
+
+```jsx
+import './act-fn-plot.css';
+
+export const params = {
+  fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu', 'silu'], default: 'gelu' },
+  range: { label: 'Range', type: 'number', min: 1, max: 10, step: 1, default: 4 },
+};
+
+export const layout = { width: 'body' };
+
+export default function ActFnPlot(props) {
+  return <p>{props.fn} from -{props.range} to {props.range}</p>;
+}
+```
+
+The default export is the component. A class that extends `HTMLElement` is defined as the custom element of that name. Any other default export is a [SolidJS](https://www.solidjs.com/) component, which Bake wraps in a custom element. A file without a default export is an error.
+
+- A SolidJS component receives the parameter values as its props. When the values change, as they do while you move a control of the parameter bar in `bake dev`, the props change and the component updates.
+- A custom element finds the parameter values in `this.params` when it is connected. When the values change, Bake sets `this.params` again and calls the element's `update()` method if it has one.
+
+The file may import npm packages that the blog installs, other files of the blog, and CSS files, which the page loads together with the component. Bake bundles each component into its own script, which a page downloads only when its article uses the component.
+
+`params` and `layout` are optional. Bake reads both at build time without running the file, so each is written as `export const` with a literal value: strings, numbers, `true`, `false`, `null`, lists, objects, template strings without `${…}`, and names of `const` declarations of the same file with such a value. Anything else, such as a function call, an arithmetic expression or an imported name, is an error at its position. The rest of the file runs only in the browser, so it may use browser APIs at its top level; an error there shows the component as failed on the page.
+
+`params` maps the name of each parameter to its declaration. An article sets a parameter with the attribute of the same name, and a parameter that the article does not set has its default. Every declaration has `label`, the text next to its control in the parameter bar, `type` and `default`:
+
+| Type | Written in the article | Other fields |
+|---|---|---|
+| `number` | A number, such as `range=6` | `min`, `max` and `step`, all optional |
+| `text` | Any text, in quotes when it has spaces, such as `title="Two words"` | |
+| `boolean` | `name` or `name=true` for true, `name=false` for false | |
+| `enum` | One of the options, such as `fn=silu` | `options`, the list of allowed strings |
+| `file` | The path of a file in the article folder, such as `data=ffn-share.json`; the component receives the address of the published file | |
+
+The names `width`, `height`, `id` and `class` cannot be parameters. An unknown field of a declaration, a default that does not fit its declaration, an attribute that is not a parameter of the component, a value that does not fit its parameter and a file that is not in the article folder are errors at their positions.
+
+`layout` describes the box of the component on the page:
+
+| Field | Meaning |
+|---|---|
+| `width` | `body`, `wide` or `page`, see [Widths](#widths), a size in pixels such as `560px`, or a percentage of the text column up to `100%`. The default is `body`. |
+| `height` | A number of pixels, or `{ ratio }`, the width divided by the height, such as `{ ratio: 1.5 }`, for a component that fills a box of that size. |
+| `frame` | `false` shows the component without the frame, the border and background, that the theme draws around it. The default is `true`. |
+
+The `width` and `height` attributes of the block replace the declared values for one use: `width` takes the same values as `layout.width` and `auto` for the declared width, and `height` takes a number of pixels, such as `:::bar-chart{height=320}`.
+
+A component without `layout.height` shows a placeholder of the theme's height `--component-placeholder-height` until it starts and then takes the height of its content, so it lays out its content for every width itself. A component that fills a box of a given size, such as a heatmap drawn to the size of its box, declares `layout.height`; its box has that height at every screen width, before and after the component starts. A component starts when it comes within one and a half screen heights of the visible part of the page, so its height changes before the reader reaches it; when a component above the visible part changes its height, the browser keeps the visible text in place, which Safari does from version 27 on.
+
+Two modules of Bake are available to components:
+
+- `bake/kit` holds SolidJS parts for figures, styled with the colours and fonts of the theme, so they follow the dark mode: the controls `Controls`, `Slider`, `Segmented`, `Toggle` and `Button`; the plot parts `Plot`, `Axes`, `Curve`, `Crosshair` and `usePlot`; `Legend` and `Swatch`; `Tex` and `SvgTex`, which typeset a TeX formula with the macros of `preamble.sty` in HTML or inside an SVG drawing, and `MathText` and `SvgMathText`, which show a line of text with formulas between `$` signs, or `$$` for a formula on its own line, in HTML or inside an SVG drawing, where `within={[left, right]}` moves a label sideways to keep it between two x positions; `divergingColors`, which maps a value from −1 to 1 to the theme's diverging colours `--diverge-low`, `--diverge-mid` and `--diverge-high`; the number helpers `linearScale`, `niceTicks`, `samplePath`, `formatNumber` and `stepDigits`; `createElementSize`, the size of an element as a signal; and `createTween` and `prefersReducedMotion` for animations that stop when the reader prefers reduced motion. Using the kit is optional, and a custom element can import its number helpers too.
+- `bake/math` exports `texToSvg(formula, { display })`, which typesets a TeX formula with the macros of `preamble.sty` and resolves to an SVG element.
+
+In `bake dev`, every component shows a parameter bar with one control per parameter, see [bake dev](#bake-dev). The bar shows a number field for a number, with a slider next to it when the declaration has `min` and `max`, a list for an enum, a switch for a boolean, and a text field for text and a file.
 
 ### Sidenotes and citations
 
@@ -347,7 +418,7 @@ The cache step is optional: it keeps the Chromium download between runs, and `np
 
 Every article page and the homepage show a small animated pet in the bottom right corner. Clicking the pet opens a chat with DeepSeek: an input field and the latest messages appear as bubbles to the left of the pet. The answers of the model are on the right and the questions of the reader on the left. Escape, a click outside the chat or a second click on the pet closes it. On an article page a question is about that article, whose Markdown source goes with every question, and the model can also read other articles of the blog. On the homepage the chat is about the whole blog: the model gets the list of articles with their summaries and sections, reads the articles a question needs, and links its answer to those articles and sections. Typing `@` in the input field opens a list of articles, months, categories and tags; the reader picks one or more of them to limit the question to those articles. When the reader selects a passage of an article, a button under the selection asks about it and quotes it in the question. Answers appear as they are written, and formulas are typeset with the macros of `preamble.sty`. A settings button in the input field starts a new chat, turns DeepSeek's thinking mode on and off, changes or clears the key and chooses another pet.
 
-There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. Each time a page is opened or reloaded, the reader unlocks the key once with Touch ID, Windows Hello or a security key, and the key stays in the memory of that page only. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
+There is no server. Each reader enters their own DeepSeek API key, and the browser sends the questions directly to DeepSeek. The key is never stored as plain text: the browser creates a passkey for the site, and the key is encrypted with a secret that only that passkey can produce, through the PRF extension of WebAuthn. The reader unlocks the key with Touch ID, Windows Hello or a security key. The browser then keeps the decryption key, which scripts cannot read out, in the site's storage for 30 days, so the pages of the site use the API key without asking again during that time. Saving or unlocking the key starts the 30 days again, and clearing the key in the chat settings forgets both. A browser that does not report support for the PRF extension shows no chat, and an authenticator without it stores no key.
 
 Passkeys need a secure address with a host name, so the chat appears on sites served over HTTPS and on `localhost`, which includes `bake dev`, and not at addresses such as `http://127.0.0.1:8000`. `bake build` publishes the `index.md` of every article next to its page and a list of the articles at `_bake/articles.json`, which the chat downloads when the reader sends the first question or types `@`. A page without scripts shows nothing of the chat.
 
@@ -384,7 +455,7 @@ The built-in pets have their own licenses, which the chat settings name in one l
 
 A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number.
 
-The `essay` theme has four table of contents styles, which `toc` selects:
+The `essay` theme has four table of contents styles, which its option `toc` selects:
 
 | Style | From 1340 pixels | From 1000 to 1339 pixels |
 |---|---|---|
@@ -395,12 +466,69 @@ The `essay` theme has four table of contents styles, which `toc` selects:
 
 A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
-The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. From 1000 pixels up the grid has `themes.bento.columns` columns, and below 1000 pixels it has one column. A section asks for its width with `cols` or `width` on its heading: `body` is a third of the columns, `wide` is half of them and `page` is all of them, so with 6 columns these are 2, 3 and 6. A section without either spans the whole row when it contains a block with `:::{width=page}`, half of the columns when it contains a block with `:::{width=wide}` or a block that does not fit into a third, such as a long line of code or a component with a pixel width, and a third otherwise. From 1000 pixels up the cards are placed in the order of the article, each one in the columns whose lowest card ends highest. A card is as tall as its content, unless its heading sets `rows`: then the card is that many rows of `themes.bento.rowHeight` pixels tall, the content that does not fit is hidden under a fade at the bottom, and the card scrolls after the reader clicks it or moves keyboard focus into it. In `bake dev` such a card shows how many pixels do not fit and the smallest `rows` that fits them. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it and is as tall as its content.
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. From 1000 pixels up the grid has `themes.bento.columns` columns. A section asks for its width with `cols` or `width` on its heading: `body` is a third of the columns, `wide` is half of them and `page` is all of them, so with 6 columns these are 2, 3 and 6. A section without either spans the whole row when it contains a block with `:::{width=page}`, half of the columns when it contains a block with `:::{width=wide}` or a block that does not fit into a third, such as a long line of code or a component with a pixel width, and a third otherwise. From 1000 pixels up the cards are placed in the order of the article, each one in the columns whose lowest card ends highest. Below 1000 pixels the cards wrap into rows in the order of the article. A card starts as wide as its span in the columns of a screen 1000 pixels wide, or as the whole row when that is more than half of the row; the cards of a row then grow to fill it without gaps and are as tall as the tallest of them; `rows` has no effect there. From 1000 pixels up a card is as tall as its content, unless its heading sets `rows`: then the card is that many rows of `themes.bento.rowHeight` pixels tall, the content that does not fit is hidden under a fade at the bottom, and the card scrolls after the reader clicks it or moves keyboard focus into it. In `bake dev` such a card shows how many pixels do not fit and the smallest `rows` that fits them. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so `toc` on a heading is an error. Without scripts, every card keeps the span its width gives it from 1000 pixels up, the grid has one column below, and every card is as tall as its content.
+
+The `bento` theme has two blocks of its own, each drawn as a card of its own after the card of the section it is written in:
+
+```markdown
+:::sticker
+🧪
+:::
+
+:::note{cols=2 color=blue}
+PyTorch's `F.gelu(x, approximate="tanh")` is the approximation above.
+:::
+```
+
+`:::sticker` holds a short text, an emoji or a small image and is drawn as a tilted sticker; an emoji alone is drawn large. `:::note` holds any Markdown, with math, links and footnotes, on a tinted card; `color` is `yellow`, `green`, `blue` or `pink`, `yellow` by default. Both take `cols`, the card columns, 1 for a sticker and a third of the columns for a note by default, and `rows`, which works as on a heading. From 1000 pixels up the section cards are placed first, and then each sticker and note, in the order of the article, goes to the highest place where it fits next to the cards placed before it, which fills the gaps the section cards leave, and to the leftmost of equally high places. Below 1000 pixels and without scripts they follow the order of the article.
 
 A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
-A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/` with a `page.jsx` and a `client.jsx`, plus a `home.jsx` for the homepage when `bake.config.js` selects it as the site theme, and an article or `bake.config.js` selects it by the folder name. A file in `themes/essay/` replaces the file of the same name in the built-in `essay` theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest. [CONTRIBUTING.md](CONTRIBUTING.md) describes what a theme receives.
+In the `essay` and `bento` themes, copying a selection of an article puts its Markdown source on the clipboard as plain text, and its formatted content as HTML for editors such as Notion or Word. The Markdown is the part of `index.md` between the two ends of the selection. An end inside a formula, a component, an embed, a footnote number or a citation moves to its edge, and so does an end inside a heading or a table row when the selection reaches beyond it. The opening and closing markup of the emphasis, links and other elements that the selection cuts is added, and the definitions of the footnotes it refers to are appended. Inside embedded content the copy is the Markdown of the embedded article, with the addresses of its images replaced by those of the published files. HTML written in the Markdown is copied as written. The Copy as Markdown button in the page header copies the whole `index.md`.
+
+### Writing a theme
+
+A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder `themes/<name>/`, and an article or `bake.config.js` selects it by the folder name. The site theme is the one that `theme` in `bake.config.js` names; it also renders the homepage and the 404 page.
+
+| File | Required | Content |
+|---|---|---|
+| `page.jsx` | yes | Default export: the component of an article page. |
+| `client.jsx` | yes | Default export: the function `start(document)`, which starts the page script. The CSS files it imports are the stylesheets of the pages. |
+| `home.jsx` | in the site theme | Default export: the component of the homepage. |
+| `not-found.jsx` | in the site theme | Default export: the component of the 404 page. |
+| `theme.css` | in the site theme | A stylesheet that Bake publishes as `_bake/theme.css`, for plain HTML pages, see `page` in [Front matter](#front-matter). |
+| `fonts.css` | no | `@font-face` rules, which the pages load without delaying the first paint. |
+| `options.js` | no | The declarations of the theme's options, reader settings, heading attributes and blocks. |
+
+`page.jsx` receives these props:
+
+| Prop | Content |
+|---|---|
+| `site` | `title`, `url`, `language` and `description` of `bake.config.js`, and `link`, the absolute address of the homepage. |
+| `article` | `title`, `summary`, `date`, `tags`, `category`, `draft`, `url`, `link`, the absolute address of the page, `shareImage`, `words` and `content`, the structure of the article: `intro`, the blocks before the first `##` heading; `sections`, each with its number, title, `attributes`, `blocks` and recap; `sidenotes`; `references`; `toc`; and `source`, the text of `index.md`. Each block has `type`, `html`, `line` and `endLine`. |
+| `assets` | `root`, the address of the site root relative to the page, and the addresses of the `styles`, `fonts` and `scripts` that the page loads. |
+| `options` | The values of the theme's options for this article, from `themes` in `bake.config.js` and the front matter. |
+
+`home.jsx` receives `site`, `options`, `home` with `groupBy`, `columns` and `categories`, `articles`, the published articles with their card fields, and `assets`. `not-found.jsx` receives `site`, `options`, `articles` with the `title` and `url` of each published article, and `assets`.
+
+A theme builds these pages from the parts that `bake/theme` exports. `ArticleDocument` writes the document of an article page: the head with the scripts and stylesheets of `assets`, the reader settings, the source of the article and the edge areas. `Header`, `arrange`, `Block`, `SectionHeading` and `Sidenotes` render the header and the article, and `Home` and `NotFound` are the homepage and the 404 page of the built-in themes. A page that does not use `ArticleDocument` or `Home` writes the parts that Bake relies on itself:
+
+- The `data-region` attributes, with the names in `REGIONS` of `bake/regions`: `article` on the element that holds the article, and `toc`, `source`, `glyphs`, `previews` and `words` on the other parts that change with the Markdown. When an article is saved, `bake dev` replaces these parts in place and reloads the page for any other change.
+- The source of the article, `<script type="application/json" class="bk-source">` with the text of `article.content.source` as JSON. Copying as Markdown reads it, and `startCopy` from `bake/copy` reports an error when it is missing.
+- `data-line` and `data-end-line` on the elements of headings, blocks and sidenotes, from their `line` and `endLine`. `bake dev` uses them to highlight changes and to open the editor at a block, and copying as Markdown takes the source of these elements from them. `Block`, `SectionHeading` and `Sidenotes` write them, and a theme writes them on a block of its own. The HTML that Bake renders from Markdown carries `data-src` with the offsets of each element in the source, which a theme keeps as it is.
+- `data-ui`, the selector `UI` of `bake/regions`, on interface elements inside the article, such as heading links and section numbers. Copying as Markdown leaves them out.
+- The two edge areas, `<div data-edge="start">` and `<div data-edge="end">`, at the end of the body. They are fixed at the bottom left and the bottom right and stack their children in a column: the settings button and the table of contents handle go into the start area, the AI chat and the `bake dev` bar into the end area. A theme hides an area with `data-hidden` on it.
+
+`client.jsx` starts the page script. Bake calls its default export `start(document)` when the page loads; `start` returns a function that stops what it started, its listeners, observers and created elements. In `bake dev`, after each update of the article in place, Bake calls that function and then `start` again. Code that does not depend on the article, such as the settings panel, runs once at the top level of `client.jsx`. `bake/live` exports `livePage(start)`, which Bake applies to the default export; another module that has to start again after each update calls it with its own `start`. `bake/theme/client` exports the scripts of the built-in themes, among them `startArticle(article)`, which starts the toast, the folds, the heading links, copying as Markdown, the preview card and the sidenote highlighting, and `startSettings`, `startHome`, `startNotFound` and `startLayout`.
+
+The stylesheets of a theme import the shared styles from `bake/theme/styles/`, such as `tokens.css`, `page.css` and `blocks.css`, and the styles of a built-in theme from `bake/themes/<name>/styles/`. An `@import` resolves relative to its file or through these two prefixes. The article styles of `blocks.css` and `page.css` stop at the box of a component, so they do not reach the content of a component, and `--component-placeholder-height` in `tokens.css` sets the height of a component before it starts.
+
+`options.js` has no imports. It exports `options`, the theme's options, declared like the parameters of a component and set in `themes` of `bake.config.js` and in the front matter; an option cannot have the name of a field of the front matter. It may export `settings`, the reader settings the theme adds to the color scheme, font, size, weight and spacing. A setting is named with lowercase letters and digits and declared as `{ values, default, control }`: `values` lists its values, `default` is one of them or `{ option: 'name' }` for the value of an enum option, and `control` is `segmented`, `switch` (two values, the first when it is on) or `list`. `ArticleDocument` takes the settings and the page's options and writes the starting value of each setting as a `data-` attribute of the `<html>` element, and `startSettings(settings, { labels, drawings })` from `bake/theme/client` shows them in the settings panel. `options.js` may also export `headings` and `blocks`, the Markdown that the theme reads beyond what every article has. `headings` maps the name of each heading attribute other than `#id` to its declaration, and `blocks` maps the name of each block of the theme, written with lowercase letters and digits, to the declarations of its attributes; a block cannot take the name of a block of Bake. An attribute is declared as `{ type }`, where the type is `number` with the optional fields `min`, `max` and `step`, `text`, `enum` with `options`, a list of strings, or `boolean`, and a heading attribute may add `depth`, the one heading level it applies to, such as 2 for `##`. The Markdown of each article is checked against the declarations of its theme. The prop `article.content` gives each section, each heading in a section and each entry of `toc` its `attributes`, with numbers and booleans as values of their type, and gives each block of the theme as a block `{ type: 'themeBlock', name, attributes, html }`, where `html` is the Markdown inside it rendered to HTML, which `page.jsx` places at build time.
+
+The built-in themes are modules that the files of a theme import: `bake/themes/essay` exports `Page`, `Article`, `Toc` and `essayLabels`, `bake/themes/bento` exports `Page` and `Article`, and each has `/client`, `/options` and `/styles/*.css`; the parts they share are `bake/theme`, `bake/theme/client` and `bake/theme/styles/*.css`. A blog changes a built-in theme with a theme folder of another name whose files import the parts they keep and replace the others. For example, `themes/mine/page.jsx` can render its own header next to the essay `Toc` and `Article`, with `export { default } from 'bake/themes/essay/client';` as `themes/mine/client.jsx` and the essay option `toc` and heading attribute `toc` copied into `themes/mine/options.js`; an article with `theme: mine` then has the essay page with that header.
+
+Bake reports these problems of a theme as errors: a folder named `themes/essay` or `themes/bento`, which names the module to import instead; a missing required file; a `client.jsx` without a default export; a mistake in the declarations of `options.js`, at that file; a file that cannot be compiled, at the position of the problem; and a page that throws while it renders, at the article, or at the theme folder for the homepage and the 404 page.
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules and [TESTING.md](TESTING.md) for the test commands. `make example` builds the example blog in `examples/blog/` and serves it at http://localhost:8000/, and `make dev` runs `bake dev` on the example blog.
+[CLAUDE.md](CLAUDE.md) holds the rules for changes to Bake, and [TESTING.md](TESTING.md) says how to run the tests. `make example` builds the example blog in `examples/blog/` and serves it at the address it prints, and `make dev` runs `bake dev` on the example blog.

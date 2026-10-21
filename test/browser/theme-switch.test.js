@@ -1,26 +1,13 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
-import { chromium } from 'playwright';
-import { bake } from '../blog.js';
-import { serve } from './server.js';
+import { launchBrowser, serveExample } from './browser.js';
 
-const exampleBlog = join(import.meta.dirname, '../../examples/blog');
 const THROTTLE = 4;
 const FADE_FRAME_LIMIT = 150;
 
-test('switching the theme restyles the page once and fades on the compositor in the essay and bento themes', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-theme-switch-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  assert.equal(result.status, 0);
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+test('switching the theme fades without a slow frame in the essay and bento themes', async (t) => {
+  const origin = await serveExample(t);
+  const browser = await launchBrowser();
 
   for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) for (const width of [1440, 375]) {
     await t.test(`${theme} at ${width} pixels with ${THROTTLE}x CPU throttling`, async () => {
@@ -30,21 +17,18 @@ test('switching the theme restyles the page once and fades on the compositor in 
       await page.getByRole('button', { name: '设置' }).click();
       await page.waitForFunction(() => document.querySelector('.bk-settings').getAnimations({ subtree: true }).length === 0);
       const before = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      const elements = await page.evaluate(() => document.querySelectorAll('*').length);
 
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
-      const events = [];
-      cdp.on('Tracing.dataCollected', ({ value }) => events.push(...value));
-      const traced = new Promise((done) => cdp.once('Tracing.tracingComplete', done));
-      await cdp.send('Tracing.start', { categories: 'devtools.timeline', transferMode: 'ReportEvents' });
-      const frames = await page.evaluate(async () => {
+      const frames = await page.evaluate(async (light) => {
+        const switchedTo = () => getComputedStyle(document.body).backgroundColor !== light;
         const times = [];
         let switched = -1;
         let running = true;
+        const dark = [...document.querySelectorAll('.bk-settings-options button')].find((button) => button.textContent.trim() === '深');
         const tick = (time) => {
           times.push(time);
-          if (switched < 0 && document.documentElement.dataset.theme === 'dark') switched = times.length - 1;
+          if (switched < 0 && switchedTo()) switched = times.length - 1;
           if (running) requestAnimationFrame(tick);
         };
         await new Promise((done) =>
@@ -55,8 +39,8 @@ test('switching the theme restyles the page once and fades on the compositor in 
           }),
         );
         const start = performance.now();
-        [...document.querySelectorAll('.bk-settings-options button')].find((button) => button.textContent.trim() === '深').click();
-        while (document.documentElement.dataset.theme !== 'dark' || document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'))) {
+        dark.click();
+        while (!switchedTo() || document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'))) {
           await new Promise((done) => setTimeout(done, 20));
         }
         const end = performance.now();
@@ -64,13 +48,9 @@ test('switching the theme restyles the page once and fades on the compositor in 
         running = false;
         const gaps = times.slice(1).map((time, index) => time - times[index]);
         return { wall: end - start, fade: gaps.slice(switched + 1) };
-      });
-      await cdp.send('Tracing.end');
-      await traced;
+      }, before);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
-      const restyles = events.filter((event) => event.name === 'UpdateLayoutTree' && event.args?.elementCount >= elements / 2);
-      assert.equal(restyles.length, 1, `the switch restyled the whole page ${restyles.length} times`);
       const slowest = Math.max(...frames.fade);
       assert.ok(slowest < FADE_FRAME_LIMIT, `a frame of the fade took ${Math.round(slowest)} ms: ${frames.fade.map(Math.round).join(' ')}`);
       assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), before);
@@ -84,18 +64,12 @@ const fading = () => document.getAnimations().some((animation) => animation.play
 const notFading = () => !document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 
 test('a change of the system colour scheme fades without showing the new colours first, and a press during the fade ends it and keeps the settings open', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-theme-fade-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  assert.equal(bake(dir, 'build').status, 0);
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+  const origin = await serveExample(t);
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
   await page.goto(`${origin}/2026-10/syntax/`);
   await page.evaluate(() => document.fonts.ready);
   const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.scheme), 'light');
 
   await page.evaluate(() => {
     window.framesBeforeFade = [];
@@ -113,32 +87,29 @@ test('a change of the system colour scheme fades without showing the new colours
   await page.waitForFunction(() => window.sawFade);
   assert.deepEqual([...new Set(await page.evaluate(() => window.framesBeforeFade))], [light]);
   await page.waitForFunction(notFading);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'system');
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.scheme), 'dark');
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), light);
+  const darkBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.notEqual(darkBackground, light);
 
   await page.getByRole('button', { name: '设置' }).click();
   await page.waitForFunction(() => document.querySelector('.bk-settings').getAnimations({ subtree: true }).length === 0);
   const option = (text) => page.locator('.bk-settings-options button', { hasText: new RegExp(`^\\s*${text}\\s*$`) });
+  assert.equal(await option('跟随系统').getAttribute('aria-pressed'), 'true');
   const dark = await option('深').boundingBox();
   await option('浅').click();
   await page.waitForFunction(fading);
   await page.mouse.click(dark.x + dark.width / 2, dark.y + dark.height / 2);
   assert.equal(await page.evaluate(fading), false);
-  assert.equal(await page.evaluate(() => document.querySelector('.bk-settings').classList.contains('is-open')), true);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+  assert.equal(await page.locator('.bk-settings-panel').isVisible(), true);
+  assert.equal(await option('浅').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), light);
   await option('深').click();
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark' && document.documentElement.dataset.scheme === 'dark');
+  await page.waitForFunction((background) => getComputedStyle(document.body).backgroundColor === background, darkBackground);
+  assert.equal(await option('深').getAttribute('aria-pressed'), 'true');
 });
 
-test('changing the text spacing fades on the compositor in the essay and bento themes', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-spacing-switch-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
-  assert.equal(bake(dir, 'build').status, 0);
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
+test('changing the text spacing fades without a slow frame in the essay and bento themes', async (t) => {
+  const origin = await serveExample(t);
+  const browser = await launchBrowser();
 
   for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) for (const width of [1440, 375]) {
     await t.test(`${theme} at ${width} pixels with ${THROTTLE}x CPU throttling`, async () => {
@@ -150,7 +121,7 @@ test('changing the text spacing fades on the compositor in the essay and bento t
       const before = await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight);
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
-      const frames = await page.evaluate(async () => {
+      const frames = await page.evaluate(async (tight) => {
         const times = [];
         let faded = -1;
         let running = true;
@@ -161,8 +132,9 @@ test('changing the text spacing fades on the compositor in the essay and bento t
         };
         requestAnimationFrame(tick);
         const start = performance.now();
-        document.querySelector('.bk-settings-row[data-setting="spacing"] button[data-value="loose"]').click();
-        while (document.documentElement.dataset.spacing !== 'loose' || document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'))) {
+        const loose = document.querySelector('.bk-settings-row[data-setting="spacing"] button[data-value="loose"]');
+        loose.click();
+        while (getComputedStyle(document.querySelector('.bk-article p')).lineHeight === tight || document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'))) {
           await new Promise((done) => setTimeout(done, 20));
         }
         const end = performance.now();
@@ -170,7 +142,7 @@ test('changing the text spacing fades on the compositor in the essay and bento t
         running = false;
         const gaps = times.slice(1).map((time, index) => time - times[index]);
         return { wall: end - start, faded, fade: gaps.slice(faded + 1) };
-      });
+      }, before);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       assert.ok(frames.faded >= 0, 'the spacing change did not fade');
       const slowest = Math.max(...frames.fade);

@@ -6,6 +6,7 @@ summary: 以 Transformer 语言模型里的运算为例，梳理训练时反向�
 tags: [深度学习, 矩阵微积分, 反向传播]
 toc: notes
 category: math
+preview: preview.js
 ---
 
 ## 引言 {#intro}
@@ -36,7 +37,7 @@ $$
 
 下图是一个 decoder-only Transformer 做语言模型训练时，从输入 token 到 Loss 的完整计算过程。$T$ 是序列长度，$d$ 是模型宽度，$V$ 是词表大小，$N$ 是 Decoder 的层数。图中省略了 batch 维度。
 
-:::matrix-transformer-diagram
+:::transformer-diagram
 :::
 
 这张图画出了本文使用的完整前向计算过程。输入是由 $T$ 个整数构成的 `token_ids`，经过 Embedding、若干 Transformer Block、输出投影和 CrossEntropy，最终得到一个标量 Loss $L$。
@@ -73,7 +74,8 @@ $$
 
 三个权重矩阵是 $W_{gate}, W_{up} \in \mathbb{R}^{d \times d_{ff}}$ 和 $W_{down} \in \mathbb{R}^{d_{ff} \times d}$。$\otimes$ 表示逐元素相乘。Swish 逐元素作用在向量上，对每个数做的是 $\mathrm{Swish}(z) = z\,\sigma(z)$，其中 $\sigma(z) = \dfrac{1}{1+e^{-z}}$ 是 sigmoid 函数。
 
-:::matrix-swiglu-diagram
+:::glu-diagram
+上图中 $W_g$、$W_u$、$W_d$ 就是 $W_{gate}$、$W_{up}$、$W_{down}$，$\phi$ 是 Swish，$\odot$ 是逐元素相乘 $\otimes$，$X$ 的 $T$ 行是 $T$ 个位置的 $\mathbf{x}$。
 :::
 
 ::::
@@ -100,7 +102,7 @@ Multi-Head Attention（MHA）把这个计算并行做 $n_h$ 次，每个 head �
 
 Grouped-Query Attention（GQA）相比 MHA 只改变 key 和 value 的数量：query 仍有 $n_h$ 个 head，key 和 value 只有 $n_{kv}$ 组，每组被 $n_h / n_{kv}$ 个 query head 共用。下图是 $n_h = 4$ 时 MHA 与 GQA 的对比，右边的 GQA 取 $n_{kv} = 2$。
 
-:::matrix-mha-gqa
+:::mha-gqa
 :::
 
 用下标写出来：query head $i$ 属于第 $j$ 组时，
@@ -135,7 +137,7 @@ $$
 
 下图画出了这个计算过程，再加上最后的拼接和 $W_O$。图中只画了 query head $i$ 一个 head；第 $j$ 组的 $\tilde{K}_j$ 和 $V_j$ 还要被同组的其他 head 使用，$\mathrm{Concat}$ 把 $n_h$ 个 head 的输出按列拼接起来。
 
-:::matrix-gqa-attention
+:::gqa-attention
 :::
 
 ::::
@@ -178,7 +180,7 @@ $$
 
 下图画出其中一对分量的旋转，取 $d_h = 8$、$b = 10000$，四对的 $\theta_k$ 分别是 $1$、$0.1$、$0.01$、$0.001$。虚线是旋转前的 $\mathbf{q}$ 和 $\mathbf{k}$，实线是旋转后的向量。两个滑块设置 query 的位置 $t$ 和 key 的位置 $s$。点“$t$ 和 $s$ 同时加 1”，两个向量转过相同的角度，旋转后的点积不变。切换到第 4 对，$t = 20$ 时向量只转了 $0.02$ 弧度。
 
-:::matrix-rope-rotation
+:::rope-rotation
 :::
 
 RoPE 没有参数，$R_t$ 由位置 $t$ 完全确定。实现里分量的配对方式不一定是相邻两个：Hugging Face 的 Llama 实现把第 $k$ 个和第 $k + d_h/2$ 个分量配成一对。两种配对只差一个固定的分量重排，上面的结论相同。
@@ -254,7 +256,7 @@ $$
 
 这个比值随 $\Delta x$ 改变。取 $f(x) = x^3$，在 $x = 1$ 处：$\Delta x = 1$ 时比值是 $7$，$\Delta x = 0.1$ 时是 $3.31$，$\Delta x = 0.01$ 时是 $3.0301$。$\Delta x$ 越小，比值越接近 $3$。下图的两个滑块分别控制 $x_0$ 和 $\Delta x$，把 $\Delta x$ 从 $1$ 减小到 $0.001$，可以看到割线的斜率逐渐接近 $3$。
 
-:::matrix-tangent-secant
+:::tangent-secant
 :::
 
 $\Delta x$ 趋于零时，割线趋于一条确定的直线，这条直线是 $x_0$ 处的切线。切线的斜率不再依赖 $\Delta x$，这个斜率就是 $x_0$ 处的导数 $\dfrac{dy}{dx}$。
@@ -362,7 +364,7 @@ $$
 
 反向传播利用的正是这种组合方式。前向计算沿 $x\to v\to u\to y$ 得到结果；如果最终的 Loss 就是 $y$，反向传播便从 $y$ 出发，先计算 $\dfrac{dy}{du}$，再乘上 $\dfrac{du}{dv}$ 得到 $\dfrac{dy}{dv}$，继续往回得到 $\dfrac{dy}{dx}$。每往回一步，都是把已经得到的梯度与这一段的局部导数组合起来。
 
-:::matrix-backprop-paths{paths=chain}
+:::backprop-paths{paths=chain}
 :::
 
 :::recap
@@ -437,7 +439,7 @@ $$
 
 所以，一个二元函数在同一点可以有两个不同的局部变化率 $\dfrac{\partial f}{\partial x}$ 和 $\dfrac{\partial f}{\partial y}$。前者描述沿 $x$ 方向移动时函数怎样变化，后者描述沿 $y$ 方向移动时函数怎样变化。如果函数有更多输入，道理完全一样。
 
-:::matrix-gradient-field
+:::gradient-field
 左边是 $f(x, y)$ 的取值，经过选定的位置 $(x_0, y_0)$ 的曲线是 $f$ 的等值线，曲线上每一点的 $f$ 都等于 $f(x_0, y_0)$。
 
 绿色箭头：$\dfrac{\partial f}{\partial x}$；粉色箭头：$\dfrac{\partial f}{\partial y}$。紫色箭头是两者合成的向量。
@@ -582,7 +584,7 @@ $$
 
 这里的 $\dfrac{dy}{dx}$ 称为 ==$y$ 对 $x$ 的全导数==（total derivative），它计入==$x$ 经过所有路径对 $y$ 的影响==。
 
-:::matrix-backprop-paths{paths=total}
+:::backprop-paths{paths=total}
 :::
 
 求和的第 $k$ 项是经过 $u_k$ 的那条路径的贡献：从 $y$ 出发，先乘 $\dfrac{\partial y}{\partial u_k}$，再乘 $\dfrac{du_k}{dx}$，图中高亮的是经过 $u_1$ 的那条路径。$n$ 条路径的贡献相加，就是全导数。
@@ -654,7 +656,7 @@ y &= f(u_1, u_2, \ldots, u_n)
 \end{aligned}
 $$
 
-:::matrix-backprop-paths{paths=vector}
+:::backprop-paths{paths=vector}
 :::
 
 每个 $u_k$ 都可能依赖全部 $m$ 个分量，所以 $y$ 和每个 $x_i$ 之间都有 $n$ 条路径。反向传播时，$y$ 对 $x_i$ 的偏导数沿这 $n$ 条路径传回 $x_i$，图中高亮的是 $x_1$ 的 $n$ 条。
@@ -696,7 +698,7 @@ $$
 
 ### 例：Loss 对 logits 的梯度 {#loss-grad}
 
-:::matrix-lm-head{from=z to=loss}
+:::lm-head{from=z to=loss}
 :::
 
 反向传播从 Loss 出发，第一步经过 cross-entropy 和 softmax，所以梯度 $\dfrac{\partial \ell}{\partial \mathbf{z}}$ 是模型里第一个要算的梯度。
@@ -753,7 +755,7 @@ $$
 - 其余分量是 $p_j > 0$，这些 logit 增大时 Loss 增大，变化率等于该 token 的概率；
 - $p_y$ 接近 1 时，所有分量都接近 0，Loss 几乎不再随 logits 变化。
 
-:::matrix-loss-logits
+:::loss-logits
 调整 logit，观察概率、Loss 和梯度
 :::
 
@@ -854,7 +856,7 @@ $W_{ij}$ 在 $W$ 的第 $i$ 行、第 $j$ 列，在 Jacobian 中则位于第 $j$
 
 下图取 $n = 2$、$m = 3$。下方是 $3 \times 2$ 的 Jacobian $J$，它的第 $i$ 列是 $\mathbf{z}$ 对 $x_i$ 的偏导数，正好是 $W$ 的第 $i$ 行。
 
-:::matrix-linear-jacobian
+:::linear-jacobian
 :::
 
 :::recap
@@ -1111,7 +1113,7 @@ $$
 
 ### 例：Loss 对 lm head 输入的梯度 {#head-jac}
 
-:::matrix-lm-head{from=x to=z brace=true}
+:::lm-head{from=x to=z brace=true}
 :::
 
 考虑单个 token 位置。lm head 的输入是行向量 $\mathbf{x}\in\mathbb{R}^{d}$，权重记作 $W=W_{out}\in\mathbb{R}^{d\times V}$，输出是词表中 $V$ 个 token 的 logits：
@@ -1134,7 +1136,7 @@ $$
 \end{aligned}
 $$
 
-:::matrix-backprop-paths{paths=head-input}
+:::backprop-paths{paths=head-input}
 :::
 
 图中经过 $z_j$ 的贡献是 $(p_j-y_j)W_{ij}$，对全部 $V$ 个 logits 求和，就得到 Loss 对 $x_i$ 的偏导数。
@@ -1180,7 +1182,7 @@ $$
 - Swish 是逐元素函数，Jacobian 是 $\mathrm{diag}\big(\mathrm{Swish}'(\mathbf{a})\big)$，$\mathrm{Swish}'$ 见[“例：Sigmoid 与 Swish 的导数”](#swish)；
 - 逐元素乘 $\mathrm{Swish}(\mathbf{a}) \otimes \mathbf{b}$ 对其中一个输入的 Jacobian，是由另一个输入构成的对角矩阵：对 $\mathrm{Swish}(\mathbf{a})$ 是 $\mathrm{diag}(\mathbf{b})$，对 $\mathbf{b}$ 是 $\mathrm{diag}\big(\mathrm{Swish}(\mathbf{a})\big)$。
 
-:::matrix-swiglu-jacobian
+:::swiglu-jacobian
 :::
 
 **一条路径上的 Jacobian 相乘**。gate 路径 $\mathbf{x} \to \mathbf{a} \to \mathrm{Swish}(\mathbf{a}) \to \mathbf{u} \to \mathbf{h}$ 是四个运算的嵌套。按[向量链式法则](#chain-vector)，各层的 Jacobian 按从外到内的顺序相乘。从外到内就是从 $\mathbf{h}$ 出发沿反向箭头走回 $\mathbf{x}$ 的顺序，所以按经过的顺序从左到右写下箭头上的 Jacobian 即可：
@@ -1379,7 +1381,7 @@ $\dfrac{\partial L}{\partial \mathbf{x}} = \dfrac{\partial L}{\partial \mathbf{z
 
 ### 求 lm head 的权重的梯度 {#head-weight toc="lm head 的权重"}
 
-:::matrix-lm-head{from=head to=head brace=true}
+:::lm-head{from=head to=head brace=true}
 :::
 
 [“例：Loss 对 lm head 输入的梯度”](#head-jac)求出了 $\dfrac{\partial \ell}{\partial \mathbf{x}}$，那时把权重 $W$ 当作常量。但训练要更新的是权重：梯度下降每一步把 $W$ 换成 $W - \eta\,\dfrac{\partial \ell}{\partial W}$，$\eta$ 是学习率。所以还需要 Loss 对 $W$ 的导数。
@@ -1406,7 +1408,7 @@ $$
 \frac{\partial \ell}{\partial W_{ij}} = \frac{\partial \ell}{\partial z_j}\,\frac{\partial z_j}{\partial W_{ij}} = \boxed{x_i\,(p_j - y_j)}
 $$
 
-:::matrix-backprop-paths{paths=head-weight}
+:::backprop-paths{paths=head-weight}
 :::
 
 图中每条连线是 $W$ 的一个元素。$W_{ij}$ 是 $x_i$ 到 $z_j$ 的那条边，Loss 只经过 $z_j$ 传到它，乘上这条边另一端的输入 $x_i$，就是它的偏导数。
@@ -1542,7 +1544,7 @@ $$
 
 右边的等号来自矩阵乘法的定义：$(X^{T}G)_{ij} = \sum_t X_{ti}\,G_{tj}$，==矩阵乘法中对 $t$ 的求和就是对位置的求和==。下图把三个位置的外积分别画出来，它们的和就是 $X^{T}G$。
 
-:::matrix-outer-product
+:::outer-product
 :::
 
 :::recap

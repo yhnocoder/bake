@@ -2,6 +2,7 @@
 title: Error fixture
 slug: label-outside-environment
 date: 2026-10-19
+category: writing
 ---
 
 $$

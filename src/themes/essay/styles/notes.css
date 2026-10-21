@@ -1,41 +1,21 @@
-.sidenote-ref {
-  font-family: var(--font-mono);
-  font-size: calc(11px * var(--reader-scale));
-  font-style: normal;
-  font-weight: 400;
-  line-height: 0;
-  vertical-align: super;
-  margin: 0 1px;
-}
-
-.sidenote-ref a {
-  position: relative;
-  isolation: isolate;
-  color: var(--accent);
-  text-decoration: none;
-  border-radius: 3px;
-  padding: 0 2px;
-}
-
-.sidenote-ref a::before,
 .bk-tintable::after,
 .bk-notes-layer .bk-sidenote::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  border-radius: inherit;
-  background: var(--mark);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--mark) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mark) 60%, transparent);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease-out;
+  transition: opacity var(--motion-slow) ease-out;
 }
 
-.sidenote-ref.is-active a::before,
 .bk-tintable.bk-tinted::after,
 .bk-notes-layer .bk-sidenote.is-active::after {
   opacity: 1;
-  transition-duration: 0.15s;
+  transition-duration: var(--motion-fast);
 }
 
 .bk-sidenote {
@@ -52,36 +32,9 @@ html:not([data-script]) .bk-article .bk-sidenote {
   border-left: 2px solid var(--line-2);
 }
 
-.bk-sidenote-number {
-  margin-right: 6px;
-  font-family: var(--font-mono);
-  font-size: calc(11px * var(--reader-scale));
-  color: var(--accent);
-}
-
-.bk-sidenote-body,
-.bk-sidenote-body > :first-child {
-  display: inline;
-}
-
-.bk-sidenote-body p {
-  margin: 0 0 6px;
-}
-
-.bk-sidenote-body > :last-child {
-  margin-bottom: 0;
-}
-
 .bk-tintable {
   position: relative;
   isolation: isolate;
-}
-
-.bk-tintable::after,
-.bk-notes-layer .bk-sidenote::after {
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--mark) 60%, transparent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mark) 60%, transparent);
 }
 
 .bk-notes-layer {
@@ -113,14 +66,16 @@ html:not([data-script]) .bk-article .bk-sidenote {
     opacity: 1;
   }
 
-  .bk-article .bk-sidenote.is-open:where(:not(.component-box *)) {
-    display: block;
-    margin: 6px 0 14px;
-    padding: 10px 14px;
-    border-radius: 8px;
-    background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
-    font-size: calc(14px * var(--reader-scale));
-    line-height: calc(1.75 + var(--leading-shift));
+  @scope (.bk-article) to (.component-box) {
+    :scope .bk-sidenote.is-open {
+      display: block;
+      margin: 6px 0 14px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background-color: color-mix(in srgb, var(--mark) 55%, var(--bg));
+      font-size: calc(14px * var(--reader-scale));
+      line-height: calc(1.75 + var(--leading-shift));
+    }
   }
 }
 
@@ -129,14 +84,16 @@ html:not([data-script]) .bk-article .bk-sidenote {
     display: none;
   }
 
-  .bk-article .bk-sidenote:where(:not(.component-box *)) {
-    display: block;
-    margin: 4px 0 12px;
-    padding: 6px 10px;
-    border-left: 2px solid var(--line-2);
-    background: none;
-    font-size: 9.5pt;
-    break-inside: avoid;
+  @scope (.bk-article) to (.component-box) {
+    :scope .bk-sidenote {
+      display: block;
+      margin: 4px 0 12px;
+      padding: 6px 10px;
+      border-left: 2px solid var(--line-2);
+      background: none;
+      font-size: 9.5pt;
+      break-inside: avoid;
+    }
   }
 
   .sidenote-ref a {

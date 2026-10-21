@@ -1,3 +1,5 @@
+import { REGIONS } from 'bake/regions';
+
 export function Header(props) {
   const { site, article, home, labels } = props;
   return (
@@ -10,7 +12,7 @@ export function Header(props) {
       <div class="bk-meta">
         <div class="bk-meta-items">
           <time datetime={article.date}>{article.date}</time>
-          <span class="bk-words" data-region="words">{labels.words(article.words)}</span>
+          <span class="bk-words" data-region={REGIONS.words}>{labels.words(article.words)}</span>
           {article.draft ? <span class="bk-draft">{labels.draft}</span> : null}
           {article.tags.length === 0 ? null : (
             <span class="bk-tags">

@@ -5,6 +5,7 @@ date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
 category: writing
+preview: preview.js
 toc: notes
 ---
 
@@ -32,6 +33,7 @@ date: 2026-10-19
 summary: Bake 支持的全部 Markdown 写法，每种写法同时给出原文和生成的样子。
 tags: [Bake, 写法]
 category: writing
+preview: preview.js
 toc: notes
 ---
 ```
@@ -49,7 +51,7 @@ toc: notes
 | `preview` | 否 | 首页卡片的动画预览脚本，放在文章文件夹里。 |
 | `cover` | 否 | 分享图片，不写时由 Bake 生成。 |
 | `theme` | 否 | 主题，`essay` 或 `bento`，不写时用站点默认值。 |
-| `toc` | 否 | 目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用站点默认值。 |
+| `toc` | 否 | essay 主题的选项，目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用 `bake.config.js` 里 `themes.essay.toc` 的值。front matter 可以写文章所用主题的任何选项，例如 bento 文章的 `columns`。 |
 | `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。 |
 | `page` | 否 | 纯 HTML 页面要原样发布的文件，写了它的 `index.md` 没有正文。 |
 
@@ -74,11 +76,11 @@ export default function preview(element) {
 }
 ```
 
-没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章没有 `preview`，卡片显示它的第一张图片。
+没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章的 `preview` 让一道渐变的分界在卡片上来回扫过，分界上方是生成的页面，下方是 Markdown 原文。
 
 ## 标题与锚点 {#headings toc="标题"}
 
-二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写这些属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`cols` 和 `rows` 是这一节在 bento 主题里的卡片占几列、几行，例如 `## ReLU {cols=2 rows=23}`，`cols` 可以写 1 到 6，`rows` 可以写 1 到 200，不写 `rows` 时卡片和内容一样高；`width` 也给出 bento 卡片的宽度，`body` 占三分之一的列，`wide` 占一半，`page` 占满一行，写了 `cols` 时以 `cols` 为准。`cols`、`rows` 和 `width` 只能写在 `##` 标题上，essay 主题忽略它们。
+二级标题自动编号 01、02，三级标题不编号。标题后面的花括号可以写这些属性：`#id` 固定这一节的锚点，不写时按标题文字生成；`toc` 是目录里显示的短标题；`cols` 和 `rows` 是这一节在 bento 主题里的卡片占几列、几行，例如 `## ReLU {cols=2 rows=23}`，`cols` 可以写 1 到 6，`rows` 可以写 1 到 200，不写 `rows` 时卡片和内容一样高；`width` 也给出 bento 卡片的宽度，`body` 占三分之一的列，`wide` 占一半，`page` 占满一行，写了 `cols` 时以 `cols` 为准。`cols`、`rows` 和 `width` 只能写在 `##` 标题上。`#id` 以外的属性由文章的主题声明：essay 主题读 `toc`，bento 主题读 `cols`、`rows` 和 `width`，写了主题没有声明的属性会报错。
 
 :::example
 ### 三级标题 {#third-level toc="短标题"}
@@ -350,9 +352,9 @@ ReLU 在负半轴输出 0，正半轴原样输出输入。它的导数在原点�
 GELU 用标准正态分布的累积分布函数给输入加权，曲线在 0 附近是平滑的，负半轴有一小段负值。两者在正半轴几乎重合，差别集中在 0 附近和负半轴。
 :::
 
-## 宽度写法 {#width width=wide}
+## 宽度写法 {#width}
 
-公式、代码、表格和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。图片不写尺寸时不超过正文宽度，图片文件再宽也不会自动扩展；写了比正文宽的像素宽度时，图片按这个宽度扩展到 wide。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。这一章的标题写了 `{width=wide}`，在 bento 主题里占两列。
+公式、代码、表格和交互组件默认按内容决定宽度：放得下就和正文同宽，放不下就扩展到 wide，还放不下就在块内横向滚动。图片不写尺寸时不超过正文宽度，图片文件再宽也不会自动扩展；写了比正文宽的像素宽度时，图片按这个宽度扩展到 wide。只有在自动的结果不合适时，才用 `:::{width=…}` 把块包起来，`width` 取 `body`、`wide` 或 `page`。
 
 ::::example
 :::{width=page}
@@ -398,20 +400,20 @@ def swiglu(x, w_gate, w_up, w_down):
 
 ## 交互组件 {#components}
 
-交互组件是博客 `components/` 下的 custom element，名字里必须有 `-`。参数写在花括号里，没写的用默认值；开头和结尾之间的文字是图注。组件只有块写法。
+交互组件是博客 `components/` 下的 custom element，名字里必须有 `-`。只有一篇文章用的组件放在这篇文章目录的 `components/` 下，只有这篇文章能用，也不会作为文章的文件发布。组件名在整个博客里不能重复。参数写在花括号里，没写的用默认值；开头和结尾之间的文字是图注。组件只有块写法。
 
 ::::example
-:::act-fn-plot{fn=gelu}
-实线是精确 GELU，虚线是两种近似。拖动「横轴范围」查看差异，关掉「近似」只看精确曲线。
+:::act-fn-plot{fns=gelu dashed="gelu-tanh,gelu-quick" zoom}
+实线是精确 GELU，虚线是两种近似。拖动「横轴范围 ±」缩小视野查看差异，指针停在图上读出数值。
 :::
 ::::
 
-这个函数图用 Bake 的部件库 `bake/kit` 写成：函数切换、滑块、开关、坐标轴、曲线、图例和悬停读数都来自部件库。部件库的颜色取主题的 CSS 变量，切换深色模式时跟着变化；公式标签用 `preamble.sty` 里的宏，和正文相同。部件库是可选的：后面的热图是直接写的 custom element，只用了部件库里计算刻度的函数。
+这个函数图用 Bake 的部件库 `bake/kit` 写成：滑块、坐标轴、曲线、悬停读数和公式标签都来自部件库，区间、箭头和标注点是组件自己画的。部件库的颜色取主题的 CSS 变量，切换深色模式时跟着变化；公式标签用 `preamble.sty` 里的宏，和正文相同。部件库是可选的：后面的柱状图是直接写的 custom element，只用了部件库里计算刻度的函数，它只在这篇文章里用，所以放在这篇文章目录的 `components/bar-chart.js`。
 
 不需要图注时，中间空着。组件本身就是 `:::` 块，宽度直接写在花括号里：
 
 ::::example
-:::act-fn-plot{fn=silu range=6 beta=2 width=body}
+:::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}
 :::
 ::::
 
@@ -423,7 +425,7 @@ def swiglu(x, w_gate, w_up, w_down):
 ::::
 
 ::::example
-:::act-fn-plot{fn=relu width=70%}
+:::act-fn-plot{fns=relu width=70%}
 :::
 ::::
 
@@ -434,19 +436,19 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
-参数的类型是文件时，值写文章目录里的文件路径。构建检查这个文件是否存在，组件在浏览器里读取它。下面的热图从 `glu-points.json` 读取两个标注点：
+参数的类型是文件时，值写文章目录里的文件路径。构建检查这个文件是否存在，组件在浏览器里读取它。下面的柱状图从 `ffn-share.json` 读取每个模型的数值：
 
 ::::example
-:::glu-heatmap{points=glu-points.json}
-左边的点门控关闭，输出接近 0；右边的点门控打开，输出接近 $g \cdot u$。
+:::bar-chart{data=ffn-share.json}
+不计 embedding 时 FFN 参数占模型参数的比例。
 :::
 ::::
 
-组件在代码里声明加载前的占位高度：`layout.height` 用于宽度 600 像素以上的屏幕，`layout.narrowHeight` 用于更窄的屏幕。组件加载前后，占位框的高度不变，页面不会跳动。在花括号里写 `height` 时，两种屏幕都用这个高度：
+组件默认和它的内容一样高，加载前先显示一个统一高度的占位框。需要填满固定大小的组件在代码里声明 `layout.height`，写像素数，或写 `{ ratio }` 表示宽度除以高度，每种屏幕宽度都用这个高度，加载前后高度不变。在花括号里写 `height` 时，组件的框用这个像素高度：
 
 ::::example
-:::glu-heatmap{height=420}
-颜色表示 GLU 门控后的输出。
+:::bar-chart{data=ffn-share.json height=320}
+同一个柱状图，框高 320 像素。
 :::
 ::::
 
@@ -477,10 +479,11 @@ SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#chain-r
 
 在页面上选中内容复制，粘贴到文本编辑器里得到的是 Markdown 原文，粘贴到 Notion 或 Word 里得到带格式的内容。复制后右下角显示「已复制为 Markdown」。页头的「复制为 Markdown」复制整篇文章的 `index.md`，包括 front matter。
 
-完整选中的块按 `index.md` 里的原文复制。只选中一部分的块从页面内容转换：==重点标记==、粗体和链接保留原来的写法，公式 $\sigma(x)$ 写成 `$…$`，旁注编号写成脚注引用，脚注的定义附在末尾[^copy-notes]。
+完整选中的块按 `index.md` 里的原文复制。只选中一部分的块也复制选中部分的原文，并补上被切开的写法的开头和结尾：==重点标记==、粗体和链接保留原来的写法，公式 $\sigma(x)$ 写成 `$…$`，旁注编号写成脚注引用，脚注的定义附在末尾[^copy-notes]。
 
 - 章节编号、标题旁的 `#` 和页边的旁注编号可以选中，复制的内容里没有它们。
 - 选区从文章外面开始时，只复制文章里的部分。
+- 标题、表格的一行、公式和嵌入的内容只选中一部分时整个复制，直接写的 HTML 按原文复制。
 
 $$
 \mathrm{SiLU}(x) = x\,\sigma(x) = \frac{x}{1 + e^{-x}}
@@ -491,7 +494,7 @@ def silu(x):
     return x / (1 + math.exp(-x))
 ```
 
-:::act-fn-plot{fn=silu range=6}
+:::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}
 选中交互组件的任何部分，复制的都是它的整个 `:::` 块。
 :::
 
@@ -506,11 +509,11 @@ def silu(x):
 | front matter 缺少必填字段 | 没有 `slug:` 一行 | `front matter is missing "slug"` |
 | slug 含有不允许的字符 | `slug: LLM_Act` | `slug "LLM_Act" may only contain lowercase letters, digits and "-"` |
 | front matter 有不认识的字段 | `layout: wide` | `unknown front matter field "layout"` |
-| toc 取值不对 | `toc: sidebar` | `toc must be notes, tabs, dots or ticks, got "sidebar"` |
+| toc 取值不对 | `toc: sidebar` | `toc must be one of notes, tabs, dots or ticks, got "sidebar"` |
 | 同一页的锚点重复 | 两个标题都写 `{#intro}` | `duplicate anchor "intro", first defined at 7:7` |
-| 标题有不认识的属性 | `## 引言 {color=red}` | `unknown attribute "color" on heading` |
-| 卡片列数不是正整数 | `## 卡片 {cols=0}` | `cols must be a whole number of card columns from 1 to 6, for example cols=2` |
-| 不认识的块 | `:::warning` | `unknown block ":::warning"` |
+| 标题写了文章主题没有声明的属性 | essay 文章里写 `## 引言 {cols=2}` | `unknown attribute "cols" on heading; the essay theme reads #id and toc` |
+| 卡片列数超出范围 | bento 文章里写 `## 卡片 {cols=0}` | `cols must be between 1 and 6, got 0` |
+| 不认识的块 | `:::warning` | `unknown block ":::warning"; the essay theme declares no blocks` |
 | 宽度取值不对 | `:::{width=full}` | `width must be body, wide or page, got "full"` |
 | 脚注没有定义 | `[^gemm]` 没有对应的 `[^gemm]:` | `footnote "gemm" has no definition` |
 | 引用了列表里没有的文献 | `[@vaswani2017]` | `citation "vaswani2017" is not in :::references` |
@@ -520,16 +523,17 @@ def silu(x):
 | list-table 各行单元格数不同 | 第二行只有两个单元格 | `list-table row 2 has 2 cells, the header row has 3` |
 | 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
 | 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |
-| 组件参数超出范围 | `:::act-fn-plot{range=20}` | `parameter "range" of act-fn-plot must be between 1 and 10, got 20` |
-| 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; components/ has no fn-plot.js or fn-plot.jsx` |
+| 组件参数超出范围 | `:::act-fn-plot{xmax=200}` | `parameter "xmax" of act-fn-plot must be between -100 and 100, got 200` |
+| 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; there is no fn-plot.js or fn-plot.jsx in components/ or in the components/ folder of this article` |
 | 组件宽度取值不对 | `:::glu-heatmap{width=full}` | `width of glu-heatmap must be body, wide, page, auto, a size in pixels such as 560px or a percentage such as 70%, got "full"` |
 | 组件的百分比宽度超过 100% | `:::glu-heatmap{width=120%}` | `width of glu-heatmap is 120%; a percentage width is at most 100% of the body column` |
 | 组件高度带了单位 | `:::glu-heatmap{height=420px}` | `height of glu-heatmap must be a positive number of pixels such as 420, got "420px"` |
 | 组件写了浮动 | `:::glu-heatmap{float=left}` | `float does not apply to components; glu-heatmap is centred in its column` |
 | 用宽度块包住组件 | `::::{width=wide}` 里面写 `:::glu-heatmap` | `write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it` |
-| 文件参数指向文章文件夹以外 | `:::glu-heatmap{points=../glu-points.json}` | `parameter "points" of glu-heatmap must be a file in the article folder, got "../glu-points.json"` |
+| 文件参数指向文章文件夹以外 | `:::points-plot{data=../points.json}` | `parameter "data" of points-plot must be a file in the article folder, got "../points.json"` |
+| 用了另一篇文章的组件 | 在别的文章里写 `:::bar-chart` | `component "bar-chart" belongs to content/posts/syntax and works only in that article; move content/posts/syntax/components/bar-chart.js to components/ to use it in other articles` |
 | 组件写了锚点或类名 | `:::act-fn-plot{#plot}` | `components take no id or class; remove the id from :::act-fn-plot` |
-| 组件文件在顶层使用浏览器 API | `components/window-plot.js` 顶层写 `window.matchMedia(…)` | `window-plot: components/window-plot.js uses the browser API window at the top level; the build reads params and layout in Node, so use it inside the component code` |
+| 组件声明不是字面量 | `components/range-plot.js` 写 `params = { n: range('N') }` | `range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |
 | 嵌入本文自己 | `:::embed` 里写本文的地址 | `:::embed cannot embed the article itself` |
 | 同一个地址写两次 | `:::embed` 里两行相同 | `:::embed lists /2026-10/syntax-linked/#vjp twice` |

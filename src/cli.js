@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-import { build } from './build/build.js';
-import { newArticle } from './build/new-article.js';
-import { newBlog } from './build/new-blog.js';
-import { configNotFoundError, hasConfig } from './config/bake-config.js';
-import { openInBrowser } from './dev/open.js';
-import { DEFAULT_HOST, DEFAULT_PORT, startDevServer } from './dev/server.js';
-import { errorCountLine, formatError } from './report.js';
 
 const usage = `Usage: bake <command>
 
@@ -29,9 +22,9 @@ const [command, ...args] = process.argv.slice(2);
 if (command === '--help' || command === '-h') {
   console.log(usage);
 } else if (command === 'init') {
-  runInit(args);
+  await runInit(args);
 } else if (command === 'new') {
-  runNew(args);
+  await runNew(args);
 } else if (command === 'build') {
   await runBuild(args);
 } else if (command === 'dev') {
@@ -40,8 +33,9 @@ if (command === '--help' || command === '-h') {
   fail(command === undefined ? usage : `Unknown command ${command}\n\n${usage}`);
 }
 
-function runInit(args) {
+async function runInit(args) {
   if (args.length > 1 || args[0]?.startsWith('-')) return fail('Usage: bake init [folder]');
+  const { newBlog } = await import('./build/new-blog.js');
   const folder = args[0] ?? '.';
   const result = newBlog(folder, localDate(new Date()));
   if (result.error) return fail(result.error);
@@ -53,8 +47,9 @@ function shellWord(text) {
   return /^[\w./-]+$/.test(text) ? text : `'${text.replaceAll("'", "'\\''")}'`;
 }
 
-function runNew(args) {
+async function runNew(args) {
   if (args.length !== 1) return fail('Usage: bake new <path>');
+  const { newArticle } = await import('./build/new-article.js');
   const result = newArticle(process.cwd(), args[0], localDate(new Date()));
   if (result.error) return fail(result.error);
   console.log(`Created ${result.file} (URL: ${result.url})`);
@@ -62,6 +57,8 @@ function runNew(args) {
 
 async function runBuild(args) {
   if (args.length > 0) return fail(`bake build: unexpected argument ${JSON.stringify(args[0])}`);
+  const { build } = await import('./build/build.js');
+  const { errorCountLine, formatError } = await import('./report.js');
   const result = await build(process.cwd());
   if (result.errors.length > 0) {
     return fail([...result.errors.map(formatError), errorCountLine(result.errors.length)].join('\n'));
@@ -72,7 +69,11 @@ async function runBuild(args) {
 async function runDev(args) {
   const options = devOptions(args);
   if (options === null) return fail('Usage: bake dev [--port <number>] [--host <address>] [--no-open]');
+  const { configNotFoundError, hasConfig } = await import('./config/bake-config.js');
+  const { formatError } = await import('./report.js');
   if (!hasConfig(process.cwd())) return fail(formatError(configNotFoundError()));
+  const { startDevServer } = await import('./dev/server.js');
+  const { openInBrowser } = await import('./dev/open.js');
   let server;
   try {
     server = await startDevServer(process.cwd(), options);
@@ -98,10 +99,11 @@ function devOptions(args) {
     values[name] = value;
     index += 1;
   }
-  const port = values['--port'] ?? String(DEFAULT_PORT);
-  const host = values['--host'] ?? DEFAULT_HOST;
-  if (!/^\d+$/.test(port) || Number(port) > 65535 || host === '' || host.startsWith('-')) return null;
-  return { port: Number(port), host, open: values['--no-open'] !== true };
+  const port = values['--port'];
+  const host = values['--host'];
+  if (port !== undefined && (!/^\d+$/.test(port) || Number(port) > 65535)) return null;
+  if (host !== undefined && (host === '' || host.startsWith('-'))) return null;
+  return { port: port === undefined ? undefined : Number(port), host, open: values['--no-open'] !== true };
 }
 
 function fail(message) {

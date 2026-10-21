@@ -1,5 +1,10 @@
-import { declaresNaturalWidth, labelsFor, naturalWidthProbe, naturalWidths, notesColumnScreen, overflows, requestLayout } from 'bake/theme/client';
+import { declaresNaturalWidth, naturalWidth, notesColumnScreen, overflows, requestLayout } from 'bake/theme/client';
 import { levelSpan } from '../spans.js';
+
+const CARD_OVERFLOW = {
+  zh: (pixels, rows) => `内容超出卡片 ${pixels} 像素，rows 至少写 ${rows}`,
+  en: (pixels, rows) => `Content is ${pixels} px taller than the card; set rows to at least ${rows}`,
+};
 
 const placedHeights = new WeakMap();
 const resizes = new ResizeObserver((entries) => {
@@ -10,11 +15,13 @@ export function placeCards(article) {
   const grid = article.querySelector('.bt-grid');
   if (grid === null) return;
   const cards = [...grid.querySelectorAll(':scope > .bt-card')];
+  const columns = Number(grid.dataset.columns);
   if (!notesColumnScreen.matches) {
     unpack(grid, cards);
+    shareRows(grid, cards, columns);
     return;
   }
-  const columns = Number(grid.dataset.columns);
+  for (const card of cards) setStyle(card, '--bt-basis', '');
   const style = getComputedStyle(grid);
   const gap = parseFloat(style.columnGap);
   const rowHeight = parseFloat(style.getPropertyValue('--bt-row-height'));
@@ -22,19 +29,35 @@ export function placeCards(article) {
   const spanWidth = (span) => column * span + gap * (span - 1);
   const spans = new Map(cards.map((card) => [card, declaredSpan(card, columns)]));
   setAttribute(grid, 'data-packed', '');
-  for (const card of cards) setStyle(card, 'width', `${spanWidth(spans.get(card))}px`);
+  for (const card of cards) setStyle(card, '--bt-width', `${spanWidth(spans.get(card))}px`);
   const wideSpan = levelSpan('wide', columns);
   for (const card of wideCards(cards.filter((card) => card.dataset.span === 'auto' && spans.get(card) < wideSpan))) {
     spans.set(card, wideSpan);
-    setStyle(card, 'width', `${spanWidth(wideSpan)}px`);
+    setStyle(card, '--bt-width', `${spanWidth(wideSpan)}px`);
   }
-  const boxes = cards.map((card) => ({ height: card.getBoundingClientRect().height, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, end: card.scrollTop + card.clientHeight >= card.scrollHeight - 1 }));
+  const boxes = new Map(cards.map((card) => [card, { height: card.getBoundingClientRect().height, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, end: card.scrollTop + card.clientHeight >= card.scrollHeight - 1 }]));
   const tops = Array(columns).fill(0);
+  const placed = [];
   const hint = devHint();
   const borders = cards.length === 0 ? 0 : verticalBorders(cards[0]);
-  cards.forEach((card, index) => {
+  const place = (card, start, top) => {
     const span = spans.get(card);
-    const { height, scrollHeight, clientHeight, end } = boxes[index];
+    const { height, scrollHeight, clientHeight, end } = boxes.get(card);
+    placed.push({ start, end: start + span, top, bottom: top + height });
+    for (let next = start; next < start + span; next += 1) tops[next] = Math.max(tops[next], top + height + gap);
+    placedHeights.set(card, height);
+    resizes.observe(card);
+    setStyle(card, '--bt-x', `${start * (column + gap)}px`);
+    setStyle(card, '--bt-y', `${top}px`);
+    const overflow = card.dataset.rows === undefined ? 0 : scrollHeight - clientHeight;
+    setAttribute(card, 'data-overflow', overflow > 1 ? '' : null);
+    setAttribute(card, 'data-end', overflow > 1 && end ? '' : null);
+    setAttribute(card, 'tabindex', overflow > 1 ? '0' : null);
+    setAttribute(card, 'data-hint', hint !== null && overflow > 1 ? hint(Math.ceil(overflow), Math.ceil((scrollHeight + borders + gap) / (rowHeight + gap))) : null);
+  };
+  const isSection = (card) => card.dataset.themeBlock === undefined;
+  for (const card of cards.filter(isSection)) {
+    const span = spans.get(card);
     let start = 0;
     let top = Infinity;
     for (let first = 0; first + span <= columns; first += 1) {
@@ -44,28 +67,48 @@ export function placeCards(article) {
         start = first;
       }
     }
-    for (let next = start; next < start + span; next += 1) tops[next] = top + height + gap;
-    placedHeights.set(card, height);
-    resizes.observe(card);
-    setStyle(card, 'transform', `translate(${start * (column + gap)}px, ${top}px)`);
-    const overflow = card.dataset.rows === undefined ? 0 : scrollHeight - clientHeight;
-    setAttribute(card, 'data-overflow', overflow > 1 ? '' : null);
-    setAttribute(card, 'data-end', overflow > 1 && end ? '' : null);
-    setAttribute(card, 'tabindex', overflow > 1 ? '0' : null);
-    setAttribute(card, 'data-hint', hint !== null && overflow > 1 ? hint(Math.ceil(overflow), Math.ceil((scrollHeight + borders + gap) / (rowHeight + gap))) : null);
-  });
-  setStyle(grid, 'height', `${Math.max(0, ...tops) - gap}px`);
+    place(card, start, top);
+  }
+  for (const card of cards.filter((card) => !isSection(card))) {
+    const { start, top } = highestFit(placed, spans.get(card), boxes.get(card).height, columns, gap);
+    place(card, start, top);
+  }
+  setStyle(grid, '--bt-height', `${Math.max(0, ...tops) - gap}px`);
+}
+
+function highestFit(placed, span, height, columns, gap) {
+  const levels = [0, ...placed.map((box) => box.bottom + gap)].sort((a, b) => a - b);
+  for (const top of levels) {
+    for (let start = 0; start + span <= columns; start += 1) {
+      const free = placed.every((box) => box.end <= start || box.start >= start + span || top >= box.bottom + gap - 0.5 || top + height + gap <= box.top + 0.5);
+      if (free) return { start, top };
+    }
+  }
+}
+
+export function releaseCards() {
+  resizes.disconnect();
 }
 
 function unpack(grid, cards) {
   setAttribute(grid, 'data-packed', null);
-  setStyle(grid, 'height', '');
+  setStyle(grid, '--bt-height', '');
   for (const card of cards) {
     resizes.unobserve(card);
     placedHeights.delete(card);
-    setStyle(card, 'width', '');
-    setStyle(card, 'transform', '');
+    for (const name of ['--bt-width', '--bt-x', '--bt-y']) setStyle(card, name, '');
     for (const name of ['data-overflow', 'data-end', 'data-hint', 'data-active', 'tabindex']) setAttribute(card, name, null);
+  }
+}
+
+// Below 1000 pixels the cards wrap into rows in the order of the article and grow to fill each row; a card that is wider than half the row takes the whole row.
+function shareRows(grid, cards, columns) {
+  const style = getComputedStyle(grid);
+  const gap = parseFloat(style.columnGap);
+  const unit = parseFloat(style.getPropertyValue('--bt-unit'));
+  for (const card of cards) {
+    const basis = declaredSpan(card, columns) * (unit + gap) - gap;
+    setStyle(card, '--bt-basis', basis > grid.clientWidth / 2 ? '100%' : `${basis}px`);
   }
 }
 
@@ -75,16 +118,8 @@ function declaredSpan(card, columns) {
 
 function wideCards(cards) {
   const rooms = new Map(cards.map((card) => [card, card.clientWidth - horizontalPadding(card)]));
-  const blocks = cards.flatMap((card) => [...card.querySelectorAll(':scope > .bk-block[data-width="auto"]')].map((block) => ({ card, block })));
-  const declared = [];
-  const overflowing = [];
-  for (const entry of blocks) {
-    if (declaresNaturalWidth(entry.block)) declared.push(entry);
-    else if (overflows(entry.block)) overflowing.push(entry);
-  }
-  const natural = naturalWidths(declared.map(({ block }) => naturalWidthProbe(block)));
-  const wide = declared.filter(({ card }, index) => natural[index] > rooms.get(card) + 0.5);
-  return new Set([...wide, ...overflowing].map(({ card }) => card));
+  const reaches = (card, block) => (declaresNaturalWidth(block) ? naturalWidth(block) > rooms.get(card) + 0.5 : overflows(block));
+  return new Set(cards.filter((card) => [...card.querySelectorAll(':scope > .bk-block[data-width="auto"]')].some((block) => reaches(card, block))));
 }
 
 function horizontalPadding(element) {
@@ -99,7 +134,7 @@ function verticalBorders(element) {
 
 function devHint() {
   if (document.querySelector('script[data-bake-dev]') === null) return null;
-  return labelsFor(document.documentElement.lang).cardOverflow;
+  return document.documentElement.lang.toLowerCase().startsWith('zh') ? CARD_OVERFLOW.zh : CARD_OVERFLOW.en;
 }
 
 function setStyle(element, name, value) {

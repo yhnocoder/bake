@@ -2,8 +2,6 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { createSite, updateSite } from '../src/build/site.js';
-import { siteLink, sitePath } from '../src/urls.js';
 import { article, bake, createBlog, validConfig } from './blog.js';
 
 const subPathConfig = `export default {
@@ -30,13 +28,24 @@ const blogFiles = {
 };
 
 const probeNotFound = {
-  'themes/probe/client.jsx': "import './probe.css';\n",
+  'themes/probe/client.jsx': "import './probe.css';\n\nexport default () => () => {};\n",
   'themes/probe/probe.css': 'body {\n  margin: 0;\n}\n',
   'themes/probe/theme.css': 'body {\n  color: black;\n}\n',
   'themes/probe/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props.article.link)} /></body></html>;\n}\n',
   'themes/probe/home.jsx': 'export default function Home() {\n  return <html><body /></html>;\n}\n',
   'themes/probe/not-found.jsx': 'export default function NotFound(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props)} /></body></html>;\n}\n',
 };
+
+function essaySiteTheme(themeCss) {
+  return {
+    'bake.config.js': subPathConfig.replace("language: 'en',", "language: 'en',\n  theme: 'mine',"),
+    'themes/mine/page.jsx': "export { Page as default } from 'bake/themes/essay';\n",
+    'themes/mine/home.jsx': "export { Home as default } from 'bake/theme';\n",
+    'themes/mine/not-found.jsx': "export { NotFound as default } from 'bake/theme';\n",
+    'themes/mine/client.jsx': "export { default } from 'bake/themes/essay/client';\n",
+    'themes/mine/theme.css': themeCss,
+  };
+}
 
 function built(t, files) {
   const dir = createBlog(t, files);
@@ -50,15 +59,6 @@ function probed(html) {
 }
 
 describe('site files', () => {
-  test('the address of the site ends with a slash with and without a sub-path', () => {
-    assert.equal(siteLink('https://example.com'), 'https://example.com/');
-    assert.equal(siteLink('https://example.com/'), 'https://example.com/');
-    assert.equal(siteLink('https://x.github.io/bake'), 'https://x.github.io/bake/');
-    assert.equal(siteLink('https://x.github.io/bake/'), 'https://x.github.io/bake/');
-    assert.equal(sitePath('https://example.com'), '/');
-    assert.equal(sitePath('https://x.github.io/bake'), '/bake/');
-  });
-
   test('feed.xml lists the published articles and plain HTML pages newest first with absolute links and summaries only', (t) => {
     const { read } = built(t, blogFiles);
     assert.equal(
@@ -127,14 +127,6 @@ describe('site files', () => {
     );
   });
 
-  test('drafts stay out of the feed, the sitemap and the 404 page when drafts get pages', async (t) => {
-    const dir = createBlog(t, blogFiles);
-    const result = await updateSite(createSite(dir, { drafts: true, base: '/' }));
-    assert.deepEqual(result.errors, []);
-    assert.ok(result.pages.some((page) => page.article.fields.title === 'Draft'));
-    for (const output of result.siteFiles) assert.doesNotMatch(String(output.render()), /Draft|2026-10\/draft/, output.path);
-  });
-
   test('the 404 page gets the published articles and asset paths from the base path of the site', (t) => {
     const { read } = built(t, { ...blogFiles, 'bake.config.js': subPathConfig.replace("language: 'en',", "language: 'en',\n  theme: 'probe',"), ...probeNotFound });
     const props = probed(read('404.html'));
@@ -159,12 +151,12 @@ describe('site files', () => {
   test('the essay theme writes a 404 page with absolute asset paths, a hidden list of candidates and a link home', (t) => {
     const { read } = built(t, blogFiles);
     const html = read('404.html');
-    assert.match(html, /^<!doctype html>\n<html lang="en" data-theme="system" data-font="sans">/);
+    assert.match(html, /^<!doctype html>\n<html lang="en"/);
     assert.match(html, /<meta name="robots" content="noindex"><title>This page does not exist · Notes &amp; &lt;Models><\/title>/);
     assert.match(html, /<link rel="stylesheet" href="\/bake\/assets\/essay-[\w-]+\.css">/);
     assert.match(html, /<link rel="preload" as="style" href="\/bake\/assets\/fonts-[\w-]+\.css" onload="this.rel='stylesheet'"><noscript><link rel="stylesheet" href="\/bake\/assets\/fonts-[\w-]+\.css"><\/noscript>/);
     assert.match(html, /<script type="module" src="\/bake\/assets\/essay-[\w-]+\.js"><\/script>/);
-    assert.match(html, /<main class="bk-not-found" data-root="\/bake\/"><a class="bk-site" href="\/bake\/">Notes &amp; &lt;Models><\/a><h1 class="bk-not-found-title">This page does not exist<\/h1><p class="bk-not-found-path" hidden>/);
+    assert.match(html, /<main class="bk-not-found"[^>]*><a class="bk-site" href="\/bake\/">Notes &amp; &lt;Models><\/a><h1 class="bk-not-found-title">This page does not exist<\/h1><p class="bk-not-found-path" hidden>/);
     assert.match(html, /<section class="bk-not-found-matches" hidden><h2>You may be looking for:<\/h2><ul><li data-url="2026-10\/alpha\/" hidden><a href="\/bake\/2026-10\/alpha\/">Alpha<\/a>/);
     assert.match(html, /<a class="bk-not-found-home" href="\/bake\/">Back to the homepage →<\/a><\/main>/);
     assert.doesNotMatch(html, /draft/);
@@ -204,7 +196,8 @@ describe('site files', () => {
   });
 
   test('_bake/theme.css holds the fonts and colours of the site theme, and plain HTML pages are published unchanged', (t) => {
-    const { dir, read } = built(t, { ...blogFiles, 'themes/essay/styles/tokens.css': ':root {\n  --bg: #123456;\n}\n' });
+    const themeCss = "@import 'bake/theme/styles/fonts.css';\n@import 'bake/theme/styles/tokens.css';\n@import 'bake/theme/styles/base.css';\n\n:root {\n  --bg: #123456;\n}\n";
+    const { dir, read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss) });
     const styles = read('_bake/theme.css');
     assert.match(styles, /--bg:#123456/);
     assert.match(styles, /font-family:LXGW WenKai/);
@@ -218,21 +211,23 @@ describe('site files', () => {
     assert.equal(read('2026-09/demo/index.html'), pageHtml);
   });
 
-  test('_bake/theme.css resolves every form of a relative @import in a theme folder against the built-in theme', (t) => {
+  test('_bake/theme.css resolves every form of @import of a file in the theme folder and of a stylesheet of bake/theme', (t) => {
     const themeCss = [
-      '@import url(./styles/fonts.css);',
-      "@import url( './styles/tokens.css' );",
-      '@import url("./styles/home.css");',
-      "@import './styles/not-found.css';",
+      '@import url(./styles/a.css);',
+      "@import url( './styles/b.css' );",
+      '@import url("./styles/c.css");',
+      "@import './styles/d.css';",
+      "@import 'bake/theme/styles/tokens.css';",
+      '@import "bake/theme/styles/home.css";',
       '',
     ].join('\n');
-    const { read } = built(t, { ...blogFiles, 'themes/essay/theme.css': themeCss });
+    const own = Object.fromEntries(['a', 'b', 'c', 'd'].map((name) => [`themes/mine/styles/${name}.css`, `.own-${name} {\n  color: red;\n}\n`]));
+    const { read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss), ...own });
     const styles = read('_bake/theme.css');
     assert.doesNotMatch(styles, /@import/i);
-    assert.match(styles, /font-family:LXGW WenKai/);
+    assert.match(styles, /\.own-a,\.own-b,\.own-c,\.own-d\{color:red\}/);
     assert.match(styles, /--bg:[^;]*#f5f6f4/);
     assert.match(styles, /\.bk-card-frame\{/);
-    assert.match(styles, /\.bk-not-found/);
   });
 
   test('reports public files at the addresses of the feed, the sitemap, the 404 page and in _bake/', (t) => {

@@ -8,8 +8,7 @@
     "allow": [
       "Bash(make check:*)",
       "Bash(scripts/test.sh:*)",
-      "Bash(npm test:*)",
-      "Bash(python3 scripts/check_comment.py:*)"
+      "Bash(npm test:*)"
     ]
   }
 }

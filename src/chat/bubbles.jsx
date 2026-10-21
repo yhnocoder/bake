@@ -1,26 +1,27 @@
-import { For, Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
+import { Show, createSignal, onCleanup } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { selectionMarkdown } from '../copy/copy.js';
+import { composing } from '../keys.js';
 import styles from './bubbles.css?inline';
-import { CHAT_RULES, READ_ARTICLE, articlePage, catalogEntry, chatTools, currentPage, loadCatalog, matchingScopes, readArticle, scopeOptions, systemPrompt } from './context.js';
+import { CHAT_RULES, READ_ARTICLE, articlePage, chatTools, currentPage, loadCatalog, readArticle, systemPrompt } from './context.js';
 import { answer } from './conversation.js';
-import { ApiError, checkKey, complete } from './deepseek.js';
-import { addNoteVersion, deleteConversation, historyGroups, localDate, readHistory, roundMessages, saveConversation, storedRound } from './history.js';
-import { HistoryList } from './history-list.jsx';
-import { MAX_INSTRUCTIONS, MAX_RULES, customPrompts, readPrompts, savePrompts } from './instructions.js';
+import { checkKey, complete } from './deepseek.js';
+import { addNoteVersion, localDate, roundMessages, saveConversation, storedRound } from './history.js';
+import { HistoryArea } from './history-area.jsx';
+import { customPrompts, readPrompts, savePrompts } from './instructions.js';
 import { NoteCard } from './note-card.jsx';
-import { MAX_NOTE_SOURCES, checkNote, citedEntries, notePrompt, noteRules } from './note.js';
-import { PetError, chooseReaderPet, forgetReaderPet, storedReaderPet } from './reader-pet.js';
-import { MATH_CLASS, replyHtml } from './reply.js';
-import { typesetMath } from './typeset.js';
+import { MAX_NOTE_SOURCES, checkNote, citedEntries, notePrompt, noteRules, ownArticle } from './note.js';
+import { CatalogError, EmptyNote, requestProblem, vaultProblem } from './problems.js';
+import { PromptForm } from './prompt-form.jsx';
+import { QuestionField } from './question-field.jsx';
+import { replyText } from './reply.js';
+import { SettingsMenu } from './settings-menu.jsx';
+import { Thread } from './thread.jsx';
 import { VaultError, clearKey, rememberedKey, saveKey, storedKey, unlockKey } from './vault.js';
 
 const THINKING_KEY = 'bk-chat-thinking';
-const SCOPE_QUERY = /@([^\s@]*)$/;
-const CONTEXT_LENGTH = /context length/i;
 const DEEPSEEK_KEYS = 'https://platform.deepseek.com/api_keys';
-const composing = (event) => event.isComposing || event.keyCode === 229;
 
 export function createChat({ shadow, root, labels, pet, petSource, launcher }) {
   const style = document.createElement('style');
@@ -39,16 +40,12 @@ function Chat(props) {
   const [view, setView] = createSignal(storedKey() === null ? 'setup' : 'locked');
   const [messages, setMessages] = createStore([]);
   const [scopes, setScopes] = createSignal([]);
-  const [options, setOptions] = createSignal(null);
-  const [query, setQuery] = createSignal(null);
-  const [active, setActive] = createSignal(0);
   const [quote, setQuote] = createSignal(null);
   const [draft, setDraft] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [pending, setPending] = createSignal(null);
   const [popover, setPopover] = createSignal(null);
   const [thinking, setThinking] = createSignal(readThinking());
-  const [faded, setFaded] = createSignal(false);
   const [announcement, setAnnouncement] = createSignal(null);
   const pageArticle = () => (page.article === null ? null : { address: page.address, title: page.title });
   const [article, setArticle] = createSignal(pageArticle());
@@ -57,7 +54,6 @@ function Chat(props) {
   const [noteBusy, setNoteBusy] = createSignal(false);
   const [noteHint, setNoteHint] = createSignal('');
   const [redo, setRedo] = createSignal(false);
-  const [historyItems, setHistoryItems] = createSignal([]);
   const builtInPrompts = { chat: CHAT_RULES, note: noteRules(labels) };
   const [prompts, setPrompts] = createSignal(readPrompts());
   let conversationId = crypto.randomUUID();
@@ -65,13 +61,11 @@ function Chat(props) {
   let apiKey = null;
   let abort = null;
   let noteAbort = null;
-  let historyNew;
   let lastId = 0;
   let unlockTried = false;
   let remembering = null;
   let activity = 'idle';
   let container;
-  let list;
   let input;
 
   const setPet = (state) => {
@@ -128,7 +122,6 @@ function Chat(props) {
     setOpen(false);
     setPopover(null);
     if (noteOpen() || redo()) closeNoteAfterFade();
-    setQuery(null);
     launcher.setAttribute('aria-expanded', 'false');
     pet.setState('idle');
     if (focus) launcher.focus({ preventScroll: true });
@@ -237,17 +230,6 @@ function Chat(props) {
     if (away()) note(labels.restoredFrom(item.article.title));
     setPet('idle');
     focusInput();
-  };
-  const toggleHistory = () => {
-    if (popover() === 'history') return setPopover(null);
-    setHistoryItems(readHistory(root).filter((item) => item.id !== conversationId));
-    setPopover('history');
-    requestAnimationFrame(() => historyNew?.focus({ preventScroll: true }));
-  };
-  const forgetConversation = (item) => {
-    deleteConversation(root, item.id);
-    setHistoryItems(historyItems().filter((other) => other.id !== item.id));
-    historyNew?.focus({ preventScroll: true });
   };
   const changeKey = () => {
     setPopover(null);
@@ -437,66 +419,6 @@ function Chat(props) {
     show();
   };
 
-  const readQuery = () => {
-    if (input === undefined || view() === 'setup') return setQuery(null);
-    const match = input.value.slice(0, input.selectionStart ?? input.value.length).match(SCOPE_QUERY);
-    setQuery(match === null ? null : match[1]);
-    if (match !== null && options() === null) {
-      loadCatalog(root).then(
-        (catalog) => setOptions(scopeOptions(catalog, labels)),
-        () => setOptions([]),
-      );
-    }
-  };
-  const visibleScopes = () => (query() === null || options() === null ? [] : matchingScopes(options(), query(), scopes()));
-  const activeScope = () => Math.min(active(), visibleScopes().length - 1);
-  const scopeGroups = () => {
-    const shown = visibleScopes().map((scope, index) => ({ scope, index }));
-    return [...new Set(shown.map(({ scope }) => scope.kind))].map((kind) => ({ kind, items: shown.filter(({ scope }) => scope.kind === kind) }));
-  };
-  const listing = () => query() !== null && options() !== null;
-  const pick = (scope) => {
-    const caret = input.selectionStart ?? input.value.length;
-    const start = input.value.slice(0, caret).lastIndexOf('@');
-    const value = input.value.slice(0, start) + input.value.slice(caret);
-    setDraft(value);
-    input.value = value;
-    input.setSelectionRange(start, start);
-    setScopes([...scopes(), scope]);
-    setActive(0);
-    readQuery();
-  };
-  const removeScope = (scope) => {
-    setScopes(scopes().filter((item) => item.id !== scope.id));
-    input.focus();
-  };
-
-  const keydown = (event) => {
-    const shown = visibleScopes();
-    if (query() !== null && shown.length > 0) {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        setActive((active() + (event.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length);
-        return;
-      }
-      if ((event.key === 'Enter' || event.key === 'Tab') && !event.isComposing) {
-        event.preventDefault();
-        pick(shown[Math.min(active(), shown.length - 1)]);
-        return;
-      }
-    }
-    if (event.key === 'Escape' && query() !== null && !composing(event)) {
-      event.preventDefault();
-      event.stopPropagation();
-      setQuery(null);
-      return;
-    }
-    if (event.key === 'Backspace' && input.selectionStart === 0 && input.selectionEnd === 0) {
-      if (scopes().length > 0) setScopes(scopes().slice(0, -1));
-      else if (quote() !== null) setQuote(null);
-    }
-    if (event.key === 'Enter' && !composing(event)) submit(event);
-  };
   const containerKeydown = (event) => {
     if (event.key !== 'Escape' || composing(event)) return;
     event.preventDefault();
@@ -529,37 +451,14 @@ function Chat(props) {
   const escape = (event) => {
     if (event.key === 'Escape' && open() && !event.defaultPrevented && !composing(event)) hide();
   };
-  const refresh = () => (page = currentPage(root));
   document.addEventListener('pointerdown', outside);
   document.addEventListener('keydown', escape);
-  document.addEventListener('bake:content', refresh);
   onCleanup(() => {
     document.removeEventListener('pointerdown', outside);
     document.removeEventListener('keydown', escape);
-    document.removeEventListener('bake:content', refresh);
   });
 
-  props.ref({ open: show, toggle, ask });
-
-  const updateFade = () => {
-    const fade = list.scrollHeight - list.clientHeight + list.scrollTop > 2;
-    if (faded() !== fade) setFaded(fade);
-  };
-  createEffect(() => {
-    if (messages.length > 0 && list !== undefined) list.scrollTop = 0;
-  });
-  const resize = new ResizeObserver(() => list && updateFade());
-  onCleanup(() => resize.disconnect());
-
-  const wideScreen = matchMedia('(min-width: 1000px)');
-  const [wide, setWide] = createSignal(wideScreen.matches);
-  const followWidth = () => setWide(wideScreen.matches);
-  wideScreen.addEventListener('change', followWidth);
-  onCleanup(() => wideScreen.removeEventListener('change', followWidth));
-  const placeholder = () => {
-    const texts = wide() ? labels.placeholder : labels.shortPlaceholder;
-    return view() === 'setup' ? texts.key : scopes().length > 0 ? texts.scoped : texts[page.article === null ? 'blog' : 'article'];
-  };
+  props.ref({ toggle, ask, readPage: () => (page = currentPage(root)) });
 
   return (
     <section class="bk-chat" data-open={open() ? '' : undefined} data-note={noteOpen() ? '' : undefined} role="dialog" aria-label={labels.title} aria-hidden={String(!open())} ref={container} on:keydown={containerKeydown}>
@@ -568,47 +467,17 @@ function Chat(props) {
           {({ text }) => <span>{text}</span>}
         </Show>
       </p>
-      <div class="bk-chat-bubbles" data-faded={faded() ? '' : undefined} hidden={noteOpen()} ref={list} onScroll={updateFade}>
-        <div class="bk-chat-thread" ref={(element) => resize.observe(element)}>
-          <For each={messages}>
-            {(message) =>
-              message.role === 'user' ? (
-                <UserBubble message={message} />
-              ) : message.role === 'assistant' ? (
-                <Reply
-                  message={message}
-                  root={root}
-                  base={away() ? article().address : undefined}
-                  labels={labels}
-                  canRetry={retryable(message.id)}
-                  onRetry={() => retry(message.id)}
-                  noteAction={message.id === lastReply() ? noteAction() : null}
-                />
-              ) : message.role === 'problem' ? (
-                <p class="bk-chat-bubble bk-chat-problem" role="alert">
-                  {message.text}
-                  <Show when={message.retry !== null && retryable(message.id)}>
-                    {' '}
-                    <button type="button" class="bk-chat-link" onClick={() => retryProblem(message.id)}>
-                      {labels.retry}
-                    </button>
-                  </Show>
-                </p>
-              ) : (
-                <p class="bk-chat-bubble bk-chat-note">
-                  {message.text}
-                  <Show when={message.link}>
-                    {' '}
-                    <a href={message.link.href} target="_blank" rel="noopener noreferrer">
-                      {message.link.text}
-                    </a>
-                  </Show>
-                </p>
-              )
-            }
-          </For>
-        </div>
-      </div>
+      <Thread
+        labels={labels}
+        root={root}
+        messages={messages}
+        hidden={noteOpen()}
+        base={away() ? article().address : undefined}
+        canRetry={retryable}
+        onRetry={retry}
+        onRetryProblem={retryProblem}
+        noteAction={(id) => (id === lastReply() ? noteAction() : null)}
+      />
       <Show when={noteOpen() && studyNote() !== null}>
         <NoteCard
           labels={labels}
@@ -627,103 +496,32 @@ function Chat(props) {
         />
       </Show>
       <form class="bk-chat-composer" onSubmit={submit}>
-        <Show when={listing()}>
-          <div class="bk-chat-scopes">
-            <Show when={visibleScopes().length > 0} fallback={<p class="bk-chat-scopes-none">{labels.noScope}</p>}>
-              <div id="bk-chat-scopes" role="listbox" aria-label={labels.scopes}>
-                <For each={scopeGroups()}>
-                  {(group) => (
-                    <div class="bk-chat-scopes-kind" role="group" aria-labelledby={`bk-chat-kind-${group.kind}`}>
-                      <p class="bk-chat-scopes-group" id={`bk-chat-kind-${group.kind}`}>
-                        {labels.kinds[group.kind]}
-                      </p>
-                      <For each={group.items}>
-                        {({ scope, index }) => (
-                          <div
-                            class="bk-chat-scope"
-                            id={`bk-chat-scope-${index}`}
-                            role="option"
-                            aria-selected={String(index === activeScope())}
-                            ref={(element) => createEffect(() => index === active() && element.scrollIntoView({ block: 'nearest' }))}
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              pick(scope);
-                            }}
-                          >
-                            <span>{scope.label}</span>
-                            <small>{scope.meta}</small>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </Show>
-          </div>
-        </Show>
-        <Show when={quote() !== null}>
-          <span class="bk-chat-chip bk-chat-quote" title={quote()}>
-            <span>
-              {labels.quoted(quote())}
-            </span>
-            <button type="button" aria-label={labels.removeQuote} onClick={() => setQuote(null)}>
-              ✕
-            </button>
-          </span>
-        </Show>
-        <For each={scopes()}>
-          {(scope) => (
-            <span class="bk-chat-chip">
-              <span>@{scope.label}</span>
-              <button type="button" aria-label={labels.removeScope(scope.label)} onClick={() => removeScope(scope)}>
-                ✕
-              </button>
-            </span>
-          )}
-        </For>
-        <input
+        <QuestionField
           ref={input}
-          type={view() === 'setup' ? 'password' : 'text'}
-          name={view() === 'setup' ? 'key' : 'question'}
-          autocomplete="off"
-          spellcheck={view() !== 'setup'}
-          value={draft()}
-          placeholder={placeholder()}
-          aria-label={view() === 'setup' ? labels.placeholder.key : labels.question}
-          role={view() === 'setup' ? undefined : 'combobox'}
-          aria-autocomplete={view() === 'setup' ? undefined : 'list'}
-          aria-expanded={view() === 'setup' ? undefined : String(listing() && visibleScopes().length > 0)}
-          aria-controls={view() === 'setup' || !listing() || visibleScopes().length === 0 ? undefined : 'bk-chat-scopes'}
-          aria-activedescendant={listing() && visibleScopes().length > 0 ? `bk-chat-scope-${activeScope()}` : undefined}
-          onInput={(event) => {
-            setDraft(event.currentTarget.value);
-            setActive(0);
-            readQuery();
-          }}
-          onClick={readQuery}
-          onBlur={() => setQuery(null)}
-          on:keydown={keydown}
+          labels={labels}
+          root={root}
+          view={view()}
+          open={open()}
+          home={page.article === null}
+          draft={draft()}
+          setDraft={setDraft}
+          quote={quote()}
+          setQuote={setQuote}
+          scopes={scopes()}
+          setScopes={setScopes}
+          onSubmit={submit}
         />
-        <div class="bk-chat-pop-area">
-          <button type="button" class="bk-chat-icon" aria-label={labels.history} title={labels.history} aria-expanded={String(popover() === 'history')} onClick={toggleHistory}>
-            <svg viewBox="0 0 16 16" aria-hidden="true" data-stroke>
-              <circle cx="8" cy="8" r="6" />
-              <path d="M8 4.6V8l2.3 1.5" />
-            </svg>
-          </button>
-          <Show when={popover() === 'history'}>
-            <HistoryList
-              labels={labels}
-              home={page.article === null}
-              groups={historyGroups(historyItems(), { address: page.address, home: page.article === null })}
-              newRef={(element) => (historyNew = element)}
-              onNew={newChat}
-              onOpen={restore}
-              onDelete={forgetConversation}
-            />
-          </Show>
-        </div>
+        <HistoryArea
+          labels={labels}
+          root={root}
+          open={popover() === 'history'}
+          onToggle={(shown) => setPopover(shown ? 'history' : null)}
+          current={() => conversationId}
+          address={page.address}
+          home={page.article === null}
+          onNew={newChat}
+          onOpen={restore}
+        />
         <div class="bk-chat-pop-area">
           <button type="button" class="bk-chat-icon" aria-label={labels.settings} title={labels.settings} aria-expanded={String(popover() === 'menu')} onClick={() => setPopover(popover() === 'menu' ? null : 'menu')}>
             <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -753,7 +551,7 @@ function Chat(props) {
             />
           </Show>
           <Show when={popover() === 'menu'}>
-            <Settings
+            <SettingsMenu
               labels={labels}
               root={root}
               pet={pet}
@@ -787,290 +585,6 @@ function Chat(props) {
   );
 }
 
-let sitePetRequest = null;
-
-function sitePet(root) {
-  sitePetRequest ??= fetch(new URL('_bake/pet/pet.json', root))
-    .then((response) => (response.ok ? response.json() : null))
-    .catch(() => null);
-  return sitePetRequest;
-}
-
-function Settings(props) {
-  const { labels, root, pet } = props;
-  const [address, setAddress] = createSignal(storedReaderPet()?.url ?? '');
-  const [status, setStatus] = createSignal(null);
-  const [loading, setLoading] = createSignal(false);
-  const [chosen, setChosen] = createSignal(storedReaderPet() !== null);
-  const [site, setSite] = createSignal(null);
-  sitePet(root).then(setSite);
-
-  const use = async () => {
-    if (loading() || address().trim() === '') return;
-    setLoading(true);
-    setStatus({ text: labels.petLoading });
-    try {
-      const chosenPet = await chooseReaderPet(address().trim());
-      pet.setSource(props.petSource());
-      setChosen(true);
-      setStatus({ text: labels.petChosen(chosenPet.name) });
-    } catch (error) {
-      const message = error instanceof PetError ? labels.petErrors[error.code] : labels.petErrors.network;
-      setStatus({ text: typeof message === 'function' ? message(error.detail) : message, failed: true });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const reset = () => {
-    forgetReaderPet();
-    pet.setSource(props.petSource());
-    setChosen(false);
-    setAddress('');
-    setStatus(null);
-  };
-
-  return (
-    <div class="bk-chat-menu" role="group" aria-label={labels.settings}>
-      <button type="button" class="bk-chat-menu-item" onClick={props.onNewChat}>
-        {labels.newChat}
-      </button>
-      <Show when={props.noteAction}>
-        {(action) => (
-          <button type="button" class="bk-chat-menu-item" disabled={action().disabled} onClick={action().run}>
-            {action().label}
-          </button>
-        )}
-      </Show>
-      <button type="button" class="bk-chat-menu-item" aria-haspopup="dialog" onClick={props.onPrompt}>
-        {labels.prompt}
-        <Show when={props.customPrompts}>
-          <span class="bk-chat-menu-state">{labels.promptSet}</span>
-        </Show>
-      </button>
-      <button type="button" class="bk-chat-menu-item" aria-pressed={String(props.thinking)} onClick={props.onThinking}>
-        {labels.thinking}
-      </button>
-      <Show when={props.view !== 'setup'}>
-        <button type="button" class="bk-chat-menu-item" onClick={props.onChangeKey}>
-          {labels.changeKey}
-        </button>
-      </Show>
-      <Show when={storedKey() !== null}>
-        <button type="button" class="bk-chat-menu-item" data-action="clear-key" onClick={props.onClearKey}>
-          {labels.clearKey}
-        </button>
-      </Show>
-      <div class="bk-chat-pet-form">
-        <label>
-          <span>{labels.pet}</span>
-          <input
-            type="url"
-            name="pet"
-            value={address()}
-            placeholder={labels.petAddress}
-            aria-label={labels.petAddress}
-            spellcheck={false}
-            onInput={(event) => setAddress(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' || event.isComposing) return;
-              event.preventDefault();
-              use();
-            }}
-          />
-        </label>
-        <button type="button" class="bk-chat-menu-button" disabled={loading() || address().trim() === ''} onClick={use}>
-          {labels.petUse}
-        </button>
-      </div>
-      <Show when={status() !== null}>
-        <p class="bk-chat-pet-status" data-failed={status().failed ? '' : undefined} role={status().failed ? 'alert' : undefined}>
-          {status().text}
-        </p>
-      </Show>
-      <Show when={chosen()}>
-        <button type="button" class="bk-chat-link" onClick={reset}>
-          {labels.petReset}
-        </button>
-      </Show>
-      <Show when={!chosen() && site()?.credit}>
-        <p class="bk-chat-credit">
-          <a href={new URL(site().credit.href, new URL('_bake/pet/', root)).href} target="_blank" rel="noopener">
-            {labels.credit(site().displayName, site().credit)}
-          </a>
-        </p>
-      </Show>
-    </div>
-  );
-}
-
-const PROMPT_TABS = ['instructions', 'chat', 'note'];
-
-function PromptForm(props) {
-  const { labels } = props;
-  const [problem, setProblem] = createSignal(null);
-  const [tab, setTab] = createSignal('instructions');
-  const fields = {};
-  const tabs = {};
-  onMount(() => {
-    const field = fields.instructions;
-    field.focus({ preventScroll: true });
-    field.setSelectionRange(field.value.length, field.value.length);
-  });
-  const save = (event) => {
-    event?.preventDefault();
-    setProblem(props.onSave({ instructions: fields.instructions.value, chat: fields.chat.value, note: fields.note.value }));
-  };
-  const choose = (name) => {
-    setTab(name);
-    tabs[name].focus();
-  };
-  return (
-    <form class="bk-chat-pop bk-chat-prompt" role="dialog" aria-label={labels.promptTitle} onSubmit={save}>
-      <div class="bk-chat-prompt-tabs" role="tablist" aria-label={labels.promptTitle}>
-        <For each={PROMPT_TABS}>
-          {(name, index) => (
-            <button
-              type="button"
-              role="tab"
-              id={`bk-chat-prompt-tab-${name}`}
-              aria-controls={`bk-chat-prompt-panel-${name}`}
-              aria-selected={String(tab() === name)}
-              tabindex={tab() === name ? 0 : -1}
-              ref={(element) => (tabs[name] = element)}
-              onClick={() => setTab(name)}
-              on:keydown={(event) => {
-                const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
-                if (step === undefined) return;
-                event.preventDefault();
-                choose(PROMPT_TABS[(index() + step + PROMPT_TABS.length) % PROMPT_TABS.length]);
-              }}
-            >
-              <For each={labels.promptTabs[name]}>
-                {(part, index) => (
-                  <>
-                    <Show when={index() > 0}>
-                      <wbr />
-                    </Show>
-                    {part}
-                  </>
-                )}
-              </For>
-            </button>
-          )}
-        </For>
-      </div>
-      <For each={PROMPT_TABS}>
-        {(name) => (
-          <div class="bk-chat-prompt-panel" role="tabpanel" id={`bk-chat-prompt-panel-${name}`} aria-labelledby={`bk-chat-prompt-tab-${name}`} hidden={tab() !== name}>
-            <textarea
-              id={name === 'instructions' ? 'bk-chat-prompt-text' : `bk-chat-prompt-${name}`}
-              rows="4"
-              data-built-in={name === 'instructions' ? undefined : ''}
-              maxlength={name === 'instructions' ? MAX_INSTRUCTIONS : MAX_RULES}
-              aria-labelledby={`bk-chat-prompt-tab-${name}`}
-              placeholder={name === 'instructions' ? labels.promptPlaceholder : undefined}
-              value={name === 'instructions' ? props.prompts.instructions : (props.prompts[name] ?? props.builtIn[name])}
-              ref={(element) => (fields[name] = element)}
-              on:keydown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.isComposing) save(event);
-              }}
-            />
-          </div>
-        )}
-      </For>
-      <p class="bk-chat-prompt-hint" role={problem() === null ? undefined : 'alert'} data-failed={problem() === null ? undefined : ''}>
-        {problem() ?? labels.promptHints[tab()]}
-      </p>
-      <div class="bk-chat-redo-actions">
-        <button
-          type="button"
-          class="bk-chat-note-button"
-          onClick={() => {
-            const field = fields[tab()];
-            field.value = tab() === 'instructions' ? '' : props.builtIn[tab()];
-            field.focus();
-          }}
-        >
-          {tab() === 'instructions' ? labels.promptClear : labels.promptReset}
-        </button>
-        <span class="bk-chat-prompt-gap" />
-        <button type="button" class="bk-chat-note-button" onClick={props.onCancel}>
-          {labels.cancel}
-        </button>
-        <button type="submit" class="bk-chat-note-button" data-primary>
-          {labels.promptSave}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function UserBubble(props) {
-  return (
-    <div class="bk-chat-bubble bk-chat-user">
-      <Show when={props.message.quote !== null}>
-        <blockquote>{props.message.quote}</blockquote>
-      </Show>
-      <p>
-        <For each={props.message.scopes}>{(label) => <span class="bk-chat-chip">@{label}</span>}</For>
-        {props.message.text}
-      </p>
-    </div>
-  );
-}
-
-function Reply(props) {
-  const { labels, root } = props;
-  let body;
-  createEffect(() => {
-    body.innerHTML = replyHtml(props.message.content, { root, base: props.base });
-    typesetMath(body);
-  });
-  return (
-    <div class="bk-chat-bubble bk-chat-reply" data-done={props.message.done ? '' : undefined}>
-      <Show when={props.message.reasoning !== ''}>
-        <details class="bk-chat-reasoning">
-          <summary>{labels.reasoning}</summary>
-          <p>{props.message.reasoning}</p>
-        </details>
-      </Show>
-      <For each={props.message.reads}>
-        {(read) => (
-          <p class="bk-chat-read" data-failed={read.failed ? '' : undefined}>
-            {read.done ? (read.failed ? labels.readFailed(read.label) : labels.read(read.label)) : labels.reading(read.label ?? '…')}
-          </p>
-        )}
-      </For>
-      <div class="bk-chat-answer" ref={body} />
-      <Show when={props.noteAction}>
-        {(action) => (
-          <button type="button" class="bk-chat-note-link" onClick={action().run}>
-            {action().label}
-          </button>
-        )}
-      </Show>
-      <Show when={props.message.error !== null}>
-        <p class="bk-chat-problem" role="alert">
-          {props.message.error}
-          <Show when={props.canRetry}>
-            {' '}
-            <button type="button" class="bk-chat-link" onClick={props.onRetry}>
-              {labels.retry}
-            </button>
-          </Show>
-        </p>
-      </Show>
-    </div>
-  );
-}
-
-function replyText(content, root) {
-  const element = document.createElement('div');
-  element.innerHTML = replyHtml(content, { root });
-  for (const math of element.querySelectorAll(`.${MATH_CLASS}`)) math.textContent = math.dataset.tex;
-  return element.textContent.trim();
-}
-
 function readThinking() {
   try {
     return localStorage.getItem(THINKING_KEY) === 'on';
@@ -1079,37 +593,3 @@ function readThinking() {
   }
 }
 
-function vaultProblem(error, labels) {
-  return labels.errors[error instanceof VaultError ? error.reason : 'failed'] ?? labels.errors.failed;
-}
-
-class CatalogError extends Error {}
-
-class EmptyNote extends Error {}
-
-function ownArticle(root, catalog, article, context) {
-  if (article === null || context.article === null) return null;
-  const entry = catalogEntry(root, catalog, article.address) ?? { url: article.address.slice(1), title: article.title, tags: [], sections: outlineSections(context.article.outline) };
-  return { entry, source: context.article.source };
-}
-
-function outlineSections(outline) {
-  const sections = [];
-  for (const heading of outline) {
-    if (heading.depth === 2) sections.push({ id: heading.id, number: String(sections.length + 1).padStart(2, '0'), title: heading.title, subsections: [] });
-    else sections.at(-1)?.subsections.push({ id: heading.id, title: heading.title });
-  }
-  return sections;
-}
-
-function requestProblem(error, labels) {
-  if (error instanceof CatalogError) return labels.errors.catalog;
-  if (error instanceof TypeError) return labels.errors.network;
-  if (!(error instanceof ApiError)) return labels.errors.other(error.message);
-  if (error.status === 401) return labels.errors.invalidKey;
-  if (error.status === 402) return labels.errors.balance;
-  if (error.status === 429) return labels.errors.rate;
-  if (error.status === 400 && CONTEXT_LENGTH.test(error.message)) return labels.errors.tooLong;
-  if (error.status >= 500) return labels.errors.server;
-  return labels.errors.other(error.message);
-}

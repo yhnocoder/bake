@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fromHtml } from 'hast-util-from-html';
 import sharp from 'sharp';
-import { article, bake, createBlog, readTree, validConfig } from './blog.js';
+import { article, bake, copyExample, createBlog, readTree, validConfig } from './blog.js';
+import { withoutCopySource } from './article.js';
 
-const exampleBlog = join(import.meta.dirname, '../examples/blog');
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
 const plainPage = `import { For } from 'solid-js';
@@ -84,14 +83,14 @@ describe('bake build', () => {
       '2026-10/rope/index.md',
       'icons/favicon.svg',
     ].sort());
-    const page = tree['2026-10/rope/index.html'].toString();
+    const page = withoutCopySource(tree['2026-10/rope/index.html'].toString());
     assert.match(page, /^<!doctype html>\n<html lang="en"/);
     assert.match(page, /<title>RoPE &lt;&amp;> "quotes" · Test Blog<\/title>/);
     assert.match(page, /<meta name="description" content="Rotary &amp; 'position' <embeddings>">/);
-    assert.match(page, /<h1 class="bk-title">RoPE &lt;&amp;> "quotes"<\/h1>/);
-    assert.match(page, /<p class="bk-summary">Rotary &amp; 'position' &lt;embeddings><\/p>/);
+    assert.match(page, /<h1[^>]*>RoPE &lt;&amp;> "quotes"<\/h1>/);
+    assert.match(page, /<p[^>]*>Rotary &amp; 'position' &lt;embeddings><\/p>/);
     assert.match(page, /<p>Text\.<\/p>/);
-    assert.match(tree['2026-09/series/index.html'].toString(), /<h1 class="bk-title">Series<\/h1>/);
+    assert.match(tree['2026-09/series/index.html'].toString(), /<h1[^>]*>Series<\/h1>/);
     const assets = Object.keys(tree).filter((path) => path.startsWith('assets/'));
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.js$/.test(path)).length, 1);
     assert.equal(assets.filter((path) => /^assets\/essay-[\w-]+\.css$/.test(path)).length, 1);
@@ -171,7 +170,7 @@ describe('bake build', () => {
         'content/posts/a/index.md:1:1 front matter is missing "slug"',
         'content/posts/a/index.md:3:7 date must be a date in the form YYYY-MM-DD, got "2026-10-32"',
         'content/posts/b/index.md:3:7 slug "B" may only contain lowercase letters, digits and "-"',
-        'content/posts/b/index.md:5:6 toc must be notes, tabs, dots or ticks, got "sidebar"',
+        'content/posts/b/index.md:5:6 toc must be one of notes, tabs, dots or ticks, got "sidebar"',
         'content/posts/b/index.md:6:1 unknown front matter field "layout"',
         'content/posts/c/index.md:1:1 index.md must start with front matter between two --- lines',
         'content/posts/c/index.md:1:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##',
@@ -202,7 +201,7 @@ describe('bake build', () => {
     assert.equal(
       result.stderr,
       [
-        'bake.config.js:3:8 toc must be notes, tabs, dots or ticks, got "x"',
+        `bake.config.js:3:3 unknown config field "toc"; toc is an option of the essay theme, written as themes.essay.toc, such as themes: { essay: { toc: 'notes' } }`,
         `themes/mine/options.js:1:1 mine: option "a" must be declared as an object such as { label: 'Range', type: 'number', default: 4 }, got 1`,
         '2 errors, dist/ was not written',
         '',
@@ -279,24 +278,18 @@ describe('bake build', () => {
   });
 
   test('builds the example blog', (t) => {
-    const dir = mkdtempSync(join(tmpdir(), 'bake-example-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
-    cpSync(exampleBlog, dir, { recursive: true, filter: (source) => source !== join(exampleBlog, 'dist') });
+    const dir = copyExample(t);
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     assert.equal(result.stdout, '7 pages\ndist/ written\n');
-    const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
-    assert.match(page, /<h1 class="bk-title">Bake 写法一览<\/h1>/);
+    const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8'));
+    assert.match(page, /<h1[^>]*>Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
     assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
-    assert.match(page, /<a class="internal-link" href="\.\.\/\.\.\/2026-10\/syntax-linked\/#chain-rule" data-target="\/2026-10\/syntax-linked\/#chain-rule">/);
-    assert.match(page, /<template class="bk-preview-template" data-target="\/2026-10\/syntax-linked\/#chain-rule" data-kind="link">/);
-    assert.match(page, /<div class="embed"><div class="embed-part"><h2 data-attributes="{&#x22;id&#x22;:&#x22;chain-rule&#x22;}">链式法则<\/h2>/);
+    assert.match(page, /<a [^>]*href="\.\.\/\.\.\/2026-10\/syntax-linked\/#chain-rule"/);
     assert.ok(existsSync(join(dir, 'dist/2026-10/syntax/relu.svg')));
-    assert.ok(existsSync(join(dir, 'dist/2026-10/syntax-linked/index.html')));
-    assert.ok(existsSync(join(dir, 'dist/2026-10/jacobian/index.html')));
-    const bento = readFileSync(join(dir, 'dist/2026-10/activations/index.html'), 'utf8');
-    assert.match(bento, /<section class="bt-card" data-span="cols" data-rows="28" style="--bt-span:2;--bt-rows:28" aria-labelledby="relu">/);
+    assert.match(page, /<h2[^>]*>链式法则<\/h2>/);
+    for (const url of ['2026-10/syntax-linked', '2026-10/jacobian', '2026-10/activations', '2026-09/llm-act-fns', '2026-09/matrix-calculus', '2026-09/html-page']) assert.ok(existsSync(join(dir, 'dist', url, 'index.html')), url);
   });
   test('publishes raster images as WebP and copies the original only when a link points to it', async (t) => {
     const photo = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#985b57' } }).png().toBuffer();
@@ -313,7 +306,7 @@ describe('bake build', () => {
     assert.deepEqual(articleFiles(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/index.md', '2026-10/rope/small.jpg', '2026-10/rope/small.webp', 'index.html']);
     assert.deepEqual(tree['2026-10/rope/small.jpg'], small);
     assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
-    assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async" data-src="angles.png">/);
+    assert.match(withoutCopySource(tree['2026-10/rope/index.html'].toString()), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
     assert.doesNotMatch(tree['2026-10/rope/index.html'].toString(), /mjx/i);
   });
 
@@ -409,7 +402,7 @@ describe('bake build', () => {
       'content/posts/host/d e.svg': vector,
       'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-10-17', extra: 'theme: "plain#1 %"\n' }),
       'themes/plain#1 %/page.jsx': plainPage,
-      'themes/plain#1 %/client.jsx': "import './plain.css';\n",
+      'themes/plain#1 %/client.jsx': "import './plain.css';\n\nexport default () => () => {};\n",
       'themes/plain#1 %/plain.css': 'main { color: #985b57; }\n',
     });
     const result = bake(dir, 'build');

@@ -21,8 +21,7 @@ export function resultWidths(example) {
 }
 
 export function renderHtml(node, context) {
-  const tree = toHast(node, { allowDangerousHtml: true, handlers: handlers(context) });
-  return toHtml(tree, { allowDangerousHtml: true });
+  return toHtml(hast(node, context), { allowDangerousHtml: true });
 }
 
 export function renderChildrenHtml(children, context) {
@@ -30,27 +29,45 @@ export function renderChildrenHtml(children, context) {
 }
 
 export function renderHast(children, context) {
-  return toHast({ type: 'root', children }, { allowDangerousHtml: true, handlers: handlers(context) });
+  return hast({ type: 'root', children }, context);
 }
 
 export function renderInlineHtml(children, context) {
-  const paragraph = toHast({ type: 'paragraph', children }, { allowDangerousHtml: true, handlers: handlers(context) });
+  const paragraph = hast({ type: 'paragraph', children }, context);
   return toHtml({ type: 'root', children: paragraph.children }, { allowDangerousHtml: true });
+}
+
+function hast(node, context) {
+  const tree = toHast(node, { allowDangerousHtml: true, handlers: handlers(context) });
+  if (context.excerpt?.mode !== 'preview') writeSourceOffsets(tree);
+  return tree;
+}
+
+// why: copying as Markdown maps a selection to the article source through these offsets
+function writeSourceOffsets(node) {
+  const { start, end } = node.position ?? {};
+  if (start?.offset !== undefined && end?.offset !== undefined) {
+    const offsets = `${start.offset} ${end.offset}`;
+    if (node.type === 'element') node.properties.dataSrc = offsets;
+    if (node.type === 'raw') node.value = node.value.replace(/^<mjx-container/, `<mjx-container data-src="${offsets}"`);
+    delete node.position;
+  }
+  for (const child of node.children ?? []) writeSourceOffsets(child);
 }
 
 function handlers(context) {
   const { excerpt } = context;
   const relocate = (href) => (excerpt === undefined ? href : `${excerpt.base}${href}`);
   return {
-    highlight: (state, node) => element('mark', {}, state.all(node)),
+    highlight: (state, node) => at(state, node, element('mark', {}, state.all(node))),
     heading(state, node) {
-      if (excerpt !== undefined) return element(`h${node.depth}`, writtenAttributes(node.attributes), state.all(node));
+      if (excerpt !== undefined) return at(state, node, element(`h${node.depth}`, writtenAttributes(node.attributes), state.all(node)));
       const result = defaultHandlers.heading(state, node);
       return { ...result, properties: { ...result.properties, ...writtenAttributes(node.attributes) } };
     },
     paragraph(state, node) {
       if (excerpt === undefined) return defaultHandlers.paragraph(state, node);
-      return element('p', {}, state.all(node));
+      return at(state, node, element('p', {}, state.all(node)));
     },
     html: (state, node) => raw(excerpt === undefined ? node.value : node.rawHtml.withoutIds),
     link(state, node) {
@@ -73,7 +90,7 @@ function handlers(context) {
       if (excerpt !== undefined) return undefined;
       const number = context.sidenoteNumber(node.identifier);
       const link = element('a', { href: fragmentOf(sidenoteId(number)) }, [text(String(number))]);
-      return element('sup', { className: ['sidenote-ref'], dataSidenote: number }, [link]);
+      return at(state, node, element('sup', { className: ['sidenote-ref'], dataSidenote: number }, [link]));
     },
     missingFootnote: (state, node) => text(`[^${node.label}]`),
     citation(state, node) {
@@ -82,41 +99,47 @@ function handlers(context) {
       const id = referenceId(node.key);
       const target = excerpt?.target(id);
       const properties = target === undefined ? {} : { dataTarget: target.address.text };
-      return element('a', { className: ['citation'], href: relocate(fragmentOf(id)), dataKey: node.key, ...properties }, [text(`[${number}]`)]);
+      return at(state, node, element('a', { className: ['citation'], href: relocate(fragmentOf(id)), dataKey: node.key, ...properties }, [text(`[${number}]`)]));
     },
     eqref(state, node) {
       const equation = context.equation(node.label);
       if (equation === undefined) return text(node.value);
-      return element('a', { className: ['eqref'], href: relocate(fragmentOf(equation.id)) }, [text(`(${equation.tag})`)]);
+      return at(state, node, element('a', { className: ['eqref'], href: relocate(fragmentOf(equation.id)) }, [text(`(${equation.tag})`)]));
     },
-    inlineMath: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
-    math: (state, node) => raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base)),
-    code: (state, node) => highlightCode(context.highlighter, node.value, node.lang ?? undefined),
+    inlineMath: (state, node) => at(state, node, raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base))),
+    math: (state, node) => at(state, node, raw(excerpt === undefined ? node.rendered : relocateMath(node.rendered, excerpt.base))),
+    code: (state, node) => at(state, node, highlightCode(context.highlighter, node.value, node.lang ?? undefined)),
     table: (state, node) => element('div', { className: ['table-scroll'] }, [defaultHandlers.table(state, node)]),
-    image: (state, node) => imageElement(node, true, excerpt, relocate),
+    image: (state, node) => at(state, node, imageElement(node, true, relocate)),
     figure(state, node) {
       const [image, caption] = node.children;
       const float = image.attributes.float === undefined ? {} : { dataFloat: image.attributes.float };
       const figcaption = caption === undefined ? [] : [element('figcaption', {}, state.all(caption))];
       const { boxWidth } = image.published;
       const style = boxWidth === undefined ? {} : { style: `width:${boxWidth}` };
-      return element('figure', { className: ['figure'], ...float, ...style }, [imageElement(image, false, excerpt, relocate), ...figcaption]);
+      return at(state, node, element('figure', { className: ['figure'], ...float, ...style }, [at(state, image, imageElement(image, false, relocate)), ...figcaption]));
     },
     blockquote(state, node) {
       const last = node.children.at(-1);
       const first = last?.type === 'paragraph' ? last.children[0] : undefined;
       if (node.children.length < 2 || first?.type !== 'text' || !first.value.startsWith(ATTRIBUTION_PREFIX)) {
-        return element('blockquote', {}, state.wrap(state.all(node), true));
+        return at(state, node, element('blockquote', {}, state.wrap(state.all(node), true)));
       }
       const quote = { ...node, children: node.children.slice(0, -1) };
       const source = { type: 'paragraph', children: [{ ...first, value: first.value.slice(ATTRIBUTION_PREFIX.length) }, ...last.children.slice(1)] };
-      return element('figure', { className: ['quote'] }, [
-        element('blockquote', {}, state.wrap(state.all(quote), true)),
-        element('figcaption', {}, state.all(source)),
-      ]);
+      return at(state, node, element('figure', { className: ['quote'] }, [element('blockquote', {}, state.wrap(state.all(quote), true)), at(state, last, element('figcaption', {}, state.all(source)))]));
     },
-    bakeBlock: (state, node) => blockElement(state, node, context),
+    bakeBlock(state, node) {
+      const result = blockElement(state, node, context);
+      for (const element of [result].flat()) state.patch(node, element);
+      return result;
+    },
   };
+}
+
+function at(state, node, result) {
+  state.patch(node, result);
+  return result;
 }
 
 function blockElement(state, node, context) {
@@ -132,7 +155,11 @@ function blockElement(state, node, context) {
       return element('div', { className: ['recap'] }, children());
     case 'references': {
       const id = (entry) => (context.excerpt === undefined ? { id: referenceId(entry.key) } : {});
-      const item = (entry) => element('li', { ...id(entry), value: entry.number, dataKey: entry.key }, state.all({ type: 'paragraph', children: entry.children }));
+      const written = new Map((node.children[0]?.children ?? []).map((written) => [written.children?.[0]?.children?.[0]?.key, written]));
+      const item = (entry) => {
+        const listed = element('li', { ...id(entry), value: entry.number, dataKey: entry.key }, state.all({ type: 'paragraph', children: entry.children }));
+        return written.has(entry.key) ? at(state, written.get(entry.key), listed) : listed;
+      };
       const cited = context.references().filter((entry) => entry.number !== undefined);
       const uncited = context.references().filter((entry) => entry.number === undefined);
       return [
@@ -149,7 +176,7 @@ function blockElement(state, node, context) {
     }
     case 'list-table':
       if (node.rows === undefined) return element('div', { dataBlock: node.name }, children());
-      return element('div', { className: ['table-scroll'] }, [listTable(state, node.rows)]);
+      return element('div', { className: ['table-scroll'] }, [listTable(state, node.children[0].children)]);
     case 'embed':
       return context.excerpt === undefined ? embedElement(context.embed(node)) : embedLinks(context.embedLinks(node));
     case '':
@@ -164,19 +191,12 @@ function blockElement(state, node, context) {
 }
 
 function componentElement(state, node, context) {
-  const { frame, frameWidth, height, narrowHeight, autoHeight } = node.component;
+  const { frame, frameWidth, height } = node.component;
   const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
   if (context.excerpt === undefined) properties.dataLine = node.position.start.line;
   if (!frame) properties.dataFrame = 'none';
-  if (autoHeight) properties.dataHeight = 'auto';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
-  const boxStyle = [
-    `--component-height:${height.height}`,
-    `--component-ratio:${height.ratio}`,
-    `--component-narrow-height:${narrowHeight.height}`,
-    `--component-narrow-ratio:${narrowHeight.ratio}`,
-  ].join(';');
-  const box = element('div', { className: ['component-box'], style: boxStyle }, []);
+  const box = element('div', { className: ['component-box'], ...(height === null ? {} : { style: `--component-height:${height.height};--component-ratio:${height.ratio}` }) }, []);
   const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
   return element('figure', properties, [box, ...caption]);
 }
@@ -197,7 +217,7 @@ function embedElement(parts) {
     parts.map((part) => {
       const number = part.number === undefined ? [] : [element('span', { className: ['embed-number'] }, [text(part.number)])];
       const source = element('p', { className: ['embed-source'] }, [element('a', { href: part.href }, [element('cite', {}, [text(part.article)]), ...number])]);
-      return element('div', { className: ['embed-part'] }, [...part.children, source]);
+      return element('div', { className: ['embed-part'], dataSrc: `${part.start} ${part.end}`, dataMarkdown: part.markdown }, [...part.children, source]);
     }),
   );
 }
@@ -207,10 +227,10 @@ function embedLinks(links) {
 }
 
 function listTable(state, [header, ...rows]) {
-  const row = (cells, tagName) => element('tr', {}, cells.map((cell) => element(tagName, {}, cellContent(state, cell))));
+  const row = (item, tagName) => at(state, item, element('tr', {}, item.children[0].children.map((cell) => at(state, cell, element(tagName, {}, cellContent(state, cell))))));
   return element('table', { className: ['list-table'] }, [
     element('thead', {}, [row(header, 'th')]),
-    element('tbody', {}, rows.map((cells) => row(cells, 'td'))),
+    element('tbody', {}, rows.map((item) => row(item, 'td'))),
   ]);
 }
 
@@ -220,12 +240,11 @@ function cellContent(state, cell) {
   return state.wrap(state.all(cell), true);
 }
 
-function imageElement(node, sized, excerpt, relocate) {
+function imageElement(node, sized, relocate) {
   const { width, height, boxWidth } = node.published;
   const src = RELATIVE_URL.test(node.published.src) ? relocate(node.published.src) : node.published.src;
   const style = sized && boxWidth !== undefined ? { style: `width:${boxWidth};height:auto` } : {};
-  const source = excerpt === undefined ? { dataSrc: node.url } : {};
-  return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...style, ...source, ...writtenAttributes(node.attributes) }, []);
+  return element('img', { src, alt: node.alt ?? '', width, height, loading: 'lazy', decoding: 'async', ...style, ...writtenAttributes(node.attributes) }, []);
 }
 
 function element(tagName, properties, children) {

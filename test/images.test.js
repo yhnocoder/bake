@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
 import { folder, outline, parse, parsed } from './article.js';
+import { article, bake, createBlog, validConfig } from './blog.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"/>';
 
@@ -45,7 +46,7 @@ describe('images', () => {
     assert.deepEqual([figure.type, figure.line, figure.endLine], ['figure', 7, 7]);
     assert.equal(
       outline(figure.html),
-      '<figure class="figure"><img src="plot.svg" alt="A plot" width="320" height="200" loading="lazy" decoding="async" data-src="plot.svg"><figcaption>Shape of $d_{ff}$ in <strong>FFN</strong>.</figcaption></figure>',
+      '<figure class="figure"><img src="plot.svg" alt="A plot" width="320" height="200" loading="lazy" decoding="async"><figcaption>Shape of $d_{ff}$ in <strong>FFN</strong>.</figcaption></figure>',
     );
   });
 
@@ -61,7 +62,7 @@ describe('images', () => {
     for (const [attributes, boxWidth, size, written] of cases) {
       const [figure] = (await parsed(`![](plot.svg)${attributes}\n`, options)).intro;
       const data = JSON.stringify(written).replaceAll('"', '&#x22;');
-      assert.equal(figure.html, `<figure class="figure" style="width:${boxWidth}"><img src="plot.svg" alt="" ${size} loading="lazy" decoding="async" data-src="plot.svg" data-attributes="${data}"></figure>`, attributes);
+      assert.equal(figure.html, `<figure class="figure" style="width:${boxWidth}"><img src="plot.svg" alt="" ${size} loading="lazy" decoding="async" data-attributes="${data}"></figure>`, attributes);
     }
   });
 
@@ -71,7 +72,7 @@ describe('images', () => {
     assert.deepEqual(
       blocks.map((block) => [block.type, block.line, block.endLine, block.html]),
       [
-        ['figure', 7, 7, '<figure class="figure" data-float="left" style="width:280px"><img src="plot.svg" alt="ReLU" width="320" height="200" loading="lazy" decoding="async" data-src="plot.svg" data-attributes="{&#x22;width&#x22;:&#x22;280px&#x22;,&#x22;float&#x22;:&#x22;left&#x22;}"></figure>'],
+        ['figure', 7, 7, '<figure class="figure" data-float="left" style="width:280px"><img src="plot.svg" alt="ReLU" width="320" height="200" loading="lazy" decoding="async" data-attributes="{&#x22;width&#x22;:&#x22;280px&#x22;,&#x22;float&#x22;:&#x22;left&#x22;}"></figure>'],
         ['paragraph', 8, 9, '<p>ReLU is <em>zero</em> below 0.\nIt is linear above.</p>'],
       ],
     );
@@ -83,8 +84,8 @@ describe('images', () => {
     assert.deepEqual(
       blocks.map((block) => block.html),
       [
-        '<p>Curve <img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-src="plot.svg" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"> here.</p>',
-        '<ul>\n<li><img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-src="plot.svg" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"></li>\n</ul>',
+        '<p>Curve <img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"> here.</p>',
+        '<ul>\n<li><img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"></li>\n</ul>',
       ],
     );
   });
@@ -93,19 +94,12 @@ describe('images', () => {
     const avif = sharp({ create: { width: 48, height: 24, channels: 3, background: '#2a78d6' } }).avif().toBuffer();
     const options = { folder: await imageFolder(t, { 'photo.avif': avif }) };
     const structure = await parsed('![A photo](photo.avif)\n', options);
-    assert.equal(structure.intro[0].html, '<figure class="figure"><img src="photo.avif" alt="A photo" width="48" height="24" loading="lazy" decoding="async" data-src="photo.avif"></figure>');
-    assert.deepEqual(structure.images, []);
-    assert.equal(structure.image, 'photo.avif');
+    assert.equal(structure.intro[0].html, '<figure class="figure"><img src="photo.avif" alt="A photo" width="48" height="24" loading="lazy" decoding="async"></figure>');
   });
 
   test('publishes raster images as WebP no wider than twice their largest display width', async (t) => {
     const options = { folder: await imageFolder(t, { 'wide.png': png(3000, 1500), 'photo.jpg': sharp({ create: { width: 900, height: 600, channels: 3, background: '#fff' } }).jpeg().toBuffer(), 'small.png': png(400, 200) }) };
     const article = await parsed('![](wide.png)\n\n![](photo.jpg){width=300px}\n\n![](small.png){width=200px}\n\n![](small.png){width=50%}\n', options);
-    assert.deepEqual(article.images, [
-      { source: 'wide.png', path: 'wide.webp', width: 2680, lossless: true, keepSource: false },
-      { source: 'photo.jpg', path: 'photo.webp', width: 600, lossless: false, keepSource: false },
-      { source: 'small.png', path: 'small.webp', width: 400, lossless: true, keepSource: false },
-    ]);
     assert.deepEqual(
       article.intro.map((block) => /<img src="([^"]*)" alt="" width="(\d+)" height="(\d+)"/.exec(block.html).slice(1)),
       [
@@ -117,27 +111,48 @@ describe('images', () => {
     );
   });
 
-  test('keeps the original of an image when a link, a URL attribute such as src, href or poster, or a srcset address in raw HTML names its whole path', async (t) => {
-    const options = { folder: await imageFolder(t, { 'a.png': png(40, 20) }) };
-    const keepSource = async (body) => (await parsed(`![](a.png)\n\n${body}\n`, options)).images[0].keepSource;
-    assert.equal(await keepSource('[original](./a.png)'), true);
-    assert.equal(await keepSource('<a href="a.png">original</a>'), true);
-    assert.equal(await keepSource('<IMG SRC=a.png>'), true);
-    assert.equal(await keepSource('<img srcset="small.png 1x, a.png 2x">'), true);
-    assert.equal(await keepSource('<video src="clip.mp4" poster="a.png"></video>'), true);
-    assert.equal(await keepSource('<object data="a.png"></object>'), true);
-    assert.equal(await keepSource('<picture><source srcset="a.png"></picture>'), true);
-    assert.equal(await keepSource('<img src="banana.png">'), false);
-    assert.equal(await keepSource('<img src="x.png" alt="a.png">'), false);
-    assert.equal(await keepSource('<!-- a.png -->'), false);
+  test('publishes the original of an image when a link, a URL attribute such as src, href or poster, or a srcset address in raw HTML names its whole path', async (t) => {
+    const references = {
+      a1: '[original](./a1.png)',
+      a2: '<a href="a2.png">original</a>',
+      a3: '<IMG SRC=a3.png>',
+      a4: '<img srcset="small.png 1x, a4.png 2x">',
+      a5: '<video src="clip.mp4" poster="a5.png"></video>',
+      a6: '<object data="a6.png"></object>',
+      a7: '<picture><source srcset="a7.png"></picture>',
+      b1: '<img src="xb1.png">',
+      b2: '<img src="x.png" alt="b2.png">',
+      b3: '<!-- b3.png -->',
+    };
+    const image = await png(40, 20);
+    const body = Object.entries(references).map(([name, reference]) => `![](${name}.png)\n\n${reference}\n`).join('\n');
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }), ...Object.fromEntries(Object.keys(references).map((name) => [`content/posts/rope/${name}.png`, image])) });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const published = readdirSync(join(dir, 'dist/2026-10/rope')).filter((name) => name.endsWith('.png'));
+    assert.deepEqual(published.sort(), ['a1.png', 'a2.png', 'a3.png', 'a4.png', 'a5.png', 'a6.png', 'a7.png']);
   });
 
-  test('records the published path of the first image in document order, inside sidenotes too', async (t) => {
-    const options = { folder: await imageFolder(t, { 'plot.svg': svg, 'photo.png': png(40, 20), 'note.png': png(40, 20) }) };
-    assert.equal((await parsed('Text.\n\n![](photo.png)\n\n![](plot.svg)\n', options)).image, 'photo.webp');
-    assert.equal((await parsed('Text.\n\n![](plot.svg)\n\n![](photo.png)\n', options)).image, 'plot.svg');
-    assert.equal((await parsed('A note[^n].\n\n![](photo.png)\n\n[^n]: ![](note.png)\n', options)).image, 'note.webp');
-    assert.equal((await parsed('No images.\n', options)).image, undefined);
+  test('shows the first image of an article in document order, inside sidenotes too, on its homepage card', async (t) => {
+    const photo = await png(40, 20);
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/photo/index.md': article({ title: 'Photo', slug: 'photo', date: '2026-10-04', body: 'Text.\n\n![](photo.png)\n\n![](plot.svg)\n' }),
+      'content/posts/photo/photo.png': photo,
+      'content/posts/photo/plot.svg': svg,
+      'content/posts/plot/index.md': article({ title: 'Plot', slug: 'plot', date: '2026-10-03', body: 'Text.\n\n![](plot.svg)\n\n![](photo.png)\n' }),
+      'content/posts/plot/photo.png': photo,
+      'content/posts/plot/plot.svg': svg,
+      'content/posts/note/index.md': article({ title: 'Note', slug: 'note', date: '2026-10-02', body: 'A note[^n].\n\n![](photo.png)\n\n[^n]: ![](note.png)\n' }),
+      'content/posts/note/photo.png': photo,
+      'content/posts/note/note.png': photo,
+      'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-10-01', body: 'No images.\n' }),
+    });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const cards = readFileSync(join(dir, 'dist/index.html'), 'utf8').split('<a class="bk-card"').slice(1);
+    assert.deepEqual(
+      cards.map((card) => /<img src="([^"]*)"/.exec(card)?.[1] ?? null),
+      ['2026-10/photo/photo.webp', '2026-10/plot/plot.svg', '2026-10/note/note.webp', null],
+    );
   });
 
   test('reports wrong image attributes at their opening brace', async (t) => {

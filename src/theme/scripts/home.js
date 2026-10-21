@@ -1,5 +1,6 @@
 import { labelsFor } from '../labels.js';
 import { storageKey } from '../settings.js';
+import { markCurrent } from './current.js';
 import { EASING, oncePerFrame, reducedMotion } from './motion.js';
 import { withoutHover } from './screens.js';
 
@@ -111,7 +112,7 @@ function startCurrentChip(home) {
   const groups = [...home.querySelectorAll('[data-grouping="category"] > .bk-group')];
   const bar = home.querySelector('.bk-home-bar');
   let pinned = null;
-  const mark = (id) => chips.forEach((chip) => chip.classList.toggle('is-current', chip.dataset.target === id));
+  const mark = (id) => chips.forEach((chip) => markCurrent(chip, chip.dataset.target === id));
   const update = oncePerFrame(() => {
     if (pinned !== null || document.documentElement.dataset.group !== 'category') return;
     const line = bar.offsetHeight + innerHeight * CURRENT_LINE;

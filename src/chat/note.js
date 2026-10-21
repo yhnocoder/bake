@@ -165,3 +165,18 @@ function labelOf(markdown, link) {
 function hastText(node) {
   return node.type === 'text' ? node.value : (node.children ?? []).map(hastText).join('');
 }
+
+export function ownArticle(root, catalog, article, context) {
+  if (article === null || context.article === null) return null;
+  const entry = catalogEntry(root, catalog, article.address) ?? { url: article.address.slice(1), title: article.title, tags: [], sections: outlineSections(context.article.outline) };
+  return { entry, source: context.article.source };
+}
+
+function outlineSections(outline) {
+  const sections = [];
+  for (const heading of outline) {
+    if (heading.depth === 2) sections.push({ id: heading.id, number: String(sections.length + 1).padStart(2, '0'), title: heading.title, subsections: [] });
+    else sections.at(-1)?.subsections.push({ id: heading.id, title: heading.title });
+  }
+  return sections;
+}

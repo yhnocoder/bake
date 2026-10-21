@@ -1,10 +1,8 @@
 @media print {
   :root {
-    --body-width: 100%;
-    --wide-width: 100%;
-    --page-width: 100%;
-    --body-left: 0px;
-    --page-shift: 0px;
+    --code-white-space: pre-wrap;
+    --code-overflow-wrap: anywhere;
+    --cell-white-space: normal;
   }
 
   body {
@@ -12,14 +10,7 @@
     font-size: 11.5pt;
   }
 
-  .bk-shell {
-    min-height: 0;
-    padding: 0;
-  }
-
-  .bk-toc,
-  .bk-toc-ui,
-  .bk-settings,
+  [data-edge],
   .bk-toast,
   .bk-preview,
   .bk-copy,
@@ -31,42 +22,35 @@
     padding-top: 0;
   }
 
-  .bk-article :is(pre.shiki, .table-scroll, mjx-container[display]):where(:not(.component-box *)) {
-    overflow: visible;
-    background-image: none;
-  }
+  @scope (.bk-article) to (.component-box) {
+    :scope :is(pre.shiki, .table-scroll, mjx-container[display]) {
+      overflow: visible;
+      background-image: none;
+    }
 
-  .bk-article pre.shiki:where(:not(.component-box *)) {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
+    :scope details.fold::details-content {
+      content-visibility: visible;
+      height: auto;
+      opacity: 1;
+    }
 
-  .bk-article :is(th, td):where(:not(.component-box *)) {
-    white-space: normal;
-  }
+    :scope details.fold > summary::after {
+      display: none;
+    }
 
-  .bk-article details.fold:where(:not(.component-box *))::details-content {
-    content-visibility: visible;
-    height: auto;
-    opacity: 1;
-  }
+    :scope .example {
+      grid-template-columns: minmax(0, 1fr);
+    }
 
-  .bk-article details.fold > summary:where(:not(.component-box *))::after {
-    display: none;
-  }
+    .bk-block,
+    :scope :is(.figure, .component, .aside, .quote, blockquote, .example) {
+      break-inside: avoid;
+      box-shadow: none;
+    }
 
-  .bk-article .example:where(:not(.component-box *)) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .bk-block,
-  .bk-article :is(.figure, .component, .aside, .quote, blockquote, .example):where(:not(.component-box *)) {
-    break-inside: avoid;
-    box-shadow: none;
-  }
-
-  .bk-article a:where(:not(.component-box *)) {
-    color: inherit;
-    text-decoration: none;
+    :scope a {
+      color: inherit;
+      text-decoration: none;
+    }
   }
 }

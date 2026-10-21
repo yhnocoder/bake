@@ -11,25 +11,31 @@ const closing = new WeakSet();
 const running = new WeakMap();
 
 export function startFolds(article) {
-  article.addEventListener('click', (event) => {
+  const openedForPrint = [];
+  const click = (event) => {
     const summary = event.target.closest('summary');
     const fold = summary?.parentElement;
     if (fold === null || fold === undefined || !fold.matches('details.fold') || !article.contains(fold)) return;
     event.preventDefault();
     toggleFold(fold);
-  });
-  const openedForPrint = [];
-  addEventListener('beforeprint', () => {
+  };
+  const beforePrint = () => {
     for (const fold of article.querySelectorAll('details.fold')) {
       const wasOpen = fold.open && !closing.has(fold);
       settle(fold, true);
       if (!wasOpen) openedForPrint.push(fold);
     }
-  });
-  addEventListener('afterprint', () => {
+  };
+  const afterPrint = () => {
     for (const fold of openedForPrint.splice(0)) fold.open = false;
     requestLayout();
-  });
+  };
+  const controller = new AbortController();
+  const { signal } = controller;
+  article.addEventListener('click', click, { signal });
+  addEventListener('beforeprint', beforePrint, { signal });
+  addEventListener('afterprint', afterPrint, { signal });
+  return () => controller.abort();
 }
 
 export function openFoldsAround(target) {

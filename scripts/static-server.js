@@ -4,7 +4,7 @@ import { join, resolve, sep } from 'node:path';
 import { createGzip } from 'node:zlib';
 import { contentType } from '../src/content-types.js';
 
-export async function serveStatic(dir, { gzip = false } = {}) {
+export async function serveStatic(dir, { gzip = false, localhost = false } = {}) {
   const root = resolve(dir);
   const assets = join(root, 'assets');
   const server = createServer((request, response) => {
@@ -35,7 +35,8 @@ export async function serveStatic(dir, { gzip = false } = {}) {
   };
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    // why: the AI chat appears only at localhost
+    origin: `http://${localhost ? 'localhost' : '127.0.0.1'}:${server.address().port}`,
     close: () =>
       new Promise((done) => {
         server.close(done);

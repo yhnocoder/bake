@@ -10,7 +10,11 @@ let toastTimer;
 export function startToast() {
   const host = document.createElement('div');
   document.body.append(host);
-  render(() => <Toast />, host);
+  const dispose = render(() => <Toast />, host);
+  return () => {
+    dispose();
+    host.remove();
+  };
 }
 
 export function showToast(text) {

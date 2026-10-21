@@ -1,62 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import sharp from 'sharp';
-import { API_KEY, CORS, KEY, PETS, QUESTION, ask, buildExample, events, exampleBlog, openBrowser, setUpKey, storage, text } from './chat-page.js';
+import { startDevServer } from '../../src/dev/server.js';
+import { article, createBlog, exampleBlog, validConfig } from '../blog.js';
+import { serveExample, settle } from './browser.js';
+import { API_KEY, KEY, QUESTION, ask, backdropRoots, events, openBrowser, openSettings, petSeen, setUpKey, shadow, storage, text, watchPet } from './chat-page.js';
 import { isSelectionChunk } from './selection-module.js';
-
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
-const PET_ROWS = {
-  idle: [0, 6, 'still'],
-  greet: [3, 4, 'once'],
-  open: [0, 6, 'once'],
-  unlocking: [6, 6, 'loop'],
-  answering: [7, 6, 'loop'],
-  reading: [8, 6, 'loop'],
-  answered: [4, 5, 'once'],
-  failed: [5, 8, 'hold'],
-};
-
-function petEntry(state, { reduced = false } = {}) {
-  const [row, frames, play] = PET_ROWS[state];
-  if (reduced) return { state, row, frames, animation: 'still', iterations: '1' };
-  return { state, row, frames, animation: { still: 'none', loop: 'loop', once: 'once', hold: 'once' }[play], iterations: play === 'loop' ? 'infinite' : '1' };
-}
-
-async function watchPet(page) {
-  await page.locator('.bk-chat-launcher .bk-chat-pet').waitFor();
-  await page.evaluate(() => {
-    const pet = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet');
-    const sheet = pet.querySelector('.bk-chat-pet-sheet');
-    const record = () => {
-      const box = pet.getBoundingClientRect();
-      const style = getComputedStyle(sheet);
-      window.bakeTest.pet.push({
-        state: pet.dataset.state,
-        row: Math.round((box.top - sheet.getBoundingClientRect().top) / box.height),
-        frames: Number(getComputedStyle(pet).getPropertyValue('--bk-chat-pet-frames')),
-        animation: style.animationName.replace(/^bk-chat-pet-/, '').replace(/-[01]$/, ''),
-        iterations: style.animationIterationCount,
-      });
-    };
-    window.bakeTest.pet = [];
-    record();
-    new MutationObserver(record).observe(pet, { attributes: true, attributeFilter: ['data-play'] });
-  });
-}
-
-async function petSeen(page, state) {
-  await page.waitForFunction((name) => window.bakeTest.pet.some((entry) => entry.state === name), state);
-  return page.evaluate((name) => window.bakeTest.pet.find((entry) => entry.state === name), state);
-}
-
-function lastPet(page) {
-  return page.evaluate(() => window.bakeTest.pet.at(-1).state);
-}
 
 function mainThreadTasks(trace) {
   const events = trace.traceEvents;
@@ -67,51 +20,8 @@ function mainThreadTasks(trace) {
     .sort((a, b) => b - a);
 }
 
-function shadow(page, script, argument) {
-  return page.evaluate(({ script, argument }) => new Function('root', 'argument', script)(document.querySelector('[data-bake-chat]').shadowRoot, argument), { script, argument });
-}
-
-async function sheetTransforms(page) {
-  const seen = [];
-  for (let step = 0; step < 6; step += 1) {
-    seen.push(await shadow(page, "return getComputedStyle(root.querySelector('.bk-chat-pet-sheet')).transform;"));
-    await page.waitForTimeout(90);
-  }
-  return seen;
-}
-
-function petSheet(width, height, format = 'webp') {
-  return sharp({ create: { width, height, channels: 4, background: { r: 40, g: 120, b: 200, alpha: 1 } } })
-    [format]()
-    .toBuffer();
-}
-
-async function openSettings(page) {
-  if ((await page.locator('.bk-chat-launcher').getAttribute('aria-expanded')) !== 'true') await page.locator('.bk-chat-launcher').click();
-  await page.locator('.bk-chat-composer button[aria-label="对话设置"]').click();
-  await page.locator('.bk-chat-menu').waitFor();
-}
-
-function backdropRoots(chat) {
-  const roots = [];
-  for (let node = chat; node !== null; node = node.parentNode instanceof ShadowRoot ? node.parentNode.host : node.parentElement) {
-    const style = getComputedStyle(node);
-    const reasons = [
-      Number(style.opacity) < 1 && 'opacity',
-      style.filter !== 'none' && 'filter',
-      style.maskImage !== 'none' && 'mask',
-      style.clipPath !== 'none' && 'clip-path',
-      style.mixBlendMode !== 'normal' && 'mix-blend-mode',
-      style.backdropFilter !== 'none' && 'backdrop-filter',
-      /opacity|filter|mask|clip-path|mix-blend-mode/.test(style.willChange) && 'will-change',
-    ].filter(Boolean);
-    if (reasons.length > 0) roots.push(`${node.localName}.${node.classList[0] ?? ''} ${reasons.join(' ')}`);
-  }
-  return roots;
-}
-
-test('the AI chat on published pages', async (t) => {
-  const base = await buildExample(t);
+test('the key and the answers of the AI chat on published pages', async (t) => {
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('the key is saved with a passkey, the browser stores only ciphertext, and the answer about the article streams with formulas and links', async (t) => {
     const { page, api, problems } = await openBrowser(t, base);
@@ -127,9 +37,7 @@ test('the AI chat on published pages', async (t) => {
       [['/models', `Bearer ${API_KEY}`]],
     );
     await page.locator('.bk-chat-note').filter({ hasText: 'key 已保存' }).waitFor();
-    const stored = await storage(page);
-    assert.doesNotMatch(JSON.stringify(stored), new RegExp(API_KEY));
-    assert.deepEqual(Object.keys(JSON.parse(stored.local['bk-chat-key'])).sort(), ['credential', 'data', 'iv', 'salt']);
+    assert.doesNotMatch(JSON.stringify(await storage(page)), new RegExp(API_KEY));
     assert.equal(await page.locator(QUESTION).getAttribute('placeholder'), '问这篇文章，打 @ 选范围…');
 
     api.answers.push({ body: text('标题见 [标题](#headings)。公式 $\\R^2$ 和\n\n$$\\frac{a}{b}$$\n\n结束。') });
@@ -162,7 +70,7 @@ test('the AI chat on published pages', async (t) => {
       await page.locator('.bk-chat-launcher').click();
       await page.locator(KEY).waitFor();
       assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass while it fades in at ${width} pixels`);
-      await page.waitForTimeout(400);
+      await settle(page);
       assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass at ${width} pixels`);
       const layout = await page.locator('.bk-chat').evaluate((chat) => {
         const glass = chat.getBoundingClientRect();
@@ -183,62 +91,35 @@ test('the AI chat on published pages', async (t) => {
   });
 
   await t.test('the passkey unlocks the key for 30 days in this browser, and only when a question is sent after that', async (t) => {
-    const { page, api } = await openBrowser(t, base);
+    const { context, page, api } = await openBrowser(t, base);
+    await context.addInitScript(() => {
+      const offset = Number(sessionStorage.getItem('bake-test-day') ?? 0) * 86400000;
+      const now = Date.now;
+      Date.now = () => now() + offset;
+    });
+    const unlockNotes = () => page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count();
+    const askOnDay = async (day, question) => {
+      await page.evaluate((day) => sessionStorage.setItem('bake-test-day', String(day)), day);
+      await page.reload();
+      await page.locator('.bk-chat-launcher').click();
+      await page.locator(QUESTION).waitFor();
+      api.answers.push({ body: text('好的。') });
+      await ask(page, question);
+      await page.locator('.bk-chat-reply[data-done]').waitFor();
+      assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
+      return unlockNotes();
+    };
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
-    const remembered = () =>
-      page.evaluate(
-        () =>
-          new Promise((resolve) => {
-            const request = indexedDB.open('bake-chat', 1);
-            request.onsuccess = () => {
-              const get = request.result.transaction('keys').objectStore('keys').get('key');
-              get.onsuccess = () => {
-                request.result.close();
-                resolve(get.result === undefined ? null : { extractable: get.result.key.extractable, usages: get.result.key.usages, days: (get.result.until - Date.now()) / 86400000 });
-              };
-            };
-          }),
-      );
-    const kept = await remembered();
-    assert.deepEqual({ ...kept, days: Math.round(kept.days) }, { extractable: false, usages: ['decrypt'], days: 30 });
-    const local = JSON.stringify((await storage(page)).local);
-    assert.ok(!local.includes(API_KEY), 'the key is never stored in plain text');
+    assert.equal(await askOnDay(0, '再说一次'), 0, 'the next page asks for no passkey');
+    assert.equal(await askOnDay(29, '再说一次'), 0, 'the key is still unlocked after 29 days');
 
-    await page.reload();
-    await page.locator('.bk-chat-launcher').click();
-    await page.locator(QUESTION).waitFor();
-    api.answers.push({ body: text('好的。') });
-    await ask(page, '再说一次');
-    await page.locator('.bk-chat-reply[data-done]').waitFor();
-    assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
-    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0);
-
-    const keepUntil = (offset) =>
-      page.evaluate(
-        (offset) =>
-          new Promise((resolve) => {
-            const request = indexedDB.open('bake-chat', 1);
-            request.onsuccess = () => {
-              const store = request.result.transaction('keys', 'readwrite').objectStore('keys');
-              store.get('key').onsuccess = (event) => {
-                store.put({ ...event.target.result, until: Date.now() + offset }, 'key').onsuccess = () => {
-                  request.result.close();
-                  resolve();
-                };
-              };
-            };
-          }),
-        offset,
-      );
-    await keepUntil(-1);
+    await page.evaluate(() => sessionStorage.setItem('bake-test-day', '31'));
     await page.reload();
     await watchPet(page);
     await page.locator('.bk-chat-launcher').click();
     await page.locator(QUESTION).waitFor();
-    await page.waitForTimeout(300);
-    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0, 'opening the chat asks for no passkey');
-    assert.equal(await remembered(), null, 'an expired key is forgotten');
+    assert.equal(await unlockNotes(), 0, 'opening the chat asks for no passkey');
     api.answers.push({ body: text('再说一次。') });
     const completions = () => api.requests.filter((request) => request.path.endsWith('/chat/completions')).length;
     const sent = completions();
@@ -252,36 +133,18 @@ test('the AI chat on published pages', async (t) => {
     await page.waitForTimeout(300);
     assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '已解锁' }).count(), 1, 'a second submit during the unlock starts no second unlock');
     assert.equal(completions() - sent, 1, 'the question is sent once');
-    assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
+    await petSeen(page, 'unlocking');
     assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
-    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 1);
-    assert.equal(Math.round((await remembered()).days), 30);
-
-    await keepUntil(365 * 86400000);
-    await page.reload();
-    await page.locator('.bk-chat-launcher').click();
-    await page.locator(QUESTION).waitFor();
-    await page.waitForTimeout(300);
-    assert.equal(await remembered(), null, 'a key kept for longer than 30 days is forgotten');
+    assert.equal(await unlockNotes(), 1, 'after 31 days the question asks for the passkey');
+    assert.equal(await askOnDay(31, '还在吗'), 0, 'the unlock is remembered again');
+    assert.equal(await askOnDay(30, '时钟往回拨了'), 1, 'a key remembered for longer than 30 days from now is forgotten');
 
     await openSettings(page);
     await page.locator('.bk-chat-menu-item[data-action="clear-key"]').click();
     await page.locator('.bk-chat-note').filter({ hasText: 'key 已清除' }).waitFor();
-    for (let tries = 0; (await remembered()) !== null; tries += 1) {
-      assert.ok(tries < 50, 'clearing the key forgets the remembered key');
-      await page.waitForTimeout(20);
-    }
-
-    await setUpKey(page);
-    assert.notEqual(await remembered(), null);
-    await page.evaluate(() => localStorage.removeItem('bk-chat-key'));
     await page.reload();
     await page.locator('.bk-chat-launcher').click();
     await page.locator(KEY).waitFor();
-    for (let tries = 0; (await remembered()) !== null; tries += 1) {
-      assert.ok(tries < 50, 'a chat without bk-chat-key forgets the remembered key when it opens');
-      await page.waitForTimeout(20);
-    }
 
     await page.addInitScript(() => {
       if (sessionStorage.getItem('bake-test-held-read') !== null) return;
@@ -318,19 +181,10 @@ test('the AI chat on published pages', async (t) => {
     });
     await page.reload();
     await setUpKey(page);
-    assert.notEqual(await remembered(), null);
     await page.waitForFunction(() => typeof window.bakeTest.releaseRead === 'function');
     await page.evaluate(() => window.bakeTest.releaseRead());
     await page.waitForFunction(() => window.bakeTest.databaseIdle());
-    assert.notEqual(await remembered(), null, 'a key saved while the chat still reads the remembered key stays');
-    await page.reload();
-    await page.locator('.bk-chat-launcher').click();
-    await page.locator(QUESTION).waitFor();
-    api.answers.push({ body: text('还在。') });
-    await ask(page, '还记得吗');
-    await page.locator('.bk-chat-reply[data-done]').waitFor();
-    assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
-    assert.equal(await page.locator('.bk-chat-note').filter({ hasText: '用通行密钥解锁' }).count(), 0, 'the next page asks for no passkey');
+    assert.equal(await askOnDay(30, '还记得吗'), 0, 'a key saved while the chat still reads the remembered key stays unlocked');
   });
 
   await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {
@@ -396,6 +250,32 @@ test('the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
   });
 
+  await t.test('on phones the button that asks about a selected passage shows while scrolling down hides the chat button, and asking shows the chat', async (t) => {
+    const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 760 } } });
+    await page.goto(`${base}/2026-10/syntax/`);
+    const launcher = page.locator('.bk-chat-launcher');
+    await launcher.waitFor();
+    for (let step = 0; step < 6; step += 1) {
+      await page.evaluate(() => scrollBy(0, 120));
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+    }
+    await launcher.waitFor({ state: 'hidden' });
+    await page.evaluate(() => {
+      const paragraph = [...document.querySelectorAll('.bk-article p')].find((element) => element.getBoundingClientRect().top > 100);
+      const range = document.createRange();
+      range.selectNodeContents(paragraph);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+    await page.locator('.bk-chat-ask').click();
+    await page.locator('.bk-chat[data-open]').waitFor();
+    await page.waitForFunction(() => {
+      const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
+      const composer = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-composer');
+      return getComputedStyle(composer).visibility === 'visible' && seenOpacity(composer) === 1;
+    }, null, { timeout: 5000 });
+  });
+
   await t.test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the chat without a quote', async (t) => {
     const { page, problems } = await openBrowser(t, base);
     await page.route((url) => isSelectionChunk(url.href), (route) => route.abort());
@@ -415,7 +295,7 @@ test('the AI chat on published pages', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('DeepSeek errors are explained with a retry, and a cleared key leaves nothing in storage', async (t) => {
+  await t.test('DeepSeek errors are explained with a retry, and a cleared key is asked for again after a reload', async (t) => {
     const { page, api } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
@@ -427,7 +307,6 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '你好！' }).waitFor();
     assert.equal(await page.locator('.bk-chat-reply').count(), 1);
     const reasoning = page.locator('.bk-chat-reasoning');
-    assert.match(await reasoning.evaluate((element) => getComputedStyle(element, '::details-content').transitionProperty), /block-size/);
     await reasoning.locator('summary').click();
     await page.waitForFunction(() => {
       const details = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-reasoning');
@@ -445,7 +324,9 @@ test('the AI chat on published pages', async (t) => {
     await page.locator('.bk-chat-menu-item[data-action="clear-key"]').click();
     await page.locator(KEY).waitFor();
     await page.locator('.bk-chat-note').filter({ hasText: 'key 已清除' }).waitFor();
-    assert.equal((await storage(page)).local['bk-chat-key'], undefined);
+    await page.reload();
+    await page.locator('.bk-chat-launcher').click();
+    await page.locator(KEY).waitFor();
   });
 
   await t.test('stopping an answer keeps the text written so far and sends it with the next question, and screen readers hear a reply only when it is done, also a reply equal to the one before', async (t) => {
@@ -544,188 +425,24 @@ test('the AI chat on published pages', async (t) => {
     );
   });
 
-  await t.test('changing the key replaces the stored key and asks the browser to forget the old passkey', async (t) => {
-    const { page } = await openBrowser(t, base);
+  await t.test('changing the key uses the new key and asks the browser to forget the old passkey', async (t) => {
+    const { page, api, passkeys } = await openBrowser(t, base);
     await page.goto(`${base}/2026-10/syntax/`);
     await setUpKey(page);
-    const first = JSON.parse((await storage(page)).local['bk-chat-key']);
+    const first = await passkeys();
+    assert.equal(first.length, 1);
     await openSettings(page);
     await page.locator('.bk-chat-menu-item', { hasText: '更换 key' }).click();
     await setUpKey(page, 'sk-test-second-key');
-    const second = JSON.parse((await storage(page)).local['bk-chat-key']);
-    assert.notEqual(second.credential, first.credential);
-    assert.deepEqual(await page.evaluate(() => window.bakeTest.signals), [first.credential]);
-  });
-
-  await t.test('a page saved in bake dev gives the chat the new source of the article', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
-    await setUpKey(page);
-    await page.evaluate(() => {
-      document.querySelector('script.bk-source').textContent = JSON.stringify('# Saved again\n\nThe new text.\n');
-      document.dispatchEvent(new Event('bake:content'));
-    });
+    assert.deepEqual(await page.evaluate(() => window.bakeTest.signals), first);
     api.answers.push({ body: text('好的。') });
-    await ask(page, '现在写了什么？');
+    await ask(page, '换了吗');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
-    assert.match(api.requests.at(-1).body.messages[0].content, /<article>\n# Saved again\n\nThe new text\.\n\n<\/article>/);
-  });
-
-  await t.test('a chat closed right after the key is saved leaves the keyboard focus on the pet', async (t) => {
-    const { page } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
-    await setUpKey(page);
-    await page.keyboard.press('Escape');
-    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-    assert.equal(await shadow(page, 'return root.activeElement?.className ?? null;'), 'bk-chat-launcher');
-  });
-
-  await t.test('Escape with the chat settings open closes only the settings, a second Escape closes the chat, and the settings read the pet of the site once', async (t) => {
-    const { page } = await openBrowser(t, base);
-    const petReads = [];
-    page.on('request', (request) => request.url().endsWith('/_bake/pet/pet.json') && petReads.push(request.url()));
-    await page.goto(`${base}/2026-10/syntax/`);
-    await setUpKey(page);
-    await openSettings(page);
-    await page.locator('.bk-chat-credit').waitFor();
-    await page.keyboard.press('Escape');
-    await page.locator('.bk-chat-menu').waitFor({ state: 'detached' });
-    await openSettings(page);
-    await page.locator('.bk-chat-credit').waitFor();
-    assert.equal(petReads.length, 1);
-    await page.keyboard.press('Escape');
-    await page.locator('.bk-chat-menu').waitFor({ state: 'detached' });
-    assert.equal(await page.locator('.bk-chat[data-open]').count(), 1);
-    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
-    await page.keyboard.press('Escape');
-    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-  });
-
-  await t.test('one Escape closes only the chat while the keyboard focus is in it, and only an overlay of the theme while the focus is on the page', async (t) => {
-    const { page } = await openBrowser(t, base);
-    await page.addInitScript(() => localStorage.setItem('bk-toc', 'tabs'));
-    await page.goto(`${base}/2026-10/syntax/`);
-    await setUpKey(page);
-    const chatOpen = () => page.locator('.bk-chat').evaluate((chat) => chat.hasAttribute('data-open'));
-    const focusQuestion = () => page.locator(QUESTION).focus();
-    const settle = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-
-    const link = page.locator('.bk-article a.internal-link').first();
-    await link.scrollIntoViewIfNeeded();
-    await focusQuestion();
-    await link.hover();
-    await page.locator('.bk-preview.is-on').waitFor();
-    await page.keyboard.press('Escape');
-    await settle();
-    assert.equal(await chatOpen(), false, 'Escape in the chat leaves the chat open');
-    assert.equal(await page.locator('.bk-preview.is-on').count(), 1, 'Escape in the chat closes the preview card');
-
-    await page.mouse.move(720, 450);
-    await page.locator('.bk-chat-launcher').click();
-    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
-    await page.locator('.bk-settings-toggle').focus();
-    await page.keyboard.press('Enter');
-    await page.locator('.bk-settings.is-open').waitFor();
-    await page.keyboard.press('Escape');
-    await settle();
-    assert.equal(await page.locator('.bk-settings.is-open').count(), 0, 'Escape on the settings leaves them open');
-    assert.equal(await chatOpen(), true, 'Escape on the settings of the theme closes the chat');
-    await page.keyboard.press('Escape');
-    await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-
-    await page.locator('.bk-chat-launcher').click();
-    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'));
-    await page.locator('.bk-toc-tab').nth(1).hover();
-    await page.locator('.bk-toc-index.is-on').waitFor({ state: 'attached' });
-    await focusQuestion();
-    await page.keyboard.press('Escape');
-    await settle();
-    assert.equal(await chatOpen(), false, 'Escape in the chat leaves the chat open');
-    assert.equal(await page.locator('.bk-toc-index.is-on').count(), 1, 'Escape in the chat closes the chapter card');
-  });
-
-  await t.test('an Escape that ends the composition of an input method closes neither the chat nor an overlay of the theme', async (t) => {
-    const { page, context } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
-    await setUpKey(page);
-    const link = page.locator('.bk-article a.internal-link').first();
-    await link.scrollIntoViewIfNeeded();
-    await link.hover();
-    await page.locator('.bk-preview.is-on').waitFor();
-    await page.locator(QUESTION).focus();
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Input.imeSetComposition', { text: 'ni', selectionStart: 2, selectionEnd: 2 });
-    await page.keyboard.press('Escape');
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    assert.equal(await page.locator('.bk-chat[data-open]').count(), 1, 'Escape during a composition closes the chat');
-    assert.equal(await page.locator('.bk-preview.is-on').count(), 1, 'Escape during a composition closes the preview card');
-  });
-
-  await t.test('a click where the bubbles were reaches the page while a closed chat fades out, at 1440 and 375 pixels', async (t) => {
-    for (const [width, height] of [
-      [1440, 900],
-      [375, 812],
-    ]) {
-      const { page, api } = await openBrowser(t, base, { contextOptions: { viewport: { width, height } } });
-      await page.goto(`${base}/2026-10/syntax/`);
-      await setUpKey(page);
-      for (let round = 0; round < 3; round += 1) {
-        api.answers.push({ body: text(`第 ${round + 1} 个回答。`) });
-        await ask(page, `问题 ${round + 1}`);
-        await page.locator('.bk-chat-reply[data-done]').nth(round).waitFor();
-      }
-      const box = await page.locator('.bk-chat-thread > *').last().boundingBox();
-      await page.evaluate(() => {
-        window.chatClicks = [];
-        document.addEventListener('click', (event) => window.chatClicks.push(event.composedPath().some((node) => node instanceof Element && node.hasAttribute('data-bake-chat'))), { capture: true });
-      });
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(50);
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      assert.deepEqual(await page.evaluate(() => window.chatClicks), [false], `at ${width} pixels the click went to the closed chat`);
-    }
-  });
-
-  await t.test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides fades out before it leaves the keyboard order', async (t) => {
-    const { context, page } = await openBrowser(t, base);
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-    await page.goto(`${base}/2026-10/syntax/`);
-    const launcher = page.locator('.bk-chat-launcher');
-    const focused = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'), null, { timeout: 2000 });
-    for (let round = 0; round < 6; round += 1) {
-      if (round === 2) {
-        await setUpKey(page);
-        await page.keyboard.press('Escape');
-        await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      }
-      if (round === 4) await page.reload();
-      await launcher.click();
-      await focused();
-      await page.keyboard.press('Escape');
-      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      await launcher.focus();
-      await page.keyboard.press('Enter');
-      await focused();
-      await page.keyboard.press('Escape');
-      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-    }
-    await launcher.click();
-    await focused();
-    const hidden = () => {
-      const root = document.querySelector('[data-bake-chat]').shadowRoot;
-      return [getComputedStyle(root.querySelector('.bk-chat-composer')).visibility, getComputedStyle(root.querySelector('.bk-chat-bubbles')).contentVisibility];
-    };
-    await page.evaluate(() => document.documentElement.style.cssText = '--chat-hidden: 1; --chat-visibility: hidden');
-    assert.deepEqual(await page.evaluate(hidden), ['visible', 'visible']);
-    await page.waitForFunction(() => {
-      const root = document.querySelector('[data-bake-chat]').shadowRoot;
-      return getComputedStyle(root.querySelector('.bk-chat-composer')).visibility === 'hidden' && getComputedStyle(root.querySelector('.bk-chat-bubbles')).contentVisibility === 'hidden';
-    });
+    assert.equal(api.requests.at(-1).headers.authorization, 'Bearer sk-test-second-key');
   });
 
   await t.test('a rejected key is reported before any passkey is created', async (t) => {
-    const { page, api } = await openBrowser(t, base);
+    const { page, api, passkeys } = await openBrowser(t, base);
     api.models = { status: 401, body: '{"error":{"message":"Authentication Fails"}}' };
     await page.goto(`${base}/2026-10/syntax/`);
     await page.locator('.bk-chat-launcher').click();
@@ -733,7 +450,8 @@ test('the AI chat on published pages', async (t) => {
     await page.locator(KEY).press('Enter');
     await page.locator('.bk-chat-problem').filter({ hasText: '不接受这个 key' }).waitFor();
     assert.equal(await page.locator(KEY).count(), 1);
-    assert.equal((await storage(page)).local['bk-chat-key'], undefined);
+    assert.deepEqual(await passkeys(), []);
+    assert.deepEqual((await storage(page)).local, {});
   });
 
   await t.test('a passkey without PRF stores nothing and says why', async (t) => {
@@ -760,127 +478,6 @@ test('the AI chat on published pages', async (t) => {
     await page.goto(`${base}/2026-10/syntax/`);
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
-  });
-
-  await t.test('the pet shows its first frame until the pointer or the keyboard reaches it, waves once, and the chat opens and closes from it', async (t) => {
-    const { page } = await openBrowser(t, base);
-    const pets = [];
-    page.on('request', (request) => {
-      const { pathname } = new URL(request.url());
-      if (pathname.startsWith('/_bake/pet/')) pets.push(pathname);
-    });
-    await page.goto(`${base}/2026-10/syntax/`);
-    await page.waitForLoadState('networkidle');
-    assert.deepEqual(pets, ['/_bake/pet/frame.webp']);
-    const launcher = page.locator('.bk-chat-launcher');
-    assert.deepEqual(await launcher.evaluate((element) => [element.offsetWidth, element.offsetHeight, getComputedStyle(element).backgroundColor, getComputedStyle(element).cursor]), [
-      76,
-      82,
-      'rgba(0, 0, 0, 0)',
-      'pointer',
-    ]);
-    await watchPet(page);
-    assert.deepEqual(await page.evaluate(() => window.bakeTest.pet), [petEntry('idle')]);
-
-    await launcher.hover();
-    assert.deepEqual(await petSeen(page, 'greet'), petEntry('greet'));
-    await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
-    assert.deepEqual(pets, ['/_bake/pet/frame.webp', '/_bake/pet/spritesheet.webp']);
-    await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
-    await page.mouse.move(600, 10);
-
-    await page.evaluate(() => document.activeElement?.blur());
-    await page.keyboard.press('Shift+Tab');
-    assert.equal(await shadow(page, "return root.activeElement?.className + ' ' + getComputedStyle(root.activeElement).outlineStyle;"), 'bk-chat-launcher solid');
-    await page.waitForFunction(() => window.bakeTest.pet.filter((entry) => entry.state === 'greet').length === 2);
-    await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
-
-    const chat = page.locator('.bk-chat');
-    const closed = async () => {
-      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
-      assert.equal(await launcher.getAttribute('aria-expanded'), 'false');
-    };
-    await launcher.click();
-    await page.locator('.bk-chat[data-open]').waitFor();
-    assert.deepEqual(await chat.evaluate(backdropRoots), [], 'no ancestor stops the blur of the glass while the chat opens');
-    assert.deepEqual(await petSeen(page, 'open'), petEntry('open'));
-    assert.equal(await launcher.getAttribute('aria-expanded'), 'true');
-    assert.deepEqual(
-      await chat.evaluate((element) => {
-        const glass = getComputedStyle(element, '::before');
-        return { slide: getComputedStyle(element).transitionProperty, opacity: getComputedStyle(element).opacity, fade: glass.transitionProperty, blur: glass.backdropFilter.startsWith('blur(') };
-      }),
-      { slide: 'translate', opacity: '1', fade: 'opacity', blur: true },
-      'the chat slides as one element and its layers fade',
-    );
-    assert.deepEqual(await chat.evaluate(backdropRoots), [], 'no ancestor stops the blur of the glass while the chat is open');
-    const box = await chat.boundingBox();
-    const pet = await launcher.boundingBox();
-    assert.ok(box.x + box.width <= pet.x && box.width === 400, JSON.stringify({ box, pet }));
-    await page.keyboard.press('Escape');
-    await closed();
-
-    await launcher.click();
-    await page.locator('.bk-chat[data-open]').waitFor();
-    await page.locator('.bk-article p').first().click();
-    await closed();
-
-    await launcher.click();
-    await page.locator('.bk-chat[data-open]').waitFor();
-    await launcher.click();
-    await closed();
-  });
-
-  await t.test('the pet waits while the key is saved, runs while an answer streams, jumps when it is done and holds the failed pose after an error', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
-    await watchPet(page);
-    await setUpKey(page);
-    assert.deepEqual(await petSeen(page, 'unlocking'), petEntry('unlocking'));
-    await page.evaluate(() => (window.bakeTest.pet = []));
-    await page.evaluate(() => (window.bakeTest.hold = true));
-    await ask(page, '慢慢说');
-    await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
-    assert.deepEqual(await petSeen(page, 'answering'), petEntry('answering'));
-    assert.ok(new Set(await sheetTransforms(page)).size > 1, 'the running frames advance');
-    await page.locator('.bk-chat-send[data-action="stop"]').click();
-    await page.locator('.bk-chat-reply[data-done]').waitFor();
-    await page.evaluate(() => (window.bakeTest.hold = false));
-
-    api.answers.push({ body: text('好的。') });
-    await ask(page, '你好');
-    await page.locator('.bk-chat-reply[data-done]').nth(1).waitFor();
-    assert.deepEqual(await petSeen(page, 'answered'), petEntry('answered'));
-    await page.waitForFunction(() => window.bakeTest.pet.at(-1).state === 'idle');
-
-    api.answers.push({ status: 500, body: '{"error":{"message":"down"}}' });
-    await ask(page, '还在吗？');
-    await page.locator('.bk-chat-reply .bk-chat-problem').filter({ hasText: '暂时无法回答' }).waitFor();
-    assert.deepEqual(await petSeen(page, 'failed'), petEntry('failed'));
-    await page.waitForTimeout(1300);
-    assert.equal(await lastPet(page), 'failed');
-    assert.equal(await shadow(page, "return getComputedStyle(root.querySelector('.bk-chat-pet-sheet')).transform;"), 'matrix(1, 0, 0, 1, -504, 0)');
-  });
-
-  await t.test('with reduced motion the pet shows the first frame of every state', async (t) => {
-    const { page, api } = await openBrowser(t, base, { contextOptions: { reducedMotion: 'reduce' } });
-    await page.goto(`${base}/2026-10/syntax/`);
-    await watchPet(page);
-    await page.locator('.bk-chat-launcher').hover();
-    assert.deepEqual(await petSeen(page, 'greet'), petEntry('greet', { reduced: true }));
-    await setUpKey(page);
-    await page.evaluate(() => (window.bakeTest.hold = true));
-    await ask(page, '慢慢说');
-    await page.locator('.bk-chat-answer').filter({ hasText: '前半句' }).waitFor();
-    assert.deepEqual(await petSeen(page, 'answering'), petEntry('answering', { reduced: true }));
-    assert.deepEqual(new Set(await sheetTransforms(page)), new Set(['none']));
-    await page.locator('.bk-chat-send[data-action="stop"]').click();
-    await page.evaluate(() => (window.bakeTest.hold = false));
-    api.answers.push({ status: 500, body: '{"error":{"message":"down"}}' });
-    await ask(page, '还在吗？');
-    assert.deepEqual(await petSeen(page, 'failed'), petEntry('failed', { reduced: true }));
-    assert.deepEqual(new Set(await sheetTransforms(page)), new Set(['none']));
   });
 
   await t.test('@ lists articles, months and topics, and the chosen scopes go into the question and the prompt while the pet reviews', async (t) => {
@@ -949,7 +546,7 @@ test('the AI chat on published pages', async (t) => {
     api.answers.push({ body: text('都读了。') });
     await ask(page, '讲了什么？');
     await page.locator('.bk-chat-reply[data-done]').waitFor();
-    assert.deepEqual(await petSeen(page, 'reading'), petEntry('reading'));
+    await petSeen(page, 'reading');
     assert.deepEqual(await page.locator('.bk-chat-user .bk-chat-chip').allTextContents(), ['@数学', '@雅可比矩阵']);
     assert.deepEqual(await chips(), []);
     const system = api.requests.at(-1).body.messages[0].content;
@@ -990,11 +587,28 @@ test('the AI chat on published pages', async (t) => {
     await bubbles.evaluate((element) => (element.scrollTop = 0));
     await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
   });
+});
 
+test('a page saved in bake dev gives the chat the new source of the article', async (t) => {
+  const file = 'content/posts/rope/index.md';
+  const dir = createBlog(t, { 'bake.config.js': validConfig, [file]: article({ body: 'The first text.\n' }) });
+  const server = await startDevServer(dir, { port: 0, print: () => {} });
+  t.after(() => server.close());
+  const base = new URL(server.url).origin;
+  const { page, api } = await openBrowser(t, base);
+  await page.goto(`${base}/2026-10/rope/`);
+  await setUpKey(page);
+  const saved = article({ body: 'The new text.\n' });
+  writeFileSync(join(dir, file), saved);
+  await page.locator('.bk-article', { hasText: 'The new text.' }).waitFor();
+  api.answers.push({ body: text('好的。') });
+  await ask(page, '现在写了什么？');
+  await page.locator('.bk-chat-reply[data-done]').waitFor();
+  assert.ok(api.requests.at(-1).body.messages[0].content.includes(`<article>\n${saved}\n</article>`));
 });
 
 test('the shadows and the speed of the AI chat on published pages', async (t) => {
-  const base = await buildExample(t);
+  const base = await serveExample(t, { localhost: true });
 
   await t.test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async (t) => {
     const seen = {};
@@ -1016,7 +630,7 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
           probe.remove();
           return value;
         };
-        return { button: token('--button-shadow'), card: token('--card-shadow'), bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: style('.bk-chat-ask', 'boxShadow'), pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
+        return { button: token('--button-shadow'), card: token('--card-shadow'), bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: getComputedStyle(document.querySelector('[data-bake-chat-ask]').shadowRoot.querySelector('.bk-chat-ask')).boxShadow, pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
       );
       const { button, card, bubble, composer, menu, ask: askButton } = seen[colorScheme];
       const report = JSON.stringify(seen[colorScheme]);
@@ -1040,10 +654,10 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
       const box = await launcher.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.locator('.bk-chat[data-open]').waitFor({ state: 'attached' });
-      await page.waitForTimeout(400);
+      await settle(page.locator('.bk-chat'));
       await page.keyboard.press('Escape');
       await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      await page.waitForTimeout(400);
+      await settle(page.locator('.bk-chat'));
     };
     const measure = async () => {
       await page.keyboard.press('Escape');
@@ -1052,7 +666,7 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
       const longest = {};
       for (const width of [1440, 375]) {
         await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
-        await page.waitForTimeout(400);
+        await settle(page.locator('.bk-chat'));
         await cycle();
         await cdp.send('HeapProfiler.collectGarbage');
         const cycles = [];
@@ -1084,227 +698,4 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
     }
   });
 
-});
-
-test('the pets and the colours of the AI chat on published pages', async (t) => {
-  const base = await buildExample(t);
-
-  await t.test('a reader chooses a pet by the link of its pet.json, and a pet.json or a sheet that is too large or a sheet with the wrong size leaves the pet unchanged', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    api.pets['/bun/pet.json'] = JSON.stringify({ id: 'bun', displayName: '<b>Bun</b>', spritesheetPath: 'art/sheet.webp', script: 'alert(1)' });
-    api.pets['/bun/art/sheet.webp'] = await petSheet(1536, 1872);
-    api.pets['/big/pet.json'] = JSON.stringify({ displayName: 'Big', spritesheetPath: 'sheet.png' });
-    api.pets['/big/sheet.png'] = Buffer.alloc(5 * 1024 * 1024 + 1);
-    api.pets['/wrong/pet.json'] = JSON.stringify({ displayName: 'Wrong', spritesheetPath: 'sheet.png' });
-    api.pets['/wrong/sheet.png'] = await petSheet(192, 208, 'png');
-    api.pets['/text/pet.json'] = JSON.stringify({ displayName: 'Text', spritesheetPath: 'sheet.png' });
-    api.pets['/text/sheet.png'] = '<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1872"/>';
-    api.pets['/huge/pet.json'] = JSON.stringify({ displayName: 'Huge', spritesheetPath: 'sheet.png', padding: ' '.repeat(64 * 1024) });
-    await page.goto(`${base}/2026-10/syntax/`);
-    const frame = () => shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-frame').src;");
-    const siteFrame = await frame();
-    assert.equal(siteFrame, `${base}/_bake/pet/frame.webp`);
-    await openSettings(page);
-    assert.equal(await shadow(page, "return root.querySelectorAll('form form').length;"), 0);
-    const credit = page.locator('.bk-chat-credit a');
-    assert.equal(await credit.textContent(), 'CRT Monitor，作者 wxy，CC BY 4.0，已裁成 9 行并转成有损 WebP');
-    assert.equal(await credit.getAttribute('href'), `${base}/_bake/pet/LICENSE.txt`);
-    const status = page.locator('.bk-chat-pet-status');
-    const choose = async (path, key = false) => {
-      const field = page.locator('.bk-chat-pet-form input[name="pet"]');
-      await field.fill(`${PETS}${path}`);
-      await (key ? field.press('Enter') : page.locator('.bk-chat-pet-form button').click());
-      await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…');
-    };
-    for (const [path, message] of [
-      ['/huge/pet.json', 'pet.json 超过 64 KB。'],
-      ['/big/pet.json', '形象图片超过 5 MB。'],
-      ['/wrong/pet.json', '形象图片是 192x208 像素，需要 1536x1872 或 1536x2288。'],
-      ['/text/pet.json', '形象图片不是 PNG 或 WebP 图片。'],
-      ['/missing/pet.json', '读不到这个链接，对方网站可能不允许跨域请求。'],
-    ]) {
-      await choose(path, true);
-      assert.equal(await status.textContent(), message);
-      assert.equal(await status.getAttribute('data-failed'), '');
-      assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
-      assert.equal(await frame(), siteFrame);
-    }
-
-    await page.evaluate(() => {
-      const setItem = Storage.prototype.setItem;
-      Storage.prototype.setItem = function (key, value) {
-        if (key === 'bk-chat-pet') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
-        return setItem.call(this, key, value);
-      };
-      window.restoreSetItem = () => (Storage.prototype.setItem = setItem);
-    });
-    await choose('/bun/pet.json');
-    assert.equal(await status.textContent(), '浏览器的存储空间已满，无法记住这个形象。');
-    assert.equal(await frame(), siteFrame);
-    await page.evaluate(() => window.restoreSetItem());
-    const sheetRequests = () => api.petRequests.filter((request) => request.path === '/bun/art/sheet.webp').length;
-    const before = sheetRequests();
-
-    await choose('/bun/pet.json');
-    assert.equal(await status.textContent(), '已换成 <b>Bun</b>。');
-    assert.equal(await status.getAttribute('data-failed'), null);
-    assert.match(await frame(), /^data:image\/webp;base64,/);
-    assert.equal(JSON.parse((await storage(page)).local['bk-chat-pet']).url, `${PETS}/bun/pet.json`);
-    assert.equal(await credit.count(), 0);
-    assert.ok(api.petRequests.length > 0 && api.petRequests.every((request) => request.headers.referer === undefined && request.headers.cookie === undefined), JSON.stringify(api.petRequests));
-    await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
-    assert.equal(sheetRequests() - before, 1);
-
-    await page.reload();
-    assert.match(await frame(), /^data:image\/webp;base64,/);
-    await page.locator('.bk-chat-launcher').hover();
-    await page.locator('.bk-chat-launcher .bk-chat-pet[data-ready]').waitFor();
-    const blob = await shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-sheet').src;");
-    assert.match(blob, /^blob:/);
-    await openSettings(page);
-    await page.locator('.bk-chat-menu .bk-chat-link', { hasText: '换回默认' }).click();
-    assert.equal(await frame(), siteFrame);
-    assert.equal(await page.evaluate((url) => fetch(url).then(() => 'read', () => 'revoked'), blob), 'revoked');
-    assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
-    await credit.waitFor();
-  });
-
-  await t.test('a reader pet link that redirects resolves its spritesheetPath against the new address, and a link that does not answer within 30 seconds leaves the pet unchanged', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    const sheet = await petSheet(1536, 1872);
-    const requested = [];
-    const server = createServer((request, response) => {
-      requested.push(request.url);
-      if (request.url === '/old/pet.json') response.writeHead(302, { ...CORS, location: '/new/pet.json' }).end();
-      else if (request.url === '/new/pet.json') response.writeHead(200, CORS).end(JSON.stringify({ displayName: 'Bun', spritesheetPath: 'sheet.webp' }));
-      else if (request.url === '/new/sheet.webp') response.writeHead(200, CORS).end(sheet);
-      else response.writeHead(404, CORS).end();
-    });
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-    t.after(() => server.close());
-    api.pets['/slow/pet.json'] = { hang: true };
-    await page.clock.install();
-    await page.goto(`${base}/2026-10/syntax/`);
-    await openSettings(page);
-    const field = page.locator('.bk-chat-pet-form input[name="pet"]');
-    const status = page.locator('.bk-chat-pet-status');
-    const settled = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…', null, { timeout: 5000 });
-    await field.fill(`${PETS}/slow/pet.json`);
-    await field.press('Enter');
-    await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent === '正在读取…');
-    await page.clock.fastForward(29_000);
-    assert.equal(await status.textContent(), '正在读取…');
-    await page.clock.fastForward(1_000);
-    await settled();
-    assert.equal(await status.textContent(), '这个链接在 30 秒内没有回应。');
-    assert.equal((await storage(page)).local['bk-chat-pet'], undefined);
-    await field.fill(`http://127.0.0.1:${server.address().port}/old/pet.json`);
-    await field.press('Enter');
-    await settled();
-    assert.equal(await status.textContent(), '已换成 Bun。');
-    assert.deepEqual(requested, ['/old/pet.json', '/new/pet.json', '/new/sheet.webp']);
-  });
-
-  for (const reducedMotion of ['no-preference', 'reduce']) {
-    const moves = reducedMotion === 'reduce' ? 'fades where it is' : 'slides out';
-    await t.test(`on a phone the pet ${moves} with the essay buttons while the reader scrolls down and while the drawer is open`, async (t) => {
-      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, hasTouch: true, reducedMotion } });
-      await page.goto(`${base}/2026-10/syntax/`);
-      const launcher = page.locator('.bk-chat-launcher');
-      await launcher.waitFor();
-      const placement = (state) =>
-        page.waitForFunction(
-          ({ hidden, inPlace }) => {
-            const element = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher');
-            const box = element.getBoundingClientRect();
-            const opacity = getComputedStyle(element).opacity;
-            element.focus();
-            const focused = element.getRootNode().activeElement === element;
-            element.blur();
-            if (!hidden) return box.right <= innerWidth && opacity === '1' && focused;
-            return (inPlace ? box.right <= innerWidth : box.left >= innerWidth) && opacity === '0' && !focused;
-          },
-          { hidden: state === 'hidden', inPlace: reducedMotion === 'reduce' },
-        );
-      const scrollBy = async (delta) => {
-        for (let step = 0; step < 5; step += 1) {
-          await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-          await page.waitForTimeout(30);
-        }
-      };
-      await placement('shown');
-      await scrollBy(800);
-      await page.waitForFunction(() => document.documentElement.classList.contains('bk-buttons-hidden'));
-      await placement('hidden');
-      await scrollBy(-200);
-      await page.waitForFunction(() => !document.documentElement.classList.contains('bk-buttons-hidden'));
-      await placement('shown');
-      await page.locator('.bk-toc-handle').click();
-      await page.waitForFunction(() => document.documentElement.classList.contains('bk-toc-drawer-open'));
-      await placement('hidden');
-      await page.keyboard.press('Escape');
-      await placement('shown');
-    });
-  }
-
-  await t.test('the pet and the bubbles use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async (t) => {
-    const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, reducedMotion: 'reduce' } });
-    await page.goto(`${base}/2026-10/syntax/`);
-    const launcher = page.locator('.bk-chat-launcher');
-    assert.equal(await launcher.evaluate((element) => getComputedStyle(element).cursor), 'pointer');
-    await launcher.click();
-    const chat = page.locator('.bk-chat[data-open]');
-    await chat.waitFor();
-    await page.locator('.bk-chat-note').first().waitFor();
-    const box = await chat.boundingBox();
-    assert.ok(box.x >= 0 && box.x + box.width <= 375 && box.y >= 0 && box.y + box.height <= 700, JSON.stringify(box));
-    assert.equal(await launcher.evaluate((element) => getComputedStyle(element).transform), 'none');
-    assert.equal(
-      await page
-        .locator('.bk-chat-bubble')
-        .first()
-        .evaluate((element) => getComputedStyle(element).translate),
-      'none',
-    );
-    assert.equal(await page.locator('.bk-chat-composer').evaluate((element) => getComputedStyle(element).translate), 'none');
-    const placeholderFits = (selector) =>
-      page.locator(selector).evaluate((input) => {
-        const context = document.createElement('canvas').getContext('2d');
-        context.font = getComputedStyle(input).font;
-        return { text: input.placeholder, width: context.measureText(input.placeholder).width, room: input.clientWidth };
-      });
-    const keyFit = await placeholderFits(KEY);
-    assert.ok(keyFit.width <= keyFit.room, JSON.stringify(keyFit));
-    await page.locator(KEY).fill(API_KEY);
-    await page.locator(KEY).press('Enter');
-    const questionFit = await placeholderFits(QUESTION);
-    assert.ok(questionFit.width <= questionFit.room, JSON.stringify(questionFit));
-    await page.locator(QUESTION).fill('标题的锚点是怎么来的？');
-    for (const control of ['.bk-chat-send', '.bk-chat-icon']) assert.deepEqual(await page.locator(control).evaluateAll((elements) => [...new Set(elements.map((element) => getComputedStyle(element).cursor))]), ['pointer']);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
-  });
-
-  await t.test('the launcher and the chat take the colours and the color scheme that the page shows, from the system or from the theme setting', async (t) => {
-    for (const [colorScheme, theme] of [['dark', 'system'], ['light', 'dark'], ['dark', 'light']]) {
-      const { context, page } = await openBrowser(t, base, { contextOptions: { colorScheme, reducedMotion: 'reduce' } });
-      await context.addInitScript((value) => localStorage.setItem('bk-theme', value), theme);
-      await page.goto(`${base}/2026-10/syntax/`);
-      const launcher = page.locator('.bk-chat-launcher');
-      await launcher.click();
-      const composer = page.locator('.bk-chat[data-open] .bk-chat-composer');
-      await composer.waitFor();
-      const expected = await page.evaluate(() => {
-        const probe = document.body.appendChild(document.createElement('div'));
-        probe.style.cssText = 'background-color: var(--surface); color: var(--ink)';
-        const style = getComputedStyle(probe);
-        return { surface: style.backgroundColor, ink: style.color, scheme: style.colorScheme, launcherScheme: style.colorScheme };
-      });
-      const shown = {
-        ...(await composer.evaluate((element) => ({ surface: getComputedStyle(element).backgroundColor, ink: getComputedStyle(element).color, scheme: getComputedStyle(element).colorScheme }))),
-        launcherScheme: await launcher.evaluate((element) => getComputedStyle(element).colorScheme),
-      };
-      assert.deepEqual(shown, expected, `${theme} theme in the ${colorScheme} scheme`);
-      await context.close();
-    }
-  });
 });

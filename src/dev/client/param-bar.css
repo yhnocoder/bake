@@ -12,23 +12,17 @@
   --pb-accent: var(--accent, #985b57);
   --pb-changed: var(--series-2, #e0662f);
   --pb-error: var(--series-8, #d64545);
-  --pb-ease: var(--ease-out, ease-out);
-  --pb-shift: 0 4px;
+  --pb-shift: 0 calc(4px * var(--motion-distance));
   --switch-off: var(--pb-line-2);
   --switch-on: var(--pb-ink-2);
   --switch-focus: var(--pb-accent);
+  --switch-thumb: #ffffff;
   font: 12px/1.5 var(--font-ui, system-ui, -apple-system, 'Segoe UI', sans-serif);
   color: var(--pb-ink);
   transition-property: opacity, display;
-  transition-duration: 180ms;
+  transition-duration: var(--motion);
   transition-timing-function: ease-out;
   transition-behavior: allow-discrete;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :host {
-    --pb-shift: 0 0;
-  }
 }
 
 :host([hidden]) {
@@ -100,7 +94,7 @@
   background: var(--pb-changed);
   opacity: 0;
   scale: 0.4;
-  transition: opacity 150ms ease-out, scale 150ms var(--pb-ease);
+  transition: opacity var(--fade) ease-out, scale var(--motion-fast) var(--ease);
 }
 
 .control[data-changed] .label::after {
@@ -133,7 +127,7 @@ button {
   border: 1px solid var(--pb-line);
   border-radius: 6px;
   background: var(--pb-surface);
-  transition: border-color 150ms ease-out;
+  transition: border-color var(--motion-fast) ease-out;
 }
 
 :is(.number, .text, .select):hover {
@@ -207,7 +201,7 @@ button {
   border-radius: 50%;
   background: var(--pb-ink);
   box-shadow: 0 0 0 2px var(--pb-panel);
-  transition: scale 120ms var(--pb-ease);
+  transition: scale var(--motion-fast) var(--ease);
   appearance: none;
 }
 
@@ -218,7 +212,7 @@ button {
   border-radius: 50%;
   background: var(--pb-ink);
   box-shadow: 0 0 0 2px var(--pb-panel);
-  transition: scale 120ms var(--pb-ease);
+  transition: scale var(--motion-fast) var(--ease);
 }
 
 .slider:hover::-webkit-slider-thumb {
@@ -244,7 +238,7 @@ button {
   color: var(--pb-ink-2);
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 150ms ease-out, color 150ms ease-out, opacity 150ms ease-out;
+  transition: background-color var(--motion-fast) ease-out, color var(--motion-fast) ease-out, opacity var(--motion-fast) ease-out;
 }
 
 button:hover:not(:disabled) {
@@ -285,7 +279,7 @@ button:disabled {
   color: var(--pb-ink-2);
   overflow-wrap: anywhere;
   transition-property: opacity, translate, display;
-  transition-duration: 180ms;
+  transition-duration: var(--fade), var(--motion), var(--fade);
   transition-timing-function: ease-out;
   transition-behavior: allow-discrete;
 }
@@ -304,23 +298,5 @@ button:disabled {
   .message {
     opacity: 0;
     translate: var(--pb-shift);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .label::after {
-    transition: opacity 150ms ease-out;
-  }
-
-  .slider::-webkit-slider-thumb {
-    transition: none;
-  }
-
-  .slider::-moz-range-thumb {
-    transition: none;
-  }
-
-  .message {
-    transition-property: opacity, display;
   }
 }

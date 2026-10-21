@@ -5,6 +5,7 @@ date: 2026-10-19
 summary: 《Bake 写法一览》里的站内链接和嵌入指向这篇文章。
 tags: [Bake, 写法]
 category: math
+preview: preview.js
 ---
 
 这篇文章提供被《Bake 写法一览》链接和嵌入的标题与段落。
@@ -27,7 +28,7 @@ $$
 
 门控单元的局部导数就是门控函数的导数，下图画出 SiLU 的形状。
 
-:::act-fn-plot{fn=silu range=4}
+:::act-fn-plot{fns=silu}
 SiLU 在负半轴有一段小于零的区域，导数在零附近平滑变化。
 :::
 

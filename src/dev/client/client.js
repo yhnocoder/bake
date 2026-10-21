@@ -1,5 +1,5 @@
 import { copyText, createOverlay } from './overlay.js';
-import { BLOCKS, anchorFor, changedLines, planUpdate, sectionOf, skeleton } from './regions.js';
+import { BLOCKS, anchorFor, changedLines, frameMoves, movePositions, planUpdate, sectionOf, skeleton } from './regions.js';
 
 const script = document.querySelector('script[data-bake-dev]');
 const { source, missing, file, token } = script.dataset;
@@ -118,6 +118,7 @@ async function refresh() {
   const anchor = findAnchor(pristine, next);
   const details = detailsState();
   const { changed, regions } = planUpdate(pristine, next, document, { isPageNode: (node) => pageNodes.has(node), shownParams: (frame) => barControls?.shown(frame) ?? null });
+  barControls?.move(frameMoves(pristine, next));
   const kept = applyUpdate(regions);
   pristine = next;
   const data = next.querySelector('script[data-bake-dev]')?.dataset ?? {};
@@ -126,7 +127,9 @@ async function refresh() {
   components = JSON.parse(data.components ?? '{}');
   if (!changed) return;
   restoreDetails(details);
-  document.dispatchEvent(new CustomEvent('bake:content'));
+  barControls?.scan();
+  // why: src/live.js starts the scripts of the page again on this event
+  document.dispatchEvent(new CustomEvent('bake:update'));
   if (anchor !== null) {
     anchor.align();
     requestAnimationFrame(() => requestAnimationFrame(anchor.align));
@@ -142,8 +145,9 @@ function applyUpdate(regions) {
       continue;
     }
     for (const step of steps) {
-      if (step.frame === undefined) step.live.replaceWith(importPageNode(step.next));
-      else kept.push(keepFrame(step));
+      if (step.frame !== undefined) kept.push(keepFrame(step));
+      else if (step.positions !== undefined) movePositions(step.positions);
+      else step.live.replaceWith(importPageNode(step.next));
     }
   }
   return kept;
@@ -160,7 +164,8 @@ function importPageNode(node) {
   return copy;
 }
 
-function keepFrame({ frame, params, attributes, boxStyle }) {
+function keepFrame({ frame, positions, params, attributes, boxStyle }) {
+  movePositions(positions);
   frame.dataset.params = params;
   if (attributes === undefined) delete frame.dataset.attributes;
   else frame.dataset.attributes = attributes;
@@ -231,9 +236,19 @@ function showChanges(lines, kept) {
 
 function reloadPage() {
   try {
-    sessionStorage.setItem(scrollKey, String(scrollY));
+    sessionStorage.setItem(scrollKey, JSON.stringify(scrollAnchor()));
   } catch {}
   location.reload();
+}
+
+// why: a component without a height shows a placeholder until it starts again after the reload, so the same scroll offset would show other text
+function scrollAnchor() {
+  const index = [...document.querySelectorAll(BLOCKS)].findIndex((block) => isShown(block) && block.getBoundingClientRect().top >= 0);
+  return { index, top: anchorElement(index).getBoundingClientRect().top };
+}
+
+function anchorElement(index) {
+  return index === -1 ? document.documentElement : document.querySelectorAll(BLOCKS)[index];
 }
 
 function restoreScroll() {
@@ -244,7 +259,11 @@ function restoreScroll() {
   } catch {}
   if (saved === null) return;
   history.scrollRestoration = 'manual';
-  const apply = () => scrollTo({ top: Number(saved), behavior: 'instant' });
+  const { index, top } = JSON.parse(saved);
+  const apply = () => {
+    const element = anchorElement(index);
+    if (element !== undefined) scrollBy({ top: element.getBoundingClientRect().top - top, behavior: 'instant' });
+  };
   apply();
   addEventListener(
     'load',

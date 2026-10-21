@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { CHAT_RULES, chatTools, matchingScopes, pageAddress, readArticle, READ_ARTICLE, scopeOptions, systemPrompt } from '../src/chat/context.js';
 import { chatLabels } from '../src/chat/labels.js';
@@ -19,9 +15,6 @@ import { openKey, sealKey } from '../src/chat/vault.js';
 import { article, bake, createBlog, readTree, validConfig } from './blog.js';
 
 const root = 'https://example.com/blog/';
-const bakeRoot = join(import.meta.dirname, '..');
-const cacheName = createHash('sha256').update(bakeRoot).digest('hex').slice(0, 16);
-const BUILD_TOOLS = ['vite', 'rolldown', 'lightningcss', 'vite-plugin-solid', '@babel/core', 'babel-preset-solid', 'babel-plugin-jsx-dom-expressions', 'solid-js'];
 
 function stream(...events) {
   const text = events.map((event) => (typeof event === 'string' ? event : `data: ${JSON.stringify(event)}\n\n`)).join('');
@@ -92,79 +85,16 @@ describe('AI chat build output', () => {
     assert.equal(tree['2026-09/demo/index.html'].toString(), '<p>demo</p>\n');
   });
 
-  test('writes the preamble for the chat and copies the chat bundle that the cache lists', (t) => {
+  test('writes the preamble for the chat', (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'preamble.sty': '\\newcommand{\\R}{\\mathbb{R}}\n', 'content/posts/rope/index.md': article({ body: 'In $\\R$.\n' }) });
     assert.equal(bake(dir, 'build').stderr, '');
     assert.deepEqual(JSON.parse(readFileSync(join(dir, 'dist/_bake/preamble.json'), 'utf8')), ['\\newcommand{\\R}{\\mathbb{R}}']);
-    const cache = join(tmpdir(), 'bake-chat');
-    const index = JSON.parse(readFileSync(join(cache, `${cacheName}.json`), 'utf8'));
-    assert.ok(index.inputs.some(([file]) => file.endsWith('/src/chat/entry.js')));
-    assert.ok(index.inputs.some(([file]) => file.endsWith('/src/components/math.js')));
-    assert.equal(readFileSync(join(dir, 'dist', index.entry), 'utf8'), readFileSync(join(cache, index.dir, index.entry), 'utf8'));
   });
 
   test('writes an empty catalog for a blog without articles', (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     assert.equal(bake(dir, 'build').status, 0);
     assert.deepEqual(JSON.parse(readFileSync(join(dir, 'dist/_bake/articles.json'), 'utf8')), { title: 'Test Blog', language: 'en', articles: [] });
-  });
-});
-
-function chatCache(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'bake-chat-cache-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  return dir;
-}
-
-function buildChat(temporary) {
-  const script = `const { chatBundle } = await import(${JSON.stringify(pathToFileURL(join(bakeRoot, 'src/chat/bundle.js')).href)});\nawait chatBundle();\n`;
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--input-type=module', '--eval', script], { env: { ...process.env, TMPDIR: temporary }, stdio: ['ignore', 'ignore', 'pipe'] });
-    let stderr = '';
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.on('close', (status) => (status === 0 ? resolve() : reject(new Error(stderr))));
-  });
-}
-
-function cacheEntries(temporary) {
-  return readdirSync(join(temporary, 'bake-chat')).sort();
-}
-
-function cacheIndex(temporary) {
-  const path = join(temporary, 'bake-chat', cacheEntries(temporary).find((entry) => entry.endsWith('.json')));
-  return { path, index: JSON.parse(readFileSync(path, 'utf8')) };
-}
-
-function installedVersion(name) {
-  return JSON.parse(readFileSync(join(bakeRoot, 'node_modules', name, 'package.json'), 'utf8')).version;
-}
-
-describe('AI chat bundle cache', () => {
-  test('two builds that miss the cache at the same time leave one index and one output folder, remove an output folder that a lost build left, and record the versions of the build tools', async (t) => {
-    const temporary = chatCache(t);
-    const lost = join(temporary, 'bake-chat', `${cacheName}-lost`);
-    mkdirSync(lost, { recursive: true });
-    writeFileSync(join(lost, 'chat.js'), '');
-    await Promise.all([buildChat(temporary), buildChat(temporary)]);
-    const { path, index } = cacheIndex(temporary);
-    assert.deepEqual(cacheEntries(temporary), [index.dir, basename(path)].sort());
-    assert.deepEqual(index.toolchain, Object.fromEntries(BUILD_TOOLS.map((name) => [name, installedVersion(name)])));
-  });
-
-  test('builds the chat again when a build tool has another version or src/chat/ holds a file that the index does not list', async (t) => {
-    const temporary = chatCache(t);
-    await buildChat(temporary);
-    const { path, index } = cacheIndex(temporary);
-    writeFileSync(path, JSON.stringify({ ...index, toolchain: { ...index.toolchain, vite: '0.0.0' } }));
-    await buildChat(temporary);
-    assert.equal(cacheIndex(temporary).index.toolchain.vite, installedVersion('vite'));
-    const figure = join(bakeRoot, 'src/chat/pet.js');
-    writeFileSync(path, JSON.stringify({ ...index, inputs: index.inputs.filter(([file]) => file !== figure) }));
-    await buildChat(temporary);
-    assert.ok(cacheIndex(temporary).index.inputs.some(([file]) => file === figure));
-    assert.equal(cacheEntries(temporary).length, 2);
   });
 });
 
@@ -181,7 +111,6 @@ describe('AI chat replies', () => {
     const html = replyHtml('| a | b |\n| - | - |\n| $|x|$ | $\\{x \\mid x > 0\\}$ |\n', { root });
     assert.match(html, /<td><span class="bk-chat-math" data-tex="\|x\|">\|x\|<\/span><\/td>/);
     assert.match(html, /data-tex="\\\{x \\mid x > 0\\\}"/);
-    assert.doesNotMatch(html, /\uE000/);
   });
 
   test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', () => {

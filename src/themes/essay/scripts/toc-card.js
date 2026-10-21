@@ -1,5 +1,5 @@
 import { fragmentOf } from 'bake/fragments';
-import { closeOnEscape, reducedMotion } from 'bake/theme/client';
+import { closeOnEscape, markCurrent, reducedMotion } from 'bake/theme/client';
 
 const SENTENCE_END = /[。！？]|[.!?](?=\s|$)/;
 const SKIPPED_TEXT = 'mjx-container, code, .sidenote-ref';
@@ -52,16 +52,13 @@ export function readOutline(nav) {
   return { chapters, entries, leads: new Map() };
 }
 
-export function outlineKey(outline) {
-  return JSON.stringify(outline.chapters.map((chapter) => [chapter.id, chapter.number, chapter.title, chapter.recap, chapter.sections.map((section) => [section.id, section.title, section.recap])]));
-}
-
 export function chapterCard(context, chapterIndex, state) {
   const chapter = context.outline.chapters[chapterIndex];
   const current = chapterIndex === state.chapter;
   const card = createElement('div', 'bk-toc-card');
   const head = tocLink(chapter.id, 'bk-toc-card-head');
   head.dataset.index = chapter.index;
+  markCurrent(head, state.entry === chapter.index);
   const number = createElement('span', current ? 'bk-toc-card-number is-current' : 'bk-toc-card-number', current ? `${chapter.number} · ${context.labels.reading}` : chapter.number);
   const title = createElement('span', 'bk-toc-card-title');
   title.append(fullTitle(chapter));
@@ -78,7 +75,7 @@ export function chapterCard(context, chapterIndex, state) {
       const row = tocLink(section.id, 'bk-toc-card-section');
       row.dataset.index = section.index;
       row.classList.toggle('is-read', state.read[section.index]);
-      row.classList.toggle('is-current', state.entry === section.index);
+      markCurrent(row, state.entry === section.index);
       row.append(createElement('span', 'bk-toc-card-section-title', section.title));
       if (section.recap !== undefined) row.append(summary('span', 'bk-toc-card-recap', section.recap));
       else {
@@ -127,7 +124,7 @@ export function createCardHost({ variant, showDelay }) {
     const { id, number } = parts.context.outline.chapters[chapter];
     tab.href = fragmentOf(id);
     tab.textContent = number;
-    tab.classList.toggle('is-current', chapter === Math.max(0, state.chapter));
+    markCurrent(tab, chapter === Math.max(0, state.chapter));
   }
   function position() {
     if (panel || shownChapter < 0) return;
@@ -274,9 +271,6 @@ export function createCardHost({ variant, showDelay }) {
       render(shownChapter, true);
       if (joined) position();
       mark(false);
-    },
-    refresh() {
-      if (!panel && isShown()) render(shownChapter, true);
     },
     relayout() {
       if (isShown()) position();

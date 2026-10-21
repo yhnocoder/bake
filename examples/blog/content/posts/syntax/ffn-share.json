@@ -1,0 +1,5 @@
+[
+  { "label": "Llama 2 7B", "value": 67, "unit": "%" },
+  { "label": "Llama 3 8B", "value": 81, "unit": "%" },
+  { "label": "Mixtral 8x7B", "value": 97, "unit": "%" }
+]

@@ -15,10 +15,7 @@ export function copyArticle() {
 
 export function startCopy(article, { copied }) {
   if (articleSource() === null) throw new Error('bake/copy needs the source of the article in script.bk-source');
-  article.addEventListener('selectstart', loadSelection, { once: true });
-  article.addEventListener('contextmenu', loadSelection, { once: true });
-  document.addEventListener('keydown', loadOnShortcut);
-  document.addEventListener('copy', (event) => {
+  const copy = (event) => {
     const selection = getSelection();
     if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) return;
     if (selectionModule === null) {
@@ -31,7 +28,14 @@ export function startCopy(article, { copied }) {
     event.clipboardData.setData('text/plain', result.markdown);
     event.clipboardData.setData('text/html', result.html);
     copied();
-  });
+  };
+  const controller = new AbortController();
+  const { signal } = controller;
+  article.addEventListener('selectstart', loadSelection, { once: true, signal });
+  article.addEventListener('contextmenu', loadSelection, { once: true, signal });
+  document.addEventListener('keydown', loadOnShortcut, { signal });
+  document.addEventListener('copy', copy, { signal });
+  return () => controller.abort();
 }
 
 export async function selectionMarkdown(range, article) {

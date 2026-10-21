@@ -2,7 +2,6 @@ import { elementOfFragment } from 'bake/fragments';
 import { createEffect, createSignal } from 'solid-js';
 import { render } from 'solid-js/web';
 import { closeOnEscape } from './escape.js';
-import { CONTENT_EVENT } from './motion.js';
 import { hoverWithFinePointer, notesColumnScreen } from './screens.js';
 
 const SHOW_DELAY = 300;
@@ -48,7 +47,10 @@ export function startPreviewCard(article) {
     return null;
   };
 
-  article.addEventListener('pointerover', (event) => {
+  const controller = new AbortController();
+  const { signal } = controller;
+  const listen = (target, type, listener, options) => target.addEventListener(type, listener, { ...options, signal });
+  listen(article, 'pointerover', (event) => {
     const trigger = triggerOf(event.target);
     if (trigger === null) return;
     keep();
@@ -57,24 +59,21 @@ export function startPreviewCard(article) {
     if (shown() || performance.now() < warmUntil) show(trigger.link, trigger.kind);
     else showTimer = setTimeout(() => show(trigger.link, trigger.kind), SHOW_DELAY);
   });
-  article.addEventListener('pointerout', (event) => {
+  listen(article, 'pointerout', (event) => {
     const trigger = triggerOf(event.target);
     if (trigger !== null && !trigger.link.contains(event.relatedTarget) && !trigger.link.matches(':focus-visible')) hide();
   });
-  article.addEventListener('focusin', (event) => {
+  listen(article, 'focusin', (event) => {
     const trigger = triggerOf(event.target);
     if (trigger === null || !trigger.link.matches(':focus-visible')) return;
     clearTimeout(showTimer);
     show(trigger.link, trigger.kind);
   });
-  article.addEventListener('focusout', (event) => {
+  listen(article, 'focusout', (event) => {
     if (triggerOf(event.target) !== null) hide();
   });
-  document.addEventListener(CONTENT_EVENT, () => {
-    clearTimeout(showTimer);
-    close();
-  });
-  addEventListener(
+  listen(
+    window,
     'scroll',
     () => {
       if (shown() && entry()?.link === document.activeElement) setPlaced(placed() + 1);
@@ -85,13 +84,20 @@ export function startPreviewCard(article) {
 
   const host = document.createElement('div');
   document.body.append(host);
-  render(() => <PreviewCard entry={entry()} shown={shown()} placed={placed()} onEnter={keep} onLeave={hide} />, host);
+  const dispose = render(() => <PreviewCard entry={entry()} shown={shown()} placed={placed()} onEnter={keep} onLeave={hide} />, host);
   closeOnEscape(host, () => {
     const wasShown = shown();
     clearTimeout(showTimer);
     close();
     return wasShown;
   });
+  return () => {
+    controller.abort();
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    dispose();
+    host.remove();
+  };
 }
 
 function readReference(link) {

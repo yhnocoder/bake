@@ -100,7 +100,7 @@
   border-radius: inherit;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transition: opacity var(--motion-fast);
 }
 
 .bk-not-found-matches li:has(a:hover, a:focus-visible)::after {
@@ -151,7 +151,7 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   box-shadow: inset 0 0 0 1px var(--accent);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--motion-fast);
 }
 
 .bk-not-found-home:hover::before,

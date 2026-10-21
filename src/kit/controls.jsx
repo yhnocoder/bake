@@ -40,7 +40,7 @@ export function Segmented(props) {
         {(option) => (
           <label class="bk-kit-segment">
             <input type="radio" name={name} value={option.value} checked={props.value === option.value} onChange={() => props.onChange(option.value)} />
-            <span>{option.label}</span>
+            {option.label}
           </label>
         )}
       </For>
@@ -51,8 +51,9 @@ export function Segmented(props) {
 export function Toggle(props) {
   return (
     <label class="bk-kit-toggle">
-      <input type="checkbox" role="switch" checked={props.checked} onChange={(event) => props.onChange(event.currentTarget.checked)} />
-      <span class="bk-kit-toggle-track" aria-hidden="true" />
+      <span class="bk-kit-switch">
+        <input type="checkbox" role="switch" checked={props.checked} onChange={(event) => props.onChange(event.currentTarget.checked)} />
+      </span>
       <span class="bk-kit-label">{props.label}</span>
     </label>
   );
