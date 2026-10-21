@@ -337,7 +337,12 @@ test('the essay theme lays out articles', async (t) => {
       await settle(page);
       await check('in the light scheme');
       await page.emulateMedia({ colorScheme: 'dark' });
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+      // why: the page fades to the new scheme with a view transition, and Chromium on Linux draws that fade without the old snapshot when the root color-scheme changes, so the first frame of the dark scheme is read with the fade finished
+      await page.waitForFunction(() => document.getAnimations().some((animation) => animation.effect.pseudoElement?.startsWith('::view-transition')));
+      await page.evaluate(async () => {
+        for (const animation of document.getAnimations()) if (animation.effect.pseudoElement?.startsWith('::view-transition')) animation.finish();
+        await new Promise((done) => requestAnimationFrame(done));
+      });
       await check('in the first frame of the dark scheme');
       await settle(page);
       await check('in the dark scheme');
