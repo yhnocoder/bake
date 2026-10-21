@@ -104,7 +104,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('says goodbye'));
     const block = page.locator('.bk-block', { hasText: 'says goodbye' });
     const covered = await block.evaluate((element) => {
-      const mark = document.querySelector('#bake-dev').shadowRoot.querySelector(`.mark[data-line="${element.dataset.line}"]`);
+      const mark = document.querySelector('#bake-dev-marks').shadowRoot.querySelector(`.mark[data-line="${element.dataset.line}"]`);
       if (mark === null || !mark.getAnimations().some((animation) => animation.id === 'bake-changed')) return null;
       const box = element.getBoundingClientRect();
       const cover = mark.getBoundingClientRect();

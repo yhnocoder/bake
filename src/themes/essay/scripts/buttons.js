@@ -2,10 +2,11 @@ import { SETTING_EVENT, notesColumnScreen } from 'bake/theme/client';
 
 const TOP_ZONE = 40;
 const TRAVEL = 8;
-const HIDDEN_CLASS = 'bk-buttons-hidden';
 
 let travel = 0;
 let jumping = false;
+let scrolledAway = false;
+let drawerOpen = false;
 
 export function startButtons() {
   const root = document.documentElement;
@@ -16,12 +17,12 @@ export function startButtons() {
     const delta = top - lastTop;
     lastTop = top;
     if (jumping) return;
-    if (notesColumnScreen.matches || !autohide() || root.classList.contains('bk-toc-drawer-open') || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
+    if (notesColumnScreen.matches || !autohide() || drawerOpen || document.querySelector('.bk-settings.is-open') !== null || top < TOP_ZONE) {
       showButtons();
       return;
     }
     travel = Math.sign(delta) === Math.sign(travel) ? travel + delta : delta;
-    if (travel > TRAVEL) hideButtons();
+    if (travel > TRAVEL) setScrolledAway(true);
     else if (travel < -TRAVEL) showButtons();
   };
   const setting = (event) => {
@@ -41,11 +42,21 @@ export function showButtonsDuring(jump) {
   jump.then(() => requestAnimationFrame(() => (jumping = false)));
 }
 
-function showButtons() {
-  travel = 0;
-  if (document.documentElement.classList.contains(HIDDEN_CLASS)) document.documentElement.classList.remove(HIDDEN_CLASS);
+export function setDrawerOpen(open) {
+  drawerOpen = open;
+  syncEdges();
 }
 
-function hideButtons() {
-  if (!document.documentElement.classList.contains(HIDDEN_CLASS)) document.documentElement.classList.add(HIDDEN_CLASS);
+function showButtons() {
+  travel = 0;
+  setScrolledAway(false);
+}
+
+function setScrolledAway(away) {
+  scrolledAway = away;
+  syncEdges();
+}
+
+function syncEdges() {
+  for (const edge of document.querySelectorAll('[data-edge]')) edge.toggleAttribute('data-hidden', drawerOpen || scrolledAway);
 }

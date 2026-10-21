@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { article, bake, createBlog } from '../blog.js';
-import { launchBrowser, nextFrame, serve, settle } from './browser.js';
+import { launchBrowser, nextFrame, serve, settle, until } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
 const STYLES = ['notes', 'tabs', 'dots', 'ticks'];
@@ -710,7 +710,10 @@ test('the table of contents', async (t) => {
     const placed = (opacity) =>
       page
         .waitForFunction(
-          (value) => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].every((element) => element.getBoundingClientRect().left >= 0 && getComputedStyle(element).opacity === value),
+          (value) => {
+            const seenOpacity = (element) => (element === null ? 1 : Number(getComputedStyle(element).opacity) * seenOpacity(element.parentElement));
+            return [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].every((element) => element.getBoundingClientRect().left >= 0 && seenOpacity(element) === value);
+          },
           opacity,
           { timeout: 2000 },
         )
@@ -731,18 +734,19 @@ test('the table of contents', async (t) => {
       }
       await settle(page);
     };
-    assert.equal(await placed('1'), true);
+    assert.equal(await placed(1), true);
     await page.evaluate(() => {
       const handle = document.querySelector('.bk-toc-handle');
+      const seenOpacity = (element) => (element === null ? 1 : Number(getComputedStyle(element).opacity) * seenOpacity(element.parentElement));
       window.handleFrames = [];
       const record = () => {
-        window.handleFrames.push({ opacity: parseFloat(getComputedStyle(handle).opacity), left: handle.getBoundingClientRect().left });
+        window.handleFrames.push({ opacity: seenOpacity(handle), left: handle.getBoundingClientRect().left });
         window.handleRecording = requestAnimationFrame(record);
       };
       record();
     });
     await scrollBy(600);
-    assert.equal(await placed('0'), true);
+    assert.equal(await placed(0), true);
     const frames = await page.evaluate(() => {
       cancelAnimationFrame(window.handleRecording);
       return window.handleFrames;
@@ -752,12 +756,12 @@ test('the table of contents', async (t) => {
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden');
     assert.deepEqual(await focusable(), [false, false]);
     await scrollBy(-200);
-    assert.equal(await placed('1'), true);
+    assert.equal(await placed(1), true);
     assert.deepEqual(await focusable(), [true, true]);
     await scrollBy(600);
     await page.evaluate(() => scrollTo(0, 0));
     await settle(page);
-    assert.equal(await placed('1'), true);
+    assert.equal(await placed(1), true);
 
     await page.click('.bk-settings-toggle');
     const toggle = page.getByRole('switch', { name: '向下滚动时隐藏按钮' });
@@ -766,25 +770,28 @@ test('the table of contents', async (t) => {
     assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await page.mouse.click(300, 200);
     await scrollBy(800);
-    assert.equal(await placed('1'), true);
+    assert.equal(await placed(1), true);
     await page.reload();
     await settle(page);
     await scrollBy(800);
-    assert.equal(await placed('1'), true, 'the buttons hide again after a reload');
+    assert.equal(await placed(1), true, 'the buttons hide again after a reload');
     await context.close();
   });
 
   await t.test('on phones an article without a table of contents hides the settings button while scrolling down and shows it on scrolling up', async () => {
     const { page, context } = await open({ path: 'plain', viewport: { width: 375, height: 760 }, hasTouch: true });
-    const state = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-settings')).opacity);
+    const state = () =>
+      page.evaluate(() => {
+        const seenOpacity = (element) => (element === null ? 1 : Number(getComputedStyle(element).opacity) * seenOpacity(element.parentElement));
+        return seenOpacity(document.querySelector('.bk-settings'));
+      });
     assert.deepEqual([await page.locator('.bk-toc').count(), await page.locator('.bk-toc-handle').count()], [0, 0]);
-    assert.equal(await state(), '1');
+    assert.equal(await state(), 1);
     await scrollInSteps(page, 600);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden', null, { timeout: 2000 });
-    assert.equal(await state(), '0');
+    assert.equal(await state(), 0);
     await scrollInSteps(page, -200);
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).opacity === '1', null, { timeout: 2000 });
-    assert.equal(await state(), '1');
+    await until(async () => (await state()) === 1, 'the settings button does not show again');
     await context.close();
   });
 

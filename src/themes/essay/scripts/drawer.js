@@ -1,11 +1,11 @@
 import { closeOnEscape, markCurrent } from 'bake/theme/client';
+import { setDrawerOpen } from './buttons.js';
 import { chapterCard, createElement } from './toc-card.js';
 
 const CLOSE_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
 export function drawerView(view) {
   const { outline, labels, state } = view;
-  const root = document.documentElement;
   const dots = view.style === 'dots';
   const handle = createElement('button', dots ? 'bk-toc-handle is-capsule' : 'bk-toc-handle is-tab');
   handle.type = 'button';
@@ -35,7 +35,8 @@ export function drawerView(view) {
   const detail = createElement('div', 'bk-toc-drawer-detail');
   split.append(index, detail);
   drawer.append(head, split);
-  view.host.append(scrim, drawer, handle);
+  view.host.append(scrim, drawer);
+  document.querySelector('[data-edge="start"]').prepend(handle);
   const buttons = outline.chapters.map((chapter, chapterIndex) => {
     const button = createElement('button', dots ? 'bk-toc-drawer-dot' : 'bk-toc-drawer-tab', dots ? undefined : chapter.number);
     button.type = 'button';
@@ -59,7 +60,7 @@ export function drawerView(view) {
   function setOpen(open) {
     drawer.classList.toggle('is-open', open);
     scrim.classList.toggle('is-open', open);
-    root.classList.toggle('bk-toc-drawer-open', open);
+    setDrawerOpen(open);
     handle.setAttribute('aria-expanded', String(open));
     if (!open) return;
     select(Math.max(0, state().chapter));
@@ -99,7 +100,7 @@ export function drawerView(view) {
     restore(saved) {
       drawer.classList.add('is-open');
       scrim.classList.add('is-open');
-      root.classList.add('bk-toc-drawer-open');
+      setDrawerOpen(true);
       handle.setAttribute('aria-expanded', 'true');
       select(Math.min(saved.selected, buttons.length - 1));
       detail.scrollTop = saved.detail;
@@ -110,7 +111,7 @@ export function drawerView(view) {
       if (isOpen()) setOpen(false);
     },
     destroy() {
-      root.classList.remove('bk-toc-drawer-open');
+      setDrawerOpen(false);
       handle.remove();
       scrim.remove();
       drawer.remove();

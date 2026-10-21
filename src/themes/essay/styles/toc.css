@@ -915,28 +915,20 @@ html[data-script] .bk-toc-chapters {
 }
 
 .bk-toc-handle {
-  position: fixed;
-  left: 0;
-  bottom: calc(var(--ui-bottom) + var(--ui-button-height) + 10px);
-  z-index: var(--layer-toc-handle);
   display: flex;
   align-items: center;
   gap: 8px;
   height: 38px;
   padding: 0 13px 0 11px;
+  border: 0;
   border-radius: 0 11px 11px 0;
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
+  font: 600 13px/1 var(--font-ui);
   font-variant-numeric: tabular-nums;
   background: var(--surface);
   color: var(--accent);
   box-shadow: var(--card-shadow);
-  transition:
-    transform var(--motion) var(--ease),
-    opacity var(--fade),
-    visibility 0s;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .bk-toc-handle.is-tab {
@@ -1152,23 +1144,5 @@ html[data-script] .bk-toc-chapters {
 
 .bk-toc-drawer-dot[aria-expanded='true'] i::before {
   opacity: 1;
-}
-
-@media (max-width: 999.98px) {
-  html:is(.bk-toc-drawer-open, .bk-buttons-hidden) [data-bake-chat] {
-    --chat-hidden: 1;
-    --chat-visibility: hidden;
-  }
-
-  html:is(.bk-toc-drawer-open, .bk-buttons-hidden) :is(.bk-toc-handle, .bk-settings) {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(calc(-110% * var(--motion-distance)));
-    visibility: hidden;
-  }
-
-  html:is(.bk-toc-drawer-open, .bk-buttons-hidden) .bk-toc-handle {
-    transition-delay: 0s, 0s, var(--fade);
-  }
 }
 

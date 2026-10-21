@@ -294,7 +294,10 @@ test('the notes of the AI chat', async (t) => {
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
     await card.waitFor();
     await scrollPage(page, 800);
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat'), '::before').opacity === '0');
+    await page.waitForFunction(() => {
+      const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
+      return seenOpacity(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat')) === 0;
+    });
     await page.mouse.click(200, 100);
     await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
     await card.waitFor({ state: 'detached' });

@@ -1,8 +1,6 @@
 :host {
   all: initial;
-  position: absolute;
-  top: 0;
-  left: 0;
+  visibility: inherit;
   --dev-bg: #ffffff;
   --dev-text: #1f2328;
   --dev-muted: #59636e;
@@ -87,15 +85,19 @@ button:focus-visible {
   opacity: 0;
 }
 
-.bar {
+:host([data-alone]) {
   position: fixed;
-  right: var(--chat-right, 16px);
-  bottom: calc(var(--chat-bottom, 16px) + 90px);
-  left: 16px;
+  right: 16px;
+  bottom: 16px;
   z-index: 2147483647;
+}
+
+.bar {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   pointer-events: none;
 }
@@ -107,9 +109,8 @@ button:focus-visible {
 .problems {
   display: flex;
   flex-direction: column;
-  align-self: flex-end;
   box-sizing: border-box;
-  width: min(560px, 100%);
+  width: min(560px, 100vw - 32px);
   max-height: min(360px, 50vh);
   overflow: hidden;
   border: 1px solid var(--dev-line);
@@ -318,7 +319,7 @@ ol {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: calc(100% - 64px);
+  max-width: calc(100vw - 96px);
   padding: 7px 16px 7px 12px;
   border: 0;
   border-radius: 999px;
@@ -328,6 +329,10 @@ ol {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.notice:has(~ .dot:not([hidden])) {
+  margin-bottom: 28px;
 }
 
 .notice::before {

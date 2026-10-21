@@ -22,7 +22,7 @@
 
   .bk-toc,
   .bk-toc-ui,
-  .bk-settings,
+  [data-edge],
   .bk-toast,
   .bk-preview,
   .bk-copy,

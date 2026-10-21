@@ -106,7 +106,7 @@ function followSystemScheme() {
 export function startSettings() {
   const labels = labelsFor(document.documentElement.lang);
   const host = document.createElement('div');
-  document.body.append(host);
+  document.querySelector('[data-edge="start"]').append(host);
   render(() => <Settings labels={labels} />, host);
   darkScheme.addEventListener('change', followSystemScheme);
   endFadeOnPress();

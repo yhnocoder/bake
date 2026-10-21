@@ -157,10 +157,10 @@ test('links, folds and citation previews', async (t) => {
     await page.locator('.bk-preview').waitFor({ state: 'visible' });
     assert.notEqual(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-toast')).opacity), '0');
     const shown = ['.bk-preview', '.bk-settings', '.bk-toast'];
-    const displays = () => page.evaluate((selectors) => selectors.map((selector) => getComputedStyle(document.querySelector(selector)).display), shown);
-    assert.ok((await displays()).every((display) => display !== 'none'));
+    const rendered = () => page.evaluate((selectors) => selectors.map((selector) => document.querySelector(selector).checkVisibility()), shown);
+    assert.deepEqual(await rendered(), [true, true, true]);
     await page.emulateMedia({ media: 'print' });
-    assert.deepEqual(await displays(), ['none', 'none', 'none']);
+    assert.deepEqual(await rendered(), [false, false, false]);
     await context.close();
   });
 

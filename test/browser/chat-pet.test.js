@@ -275,14 +275,15 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
       const placement = (state) =>
         page.waitForFunction(
           ({ hidden, inPlace }) => {
+            const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
             const element = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher');
             const box = element.getBoundingClientRect();
-            const opacity = getComputedStyle(element).opacity;
+            const opacity = seenOpacity(element);
             element.focus();
             const focused = element.getRootNode().activeElement === element;
             element.blur();
-            if (!hidden) return box.right <= innerWidth && opacity === '1' && focused;
-            return (inPlace ? box.right <= innerWidth : box.left >= innerWidth) && opacity === '0' && !focused;
+            if (!hidden) return box.right <= innerWidth && opacity === 1 && focused;
+            return (inPlace ? box.right <= innerWidth : box.left >= innerWidth) && opacity === 0 && !focused;
           },
           { hidden: state === 'hidden', inPlace: reducedMotion === 'reduce' },
         );

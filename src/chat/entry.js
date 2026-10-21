@@ -26,10 +26,18 @@ function startChat(root) {
   launcher.setAttribute('aria-label', labels.open);
   launcher.setAttribute('aria-haspopup', 'dialog');
   launcher.append(pet.element);
+  shadow.append(style, launcher);
+  document.querySelector('[data-edge="end"]').append(host);
   const ask = button('bk-chat-ask', labels.ask);
   ask.hidden = true;
-  shadow.append(style, launcher, ask);
-  document.body.append(host);
+  const askHost = document.createElement('div');
+  askHost.dataset.bakeChatAsk = '';
+  const askShadow = askHost.attachShadow({ mode: 'open' });
+  const askStyle = document.createElement('style');
+  askStyle.textContent = styles;
+  askShadow.append(askStyle, ask);
+  // why: the ask button follows the selection, also while the theme hides the end area
+  document.body.append(askHost);
 
   launcher.setAttribute('aria-expanded', 'false');
   let chat = null;

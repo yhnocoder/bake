@@ -166,12 +166,13 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
     const fading = page.evaluate(
       () =>
         new Promise((resolve) => {
-          const root = document.querySelector('[data-bake-chat]').shadowRoot;
+          const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
+          const composer = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-composer');
           const frames = [];
           const sample = () => {
-            const composer = getComputedStyle(root.querySelector('.bk-chat-composer'));
-            frames.push({ opacity: Number(composer.opacity), visibility: composer.visibility });
-            if (composer.visibility === 'hidden' && getComputedStyle(root.querySelector('.bk-chat-bubbles')).contentVisibility === 'hidden') resolve(frames);
+            const visibility = getComputedStyle(composer).visibility;
+            frames.push({ opacity: seenOpacity(composer), visibility });
+            if (visibility === 'hidden') resolve(frames);
             else requestAnimationFrame(sample);
           };
           sample();

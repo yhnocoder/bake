@@ -45,6 +45,8 @@ export default function NotFound(props) {
             {labels.backHome}
           </a>
         </main>
+        <div data-edge="start" />
+        <div data-edge="end" />
       </body>
     </html>
   );

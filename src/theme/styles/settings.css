@@ -2,17 +2,61 @@
 
 :root {
   --ui-bottom: 16px;
-  --chat-bottom: var(--ui-bottom);
   --ui-button-height: 34px;
   --ui-stack-gap: 8px;
   --ui-reserve: calc(var(--ui-bottom) + var(--ui-button-height) + var(--ui-stack-gap));
 }
 
-.bk-settings {
+[data-edge] {
   position: fixed;
-  left: 16px;
   bottom: var(--ui-bottom);
-  z-index: var(--layer-settings);
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  transition:
+    translate var(--motion) var(--ease),
+    opacity var(--fade),
+    visibility 0s;
+}
+
+[data-edge] > * {
+  pointer-events: auto;
+}
+
+[data-edge='start'] {
+  left: 16px;
+  z-index: var(--layer-edge-start);
+  align-items: flex-start;
+  gap: 10px;
+}
+
+[data-edge='end'] {
+  right: 16px;
+  z-index: var(--layer-edge-end);
+  align-items: flex-end;
+  gap: var(--ui-stack-gap);
+}
+
+[data-edge][data-hidden] {
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, var(--fade);
+}
+
+[data-edge][data-hidden] > * {
+  pointer-events: none;
+}
+
+[data-edge='start'][data-hidden] {
+  translate: calc(-110% * var(--motion-distance)) 0;
+}
+
+[data-edge='end'][data-hidden] {
+  translate: calc((100% + 24px) * var(--motion-distance)) 0;
+}
+
+.bk-settings {
+  position: relative;
   font-family: var(--font-ui);
   font-size: 12px;
   line-height: 1.5;
@@ -446,12 +490,8 @@
     --ui-button-height: 38px;
   }
 
-  .bk-settings {
+  [data-edge='start'] {
     left: 0;
-    transition:
-      transform var(--motion) var(--ease),
-      opacity var(--fade),
-      visibility var(--fade);
   }
 
   .bk-settings-toggle {
@@ -464,7 +504,7 @@
     left: 10px;
   }
 
-  .bk-toc-ui:has(> .bk-toc-handle) ~ * .bk-settings-panel {
+  [data-edge='start']:has(.bk-toc-handle) .bk-settings-panel {
     --panel-bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
   }
 }

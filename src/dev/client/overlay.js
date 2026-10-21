@@ -23,7 +23,6 @@ export function createOverlay() {
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = [
     '<link rel="stylesheet" href="/__bake/overlay.css"><link rel="stylesheet" href="/__bake/controls.css">',
-    '<div class="marks"></div>',
     '<div class="bar">',
     '<button type="button" class="notice" hidden></button>',
     '<button type="button" class="dot" data-state="clear" aria-label="Show the problems list" title="No problems"></button>',
@@ -38,11 +37,22 @@ export function createOverlay() {
     '</section>',
     '</div>',
   ].join('');
-  document.body.append(host);
+  const edge = document.querySelector('[data-edge="end"]');
+  // why: pages that no theme renders, such as HTML files in an article folder and the page for a missing address, have no edge areas
+  if (edge === null) {
+    host.dataset.alone = '';
+    document.body.append(host);
+  } else edge.prepend(host);
+  const marksHost = document.createElement('div');
+  marksHost.id = 'bake-dev-marks';
+  marksHost.dataset.bakeDev = '';
+  const marksShadow = marksHost.attachShadow({ mode: 'open' });
+  marksShadow.innerHTML = '<link rel="stylesheet" href="/__bake/overlay.css"><div class="marks"></div>';
+  document.body.append(marksHost);
   const panel = shadow.querySelector('.problems');
   const title = shadow.querySelector('.title');
   const list = shadow.querySelector('.list');
-  const marks = shadow.querySelector('.marks');
+  const marks = marksShadow.querySelector('.marks');
   const copyAll = shadow.querySelector('.copy-all');
   const dot = shadow.querySelector('.dot');
   const notice = shadow.querySelector('.notice');

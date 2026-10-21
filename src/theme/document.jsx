@@ -29,6 +29,8 @@ export function ArticleDocument(props) {
         {props.children}
         <PreviewTemplates previews={article.content.previews} labels={labels} />
         <script type="application/json" class="bk-source" data-region={REGIONS.source} innerHTML={sourceJson(article.content.source)} />
+        <div data-edge="start" />
+        <div data-edge="end" />
       </body>
     </html>
   );

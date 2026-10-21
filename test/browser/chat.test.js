@@ -250,6 +250,26 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
   });
 
+  await t.test('on phones the button that asks about a selected passage shows while scrolling down hides the chat button', async (t) => {
+    const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 760 } } });
+    await page.goto(`${base}/2026-10/syntax/`);
+    const launcher = page.locator('.bk-chat-launcher');
+    await launcher.waitFor();
+    for (let step = 0; step < 6; step += 1) {
+      await page.evaluate(() => scrollBy(0, 120));
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+    }
+    await launcher.waitFor({ state: 'hidden' });
+    await page.evaluate(() => {
+      const paragraph = [...document.querySelectorAll('.bk-article p')].find((element) => element.getBoundingClientRect().top > 100);
+      const range = document.createRange();
+      range.selectNodeContents(paragraph);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+    await page.locator('.bk-chat-ask').waitFor();
+  });
+
   await t.test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the chat without a quote', async (t) => {
     const { page, problems } = await openBrowser(t, base);
     await page.route((url) => isSelectionChunk(url.href), (route) => route.abort());
@@ -604,7 +624,7 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
           probe.remove();
           return value;
         };
-        return { button: token('--button-shadow'), card: token('--card-shadow'), bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: style('.bk-chat-ask', 'boxShadow'), pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
+        return { button: token('--button-shadow'), card: token('--card-shadow'), bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: getComputedStyle(document.querySelector('[data-bake-chat-ask]').shadowRoot.querySelector('.bk-chat-ask')).boxShadow, pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
       );
       const { button, card, bubble, composer, menu, ask: askButton } = seen[colorScheme];
       const report = JSON.stringify(seen[colorScheme]);

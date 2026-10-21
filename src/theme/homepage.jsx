@@ -50,6 +50,8 @@ export default function Home(props) {
             <Listing byCategory={byCategory} byMonth={byMonth} groups={groups} groupBy={groupBy} tags={tags} columns={String(home.columns)} labels={labels} />
           )}
         </div>
+        <div data-edge="start" />
+        <div data-edge="end" />
       </body>
     </html>
   );

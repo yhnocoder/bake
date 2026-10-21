@@ -154,15 +154,13 @@
   --layer-home-bar: 20;
   --layer-toc-column: 20;
   --layer-toc-entries: 30;
-  --layer-toc-handle: 40;
   --layer-preview-card: 55;
   --layer-toc-card: 60;
-  --layer-settings: 70;
+  --layer-edge-start: 70;
   --layer-drawer-scrim: 73;
   --layer-drawer: 74;
-  --layer-chat-button: 75;
+  --layer-edge-end: 75;
   --layer-chat-ask: 76;
-  --layer-chat-panel: 77;
   --layer-toast: 80;
 }
 
