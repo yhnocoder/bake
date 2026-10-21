@@ -1,28 +1,34 @@
 import { For, createSignal, onMount } from 'solid-js';
 import { render } from 'solid-js/web';
 import { labelsFor } from '../labels.js';
-import { SETTINGS, storageKey } from '../settings.js';
+import { READING_SETTINGS, storageKey } from '../settings.js';
 import { closeOnEscape } from './escape.js';
 import { requestLayout } from './layout.js';
 import { reducedMotion } from './motion.js';
 
 export const SETTING_EVENT = 'bk:setting';
 const THEME_EVENT = 'bake:theme';
+const CONTROLS = ['list', 'segmented', 'switch'];
 
-export const settingRows = [
-  { name: 'toc', label: (labels) => labels.tocStyle, option: (labels, value) => labels.tocStyles[value], list: true, layout: {} },
-  { name: 'theme', label: (labels) => labels.theme, option: (labels, value) => labels.themes[value] },
-  { name: 'font', fades: true, label: (labels) => labels.font, option: (labels, value) => labels.fonts[value], layout: { arrange: true } },
-  { name: 'size', fades: true, label: (labels) => labels.size, option: (labels, value) => labels.sizes[value], glyph: () => 'A', layout: { arrange: true } },
-  { name: 'weight', fades: true, label: (labels) => labels.weight, option: (labels, value) => labels.weights[value], layout: { arrange: true } },
-  { name: 'spacing', fades: true, label: (labels) => labels.spacing, option: (labels, value) => labels.spacings[value], layout: { arrange: true } },
-  { name: 'buttons', label: (labels) => labels.buttons, toggle: { on: 'autohide', off: 'always', text: (labels) => labels.hideButtons } },
-];
+function readingRows(labels) {
+  return [
+    { name: 'theme', label: labels.theme, text: (value) => labels.themes[value] },
+    { name: 'font', fades: true, label: labels.font, text: (value) => labels.fonts[value], layout: { arrange: true } },
+    { name: 'size', fades: true, label: labels.size, text: (value) => labels.sizes[value], glyph: 'A', layout: { arrange: true } },
+    { name: 'weight', fades: true, label: labels.weight, text: (value) => labels.weights[value], layout: { arrange: true } },
+    { name: 'spacing', fades: true, label: labels.spacing, text: (value) => labels.spacings[value], layout: { arrange: true } },
+  ].map((row) => ({ ...row, values: READING_SETTINGS[row.name].values, control: 'segmented' }));
+}
 
-const values = Object.fromEntries(Object.keys(SETTINGS).map((name) => [name, createSignal(document.documentElement.dataset[name])]));
+function themeRows(settings, labels) {
+  return Object.entries(settings).map(([name, { values, control }]) => ({ name, values, control, label: labels[name].label, text: (value) => labels[name].values[value] }));
+}
+
+let rows = [];
+let values = {};
 
 function settingValue(name) {
-  return values[name][0]();
+  return values[name]?.[0]();
 }
 
 export function chooseSetting(name, value) {
@@ -34,7 +40,7 @@ export function chooseSetting(name, value) {
     switchTheme(value);
     return;
   }
-  const row = settingRows.find((candidate) => candidate.name === name);
+  const row = rows.find((candidate) => candidate.name === name);
   const apply = (now) => {
     document.documentElement.dataset[name] = value;
     document.dispatchEvent(new CustomEvent(SETTING_EVENT, { detail: { name, value } }));
@@ -103,18 +109,22 @@ function followSystemScheme() {
   });
 }
 
-export function startSettings() {
+export function startSettings(settings = {}, { labels: themeLabels = {}, drawings = {} } = {}) {
   const labels = labelsFor(document.documentElement.lang);
+  const defaults = JSON.parse(document.querySelector('.bk-setting-defaults')?.textContent ?? '{}');
+  // why: the panel opens upward from its button, so a tall list sits at the top and a switch at the bottom, whatever the order of the declarations
+  rows = [...readingRows(labels), ...themeRows(settings, themeLabels)].sort((a, b) => CONTROLS.indexOf(a.control) - CONTROLS.indexOf(b.control));
+  values = Object.fromEntries(rows.map((row) => [row.name, createSignal(document.documentElement.dataset[row.name])]));
   const host = document.createElement('div');
   document.querySelector('[data-edge="start"]').append(host);
-  render(() => <Settings labels={labels} />, host);
+  render(() => <Settings labels={labels} defaults={defaults} drawings={drawings} />, host);
   darkScheme.addEventListener('change', followSystemScheme);
   endFadeOnPress();
   loadLightWenkai();
 }
 
 function Settings(props) {
-  const { labels } = props;
+  const { labels, defaults, drawings } = props;
   const [open, setOpen] = createSignal(false);
   let root;
   let toggle;
@@ -153,38 +163,29 @@ function Settings(props) {
         </svg>
       </button>
       <div class="bk-settings-panel" id="bk-settings-panel" role="group" aria-label={labels.settings}>
-        <For each={settingRows.filter((row) => settingValue(row.name) !== undefined)}>
-          {(row) => (row.list ? <ListRow row={row} labels={labels} /> : row.toggle === undefined ? <OptionsRow row={row} labels={labels} /> : <ToggleRow row={row} labels={labels} />)}
+        <For each={rows.filter((row) => settingValue(row.name) !== undefined)}>
+          {(row) => (row.control === 'list' ? <ListRow row={row} initial={defaults[row.name]} drawings={drawings[row.name]} labels={labels} /> : row.control === 'switch' ? <SwitchRow row={row} /> : <OptionsRow row={row} />)}
         </For>
       </div>
     </div>
   );
 }
 
-const STYLE_GLYPHS = {
-  notes: '<path d="M7 6v16" stroke="var(--line-2)" stroke-width="1"/><path d="M7 11v4" stroke="var(--accent)" stroke-width="1.6"/><path d="M10 7h10M10 12h8M10 16.5h11M10 19.5h7" stroke="var(--ink-3)" stroke-width="1.2" stroke-linecap="round"/>',
-  tabs: '<rect x="0" y="5" width="8" height="3.5" rx="1.2" fill="var(--line-2)"/><rect x="0" y="10" width="11" height="3.5" rx="1.2" fill="var(--accent)"/><path d="M2 15.5v5" stroke="var(--ink-2)" stroke-width="1.2"/><rect x="0" y="22" width="8" height="3.5" rx="1.2" fill="var(--line-2)"/>',
-  dots: '<circle cx="14" cy="5" r="1.6" fill="var(--ink-3)"/><rect x="11.5" y="8.5" width="5" height="11" rx="2.5" fill="var(--accent)"/><circle cx="14" cy="23" r="1.6" fill="var(--line-2)"/>',
-  ticks: '<path d="M8 7h8M8 10h5M8 13h5M8 17h12M8 20h5M8 23h8" stroke="var(--line-2)" stroke-width="1.3" stroke-linecap="round"/><path d="M8 7h8M8 10h5M8 13h5" stroke="var(--ink-3)" stroke-width="1.3" stroke-linecap="round"/><path d="M8 17h12" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>',
-};
-
 function ListRow(props) {
-  const { row, labels } = props;
-  const values = SETTINGS[row.name].values;
-  const initial = document.documentElement.dataset.defaultToc;
+  const { row, initial, drawings, labels } = props;
   return (
     <div class="bk-settings-row is-list" data-setting={row.name}>
       <span class="bk-settings-label" id={`bk-settings-${row.name}`}>
-        {row.label(labels)}
+        {row.label}
       </span>
       <div class="bk-settings-list" role="radiogroup" aria-labelledby={`bk-settings-${row.name}`}>
-        <For each={values}>
+        <For each={row.values}>
           {(value, index) => (
             <button type="button" class="bk-settings-choice" role="radio" data-value={value} aria-checked={String(settingValue(row.name) === value)} onClick={() => chooseSetting(row.name, value)}>
-              <svg viewBox="0 0 28 28" aria-hidden="true" innerHTML={STYLE_GLYPHS[value]} />
+              <svg viewBox="0 0 28 28" aria-hidden="true" innerHTML={drawings?.[value]} />
               <span>
-                <b>{row.option(labels, value)}</b>
-                <small>{value === initial ? `T${index() + 1} · ${labels.defaultStyle}` : `T${index() + 1}`}</small>
+                <b>{row.text(value)}</b>
+                <small>{value === initial ? `T${index() + 1} · ${labels.defaultValue}` : `T${index() + 1}`}</small>
               </span>
             </button>
           )}
@@ -195,23 +196,23 @@ function ListRow(props) {
 }
 
 function OptionsRow(props) {
-  const { row, labels } = props;
+  const { row } = props;
   return (
     <div class="bk-settings-row" data-setting={row.name}>
-      <span class="bk-settings-label">{row.label(labels)}</span>
-      <div class="bk-kit-segmented bk-settings-options" role="group" aria-label={row.label(labels)}>
-        <For each={SETTINGS[row.name].values}>
+      <span class="bk-settings-label">{row.label}</span>
+      <div class="bk-kit-segmented bk-settings-options" role="group" aria-label={row.label}>
+        <For each={row.values}>
           {(value) => (
             <button
               type="button"
               class="bk-kit-segment"
               data-value={value}
-              aria-label={row.glyph === undefined ? undefined : row.option(labels, value)}
-              title={row.glyph === undefined ? undefined : row.option(labels, value)}
+              aria-label={row.glyph === undefined ? undefined : row.text(value)}
+              title={row.glyph === undefined ? undefined : row.text(value)}
               aria-pressed={String(settingValue(row.name) === value)}
               onClick={() => chooseSetting(row.name, value)}
             >
-              {row.glyph === undefined ? row.option(labels, value) : row.glyph(value)}
+              {row.glyph ?? row.text(value)}
             </button>
           )}
         </For>
@@ -220,15 +221,15 @@ function OptionsRow(props) {
   );
 }
 
-function ToggleRow(props) {
-  const { row, labels } = props;
-  const { on, off, text } = row.toggle;
+function SwitchRow(props) {
+  const { row } = props;
+  const [on, off] = row.values;
   const checked = () => settingValue(row.name) === on;
   return (
     <div class="bk-settings-row" data-setting={row.name}>
-      <span class="bk-settings-label">{row.label(labels)}</span>
+      <span class="bk-settings-label">{row.label}</span>
       <button type="button" class="bk-settings-switch" role="switch" aria-checked={String(checked())} onClick={() => chooseSetting(row.name, checked() ? off : on)}>
-        <span>{text(labels)}</span>
+        <span>{row.text(on)}</span>
         <i class="bk-kit-switch" aria-hidden="true" />
       </button>
     </div>

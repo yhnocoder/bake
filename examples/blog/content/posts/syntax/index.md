@@ -49,7 +49,7 @@ toc: notes
 | `preview` | 否 | 首页卡片的动画预览脚本，放在文章文件夹里。 |
 | `cover` | 否 | 分享图片，不写时由 Bake 生成。 |
 | `theme` | 否 | 主题，`essay` 或 `bento`，不写时用站点默认值。 |
-| `toc` | 否 | 目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用站点默认值。 |
+| `toc` | 否 | essay 主题的选项，目录样式：`notes`、`tabs`、`dots`、`ticks`，分别是 T1 前文笔记、T2 书签索引、T3 圆点胶囊、T4 刻度线，不写时用 `bake.config.js` 里 `themes.essay.toc` 的值。front matter 可以写文章所用主题的任何选项，例如 bento 文章的 `columns`。 |
 | `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。 |
 | `page` | 否 | 纯 HTML 页面要原样发布的文件，写了它的 `index.md` 没有正文。 |
 
@@ -506,7 +506,7 @@ def silu(x):
 | front matter 缺少必填字段 | 没有 `slug:` 一行 | `front matter is missing "slug"` |
 | slug 含有不允许的字符 | `slug: LLM_Act` | `slug "LLM_Act" may only contain lowercase letters, digits and "-"` |
 | front matter 有不认识的字段 | `layout: wide` | `unknown front matter field "layout"` |
-| toc 取值不对 | `toc: sidebar` | `toc must be notes, tabs, dots or ticks, got "sidebar"` |
+| toc 取值不对 | `toc: sidebar` | `toc must be one of notes, tabs, dots or ticks, got "sidebar"` |
 | 同一页的锚点重复 | 两个标题都写 `{#intro}` | `duplicate anchor "intro", first defined at 7:7` |
 | 标题有不认识的属性 | `## 引言 {color=red}` | `unknown attribute "color" on heading` |
 | 卡片列数不是正整数 | `## 卡片 {cols=0}` | `cols must be a whole number of card columns from 1 to 6, for example cols=2` |

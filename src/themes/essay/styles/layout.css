@@ -1,0 +1,86 @@
+:root {
+  --frame-width: min(1340px, 100cqw);
+  --toc-width: 200px;
+  --column-gap: 40px;
+  --notes-width: calc(240px - (1340px - var(--frame-width)));
+  --rail-width: 56px;
+  --body-width: 820px;
+  --wide-width: calc(var(--body-width) + var(--column-gap) + var(--notes-width));
+  --page-width: var(--frame-width);
+  --toc-left: calc((100cqw - var(--frame-width)) / 2);
+  --body-left: calc(var(--toc-left) + var(--toc-width) + var(--column-gap));
+  --page-shift: calc(var(--toc-left) - var(--body-left));
+}
+
+@media (min-width: 1340px) {
+  :root[data-script]:not([data-toc='notes']) {
+    --body-left: calc(var(--rail-width) + (100cqw - var(--rail-width) - var(--wide-width)) / 2);
+  }
+}
+
+@media (max-width: 1339.98px) {
+  :root {
+    --notes-width: 200px;
+    --toc-width: var(--rail-width);
+    --toc-left: 0px;
+    --body-width: min(820px, 100cqw - var(--rail-width) - 64px - var(--column-gap) - var(--notes-width));
+    --body-left: calc(var(--rail-width) + max(32px, (100cqw - var(--rail-width) - var(--wide-width)) / 2));
+    --page-width: var(--wide-width);
+    --page-shift: 0px;
+  }
+}
+
+@media (max-width: 999.98px) {
+  :root {
+    --body-width: min(820px, 100cqw - 32px);
+    --body-left: calc((100cqw - var(--body-width)) / 2);
+    --wide-width: var(--body-width);
+    --page-width: var(--body-width);
+    --page-shift: 0px;
+  }
+}
+
+.bk-shell {
+  container-type: inline-size;
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 120px;
+}
+
+.bk-header,
+.bk-article {
+  margin-left: var(--body-left);
+  width: var(--body-width);
+}
+
+@media (min-width: 1000px) {
+  .bk-settings-row[data-setting='buttons'] {
+    display: none;
+  }
+}
+
+@media (max-width: 999.98px) {
+  [data-edge='start']:has(.bk-toc-handle) .bk-settings-panel {
+    --panel-bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
+  }
+}
+
+@media print {
+  :root {
+    --body-width: 100%;
+    --wide-width: 100%;
+    --page-width: 100%;
+    --body-left: 0px;
+    --page-shift: 0px;
+  }
+
+  .bk-shell {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .bk-toc,
+  .bk-toc-ui {
+    display: none !important;
+  }
+}

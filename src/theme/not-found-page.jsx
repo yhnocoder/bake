@@ -1,18 +1,18 @@
 import { FontLinks } from './font-links.jsx';
 import { labelsFor } from './labels.js';
-import { SITE_SETTINGS, prepaintScript, settingAttributes } from './settings.js';
+import { SITE_SETTINGS, prepaintScript, settingAttributes, settingDefaults } from './settings.js';
 
 export default function NotFound(props) {
   const { site, articles, assets } = props;
   const labels = labelsFor(site.language);
   return (
-    <html lang={site.language} {...settingAttributes(SITE_SETTINGS)}>
+    <html lang={site.language} {...settingAttributes(settingDefaults(SITE_SETTINGS))}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex" />
         <title>{`${labels.notFound} · ${site.title}`}</title>
-        <script innerHTML={prepaintScript()} />
+        <script innerHTML={prepaintScript(SITE_SETTINGS)} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />
         ))}

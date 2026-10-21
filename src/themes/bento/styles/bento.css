@@ -14,11 +14,6 @@
 }
 
 .bt-shell {
-  --body-left: 0px;
-  --body-width: 100%;
-  --wide-width: 100%;
-  --page-width: 100%;
-  --page-shift: 0px;
   width: min(1340px, 100% - 2 * var(--bt-gutter));
   min-height: 100vh;
   margin: 0 auto;

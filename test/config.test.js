@@ -25,7 +25,7 @@ describe('bake.config.js', () => {
         ["language: @' '", 'language must be a non-empty string, got " "'],
         ["url: @'example.com'", 'url must be an absolute http or https URL, got "example.com"'],
         ["theme: @'paper'", 'theme must be essay, bento or mine, got "paper"'],
-        ["toc: @'sidebar'", 'toc must be notes, tabs, dots or ticks, got "sidebar"'],
+        ["@toc: 'dots'", `unknown config field "toc"; toc is an option of the essay theme, written as themes.essay.toc, such as themes: { essay: { toc: 'notes' } }`],
         ['themes: @4', 'themes must be an object, got 4'],
         ["home: @'grid'", 'home must be an object, got "grid"'],
         ["categories: @{ ml: 'ML' }", 'categories must be a list, got an object'],
@@ -61,7 +61,10 @@ describe('bake.config.js', () => {
         ["themes: { bento: { columns: @'4' } }", 'themes.bento.columns must be a number, got "4"'],
         ["categories: [{ id: 'ml', name: 'ML', color: '#000000', desc: @3 }]", 'categories[0].desc must be a string, got 3'],
       ],
-      [["home: { groupBy: @'category' }", 'home.groupBy is "category" but bake.config.js defines no categories']],
+      [
+        ["themes: { essay: { toc: @'sidebar' } }", 'themes.essay.toc must be one of notes, tabs, dots or ticks, got "sidebar"'],
+        ["home: { groupBy: @'category' }", 'home.groupBy is "category" but bake.config.js defines no categories'],
+      ],
     ];
     for (const round of rounds) {
       const lines = problems(t, { 'bake.config.js': config(`  ${base},`, ...round.map(([marked]) => `  ${marked.replace('@', '')},`)) });
@@ -121,17 +124,30 @@ describe('bake.config.js', () => {
       'themes/mine/page.jsx': 'export default function Page(props) {\n  return <html><body><script type="application/json" innerHTML={JSON.stringify(props.options)} /></body></html>;\n}\n',
       'themes/mine/client.jsx': '',
       'content/posts/rope/index.md': article({ extra: 'theme: mine\n' }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: mine\nrule: false\n' }),
     });
     assert.equal(bake(dir, 'build').stderr, '');
     assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<script type="application\/json">{"density":"tight","rule":true}<\/script>/);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<script type="application\/json">{"density":"tight","rule":false}<\/script>/);
     assert.deepEqual(problems(t, { 'bake.config.js': config(`  ${base},`, "  themes: { mine: { density: 'dense' } },"), 'themes/mine/options.js': options }), [
       'bake.config.js:3:30 themes.mine.density must be one of loose or tight, got "dense"',
     ]);
-    const broken = "export const options = { size: { label: 'Size', type: 'number', min: 1, max: 3, default: 5 }, data: { label: 'Data', type: 'file', default: 'a.json' }, plain: { type: 'text', default: '' } };\n";
+    const broken = [
+      "export const options = { size: { label: 'Size', type: 'number', min: 1, max: 3, default: 5 }, data: { label: 'Data', type: 'file', default: 'a.json' }, plain: { type: 'text', default: '' }, tags: { label: 'Tags', type: 'text', default: '' }, rule: { label: 'Rule', type: 'boolean', default: true } };",
+      "export const settings = { font: { values: ['a'], default: 'a', control: 'list' }, Mode: { values: ['a'], default: 'a', control: 'list' }, ink: { values: ['a', 'b', 'c'], default: 'd', control: 'switch' }, rule: { values: ['on'], default: { option: 'rule' }, control: 'list', label: 'Rule' } };",
+      '',
+    ].join('\n');
     assert.deepEqual(problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
       'themes/mine/options.js:1:1 mine: the default of option "size" must be between 1 and 3, got 5',
       'themes/mine/options.js:1:1 mine: option "data" has the type "file"; a theme option is set in bake.config.js and cannot name a file of an article',
       'themes/mine/options.js:1:1 mine: option "plain" needs a label, the text shown next to its control',
+      'themes/mine/options.js:1:1 mine: option "tags" has the name of the front matter field "tags", so an article could not set it',
+      'themes/mine/options.js:1:1 mine: setting "font" uses a name reserved for Bake; a theme cannot declare theme, font, size, weight, spacing, scheme or script',
+      'themes/mine/options.js:1:1 mine: setting "Mode" becomes the attribute data-Mode; use lowercase letters and digits, starting with a letter',
+      'themes/mine/options.js:1:1 mine: setting "ink" is a switch and needs two values, the value when it is on and the value when it is off',
+      'themes/mine/options.js:1:1 mine: the default of setting "ink" must be one of its values, a, b or c, got "d"',
+      'themes/mine/options.js:1:1 mine: setting "rule" has the unknown field "label"; the fields of a setting are values, default and control',
+      'themes/mine/options.js:1:1 mine: the default of setting "rule" names the option "rule", which must be an enum whose options are values of the setting',
     ]);
   });
 });

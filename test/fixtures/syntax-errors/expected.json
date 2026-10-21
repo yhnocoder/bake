@@ -2,7 +2,7 @@
   "missing-slug.md": "missing-slug.md:1:1 front matter is missing \"slug\"",
   "invalid-slug.md": "invalid-slug.md:3:7 slug \"LLM_Act\" may only contain lowercase letters, digits and \"-\"",
   "unknown-front-matter-field.md": "unknown-front-matter-field.md:6:1 unknown front matter field \"layout\"",
-  "invalid-toc.md": "invalid-toc.md:6:6 toc must be notes, tabs, dots or ticks, got \"sidebar\"",
+  "invalid-toc.md": "invalid-toc.md:6:6 toc must be one of notes, tabs, dots or ticks, got \"sidebar\"",
   "duplicate-anchor.md": "duplicate-anchor.md:11:7 duplicate anchor \"intro\", first defined at 7:7",
   "unknown-heading-attribute.md": "unknown-heading-attribute.md:8:7 unknown attribute \"color\" on heading",
   "unknown-block.md": "unknown-block.md:8:1 unknown block \":::warning\"",

@@ -94,12 +94,12 @@ describe('themes', () => {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: '## One\n\nText.\n' }),
       'themes/plain/page.jsx': [
-        "import { ArticleDocument, Block, Header, SITE_SETTINGS, labelsFor } from 'bake/theme';",
+        "import { ArticleDocument, Block, Header, labelsFor } from 'bake/theme';",
         '',
         'export default function Page(props) {',
         '  const labels = labelsFor(props.site.language);',
         '  return (',
-        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} settings={SITE_SETTINGS} bodyClass="plain">',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} bodyClass="plain">',
         '      <Header site={props.site} article={props.article} home={props.assets.root} labels={labels} />',
         '      <main class="bk-article">{props.article.content.sections[0].blocks.map((block) => <Block block={block} labels={labels} />)}</main>',
         '    </ArticleDocument>',
@@ -120,18 +120,46 @@ describe('themes', () => {
     assert.match(readFileSync(join(dir, 'dist/assets', styles[0]), 'utf8'), /--bg:/);
   });
 
+  test('a theme of the blog adds a reader setting whose default is the value of a theme option that the article sets', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article({ extra: 'theme: plain\nink: dark\n' }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: plain\n' }),
+      'themes/plain/options.js': [
+        "export const options = { ink: { label: 'Ink', type: 'enum', options: ['light', 'dark'], default: 'light' } };",
+        "export const settings = { ink: { values: ['light', 'dark'], default: { option: 'ink' }, control: 'segmented' } };",
+        '',
+      ].join('\n'),
+      'themes/plain/page.jsx': [
+        "import { ArticleDocument, labelsFor } from 'bake/theme';",
+        "import { settings } from './options.js';",
+        '',
+        'export default function Page(props) {',
+        '  return <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labelsFor(props.site.language)} settings={settings} options={props.options} />;',
+        '}',
+        '',
+      ].join('\n'),
+      'themes/plain/client.jsx': '',
+    });
+    assert.equal(bake(dir, 'build').stderr, '');
+    const html = (slug) => readFileSync(join(dir, `dist/2026-10/${slug}/index.html`), 'utf8');
+    assert.match(html('rope'), /<html lang="en" data-theme="system" data-font="sans" data-size="medium" data-weight="regular" data-spacing="normal" data-ink="dark">/);
+    assert.match(html('rope'), /"ink":\["light","dark"\]/);
+    assert.match(html('gelu'), /<html lang="en" [^>]*data-ink="light">/);
+  });
+
   test('files of a theme of the blog never take the place of the files of bake/theme that have the same path', (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: '## One\n\nText.\n' }),
       'themes/plain/page.jsx': [
-        "import { ArticleDocument, Header, SITE_SETTINGS, labelsFor } from 'bake/theme';",
+        "import { ArticleDocument, Header, labelsFor } from 'bake/theme';",
         "import { mark } from './header.jsx';",
         '',
         'export default function Page(props) {',
         '  const labels = labelsFor(props.site.language);',
         '  return (',
-        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} settings={SITE_SETTINGS} bodyClass={mark}>',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} bodyClass={mark}>',
         '      <Header site={props.site} article={props.article} home={props.assets.root} labels={labels} />',
         '    </ArticleDocument>',
         '  );',

@@ -58,7 +58,7 @@ A blog is an ordinary repository. Bake reads it from the blog root:
 
 ```
 my-blog/
-  bake.config.js        site title, URL, language, default theme and table of contents style
+  bake.config.js        site title, URL, language, default theme and theme options
   preamble.sty          math macros shared by every article
   package.json          npm packages used by components
   content/
@@ -83,7 +83,7 @@ export default {
   url: 'https://example.github.io',
   language: 'en',
   theme: 'essay',
-  toc: 'notes',
+  themes: { essay: { toc: 'notes' } },
 };
 ```
 
@@ -94,8 +94,7 @@ export default {
 | `url` | yes | Absolute `http` or `https` address of the published site. |
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
-| `toc` | no | Default table of contents style: `notes`, `tabs`, `dots` or `ticks`. The default is `notes`. |
-| `themes` | no | The options of each theme, keyed by the theme name. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default, written as `themes: { bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
+| `themes` | no | The options of each theme, keyed by the theme name. The `essay` theme has one option: `toc`, the table of contents style, `notes`, `tabs`, `dots` or `ticks`, `notes` by default. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default. Both are written as `themes: { essay: { toc: 'dots' }, bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `chat` | no | `{ pet }`: the pet of the AI chat, described in "The pet" below. The default is `crt-monitor`. |
 | `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
@@ -127,11 +126,10 @@ tags: [LLM]
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of a PNG, JPEG, GIF, WebP, AVIF or SVG image in the article folder that becomes the share image in place of the card Bake draws, see [Share images](#share-images). |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
-| `toc` | no | Table of contents style of this article. The default comes from `bake.config.js`. It has no effect in the `bento` theme, which has no table of contents. |
 | `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
 | `page` | no | Path of an HTML file in the article folder. Bake publishes the folder unchanged and serves this file as the article's `index.html`. An `index.md` with `page` has no text after the front matter. |
 
-Any other field is an error, and two articles cannot have the same URL.
+The front matter can also set the options of the article's theme by their names, such as `toc: dots` in an `essay` article or `columns: 4` in a `bento` article; a value written in the front matter replaces the one in `themes` of `bake.config.js` for this article. Any other field is an error, and two articles cannot have the same URL.
 
 ## Writing an article
 
@@ -378,7 +376,7 @@ The built-in pets have their own licenses, which the chat settings name in one l
 
 A theme decides how every article page looks. The `essay` theme lays an article out in three columns: the table of contents on the left, the text in an 820 pixel column, and the sidenotes on the right. Below 1000 pixels the page has one column and a sidenote opens under its paragraph when the reader taps its number.
 
-The `essay` theme has four table of contents styles, which `toc` selects:
+The `essay` theme has four table of contents styles, which its option `toc` selects:
 
 | Style | From 1340 pixels | From 1000 to 1339 pixels |
 |---|---|---|
@@ -389,11 +387,11 @@ The `essay` theme has four table of contents styles, which `toc` selects:
 
 A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
-The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. From 1000 pixels up the grid has `themes.bento.columns` columns, and below 1000 pixels it has one column. A section asks for its width with `cols` or `width` on its heading: `body` is a third of the columns, `wide` is half of them and `page` is all of them, so with 6 columns these are 2, 3 and 6. A section without either spans the whole row when it contains a block with `:::{width=page}`, half of the columns when it contains a block with `:::{width=wide}` or a block that does not fit into a third, such as a long line of code or a component with a pixel width, and a third otherwise. From 1000 pixels up the cards are placed in the order of the article, each one in the columns whose lowest card ends highest. A card is as tall as its content, unless its heading sets `rows`: then the card is that many rows of `themes.bento.rowHeight` pixels tall, the content that does not fit is hidden under a fade at the bottom, and the card scrolls after the reader clicks it or moves keyboard focus into it. In `bake dev` such a card shows how many pixels do not fit and the smallest `rows` that fits them. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so the front matter field `toc` and `{toc="…"}` on headings have no effect. Without scripts, every card keeps the span its width gives it and is as tall as its content.
+The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. From 1000 pixels up the grid has `themes.bento.columns` columns, and below 1000 pixels it has one column. A section asks for its width with `cols` or `width` on its heading: `body` is a third of the columns, `wide` is half of them and `page` is all of them, so with 6 columns these are 2, 3 and 6. A section without either spans the whole row when it contains a block with `:::{width=page}`, half of the columns when it contains a block with `:::{width=wide}` or a block that does not fit into a third, such as a long line of code or a component with a pixel width, and a third otherwise. From 1000 pixels up the cards are placed in the order of the article, each one in the columns whose lowest card ends highest. A card is as tall as its content, unless its heading sets `rows`: then the card is that many rows of `themes.bento.rowHeight` pixels tall, the content that does not fit is hidden under a fade at the bottom, and the card scrolls after the reader clicks it or moves keyboard focus into it. In `bake dev` such a card shows how many pixels do not fit and the smallest `rows` that fits them. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so `{toc="…"}` on headings has no effect. Without scripts, every card keeps the span its width gives it and is as tall as its content.
 
 A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
-A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/`, and an article or `bake.config.js` selects it by the folder name. Every theme has a `page.jsx` for article pages and a `client.jsx` for the page script. The site theme, the one `theme` in `bake.config.js` names, also has a `home.jsx` for the homepage, a `not-found.jsx` for the 404 page and a `theme.css`, which Bake publishes as `_bake/theme.css`. A `fonts.css` with `@font-face` rules and an `options.js` with the theme's options are optional. A file in `themes/essay/` or `themes/bento/` replaces the file with the same path in the built-in theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest.
+A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake renders to static HTML at build time, plus the scripts and styles that run in the browser. A blog adds its own theme as a folder in `themes/`, and an article or `bake.config.js` selects it by the folder name. Every theme has a `page.jsx` for article pages and a `client.jsx` for the page script. The site theme, the one `theme` in `bake.config.js` names, also has a `home.jsx` for the homepage, a `not-found.jsx` for the 404 page and a `theme.css`, which Bake publishes as `_bake/theme.css`. A `fonts.css` with `@font-face` rules and an `options.js` are optional. `options.js` has no imports and exports `options`, the theme's options, declared like the parameters of a component and set in `themes` of `bake.config.js` and in the front matter, and may export `settings`, the reader settings the theme adds to the color scheme, font, size, weight and spacing. A setting is declared as `{ values, default, control }`: `values` lists its values, `default` is one of them or `{ option: 'name' }` for the value of an enum option, and `control` is `segmented`, `switch` (two values, the first when it is on) or `list`. `ArticleDocument` from `bake/theme` takes the settings and the page's options and writes the starting value of each setting as a `data-` attribute of the `<html>` element, and `startSettings(settings, { labels, drawings })` from `bake/theme/client` shows them in the settings panel. A file in `themes/essay/` or `themes/bento/` replaces the file with the same path in the built-in theme, so a blog can change one part, such as `themes/essay/header.jsx`, and keep the rest.
 
 ## Development
 

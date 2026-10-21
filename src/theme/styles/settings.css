@@ -234,12 +234,6 @@
   text-align: left;
 }
 
-@media (min-width: 1000px) {
-  .bk-settings-row[data-setting='buttons'] {
-    display: none;
-  }
-}
-
 .bk-toast {
   position: fixed;
   left: 50%;
@@ -502,10 +496,6 @@
 
   .bk-settings-panel {
     left: 10px;
-  }
-
-  [data-edge='start']:has(.bk-toc-handle) .bk-settings-panel {
-    --panel-bottom: calc(var(--ui-button-height) + 10px + 38px + 14px);
   }
 }
 

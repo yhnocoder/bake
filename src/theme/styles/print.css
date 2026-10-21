@@ -1,10 +1,5 @@
 @media print {
   :root {
-    --body-width: 100%;
-    --wide-width: 100%;
-    --page-width: 100%;
-    --body-left: 0px;
-    --page-shift: 0px;
     --code-white-space: pre-wrap;
     --code-overflow-wrap: anywhere;
     --cell-white-space: normal;
@@ -15,13 +10,6 @@
     font-size: 11.5pt;
   }
 
-  .bk-shell {
-    min-height: 0;
-    padding: 0;
-  }
-
-  .bk-toc,
-  .bk-toc-ui,
   [data-edge],
   .bk-toast,
   .bk-preview,

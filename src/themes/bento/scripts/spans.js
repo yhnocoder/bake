@@ -1,5 +1,10 @@
-import { declaresNaturalWidth, labelsFor, naturalWidth, notesColumnScreen, overflows, requestLayout } from 'bake/theme/client';
+import { declaresNaturalWidth, naturalWidth, notesColumnScreen, overflows, requestLayout } from 'bake/theme/client';
 import { levelSpan } from '../spans.js';
+
+const CARD_OVERFLOW = {
+  zh: (pixels, rows) => `内容超出卡片 ${pixels} 像素，rows 至少写 ${rows}`,
+  en: (pixels, rows) => `Content is ${pixels} px taller than the card; set rows to at least ${rows}`,
+};
 
 const placedHeights = new WeakMap();
 const resizes = new ResizeObserver((entries) => {
@@ -95,7 +100,7 @@ function verticalBorders(element) {
 
 function devHint() {
   if (document.querySelector('script[data-bake-dev]') === null) return null;
-  return labelsFor(document.documentElement.lang).cardOverflow;
+  return document.documentElement.lang.toLowerCase().startsWith('zh') ? CARD_OVERFLOW.zh : CARD_OVERFLOW.en;
 }
 
 function setStyle(element, name, value) {

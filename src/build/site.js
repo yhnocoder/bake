@@ -104,7 +104,8 @@ async function readSettings(root) {
   const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const componentErrors = [];
   const components = errors.length > 0 ? new Map() : await readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES }, componentErrors);
-  return { errors, config, preamble, pet, components, componentErrors, rules: { themes: themeNames, categories: config.categories.map((category) => category.id) } };
+  const rules = { themes: themeNames, categories: config.categories.map((category) => category.id), theme: config.theme, options: themeOptions, optionProblem };
+  return { errors, config, preamble, pet, components, componentErrors, rules };
 }
 
 function readsThemePath(root, name, theme, path) {
@@ -250,8 +251,9 @@ async function loadArticle(root, article, { rules, preamble, components }) {
   const folder = { path: join(root, article.dir), files: article.files };
   const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components }) : null;
   const positions = frontMatter?.positions ?? {};
+  const options = frontMatter?.options ?? {};
   const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);
-  return { ...article, source, fields, positions, url, draft: fields?.draft === true, document, content: null, cover, errors };
+  return { ...article, source, fields, options, positions, url, draft: fields?.draft === true, document, content: null, cover, errors };
 }
 
 async function readCover(path, cover, file, position, errors) {
@@ -295,11 +297,11 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
   const name = themeOf(article, config);
   const theme = themes.get(name);
   if (theme === null) return '';
-  const { fields, content } = article;
+  const { content } = article;
   const root = pageRoot(entry.url);
   const props = {
     site: siteProps(config),
-    options: config.themes[name],
+    options: { ...config.themes[name], ...article.options },
     article: {
       title: entry.title,
       summary: entry.summary,
@@ -307,7 +309,6 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
       tags: entry.tags,
       category: entry.category,
       draft: entry.draft,
-      toc: fields.toc ?? config.toc,
       url: entry.url,
       link: entry.link,
       shareImage: shareImageProps(config, shareImages.get(article.file)),

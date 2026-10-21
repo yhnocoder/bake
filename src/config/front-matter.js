@@ -1,11 +1,10 @@
 import { LineCounter, isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { describeValue, errorAt, fileStart } from '../report.js';
-import { TOC_STYLES } from '../choices.js';
 import { characterProblem, choiceProblem, folderFile, folderPath, slugProblem } from './rules.js';
 import { CONFIG_FILE } from './bake-config.js';
 
 const REQUIRED = ['title', 'slug', 'date'];
-const FIELDS = ['title', 'slug', 'date', 'summary', 'tags', 'category', 'preview', 'theme', 'toc', 'draft', 'cover', 'page'];
+export const FRONT_MATTER_FIELDS = Object.freeze(['title', 'slug', 'date', 'summary', 'tags', 'category', 'preview', 'theme', 'draft', 'cover', 'page']);
 const DATE_FORM = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function readFrontMatter(file, source, rules, errors) {
@@ -34,16 +33,25 @@ export function readFrontMatter(file, source, rules, errors) {
     return null;
   }
   const report = (node, message) => errors.push(errorAt(file, positionOf(node.range[0]), message));
+  const items = document.contents?.items ?? [];
+  const written = items.find((pair) => keyName(pair) === 'theme')?.value?.toJS(document);
+  const theme = written ?? rules.theme;
+  const declarations = rules.options.get(theme);
   const fields = {};
+  const options = {};
   const positions = {};
-  for (const pair of document.contents?.items ?? []) {
-    const name = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
-    if (!FIELDS.includes(name)) {
-      report(pair.key, `unknown front matter field ${JSON.stringify(name)}`);
-      continue;
-    }
+  for (const pair of items) {
+    const name = keyName(pair);
     const node = pair.value ?? pair.key;
     const value = pair.value === null ? null : pair.value.toJS(document);
+    if (!FRONT_MATTER_FIELDS.includes(name)) {
+      // why: an article whose theme is wrong is reported at its theme, and its options are known only once the theme is
+      if (declarations === undefined) continue;
+      if (!Object.hasOwn(declarations, name)) report(pair.key, unknownField(name, theme, rules.options));
+      else if (rules.optionProblem(declarations[name], value) !== null) report(node, `${name} ${rules.optionProblem(declarations[name], value)}`);
+      else options[name] = value;
+      continue;
+    }
     const problem = fieldProblem(name, value, pair.value, rules);
     if (problem) {
       report(problem.node ?? node, problem.message);
@@ -64,7 +72,17 @@ export function readFrontMatter(file, source, rules, errors) {
       errors.push(errorAt(file, { line: body + 1, column: lines[body].search(/\S/) + 1 }, 'index.md with "page" must have no body'));
     }
   }
-  return { fields, positions };
+  return { fields, options, positions };
+}
+
+function keyName(pair) {
+  return isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+}
+
+function unknownField(name, theme, options) {
+  const owner = [...options].find(([, declarations]) => declarations !== null && Object.hasOwn(declarations, name))?.[0];
+  const field = `unknown front matter field ${JSON.stringify(name)}`;
+  return owner === undefined ? field : `${field}; it is an option of the ${owner} theme, and this article uses the ${theme} theme`;
 }
 
 function fieldProblem(name, value, node, rules) {
@@ -96,8 +114,6 @@ function fieldMessage(name, value, rules) {
       return rules.categories.includes(value) ? null : `category ${describeValue(value)} is not one of the categories in ${CONFIG_FILE}`;
     case 'theme':
       return choiceProblem('theme', rules.themes, value);
-    case 'toc':
-      return choiceProblem('toc', TOC_STYLES, value);
     case 'draft':
       return typeof value === 'boolean' ? null : `draft must be true or false, got ${describeValue(value)}`;
     case 'preview':

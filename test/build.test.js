@@ -169,7 +169,7 @@ describe('bake build', () => {
         'content/posts/a/index.md:1:1 front matter is missing "slug"',
         'content/posts/a/index.md:3:7 date must be a date in the form YYYY-MM-DD, got "2026-10-32"',
         'content/posts/b/index.md:3:7 slug "B" may only contain lowercase letters, digits and "-"',
-        'content/posts/b/index.md:5:6 toc must be notes, tabs, dots or ticks, got "sidebar"',
+        'content/posts/b/index.md:5:6 toc must be one of notes, tabs, dots or ticks, got "sidebar"',
         'content/posts/b/index.md:6:1 unknown front matter field "layout"',
         'content/posts/c/index.md:1:1 index.md must start with front matter between two --- lines',
         'content/posts/c/index.md:1:1 heading level 1 is not allowed; the article title comes from front matter, sections start at ##',
@@ -200,7 +200,7 @@ describe('bake build', () => {
     assert.equal(
       result.stderr,
       [
-        'bake.config.js:3:8 toc must be notes, tabs, dots or ticks, got "x"',
+        `bake.config.js:3:3 unknown config field "toc"; toc is an option of the essay theme, written as themes.essay.toc, such as themes: { essay: { toc: 'notes' } }`,
         `themes/mine/options.js:1:1 mine: option "a" must be declared as an object such as { label: 'Range', type: 'number', default: 4 }, got 1`,
         '2 errors, dist/ was not written',
         '',

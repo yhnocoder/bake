@@ -1,4 +1,5 @@
-import { LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, labelsFor, leftColumnScreen, notesColumnScreen, oncePerFrame } from 'bake/theme/client';
+import { LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, leftColumnScreen, notesColumnScreen, oncePerFrame, requestLayout } from 'bake/theme/client';
+import { essayLabels } from '../essay-labels.js';
 import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
 import { bottomReserve, createCardHost, readOutline } from './toc-card.js';
@@ -32,7 +33,7 @@ export function startToc(article) {
   host.className = 'bk-toc-ui';
   document.body.insertBefore(host, document.querySelector('.bk-shell'));
   const outline = readOutline(nav);
-  const labels = labelsFor(root.lang);
+  const labels = essayLabels(root.lang);
   let jumping = false;
   let state = null;
   let mounted = null;
@@ -119,7 +120,9 @@ export function startToc(article) {
   document.addEventListener(
     SETTING_EVENT,
     (event) => {
-      if (event.detail.name === 'toc') mount();
+      if (event.detail.name !== 'toc') return;
+      mount();
+      requestLayout();
     },
     { signal },
   );
