@@ -13,7 +13,7 @@ const SCHEME = /^([a-z][a-z\d+.-]*):/i;
 const OPEN_SCHEMES = new Set(['http', 'https', 'mailto']);
 
 export function markdownTree(markdown) {
-  return processor.runSync(parseWithPipesInMath(processor, markdown).tree);
+  return processor.runSync(parseWithPipesInMath(processor, markdown));
 }
 
 export function replyHtml(markdown, { root, base }) {
