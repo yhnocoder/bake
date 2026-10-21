@@ -1,109 +1,69 @@
 const COLOR = '#985b57';
-const NAMESPACE = 'http://www.w3.org/2000/svg';
-const CHARACTER = 55;
-const REVEAL = 300;
-const HOLD = 1800;
-const FADE = 250;
-const SOURCE_X = 46;
-const INK = { mark: COLOR, text: 'var(--ink)', attribute: 'var(--ink-3)' };
+const MATH_FONT = "'STIX Two Math', 'Cambria Math', 'Times New Roman', serif";
+const SWEEP = 2600;
+const HOLD = 1200;
+let previews = 0;
 
-// Each example is the Markdown of one kind of block, typed out line by line, followed by the page Bake makes of it.
-const EXAMPLES = [
-  {
-    source: [
-      [[':::', 'mark'], ['aside', 'text'], ['{title="阅读约定"}', 'attribute']],
-      [['向量都写成列向量。', 'text']],
-      [[':::', 'mark']],
-    ],
-    page: `<rect x="40" y="96" width="240" height="56" rx="6" fill="${COLOR}" fill-opacity=".1"/>
-      <rect x="40" y="96" width="3" height="56" fill="${COLOR}"/>
-      <text x="56" y="118" font-size="13" font-weight="700" fill="${COLOR}">阅读约定</text>
-      <text x="56" y="140" font-size="13" fill="var(--ink-2)">向量都写成列向量。</text>`,
-  },
-  {
-    source: [
-      [[':::', 'mark'], ['act-fn-plot', 'text'], ['{fns=relu}', 'attribute']],
-      [['ReLU 和它的导数。', 'text']],
-      [[':::', 'mark']],
-    ],
-    page: `<line x1="70" y1="138" x2="250" y2="138" stroke="var(--line)"/>
-      <line x1="160" y1="92" x2="160" y2="144" stroke="var(--line)"/>
-      <path d="M70 138H160L160 118H250" fill="none" stroke="var(--ink-3)" stroke-dasharray="3 3"/>
-      <path d="M70 138H160L230 96" fill="none" stroke="${COLOR}" stroke-width="2.5" stroke-linejoin="round"/>
-      <text x="160" y="160" text-anchor="middle" font-size="11" fill="var(--ink-2)">ReLU 和它的导数。</text>`,
-  },
-  {
-    source: [[['**', 'mark'], ['加粗', 'text'], ['**', 'mark'], ['、', 'text'], ['*', 'mark'], ['斜体', 'text'], ['*', 'mark'], ['和 ', 'text'], ['`', 'mark'], ['code', 'text'], ['`', 'mark']]],
-    page: `<text x="160" y="130" text-anchor="middle" font-size="18" fill="var(--ink)"><tspan font-weight="700">加粗</tspan>、<tspan font-style="italic">斜体</tspan>和 <tspan font-family="var(--font-mono)" font-size="16" fill="${COLOR}">code</tspan></text>`,
-  },
-  {
-    source: [[['梯度遵循', 'text'], ['[', 'mark'], ['链式法则', 'text'], ['](', 'mark'], ['#chain-rule', 'attribute'], [')', 'mark']]],
-    page: `<text x="160" y="124" text-anchor="middle" font-size="18" fill="var(--ink)">梯度遵循<tspan fill="${COLOR}" text-decoration="underline">链式法则</tspan></text>
-      <text x="160" y="148" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="var(--ink-3)">→ 被引用的文章 · 链式法则</text>`,
-  },
-];
-const lengths = EXAMPLES.map(({ source }) => source.flat().reduce((sum, [text]) => sum + [...text].length, 0));
-const durations = lengths.map((length) => length * CHARACTER + REVEAL + HOLD);
-const TOTAL = durations.reduce((sum, duration) => sum + duration, 0);
+function source(y, parts, size = 11) {
+  const spans = parts.map(([text, mark]) => `<tspan${mark ? ` fill="${COLOR}"` : ''}>${text}</tspan>`).join('');
+  return `<text x="28" y="${y}" font-size="${size}" font-family="var(--font-mono)" fill="var(--ink-2)">${spans}</text>`;
+}
 
+// A line moves down the page and back: above it the article is rendered, below it the Markdown is still source.
 export default function preview(element) {
-  element.innerHTML = `<svg viewBox="0 0 320 180" aria-hidden="true" style="display:block;width:100%;height:100%;font-family:var(--font-body)">
-    <rect x="16" y="12" width="288" height="64" rx="8" fill="var(--surface)" stroke="var(--line)"/>
-    <text x="294" y="26" text-anchor="end" font-size="9" font-family="var(--font-mono)" fill="var(--ink-3)">Markdown</text>
-    <g class="source" font-family="var(--font-mono)" font-size="11.5" style="font-variant-ligatures:none"></g>
-    <rect class="caret" width="1.5" height="13" fill="${COLOR}"/>
-    <rect x="16" y="84" width="288" height="84" rx="8" fill="var(--surface)" stroke="var(--line)"/>
-    <text x="294" y="98" text-anchor="end" font-size="9" font-family="var(--font-mono)" fill="var(--ink-3)">页面</text>
-    ${EXAMPLES.map(({ page }) => `<g class="page">${page}</g>`).join('')}
+  const id = `syntax-preview-${(previews += 1)}`;
+  element.innerHTML = `<svg viewBox="0 0 320 180" aria-hidden="true" style="display:block;width:100%;height:100%;font-family:var(--font-sans);font-variant-ligatures:none">
+    <defs>
+      <clipPath id="${id}-page"><rect class="page" width="320"/></clipPath>
+      <clipPath id="${id}-source"><rect class="source" width="320" height="180"/></clipPath>
+      <linearGradient id="${id}-glow" x2="0" y2="1"><stop offset="0" stop-color="${COLOR}" stop-opacity="0"/><stop offset="1" stop-color="${COLOR}" stop-opacity=".14"/></linearGradient>
+    </defs>
+    <g clip-path="url(#${id}-source)">
+      ${source(38, [['## ', 1], ['链式法则']], 12)}
+      ${source(64, [['梯度由'], ['**', 1], ['局部导数'], ['**', 1], ['连乘得到。']])}
+      ${source(98, [['$$', 1], ['\\frac{∂L}{∂x} = J^T\\frac{∂L}{∂y}'], ['$$', 1]], 10)}
+      ${source(130, [[':::', 1], ['aside'], ['{title="阅读约定"}', 1]], 10)}
+      ${source(145, [['向量都写成列向量。']], 10)}
+      ${source(160, [[':::', 1]], 10)}
+    </g>
+    <g clip-path="url(#${id}-page)">
+      <rect width="320" height="180" fill="var(--surface)"/>
+      <text x="28" y="40" font-size="18" font-weight="700" font-family="var(--font-heading)" fill="var(--ink)">链式法则</text>
+      <text x="28" y="64" font-size="12" fill="var(--ink-2)">梯度由<tspan font-weight="700" fill="var(--ink)">局部导数</tspan>连乘得到。</text>
+      <g font-family="${MATH_FONT}" font-size="13" fill="var(--ink)" text-anchor="middle">
+        <text x="40" y="91" font-style="italic">∂L</text>
+        <line x1="30" y1="95" x2="50" y2="95" stroke="var(--ink)"/>
+        <text x="40" y="108" font-style="italic">∂x</text>
+        <text x="72" y="99">= <tspan font-style="italic">J</tspan><tspan font-size="9" dy="-5">T</tspan></text>
+        <text x="104" y="91" font-style="italic">∂L</text>
+        <line x1="94" y1="95" x2="114" y2="95" stroke="var(--ink)"/>
+        <text x="104" y="108" font-style="italic">∂y</text>
+      </g>
+      <rect x="28" y="118" width="264" height="48" rx="8" fill="var(--surface-2)"/>
+      <text x="42" y="135" font-size="8.5" font-weight="600" letter-spacing=".04em" font-family="var(--font-ui)" fill="var(--ink-2)">阅读约定</text>
+      <text x="42" y="154" font-size="12" fill="var(--ink)">向量都写成列向量。</text>
+    </g>
+    <rect class="glow" width="320" height="20" fill="url(#${id}-glow)"/>
+    <line class="scan" x2="320" stroke="${COLOR}" stroke-width="1.5"/>
   </svg>`;
-  const source = element.querySelector('.source');
-  const caret = element.querySelector('.caret');
-  const pages = element.querySelectorAll('.page');
-  let elapsed = lengths[0] * CHARACTER + REVEAL;
+  const page = element.querySelector('.page');
+  const rest = element.querySelector('.source');
+  const glow = element.querySelector('.glow');
+  const scan = element.querySelector('.scan');
+  let elapsed = HOLD + SWEEP * 0.45;
   let frame = 0;
   let last;
   const draw = () => {
-    let time = elapsed % TOTAL;
-    let index = 0;
-    while (time >= durations[index]) {
-      time -= durations[index];
-      index += 1;
-    }
-    const typing = lengths[index] * CHARACTER;
-    const fade = Math.min(1, (durations[index] - time) / FADE);
-    let left = Math.min(lengths[index], Math.floor(time / CHARACTER));
-    const lines = EXAMPLES[index].source;
-    const top = 48 - (lines.length - 1) * 9;
-    source.replaceChildren();
-    source.setAttribute('opacity', fade);
-    let end = null;
-    lines.forEach((tokens, row) => {
-      const number = document.createElementNS(NAMESPACE, 'text');
-      number.setAttribute('x', 34);
-      number.setAttribute('y', top + row * 18);
-      number.setAttribute('text-anchor', 'end');
-      number.setAttribute('fill', 'var(--ink-3)');
-      number.setAttribute('fill-opacity', 0.6);
-      number.textContent = row + 1;
-      const line = document.createElementNS(NAMESPACE, 'text');
-      line.setAttribute('x', SOURCE_X);
-      line.setAttribute('y', top + row * 18);
-      for (const [text, kind] of tokens) {
-        if (left === 0) break;
-        const shown = [...text].slice(0, left).join('');
-        left -= [...shown].length;
-        const span = document.createElementNS(NAMESPACE, 'tspan');
-        span.setAttribute('fill', INK[kind]);
-        span.textContent = shown;
-        line.append(span);
-      }
-      source.append(number, line);
-      if (line.textContent !== '' || end === null) end = { line, row };
-    });
-    caret.setAttribute('x', SOURCE_X + end.line.getComputedTextLength() + 1);
-    caret.setAttribute('y', top + end.row * 18 - 11);
-    caret.setAttribute('opacity', time < typing || Math.floor(time / 500) % 2 === 0 ? fade : 0);
-    pages.forEach((page, i) => page.setAttribute('opacity', i === index ? Math.min(1, Math.max(0, (time - typing) / REVEAL), fade) : 0));
+    const time = elapsed % (2 * (SWEEP + HOLD));
+    const down = time < HOLD ? 0 : time < HOLD + SWEEP ? (time - HOLD) / SWEEP : 1;
+    const phase = time < 2 * HOLD + SWEEP ? down : 1 - (time - 2 * HOLD - SWEEP) / SWEEP;
+    const eased = phase < 0.5 ? 2 * phase * phase : 1 - (-2 * phase + 2) ** 2 / 2;
+    const y = 10 + eased * 160;
+    page.setAttribute('height', y);
+    rest.setAttribute('y', y);
+    glow.setAttribute('y', y - 20);
+    scan.setAttribute('y1', y);
+    scan.setAttribute('y2', y);
   };
   const step = (now) => {
     if (last !== undefined) elapsed += Math.min(now - last, 50);

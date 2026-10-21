@@ -76,7 +76,7 @@ export default function preview(element) {
 }
 ```
 
-没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章的 `preview` 画出 Markdown 源码逐块变成页面的过程。
+没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章的 `preview` 画一条横线在卡片上来回扫过，线上方是生成的页面，线下方是 Markdown 原文。
 
 ## 标题与锚点 {#headings toc="标题"}
 
