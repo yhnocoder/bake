@@ -9,7 +9,7 @@ export const params = {
   to: { label: '高亮终点', type: 'enum', options: steps, default: 'loss' },
   brace: { label: '标出 Loss 对 logits 的梯度', type: 'boolean', default: false },
 }
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 278, wide: 302 } }
 
 const chain = [
   { act: '$\\mathbf{x} \\in \\mathbb{R}^{d}$', mark: 'x' },

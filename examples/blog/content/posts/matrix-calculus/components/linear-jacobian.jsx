@@ -7,7 +7,7 @@ export const params = {
   x1: { label: 'x₁ 的初始值', type: 'number', min: -2, max: 2, step: 0.01, default: 1 },
   x2: { label: 'x₂ 的初始值', type: 'number', min: -2, max: 2, step: 0.01, default: -0.5 },
 }
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 512, wide: 335 } }
 
 const W = [
   [1, -2, 0.5],

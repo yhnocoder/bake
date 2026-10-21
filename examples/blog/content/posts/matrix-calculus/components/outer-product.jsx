@@ -4,7 +4,7 @@ import { fadeIn } from './lib/view.jsx'
 import { Matrix } from './lib/matrix.jsx'
 
 export const params = {}
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 760, wide: 394 } }
 
 const WEIGHTS = [
   [1, 1, 0.5],

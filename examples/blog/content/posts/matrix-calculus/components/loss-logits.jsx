@@ -6,7 +6,7 @@ import './lib/loss.css'
 export const params = {
   vocab: { label: 'Vocab size', type: 'enum', options: ['5', '6', '7', '8'], default: '6' },
 }
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 931, wide: 540 } }
 
 const INITIAL = [2, 1, 0, -1, 0.5, -0.5, 1.5, -1.5]
 const SIZES = ['5', '6', '7', '8']

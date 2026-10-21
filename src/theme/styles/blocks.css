@@ -707,9 +707,15 @@
 
 .bk-article .component-box {
   position: relative;
-  height: var(--component-height, var(--component-placeholder-height));
+  height: var(--component-height, var(--component-placeholder-narrow, var(--component-placeholder-height)));
   aspect-ratio: var(--component-ratio, auto);
   border-radius: 6px;
+}
+
+@media (min-width: 600px) {
+  .bk-article .component-box {
+    height: var(--component-height, var(--component-placeholder-wide, var(--component-placeholder-height)));
+  }
 }
 
 .bk-article .component[data-state='ready'] > .component-box {

@@ -22,7 +22,7 @@ export const params = {
   beta: { label: 'β 初始值', type: 'number', min: 0.1, max: 5, step: 0.05, default: 1 },
 }
 
-export const layout = { width: 'body' }
+export const layout = { width: 'body', placeholder: { narrow: 582, wide: 338 } }
 
 const ZOOM_MIN = 0.25
 const TWO_COLUMN_MIN_WIDTH = 420
