@@ -1,8 +1,9 @@
 import { WIDTHS, folderFile, parseSize } from '../config/rules.js';
 import { describeValue, listAll, listChoices } from '../report.js';
 import { meantName } from '../suggest.js';
+import { readNumbers } from './numbers.js';
 
-export const PARAM_TYPES = Object.freeze(['number', 'text', 'boolean', 'enum', 'file']);
+export const PARAM_TYPES = Object.freeze(['number', 'numbers', 'text', 'boolean', 'enum', 'file']);
 export const SIZE_ATTRIBUTES = Object.freeze(['width', 'height']);
 export const RESERVED_PARAMS = Object.freeze([...SIZE_ATTRIBUTES, 'id', 'class']);
 
@@ -10,7 +11,7 @@ const PARAM_NAME = /^[A-Za-z_][\w-]*$/;
 const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 const PIXELS = /^\d+(?:\.\d+)?$/;
 const COMMON_FIELDS = ['label', 'type', 'default'];
-const TYPE_FIELDS = { number: ['min', 'max', 'step'], text: [], boolean: [], enum: ['options'], file: [] };
+const TYPE_FIELDS = { number: ['min', 'max', 'step'], numbers: ['min', 'max'], text: [], boolean: [], enum: ['options'], file: [] };
 const LAYOUT_FIELDS = ['width', 'height', 'placeholder', 'frame'];
 const LAYOUT_WIDTH_CHOICES = 'body, wide, page, a size in pixels such as 560px or a percentage of the body column up to 100% such as 70%';
 const HEIGHT_FORMS = 'a number of pixels or { ratio }, the width divided by the height, such as { ratio: 1.5 }';
@@ -37,7 +38,7 @@ export function paramProblems(name, declaration, { noun, reserved, written, sett
   }
   if (declaration.label === undefined) problems.push(`${subject} needs a label, the text shown next to its control`);
   else if (typeof declaration.label !== 'string') problems.push(`the label of ${subject} must be text, got ${describeValue(declaration.label)}`);
-  if (declaration.type === 'number') {
+  if (declaration.type === 'number' || declaration.type === 'numbers') {
     for (const field of ['min', 'max', 'step']) {
       const value = declaration[field];
       if (value !== undefined && !Number.isFinite(value)) problems.push(`${subject} has ${field} ${describeValue(value)}; it must be a number`);
@@ -154,6 +155,10 @@ export function convertAttribute(declaration, raw) {
   if (declaration.type === 'number') {
     if (typeof raw !== 'string' || !NUMBER.test(raw)) return { problem: `must be a number, got ${describeAttribute(raw)}` };
     value = Number(raw);
+  } else if (declaration.type === 'numbers') {
+    if (raw === true) return { problem: `needs a value, got ${describeAttribute(raw)}` };
+    value = readNumbers(raw);
+    if (value === null) return { problem: `must be numbers separated by commas, such as "2, 1, 0.5", got ${describeAttribute(raw)}` };
   } else if (declaration.type === 'boolean') {
     if (raw !== true && raw !== 'true' && raw !== 'false') return { problem: `must be true or false, got ${describeAttribute(raw)}` };
     value = raw !== 'false';
@@ -178,11 +183,13 @@ export function valueProblem(declaration, value) {
   switch (declaration.type) {
     case 'number': {
       if (!Number.isFinite(value)) return `must be a number, got ${describeValue(value)}`;
-      const { min, max } = declaration;
-      if (min !== undefined && max !== undefined && (value < min || value > max)) return `must be between ${min} and ${max}, got ${value}`;
-      if (min !== undefined && value < min) return `must be at least ${min}, got ${value}`;
-      if (max !== undefined && value > max) return `must be at most ${max}, got ${value}`;
-      return null;
+      const range = rangeProblem(declaration, value);
+      return range === null ? null : `must be ${range}, got ${value}`;
+    }
+    case 'numbers': {
+      if (!Array.isArray(value) || !value.every(Number.isFinite)) return `must be a list of numbers, got ${describeValue(value)}`;
+      const outside = value.find((item) => rangeProblem(declaration, item) !== null);
+      return outside === undefined ? null : `must hold numbers ${rangeProblem(declaration, outside)}, got ${outside}`;
     }
     case 'boolean':
       return typeof value === 'boolean' ? null : `must be true or false, got ${describeValue(value)}`;
@@ -191,6 +198,13 @@ export function valueProblem(declaration, value) {
     default:
       return typeof value === 'string' ? null : `must be text, got ${describeValue(value)}`;
   }
+}
+
+function rangeProblem({ min, max }, value) {
+  if (min !== undefined && max !== undefined && (value < min || value > max)) return `between ${min} and ${max}`;
+  if (min !== undefined && value < min) return `at least ${min}`;
+  if (max !== undefined && value > max) return `at most ${max}`;
+  return null;
 }
 
 function describeAttribute(value) {

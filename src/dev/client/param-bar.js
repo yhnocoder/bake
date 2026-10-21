@@ -1,3 +1,5 @@
+// why: the dev server sends the client files unbundled from one folder and serves src/components/numbers.js there too
+import { readNumbers, sameValue, writeNumbers } from './numbers.js';
 import { FRAMES } from './regions.js';
 
 const BAR = 'bake-param-bar';
@@ -110,7 +112,9 @@ function createStates() {
 function validValue(declaration, value) {
   switch (declaration.type) {
     case 'number':
-      return Number.isFinite(value) && !(value < declaration.min) && !(value > declaration.max);
+      return Number.isFinite(value) && inRange(declaration, value);
+    case 'numbers':
+      return Array.isArray(value) && value.every((item) => Number.isFinite(item) && inRange(declaration, item));
     case 'boolean':
       return typeof value === 'boolean';
     case 'enum':
@@ -118,6 +122,10 @@ function validValue(declaration, value) {
     default:
       return typeof value === 'string';
   }
+}
+
+function inRange({ min, max }, value) {
+  return !(value < min) && !(value > max);
 }
 
 function createBar(frame, index, declarations, server, { states, bars }) {
@@ -183,7 +191,7 @@ function createBar(frame, index, declarations, server, { states, bars }) {
   bars.set(key, controller);
   refreshMarks();
   showMessage();
-  if (controls.some((control) => current[control.param] !== markdown[control.param])) apply();
+  if (controls.some((control) => !sameValue(current[control.param], markdown[control.param]))) apply();
 
   new MutationObserver(() => {
     if (waiting && frame.dataset.state === 'ready') apply();
@@ -222,7 +230,7 @@ function createBar(frame, index, declarations, server, { states, bars }) {
   function refreshMarks() {
     const changes = {};
     for (const control of controls) {
-      const differs = current[control.param] !== markdown[control.param];
+      const differs = !sameValue(current[control.param], markdown[control.param]);
       control.element.toggleAttribute('data-changed', differs);
       control.element.title = differs ? `Not written yet; the Markdown gives ${JSON.stringify(markdown[control.param])}` : '';
       if (differs) changes[control.param] = current[control.param];
@@ -320,6 +328,19 @@ function createControl(param, declaration, value, change) {
         slider.value = String(next);
         fill(slider);
       }
+      wrapper.removeAttribute('data-invalid');
+    };
+  } else if (declaration.type === 'numbers') {
+    const field = input('text', 'text');
+    field.spellcheck = false;
+    field.addEventListener('input', () => {
+      const next = readNumbers(field.value);
+      const valid = next !== null && next.every((item) => inRange(declaration, item));
+      wrapper.toggleAttribute('data-invalid', !valid);
+      if (valid) change(next);
+    });
+    control.set = (next) => {
+      field.value = writeNumbers(next);
       wrapper.removeAttribute('data-invalid');
     };
   } else if (declaration.type === 'enum') {

@@ -21,7 +21,7 @@ const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
 const MAX_REQUEST_BYTES = 1024 * 1024;
 const CLIENT_DIR = join(import.meta.dirname, 'client');
-const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, join(CLIENT_DIR, file)]), ['controls.css', join(import.meta.dirname, '../kit/controls.css')]]);
+const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, join(CLIENT_DIR, file)]), ['controls.css', join(import.meta.dirname, '../kit/controls.css')], ['numbers.js', join(import.meta.dirname, '../components/numbers.js')]]);
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
