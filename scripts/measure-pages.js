@@ -269,8 +269,10 @@ function firstScreenSettled() {
   const perf = window.__bakePerf;
   if (perf.firstScreen === null) {
     perf.firstScreen = [...document.querySelectorAll('figure.component')].filter((frame) => {
+      // why: a frame inside a closed fold keeps a layout box, but the reader cannot see it and it starts only when the fold opens
+      if (!frame.checkVisibility()) return false;
       const box = frame.getBoundingClientRect();
-      return box.bottom > 0 && box.top < innerHeight && box.width > 0;
+      return box.bottom > 0 && box.top < innerHeight;
     });
   }
   return perf.firstContentfulPaint !== null && perf.firstScreen.every((frame) => perf.settled.has(frame));
@@ -293,14 +295,14 @@ async function scrollOneStep(pixels) {
   const frames = [...document.querySelectorAll('figure.component')];
   const blank = frames.flatMap((frame, index) => {
     const box = frame.getBoundingClientRect();
-    const visible = box.bottom > 0 && box.top < innerHeight && box.width > 0;
+    const visible = frame.checkVisibility() && box.bottom > 0 && box.top < innerHeight;
     return visible && frame.getAttribute('data-state') !== 'ready' && frame.getAttribute('data-state') !== 'failed' ? [index] : [];
   });
   return { blank, atEnd: scrollY + innerHeight >= document.documentElement.scrollHeight - 1 };
 }
 
 function allComponentsSettled() {
-  return [...document.querySelectorAll('figure.component')].every((frame) => window.__bakePerf.settled.has(frame));
+  return [...document.querySelectorAll('figure.component')].every((frame) => !frame.checkVisibility() || window.__bakePerf.settled.has(frame));
 }
 
 export function formatValue(value, unit) {
