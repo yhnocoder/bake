@@ -1,6 +1,9 @@
 export const BLOCKS = '[data-region] [data-line]';
 export const FRAMES = '[data-region] figure.component[data-line]';
 const FRAME = 'figure.component[data-line]';
+// why: these attributes give the place of a node in the source, which moves with every edit above it
+const POSITIONS = ['data-line', 'data-end-line', 'data-src'];
+const POSITIONED = '[data-line], [data-src]';
 
 export function skeleton(doc) {
   const copy = doc.documentElement.cloneNode(true);
@@ -53,9 +56,39 @@ function planNode(old, next, live, plan, context) {
       plan.push(frame);
       return;
     }
-    if (!next.matches('figure.component') && old.tagName === next.tagName && sameAttributes(old, next) && planChildren(old, next, live, plan, context)) return;
+    const positions = withoutPositions(old) === withoutPositions(next) ? positionPairs(live, next, context) : null;
+    if (positions !== null) {
+      plan.push({ positions });
+      return;
+    }
+    if (!next.matches('figure.component') && old.tagName === next.tagName && sameAttributes(old, next) && planChildren(old, next, live, plan, context)) {
+      plan.push({ positions: [[live, next]] });
+      return;
+    }
   }
   plan.push({ live, next });
+}
+
+function withoutPositions(element) {
+  const copy = element.cloneNode(true);
+  for (const part of [copy, ...copy.querySelectorAll(POSITIONED)]) for (const name of POSITIONS) part.removeAttribute(name);
+  return copy.outerHTML;
+}
+
+function positionPairs(live, next, { isPageNode }) {
+  const lives = [live, ...live.querySelectorAll(POSITIONED)].filter(isPageNode);
+  const nexts = [next, ...next.querySelectorAll(POSITIONED)];
+  return lives.length === nexts.length ? lives.map((element, index) => [element, nexts[index]]) : null;
+}
+
+export function movePositions(pairs) {
+  for (const [live, next] of pairs) {
+    for (const name of POSITIONS) {
+      const value = next.getAttribute(name);
+      if (value === null) live.removeAttribute(name);
+      else live.setAttribute(name, value);
+    }
+  }
 }
 
 function nodeHtml(node) {
@@ -63,23 +96,26 @@ function nodeHtml(node) {
 }
 
 function sameAttributes(a, b) {
-  return a.attributes.length === b.attributes.length && [...a.attributes].every((attribute) => b.getAttribute(attribute.name) === attribute.value);
+  const written = (element) => [...element.attributes].filter((attribute) => !POSITIONS.includes(attribute.name));
+  return written(a).length === written(b).length && written(a).every((attribute) => b.getAttribute(attribute.name) === attribute.value);
 }
 
-function frameChange(old, next, live, { shownParams }) {
+function frameChange(old, next, live, context) {
   if (!old.matches(FRAME) || !next.matches(FRAME) || old.dataset.component !== next.dataset.component) return null;
   const strip = (frame) => {
     const copy = frame.cloneNode(true);
     copy.removeAttribute('data-params');
     copy.removeAttribute('data-attributes');
     copy.querySelector(':scope > .component-box')?.removeAttribute('style');
-    return copy.outerHTML;
+    return withoutPositions(copy);
   };
   if (strip(old) !== strip(next)) return null;
+  const positions = positionPairs(live, next, context);
+  if (positions === null) return null;
   const params = JSON.parse(next.dataset.params);
-  const shown = shownParams(live) ?? JSON.parse(old.dataset.params);
+  const shown = context.shownParams(live) ?? JSON.parse(old.dataset.params);
   if (!sameValues(shown, params)) return null;
-  return { frame: live, params: next.dataset.params, attributes: next.dataset.attributes, boxStyle: next.querySelector(':scope > .component-box')?.getAttribute('style') ?? null };
+  return { frame: live, positions, params: next.dataset.params, attributes: next.dataset.attributes, boxStyle: next.querySelector(':scope > .component-box')?.getAttribute('style') ?? null };
 }
 
 function sameValues(a, b) {
@@ -88,16 +124,7 @@ function sameValues(a, b) {
 }
 
 function blocksOf(doc) {
-  return [...doc.querySelectorAll(BLOCKS)].map((element) => ({ line: element.dataset.line, signature: signature(element) }));
-}
-
-function signature(element) {
-  const copy = element.cloneNode(true);
-  for (const part of [copy, ...copy.querySelectorAll('[data-line]')]) {
-    part.removeAttribute('data-line');
-    part.removeAttribute('data-end-line');
-  }
-  return copy.outerHTML;
+  return [...doc.querySelectorAll(BLOCKS)].map((element) => ({ line: element.dataset.line, signature: withoutPositions(element) }));
 }
 
 export function changedLines(old, next) {
@@ -136,7 +163,7 @@ function framesOf(doc) {
     const name = frame.dataset.component;
     const index = seen.get(name) ?? 0;
     seen.set(name, index + 1);
-    return { name, key: `${name} ${index}`, signature: signature(frame) };
+    return { name, key: `${name} ${index}`, signature: withoutPositions(frame) };
   });
 }
 

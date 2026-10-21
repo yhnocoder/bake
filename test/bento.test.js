@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { article, bake, createBlog } from './blog.js';
+import { withoutCopySource } from './article.js';
 
 const config = (extra) => `export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento'${extra} };\n`;
 
@@ -78,7 +79,7 @@ test('the bento theme renders each ## section as a card whose span follows its c
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
-  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   assert.deepEqual(
     cards(html).map(({ title, span, columns, rows, notes }) => ({ title, span, columns, rows, notes })),
     [
@@ -109,7 +110,7 @@ test('the bento theme writes the homepage, the 404 page and the theme stylesheet
   assert.match(readFileSync(join(dir, 'dist/feed.xml'), 'utf8'), /<link>https:\/\/example.com\/2026-10\/cards\/<\/link>/);
   assert.match(readFileSync(join(dir, 'dist/_bake/theme.css'), 'utf8'), /--bg:/);
   assert.match(readFileSync(join(dir, 'dist/index.html'), 'utf8'), /<script type="module" src="assets\/chat-[\w-]+\.js">/);
-  const page = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   assert.match(page, /<script type="module" src="\.\.\/\.\.\/assets\/chat-[\w-]+\.js">/);
   assert.equal(readFileSync(join(dir, 'dist/2026-10/cards/index.md'), 'utf8'), readFileSync(join(dir, 'content/posts/cards/index.md'), 'utf8'));
   const catalog = JSON.parse(readFileSync(join(dir, 'dist/_bake/articles.json'), 'utf8'));
@@ -131,7 +132,7 @@ test('the bento theme shows the recap of a section under the card title and the 
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
-  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   assert.match(html, />One<\/span><\/h2><div class="[^"]*recap[^"]*"><p>The section in short.<\/p><\/div>(?:(?!<h3).)*<p>Text.<\/p>/s);
   assert.match(html, />Part<\/span><\/h3><div class="[^"]*recap[^"]*"><p>The part in short.<\/p><\/div>(?:(?!<\/section>).)*<p>More text.<\/p>/s);
 });
@@ -147,7 +148,7 @@ test('the bento theme lists a sidenote that only a recap refers to at the bottom
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
-  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   const cards = html.split('<section class="bt-card"').slice(1);
   assert.equal(cards.length, 2);
   assert.deepEqual([...cards[0].matchAll(/<aside class="bk-sidenote"[^>]*data-label="(\w+)"/g)].map((match) => match[1]), ['section', 'part']);
@@ -165,7 +166,7 @@ test('the bento theme draws a sticker and a note as their own cards after the ca
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
-  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   const grid = /<div class="bt-grid"[^>]*>(.*)<\/div><\/article>/s.exec(html)[1];
   const cards = [...grid.matchAll(/<(section|div) class="bt-card[^"]*"([^>]*)>/g)].map(([, tag, attributes]) => [tag, /data-theme-block="(\w+)"/.exec(attributes)?.[1], /style="([^"]*)"/.exec(attributes)[1], /data-color="(\w+)"/.exec(attributes)?.[1], attributes.includes('data-emoji')]);
   assert.deepEqual(cards, [

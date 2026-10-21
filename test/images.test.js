@@ -46,7 +46,7 @@ describe('images', () => {
     assert.deepEqual([figure.type, figure.line, figure.endLine], ['figure', 7, 7]);
     assert.equal(
       outline(figure.html),
-      '<figure class="figure"><img src="plot.svg" alt="A plot" width="320" height="200" loading="lazy" decoding="async" data-src="plot.svg"><figcaption>Shape of $d_{ff}$ in <strong>FFN</strong>.</figcaption></figure>',
+      '<figure class="figure"><img src="plot.svg" alt="A plot" width="320" height="200" loading="lazy" decoding="async"><figcaption>Shape of $d_{ff}$ in <strong>FFN</strong>.</figcaption></figure>',
     );
   });
 
@@ -62,7 +62,7 @@ describe('images', () => {
     for (const [attributes, boxWidth, size, written] of cases) {
       const [figure] = (await parsed(`![](plot.svg)${attributes}\n`, options)).intro;
       const data = JSON.stringify(written).replaceAll('"', '&#x22;');
-      assert.equal(figure.html, `<figure class="figure" style="width:${boxWidth}"><img src="plot.svg" alt="" ${size} loading="lazy" decoding="async" data-src="plot.svg" data-attributes="${data}"></figure>`, attributes);
+      assert.equal(figure.html, `<figure class="figure" style="width:${boxWidth}"><img src="plot.svg" alt="" ${size} loading="lazy" decoding="async" data-attributes="${data}"></figure>`, attributes);
     }
   });
 
@@ -72,7 +72,7 @@ describe('images', () => {
     assert.deepEqual(
       blocks.map((block) => [block.type, block.line, block.endLine, block.html]),
       [
-        ['figure', 7, 7, '<figure class="figure" data-float="left" style="width:280px"><img src="plot.svg" alt="ReLU" width="320" height="200" loading="lazy" decoding="async" data-src="plot.svg" data-attributes="{&#x22;width&#x22;:&#x22;280px&#x22;,&#x22;float&#x22;:&#x22;left&#x22;}"></figure>'],
+        ['figure', 7, 7, '<figure class="figure" data-float="left" style="width:280px"><img src="plot.svg" alt="ReLU" width="320" height="200" loading="lazy" decoding="async" data-attributes="{&#x22;width&#x22;:&#x22;280px&#x22;,&#x22;float&#x22;:&#x22;left&#x22;}"></figure>'],
         ['paragraph', 8, 9, '<p>ReLU is <em>zero</em> below 0.\nIt is linear above.</p>'],
       ],
     );
@@ -84,8 +84,8 @@ describe('images', () => {
     assert.deepEqual(
       blocks.map((block) => block.html),
       [
-        '<p>Curve <img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-src="plot.svg" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"> here.</p>',
-        '<ul>\n<li><img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-src="plot.svg" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"></li>\n</ul>',
+        '<p>Curve <img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"> here.</p>',
+        '<ul>\n<li><img src="plot.svg" alt="" width="320" height="200" loading="lazy" decoding="async" style="width:64px;height:auto" data-attributes="{&#x22;width&#x22;:&#x22;64px&#x22;}"></li>\n</ul>',
       ],
     );
   });
@@ -94,7 +94,7 @@ describe('images', () => {
     const avif = sharp({ create: { width: 48, height: 24, channels: 3, background: '#2a78d6' } }).avif().toBuffer();
     const options = { folder: await imageFolder(t, { 'photo.avif': avif }) };
     const structure = await parsed('![A photo](photo.avif)\n', options);
-    assert.equal(structure.intro[0].html, '<figure class="figure"><img src="photo.avif" alt="A photo" width="48" height="24" loading="lazy" decoding="async" data-src="photo.avif"></figure>');
+    assert.equal(structure.intro[0].html, '<figure class="figure"><img src="photo.avif" alt="A photo" width="48" height="24" loading="lazy" decoding="async"></figure>');
   });
 
   test('publishes raster images as WebP no wider than twice their largest display width', async (t) => {

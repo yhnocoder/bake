@@ -1,5 +1,5 @@
 import { copyText, createOverlay } from './overlay.js';
-import { BLOCKS, anchorFor, changedLines, frameMoves, planUpdate, sectionOf, skeleton } from './regions.js';
+import { BLOCKS, anchorFor, changedLines, frameMoves, movePositions, planUpdate, sectionOf, skeleton } from './regions.js';
 
 const script = document.querySelector('script[data-bake-dev]');
 const { source, missing, file, token } = script.dataset;
@@ -145,8 +145,9 @@ function applyUpdate(regions) {
       continue;
     }
     for (const step of steps) {
-      if (step.frame === undefined) step.live.replaceWith(importPageNode(step.next));
-      else kept.push(keepFrame(step));
+      if (step.frame !== undefined) kept.push(keepFrame(step));
+      else if (step.positions !== undefined) movePositions(step.positions);
+      else step.live.replaceWith(importPageNode(step.next));
     }
   }
   return kept;
@@ -163,7 +164,8 @@ function importPageNode(node) {
   return copy;
 }
 
-function keepFrame({ frame, params, attributes, boxStyle }) {
+function keepFrame({ frame, positions, params, attributes, boxStyle }) {
+  movePositions(positions);
   frame.dataset.params = params;
   if (attributes === undefined) delete frame.dataset.attributes;
   else frame.dataset.attributes = attributes;

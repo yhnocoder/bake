@@ -10,8 +10,8 @@
       "basis": "The largest value measured, 1331098 bytes on /2026-10/syntax-linked/ at 1440 pixels wide, plus 20 percent, rounded up"
     },
     "htmlBytes": {
-      "limit": 64000,
-      "basis": "The largest value measured, 51248 bytes on /2026-10/syntax/ at 1440 pixels wide, plus 20 percent, rounded up"
+      "limit": 256000,
+      "basis": "The largest gzip size of a built page of examples/blog after copying as Markdown added the source offsets to the HTML, 212996 bytes for /2026-09/matrix-calculus/, measured with Node's zlib at its default level, plus 20 percent, rounded up"
     },
     "cssBytes": {
       "limit": 100000,

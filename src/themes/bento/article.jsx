@@ -3,7 +3,7 @@ import { Block, SectionHeading, Sidenotes, arrange, subsectionOf } from 'bake/th
 import { levelSpan } from './spans.js';
 
 const TILTS = ['-1.5deg', '1deg', '-0.75deg', '1.5deg'];
-const EMOJI_ONLY = /^<p>[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}‍️\s]+<\/p>$/u;
+const EMOJI_ONLY = /^<p[^>]*>[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}‍️\s]+<\/p>$/u;
 
 export function Article(props) {
   const { content, options, labels } = props;

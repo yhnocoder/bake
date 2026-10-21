@@ -5,6 +5,7 @@ import { describe, test } from 'node:test';
 import { fromHtml } from 'hast-util-from-html';
 import sharp from 'sharp';
 import { article, bake, copyExample, createBlog, readTree, validConfig } from './blog.js';
+import { withoutCopySource } from './article.js';
 
 const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
@@ -82,7 +83,7 @@ describe('bake build', () => {
       '2026-10/rope/index.md',
       'icons/favicon.svg',
     ].sort());
-    const page = tree['2026-10/rope/index.html'].toString();
+    const page = withoutCopySource(tree['2026-10/rope/index.html'].toString());
     assert.match(page, /^<!doctype html>\n<html lang="en"/);
     assert.match(page, /<title>RoPE &lt;&amp;> "quotes" · Test Blog<\/title>/);
     assert.match(page, /<meta name="description" content="Rotary &amp; 'position' <embeddings>">/);
@@ -281,7 +282,7 @@ describe('bake build', () => {
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
     assert.equal(result.stdout, '7 pages\ndist/ written\n');
-    const page = readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8');
+    const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/syntax/index.html'), 'utf8'));
     assert.match(page, /<h1[^>]*>Bake 写法一览<\/h1>/);
     assert.match(page, /<mjx-container class="MathJax" jax="SVG"[^>]*data-tex="x \\in \\R\^d">/);
     assert.match(page, /<pre class="shiki bake"[^>]*data-language="python">/);
@@ -305,7 +306,7 @@ describe('bake build', () => {
     assert.deepEqual(articleFiles(tree), ['2026-10/rope/angles.webp', '2026-10/rope/index.html', '2026-10/rope/index.md', '2026-10/rope/small.jpg', '2026-10/rope/small.webp', 'index.html']);
     assert.deepEqual(tree['2026-10/rope/small.jpg'], small);
     assert.deepEqual(await sharp(tree['2026-10/rope/angles.webp']).metadata().then(({ format, width, height }) => [format, width, height]), ['webp', 2680, 893]);
-    assert.match(tree['2026-10/rope/index.html'].toString(), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async" data-src="angles.png">/);
+    assert.match(withoutCopySource(tree['2026-10/rope/index.html'].toString()), /<img src="angles.webp" alt="Angles" width="2680" height="893" loading="lazy" decoding="async">/);
     assert.doesNotMatch(tree['2026-10/rope/index.html'].toString(), /mjx/i);
   });
 

@@ -231,8 +231,14 @@ export function embedParts(article, node) {
     const source = page.article;
     const context = excerptContext(source, 'embed', article, page);
     article.borrowed.add(source);
+    const nodes = embedNodes(source, address.anchor);
+    const start = nodes[0].position.start.offset;
+    const end = nodes.at(-1).position.end.offset;
     return {
-      children: renderHast(embedNodes(source, address.anchor), context).children,
+      children: renderHast(nodes, context).children,
+      markdown: source.source.slice(start, end),
+      start,
+      end,
       href: addressHref(article.context.root, address.path, address.anchor),
       article: page.title,
       number: targetHeading(source, address.anchor, context).number,

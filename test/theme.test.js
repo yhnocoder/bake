@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { article, bake, createBlog, validConfig } from './blog.js';
+import { withoutCopySource } from './article.js';
 import { launchBrowser, serve } from './browser/browser.js';
 
 const plainPage = `import { For } from 'solid-js';
@@ -56,7 +57,7 @@ describe('themes', () => {
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'));
     assert.match(page, /<header class="custom-header">Custom (<!--!\$-->)?Rope<\/header>/);
     assert.doesNotMatch(page, /bk-header/);
     assert.match(page, /<html lang="en" [^>]*data-toc="dots"/);
@@ -78,7 +79,7 @@ describe('themes', () => {
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'));
     const assets = readdirSync(join(dir, 'dist/assets'));
     const plainStyles = assets.filter((name) => /^plain-[\w-]+\.css$/.test(name));
     assert.equal(plainStyles.length, 1);
@@ -123,7 +124,7 @@ describe('themes', () => {
     });
     const result = bake(dir, 'build');
     assert.equal(result.stderr, '');
-    const page = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const page = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'));
     assert.match(page, /<html lang="en"/);
     assert.match(page, /<body class="plain"/);
     assert.match(page, /<header class="bk-header"/);
@@ -189,7 +190,7 @@ describe('themes', () => {
       'themes/plain/client.jsx': 'export default () => () => {};\n',
     });
     assert.equal(bake(dir, 'build').stderr, '');
-    const html = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'));
     assert.match(html, /<section data-tone="loud"><aside data-block="card" data-tint="blue"><p>See <a href="#one">one<\/a> and <mjx-container[^>]*>.*<\/mjx-container>\.<\/p><\/aside><\/section>/s);
     assert.doesNotMatch(html, /<script/);
   });
@@ -215,7 +216,7 @@ describe('themes', () => {
     const [chunk] = named(/^lazy-[\w-]+\.js$/);
     assert.doesNotMatch(readFileSync(join(dir, 'dist/assets', entry), 'utf8'), /loaded-on-demand/);
     assert.match(readFileSync(join(dir, 'dist/assets', chunk), 'utf8'), /loaded-on-demand/);
-    const html = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'));
     const scripts = [...html.matchAll(/<script[^>]*>/g)].map(([tag]) => tag);
     assert.deepEqual(scripts.slice(0, 1), [`<script type="module" src="../../assets/${entry}">`]);
     assert.deepEqual([...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(([, href]) => href), [`../../assets/${named(/^plain-[\w-]+\.css$/)[0]}`]);

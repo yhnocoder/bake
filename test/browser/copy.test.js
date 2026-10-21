@@ -120,9 +120,9 @@ test('copying from an article gives the Markdown source of the selection', async
   });
 
   await t.test('section numbers and heading links are left out of the Markdown and the HTML, and math is TeX in the HTML', async () => {
-    await select(page, { selector: '#copy .bk-heading-text', text: 'Markdown' }, { selector: copyChapter, text: '只选中一部分的块从页面内容转换：', after: true });
+    await select(page, { selector: '#copy .bk-heading-text', text: 'Markdown' }, { selector: copyChapter, text: '只选中一部分的块也复制选中部分的原文，', after: true });
     const partial = await copied(page);
-    assert.equal(partial.text, `${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n完整选中的块按 \`index.md\` 里的原文复制。只选中一部分的块从页面内容转换：`);
+    assert.equal(partial.text, `${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n完整选中的块按 \`index.md\` 里的原文复制。只选中一部分的块也复制选中部分的原文，`);
     await select(page, { selector: '#copy', text: '15' }, { selector: copyChapter, contains: '附在末尾', text: '。', after: true, last: true });
     const whole = await copied(page);
     assert.ok(whole.text.startsWith(`${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n${sourceLine('完整选中的块')}`), whole.text);
@@ -144,11 +144,11 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.match((await copied(page)).html, new RegExp(`<img src="${base}/2026-10/syntax/ffn-shapes.svg"`));
   });
 
-  await t.test('a converted heading and component keep the attributes written in the source', async () => {
+  await t.test('a selection from the source of an example into its result gives the source of the result once, with the attributes of a heading and a component', async () => {
     await select(page, { selector: '#headings ~ .bk-block .example-source', text: '三级标题' }, { selector: '#headings ~ .bk-block .example-result h3', text: '三级标题', after: true });
-    assert.equal((await copied(page)).text, '三级标题 {#third-level toc="短标题"}\n\n### 三级标题 {#third-level toc="短标题"}');
+    assert.equal((await copied(page)).text, '### 三级标题 {#third-level toc="短标题"}');
     await select(page, { selector: '#components ~ .bk-block .example-source', text: 'width=body}' }, { selector: '#components ~ .bk-block .example-result figure[data-attributes*="body"]', after: true });
-    assert.equal((await copied(page)).text, 'width=body}\n:::\n\n:::act-fn-plot{fn=silu range=6 beta=2 width=body}\n:::');
+    assert.equal((await copied(page)).text, ':::act-fn-plot{fn=silu range=6 beta=2 width=body}\n:::');
   });
 
   await t.test('a selection of only the title of a fold gives the title', async () => {
@@ -313,26 +313,26 @@ test('copying from articles written for the cases of the conversion', async (t) 
     assert.equal((await copied(page)).text, `:::aside\n${images(`${base}/2026-10/dots/dot.webp`)}\n:::`);
   });
 
-  await t.test('a converted paragraph escapes an ending that reads as a paragraph anchor, and the text of a button in raw HTML is left out of the Markdown and the HTML', async () => {
+  await t.test('a paragraph keeps the escape of an ending that reads as a paragraph anchor, raw HTML is copied as its source, and the text of a button in raw HTML is left out of the HTML', async () => {
     await openWithSelectionModule(page, `${base}/2026-10/ends/`);
     const paragraph = '.bk-article p';
     await select(page, { selector: paragraph, contains: 'note', text: 'note' }, { selector: paragraph, contains: 'Press', text: 'now', after: true });
     const { text, html } = await copied(page);
-    assert.equal(text, 'note ends with \\^b\n\nPress  now');
+    assert.equal(text, 'note ends with \\^b\n\n<p>Press <button>OK</button> now.</p>');
     assert.doesNotMatch(html, /OK/);
   });
 
-  await t.test('a citation and a reference list without data-key, which only raw HTML can write, are copied as a link and a list, and an image with unreadable data-attributes as a plain image', async () => {
+  await t.test('a selection inside raw HTML copies the raw HTML block as written, because each boundary moves to the nearer edge of the block', async () => {
     await openWithSelectionModule(page, `${base}/2026-10/raw/`);
     await select(page, { selector: '.bk-article p', contains: 'Raw', text: 'cites' }, { selector: '.bk-article p', contains: 'Raw', text: ' before', after: true });
-    assert.equal((await copied(page)).text, 'cites [\\[1\\]](#keys) before');
+    assert.equal((await copied(page)).text, '<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>');
     await select(page, { selector: '.bk-article li', contains: 'First', text: 'irst' }, { selector: '.bk-article li', contains: 'Second', text: 'Sec', after: true });
-    assert.equal((await copied(page)).text, '1. irst plain entry.\n2. Sec');
+    assert.equal((await copied(page)).text, '<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>');
     await select(page, { selector: '.bk-article p', contains: 'shows', text: 'shows' }, { selector: '.bk-article p', contains: 'shows', text: ' here', after: true });
-    assert.equal((await copied(page)).text, `shows ![q](${base}/2026-10/raw/q.png) and ![r](${base}/2026-10/raw/r.png){height=12px} here`);
+    assert.match((await copied(page)).text, /^<p>Raw shows <img src="q.png" [^\n]* here\.<\/p>$/);
   });
 
-  await t.test('a partly selected paragraph escapes the text that Markdown would read as syntax and keeps every other character, including U+FDD0, so the copy renders the same text', async () => {
+  await t.test('a part of a paragraph keeps the escapes written in the source and every other character, including U+FDD0, so the copy renders the same text', async () => {
     await openWithSelectionModule(page, `${base}/2026-10/escapes/`);
     for (const [, from, to] of escapedParagraphs) {
       const point = { selector: '.bk-article p', contains: from };
