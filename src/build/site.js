@@ -172,7 +172,7 @@ function homeOutput(entries, { root, config, themes, chat }, errors) {
       options: config.themes[config.theme],
       home: { groupBy: config.home.groupBy, columns: config.home.columns, categories: config.categories },
       articles: entries.map(homeArticle),
-      assets: { root: './', styles: assetLinks('', theme.styles), fonts: assetLinks('', theme.fonts), scripts: assetLinks('', [theme.script, chat.entry]) },
+      assets: { root: './', styles: assetLinks('', theme.styles), scripts: assetLinks('', [theme.script, chat.entry]) },
     }),
   );
   return { path: 'index.html', render: () => html, owner: 'the homepage' };
@@ -184,7 +184,7 @@ function notFoundOutput(entries, base, { root, config, themes }, errors) {
       site: siteProps(config),
       options: config.themes[config.theme],
       articles: entries.map((entry) => ({ title: entry.title, url: entry.path })),
-      assets: { root: base, styles: assetLinks(base, theme.styles), fonts: assetLinks(base, theme.fonts), scripts: assetLinks(base, [theme.script]) },
+      assets: { root: base, styles: assetLinks(base, theme.styles), scripts: assetLinks(base, [theme.script]) },
     }),
   );
   return { path: NOT_FOUND_PATH, render: () => html, owner: 'the 404 page' };
@@ -361,8 +361,6 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
     assets: {
       root,
       styles: assetLinks(root, theme.styles),
-      lazyStyles: Object.fromEntries(Object.entries(theme.lazyStyles).map(([name, path]) => [name, assetLinks(root, [path])[0]])),
-      fonts: assetLinks(root, theme.fonts),
       scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },

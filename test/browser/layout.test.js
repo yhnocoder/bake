@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import sharp from 'sharp';
@@ -7,7 +6,6 @@ import { article, bake, copyExample, writeFiles } from '../blog.js';
 import { launchBrowser, serve, settle } from './browser.js';
 
 const overflowWidths = [375, 600, 1000, 1339, 1340, 1440];
-const WENKAI_TEXT = '.bk-site, .bk-title, .bk-article :is(h2, h3, h4, h5, h6)';
 
 const longToken = 'x'.repeat(240);
 const wideRow = (cell, count) => `| ${Array.from({ length: count }, (_, index) => `${cell} ${index + 1}`).join(' | ')} |`;
@@ -400,57 +398,7 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('with the default body font the page downloads only the WenKai subsets that the masthead, title and headings use', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    const requested = [];
-    page.on('request', (request) => {
-      const file = request.url().split('/').pop();
-      if (file.startsWith('lxgwwenkai-')) requested.push(file);
-    });
-    await page.goto(`${origin}/2026-10/syntax/`, { waitUntil: 'networkidle' });
-    await settle(page);
-    const { outside, codePoints } = await page.evaluate((selector) => {
-      const elements = [...document.querySelectorAll('body *')].filter(
-        (element) => getComputedStyle(element).fontFamily.startsWith('"LXGW WenKai"') && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== ''),
-      );
-      return {
-        outside: elements.filter((element) => element.closest(selector) === null).map((element) => element.outerHTML.slice(0, 80)),
-        codePoints: [...new Set([...elements.map((element) => element.textContent).join('')].map((character) => character.codePointAt(0)))],
-      };
-    }, WENKAI_TEXT);
-    await page.close();
-    assert.deepEqual(outside, []);
-    const subsets = wenkaiSubsets(join(dir, 'dist/assets'));
-    const needed = new Set(subsets.filter((subset) => codePoints.some((point) => subset.ranges.some(([from, to]) => point >= from && point <= to))).map((subset) => subset.file));
-    assert.ok(requested.length > 0, 'expected the title and headings to load WenKai');
-    assert.deepEqual(
-      requested.filter((file) => !needed.has(file)),
-      [],
-    );
-  });
 
-  await t.test('the font faces load from a stylesheet that does not block the first paint, with and without scripts', async () => {
-    for (const path of ['', '2026-10/syntax/', '2026-10/activations/', 'missing/']) {
-      const html = await (await fetch(`${origin}/${path}`)).text();
-      const blocking = [...html.replace(/<noscript>.*?<\/noscript>/gs, '').matchAll(/<link rel="stylesheet" href="([^"]+)"( media="[^"]+")?/g)].filter(([, , media]) => media === undefined).map(([, href]) => href);
-      assert.ok(blocking.length > 0, `${path} links no stylesheet`);
-      for (const href of blocking) {
-        const css = readFileSync(join(dir, 'dist/assets', href.split('/').pop()), 'utf8');
-        assert.equal(css.includes('@font-face'), false, `${path} blocks its first paint on ${href}, which declares fonts`);
-      }
-    }
-    for (const javaScriptEnabled of [true, false]) {
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, javaScriptEnabled });
-      const page = await context.newPage();
-      await page.goto(`${origin}/2026-10/syntax/`, { waitUntil: 'networkidle' });
-      const loaded = await page.evaluate(async () => {
-        await document.fonts.ready;
-        return [...document.fonts].filter((face) => face.status === 'loaded').map((face) => `${face.family} ${face.weight}`);
-      });
-      await context.close();
-      assert.ok(loaded.includes('LXGW WenKai 700'), `with scripts ${javaScriptEnabled ? 'enabled' : 'disabled'} the headings did not load WenKai: ${loaded.join(', ')}`);
-    }
-  });
 
   await t.test('the references label is hidden right after a heading and shown otherwise', async () => {
     const labels = async (path) => {
@@ -480,17 +428,3 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(Object.entries(layouts).filter(([, count]) => count > 30), []);
   });
 });
-
-function wenkaiSubsets(assets) {
-  const css = readdirSync(assets)
-    .filter((file) => file.endsWith('.css'))
-    .map((file) => readFileSync(join(assets, file), 'utf8'))
-    .join('\n');
-  return [...css.matchAll(/@font-face\{[^}]*LXGW WenKai[^}]*url\(\.\/([^)]+)\)[^}]*unicode-range:([^;}]+)/g)].map(([, file, ranges]) => ({
-    file,
-    ranges: ranges.split(',').map((range) => {
-      const [from, to = from] = range.trim().slice(2).split('-');
-      return [parseInt(from, 16), parseInt(to, 16)];
-    }),
-  }));
-}

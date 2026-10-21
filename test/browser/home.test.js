@@ -383,7 +383,7 @@ test('the essay homepage', async (t) => {
     await context.close();
   });
 
-  await t.test('the settings panel on the homepage offers the theme and the body font with their current values', async () => {
+  await t.test('the settings panel on the homepage offers the theme and the font with their current values', async () => {
     const { context, page } = await open();
     for (const width of [1440, 375]) {
       await page.setViewportSize({ width, height: 800 });
@@ -394,11 +394,31 @@ test('the essay homepage', async (t) => {
         rows: [...document.querySelectorAll('.bk-settings-row')].filter((row) => row.checkVisibility()).map((row) => row.querySelector('.bk-settings-label').textContent),
         pressed: [...document.querySelectorAll('.bk-settings-panel [aria-pressed="true"]')].map((button) => button.textContent),
         handles: document.querySelectorAll('.bk-toc-handle').length,
+        homeLinks: document.querySelectorAll('.bk-settings-home').length,
         gap: Math.round(document.querySelector('.bk-settings-toggle').getBoundingClientRect().top - document.querySelector('.bk-settings-panel').getBoundingClientRect().bottom),
       }));
-      assert.deepEqual(panel, { rows: ['主题', '正文'], pressed: ['跟随系统', '黑体'], handles: 0, gap: 8 }, `at ${width} pixels`);
+      assert.deepEqual(panel, { rows: ['主题', '字体'], pressed: ['跟随系统'], handles: 0, homeLinks: 0, gap: 8 }, `at ${width} pixels`);
       await page.keyboard.press('Escape');
     }
+    await context.close();
+  });
+
+  await t.test('a link to another page fades the page out before it opens, and going back shows the page again', async () => {
+    const { context, page } = await open();
+    const card = page.locator('[data-grouping="category"] .bk-card').first();
+    const href = await card.getAttribute('href');
+    const fades = await card.evaluate((element) => {
+      element.click();
+      return document
+        .querySelector('.bk-home')
+        .getAnimations()
+        .filter((animation) => !(animation instanceof CSSTransition || animation instanceof CSSAnimation))
+        .map((animation) => animation.effect.getKeyframes().map((frame) => frame.opacity));
+    });
+    assert.deepEqual(fades, [['1', '0']]);
+    await page.waitForURL(`**/${href}`);
+    await page.goBack();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-home')).opacity === '1');
     await context.close();
   });
 

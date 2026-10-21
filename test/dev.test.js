@@ -181,7 +181,7 @@ describe('bake dev', () => {
     assert.doesNotMatch(sitemap, /gelu/);
     const styles = await get('/_bake/theme.css');
     assert.equal(styles.status, 200);
-    assert.match(await styles.text(), /font-family:LXGW WenKai/);
+    assert.match(await styles.text(), /--font-sans:/);
     const notFound = await get('/404.html');
     assert.equal(notFound.status, 200);
     const html = await notFound.text();

@@ -402,6 +402,11 @@ html:has(> body > .bk-home) {
   transition: scale var(--motion-slow) var(--ease);
 }
 
+/* why: a card with a preview script shows the preview as soon as it loads, so its fallback only appears when the preview fails or scripts do not run */
+:root[data-script] .bk-home .bk-card[data-preview]:not([data-preview-failed]) .bk-card-fallback {
+  visibility: hidden;
+}
+
 .bk-home .bk-card:is(:hover, :focus-visible) .bk-card-fallback {
   scale: calc(1 + 0.03 * var(--motion-distance));
 }

@@ -156,7 +156,7 @@ describe('themes', () => {
     });
     assert.equal(bake(dir, 'build').stderr, '');
     const html = (slug) => readFileSync(join(dir, `dist/2026-10/${slug}/index.html`), 'utf8');
-    assert.match(html('rope'), /<html lang="en" data-theme="system" data-font="sans" data-size="medium" data-weight="regular" data-spacing="normal" data-ink="dark">/);
+    assert.match(html('rope'), /<html lang="en" data-theme="system" data-size="medium" data-weight="regular" data-spacing="normal" data-ink="dark">/);
     assert.match(html('rope'), /"ink":\["light","dark"\]/);
     assert.match(html('gelu'), /<html lang="en" [^>]*data-ink="light">/);
   });

@@ -9,7 +9,7 @@ import 'bake/theme/styles/settings.css';
 import 'bake/theme/styles/home.css';
 import 'bake/theme/styles/not-found.css';
 import 'bake/theme/styles/print.css';
-import { resolveWidths, startArticle, startHome, startLayout, startNotFound, startSettings } from 'bake/theme/client';
+import { resolveWidths, startArticle, startHome, startLayout, startLeaveFade, startNotFound, startSettings } from 'bake/theme/client';
 import { essayLabels } from './labels.js';
 import { settings } from './options.js';
 import { startButtons } from './scripts/buttons.js';
@@ -20,6 +20,7 @@ import { startToc } from './scripts/toc.js';
 const home = document.querySelector('.bk-home');
 const notFound = document.querySelector('.bk-not-found');
 startSettings(settings, { labels: essayLabels(document.documentElement.lang).settings, drawings: SETTING_DRAWINGS });
+startLeaveFade();
 if (home !== null) startHome(home);
 if (notFound !== null) startNotFound(notFound);
 

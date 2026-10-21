@@ -52,7 +52,7 @@ test('the 404 page and the theme stylesheet', async (t) => {
       heading: getComputedStyle(document.querySelector('h1')).fontFamily,
     }));
     assert.equal(look.background, 'rgb(245, 246, 244)');
-    assert.match(look.heading, /LXGW WenKai/);
+    assert.match(look.heading, /PingFang SC/);
     await page.getByRole('link', { name: '旋转位置编码' }).click();
     await page.waitForURL(`${origin}/2026-10/rope/`);
     assert.equal(await page.locator('h1.bk-title').textContent(), '旋转位置编码');
@@ -98,16 +98,16 @@ test('the 404 page and the theme stylesheet', async (t) => {
     assert.equal(await page.locator('.bk-not-found-matches').isVisible(), false);
     await page.goto(`${origin}/a/b/c/missing.png`);
     assert.deepEqual(await visible(page), { path: '/a/b/c/missing.png', matches: [] });
-    assert.match(await page.evaluate(() => getComputedStyle(document.querySelector('h1')).fontFamily), /LXGW WenKai/);
+    assert.match(await page.evaluate(() => getComputedStyle(document.querySelector('h1')).fontFamily), /PingFang SC/);
     await page.goto(`${origin}/2026-10/draft/`);
     assert.deepEqual(await visible(page), { path: '/2026-10/draft/', matches: [] });
     await context.close();
   });
 
-  await t.test('the 404 page offers the theme and the body font in the settings panel and applies the chosen theme before its script runs', async () => {
+  await t.test('the 404 page offers the theme and the font in the settings panel and applies the chosen theme before its script runs', async () => {
     const { context, page } = await open('/2026-01/rope/');
     await page.getByRole('button', { name: '设置' }).click();
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['主题', '正文']);
+    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['主题', '字体']);
     await page.getByRole('button', { name: '深' }).click();
     await page.route('**/assets/*.js', (route) => route.abort());
     await page.reload();
