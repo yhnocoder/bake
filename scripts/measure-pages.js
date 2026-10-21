@@ -48,7 +48,7 @@ if (import.meta.main) await main(process.argv.slice(2));
 async function main(args) {
   const outIndex = args.indexOf('--out');
   const out = outIndex === -1 ? undefined : args[outIndex + 1];
-  const positional = args.filter((_, index) => index !== outIndex && index !== outIndex + 1);
+  const positional = outIndex === -1 ? args : args.filter((_, index) => index !== outIndex && index !== outIndex + 1);
   if (positional.length !== 1 || (outIndex !== -1 && out === undefined)) {
     console.error(usage);
     process.exit(2);
