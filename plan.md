@@ -308,6 +308,10 @@ No npm publish workflow in this branch. The full test suites run in CI on the pu
 - `htmlBytes`, measured as the gzip size of the built HTML: the largest page, matrix-calculus, grows from 198124 to 212996 bytes, llm-act-fns from 120821 to 128050 and syntax from 52481 to 58006. The limit was already exceeded before this part, so it becomes 256000 with a new basis.
 - Deleted: `MarkdownWriter` and its selector tables, the Markdown serializer `src/markdown/serialize.js` with the to-Markdown handlers of the syntax modules and `writeAttributes`, their tests, and the dependencies `mdast-util-gfm`, `mdast-util-math`, `mdast-util-to-markdown` and the two `mdast-util-to-markdown-cjk-friendly` packages. Unit tests read the HTML without the copy data through `withoutCopySource` in `test/article.js`.
 
+#### Step 6 part 14: README
+
+- "Components" in README.md describes the files and their names, the default export as a SolidJS component or a custom element and how each receives the parameter values, `params` with a table of the types, `layout` with a table of its fields, the `width` and `height` attributes, heights, `bake/kit`, `bake/math` and the controls of the parameter bar. "Themes" describes copying as Markdown for readers and gains "Writing a theme": the files in a table, the props of the three page components, the parts of a page that Bake relies on (the regions of `bake/regions`, the source script, `data-line`, `data-src` and `data-ui`, the edge areas), `client.jsx` with `bake/live`, the stylesheets, `options.js` with `options`, `settings`, `headings` and `blocks` as the theme-markdown branch wrote them, reusing the built-in themes, and the reported errors.
+
 #### Step 7: chat
 
 - `Chat` in `src/chat/bubbles.jsx` keeps the conversation state and the actions that share it; the thread, the question field, the history area, the settings menu, the prompt form and the problem messages are their own modules (1115 to 595 lines). The chat chunk grew by about 1 KB.
