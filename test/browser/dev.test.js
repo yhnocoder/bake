@@ -639,6 +639,9 @@ test('bake dev shows a parameter bar on each component of the article that chang
     await bar.locator('.write').click();
     await message.filter({ hasText: `Wrote line ${line}` }).waitFor();
     assert.match(readFileSync(file, 'utf8'), new RegExp(`xmin=-6 xmax=${range} ymax=6 width`));
+    await copiedSource();
+    await settle(page);
+    assert.equal((await liveParams()).xmax, range);
   };
 
   await t.test('Write refuses when the file changed before the page updated, keeps the message and values, and a second Write succeeds', async () => {
