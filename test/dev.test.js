@@ -382,6 +382,15 @@ describe('updates while bake dev runs', () => {
     assert.equal(lines.at(-2), 'components/demo-chart.js:1:38 demo-chart: layout.frame must be true or false, got "no"');
   });
 
+  test('checks an article again when a component that it names is added or changes its parameters', async (t) => {
+    const chart = (params) => `export const params = { ${params} };\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {}\n`;
+    const { dir, lines } = await serve(t, { 'content/posts/rope/index.md': article({ body: ':::demo-chart{size=2}\n:::\n' }) });
+    assert.equal(lines[0], 'content/posts/rope/index.md:7:1 unknown component "demo-chart"; components/ has no demo-chart.js or demo-chart.jsx');
+    await save(dir, { 'components/demo-chart.js': chart("size: { label: 'Size', type: 'number', default: 1 }") }, () => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
+    await save(dir, { 'components/demo-chart.js': chart("scale: { label: 'Scale', type: 'number', default: 1 }") }, () => lines.at(-1) === '1 error', `bake dev printed ${JSON.stringify(lines)}`);
+    assert.match(lines.at(-2), /^content\/posts\/rope\/index\.md:7:\d+ .*size/);
+  });
+
   test('keeps every page while bake.config.js has problems and uses the fixed configuration', async (t) => {
     const { dir, lines, text } = await serve(t, { 'content/posts/rope/index.md': article() });
     await save(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => /Rope again · Test Blog/.test(await text('/2026-10/rope/')), 'the new title was not served');
