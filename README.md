@@ -2,19 +2,25 @@
 
 Bake generates a static site from a technical blog written in Markdown. Articles can include math, code, sidenotes, folds, callouts and interactive components written as standard web components. Each article chooses a theme: `essay` lays it out as a long read with a table of contents and sidenotes, `bento` arranges its sections as cards.
 
-## Installation
+## Install
 
-Bake needs Node.js 24 or later. It is published on npm as `@yhnocoder/bake` and is installed in each blog as a development dependency. To start a new blog:
+Bake needs Node 24 or later. A blog is an npm project that installs Bake as a development dependency. The npm package is named `@yhnocoder/bake`; until it is published to npm, install it from GitHub:
 
 ```bash
-npx @yhnocoder/bake init my-blog
-cd my-blog
-npm install --save-dev @yhnocoder/bake
+mkdir my-blog && cd my-blog
+npm init -y
 npm pkg set type=module
+npm install --save-dev github:yhnocoder/bake
 npx playwright install chromium
+npx bake init
+npx bake dev
 ```
 
-`bake init` creates no `package.json`; `npm install` creates it. `bake.config.js` is an ES module, so the blog's `package.json` sets `"type": "module"`; Bake reports an error when the nearest `package.json` sets another type or none. The last command downloads the Chromium build that `bake build` uses to draw share images, see [Share images](#share-images). Inside the blog, `npx bake <command>` runs the installed version, and the commands below can also be added to the `scripts` of `package.json`.
+`bake.config.js` is an ES module, so the `package.json` of the blog sets `"type": "module"`. `npm init -y` writes `"type": "commonjs"`, which `npm pkg set type=module` replaces; Bake reports an error at `bake.config.js` when the nearest `package.json` sets another type or none. `npx playwright install chromium` downloads the browser that `bake build` draws the share images with, see [Share images](#share-images). The command `bake` comes with the package, so `npx bake` runs it from the blog folder, and the scripts in `package.json` can call it as `bake`.
+
+## Example blog
+
+`examples/blog/` is a blog written with Bake. Its syntax article lists every syntax item with its source next to its result, and its other articles show components, embeds, plain HTML pages and both themes. `make example` builds it and serves it at http://localhost:8000/. The `demo` workflow in `.github/workflows/demo.yml` builds it with the address of this repository's GitHub Pages site and publishes it there when it is started by hand from the Actions tab; it is never started by a push.
 
 ## Commands
 
@@ -60,7 +66,7 @@ A blog is an ordinary repository. Bake reads it from the blog root:
 my-blog/
   bake.config.js        site title, URL, language, default theme and theme options
   preamble.sty          math macros shared by every article
-  package.json          npm packages used by components
+  package.json          Bake and the npm packages that components use
   content/
     posts/
       2026-10/
