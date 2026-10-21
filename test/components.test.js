@@ -107,7 +107,7 @@ describe('component blocks', () => {
       'index.md:7:41 parameter "gamma" of act-fn-plot must be at most 4, got 5',
       'index.md:7:49 parameter "toggle" of act-fn-plot must be true or false, got "yes"',
       'index.md:7:60 parameter "title" of act-fn-plot needs a value, got no value',
-      'index.md:7:66 unknown parameter "bta" for act-fn-plot',
+      'index.md:7:66 unknown parameter "bta" for act-fn-plot; did you mean beta?',
       'index.md:7:72 float does not apply to components; act-fn-plot is centred in its column',
       'index.md:10:16 parameter "range" of act-fn-plot must be a number, got "abc"',
       'index.md:10:26 parameter "beta" of act-fn-plot must be a number, got no value',

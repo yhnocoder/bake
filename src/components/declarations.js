@@ -1,5 +1,6 @@
 import { WIDTHS, folderFile, parseSize } from '../config/rules.js';
 import { describeValue, listAll, listChoices } from '../report.js';
+import { meantName } from '../suggest.js';
 
 export const PARAM_TYPES = Object.freeze(['number', 'text', 'boolean', 'enum', 'file']);
 export const SIZE_ATTRIBUTES = Object.freeze(['width', 'height']);
@@ -84,7 +85,8 @@ export function resolveComponent(name, component, attributes, files) {
     }
     const declaration = component.params[attribute];
     if (declaration === undefined) {
-      report(attribute, attribute === 'float' ? `float does not apply to components; ${name} is centred in its column` : `unknown parameter "${attribute}" for ${name}`);
+      const meant = meantName(attribute, Object.keys(component.params));
+      report(attribute, attribute === 'float' ? `float does not apply to components; ${name} is centred in its column` : `unknown parameter "${attribute}" for ${name}${meant === undefined ? '' : `; did you mean ${meant}?`}`);
       continue;
     }
     const { value, problem } = convertAttribute(declaration, raw);
