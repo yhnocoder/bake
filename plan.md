@@ -215,6 +215,10 @@ Run the step 0 scripts on the final commit and write the comparison table of med
 
 If the dev startup and hot update scripts gave stable numbers, move them into the repository as one script next to `scripts/measure-pages.js`, with limits in `test/perf/budgets.json` checked by `scripts/check-budgets.js` (extended for metrics that have no page and width), and run it in the nightly workflow. `scripts/measure-pages.js` measures page loading for readers and the frame time gate measures interactions; this script measures the author's `bake dev` loop, so the three share the budget file, the budget check and the screen sizes, and nothing else. Timings vary too much between runs for the pull request tier, so it stays nightly. The frame rate already runs in CI as the frame time gate.
 
+Measure without throttling everywhere: delete the CPU slowdown of the frame time gate (`CPU_SLOWDOWN` in `test/frames/frames.js`) and the CPU and network throttling of `scripts/measure-pages.js`, rewrite the limits of `test/perf/budgets.json` and their basis from the final measurements, set the `knownFailures` of the frame gate to the cases that fail without throttling, and update TESTING.md. Before that, fix what keeps `make perf` from finishing: components inside closed folds never start, so the final wait times out and they count in `componentsBlankOnScroll`; and `scripts/measure-pages.js` ignores its dist folder when `--out` is not given. The frame case that scrolls the first 8000 pixels of the syntax article fails in some local runs before and after part 11; find the cause.
+
+No npm publish workflow in this branch. The full test suites run in CI on the pull request; the branch is pushed after each group of commits.
+
 ## Decisions made during implementation
 
 - Step 6 part 2: the shared sidenote highlighting marks the references and notes of both themes; the paragraph tint stays in essay, which passes it to `startArticle` as the `onSidenote` callback, and a note opened inline on a narrow screen is not a trigger, so the essay behaviour stays as before.
@@ -293,3 +297,21 @@ If the dev startup and hot update scripts gave stable numbers, move them into th
 - Deleted: `narrowHeight`, `autoHeight`, `componentHeights` with its narrow height, the `data-height="auto"` attribute and rules, `--component-narrow-height` and `--component-narrow-ratio` with the narrow media query in `blocks.css` and `view.css`, the box-filling flex rules of the two plots and the aspect-ratio choice of `act-fn-plot`.
 - Verification: `npm test`, the components, kit and math unit and browser tests pass. `BAKE_FRAMES=all npm run test:frames` passes every case but "scrolling the first 8000 pixels of the syntax article" at 1440 or 375 pixels, which fails in some runs on this machine in both versions: in four runs each of the 375 pixel case, this commit failed twice (25 and 4 dropped frames) and the part 10 commit failed twice (214 and 11 dropped frames). Left for later as a flaky case of the frame gate.
 - `make perf` stops on this commit and on the part 10 commit alike: the components inside the closed folds of matrix-calculus never start, so the wait for every component to settle in `scripts/measure-pages.js` times out, and the five of them count as blank on scroll. With that wait cut short (`test-out/heights/measure-debug.mjs`), both commits exceed the same 35 budgets, `componentsBlankOnScroll` is 5 on matrix-calculus and 0 on every other page in both, and `htmlBytes` falls by about 760 bytes on matrix-calculus. `scripts/measure-pages.js` also ignores its dist folder when `--out` is not given. Both are left for later.
+
+#### Step 7: chat
+
+- `Chat` in `src/chat/bubbles.jsx` keeps the conversation state and the actions that share it; the thread, the question field, the history area, the settings menu, the prompt form and the problem messages are their own modules (1115 to 595 lines). The chat chunk grew by about 1 KB.
+- `[data-ui]` is defined once, as `UI` in `src/regions.js`, a public module (part 14 documents it or leaves it out). The chat does not import it from `src/copy/markdown.js`, which would pull the Markdown serializer into the chat chunk.
+- The chat follows the selection with `oncePerFrame` from `src/theme/scripts/motion.js`.
+- Asking about a passage removes `data-hidden` from the end area; essay's scrolled-away state is unchanged, so the next scroll down hides it again.
+- Exports that only unit tests import stay exported.
+
+#### Step 7: build and dev
+
+- The dev test timeout came from macOS dropping a change made a moment after `fs.watch` starts; a file saved during the first build of `bake dev` was never picked up. `bake dev` now watches before the first build and ignores a path whose `ctime` is older than the start of the watcher, since macOS also reports writes made just before it. The dev tests save once instead of repeating the save.
+- Each cached result of the site keeps the blog paths it read, and a change to one of them or to a folder above it drops the result; an article also keeps the settings, the preamble and the declarations of the components it looked up, including missing names. The bundle still depends on the whole `components/` folder, because `bundleComponents` does not report the modules it read; make it report them after the component cleanup.
+- The site theme compiles before the article loop. `writeDist` renders all files at the same time and writes them one after another.
+- Dev medians before and after (noisy, other agents running): component edit 1738 to 685 ms, config edit 1979 to 303 ms, startup unchanged.
+- A `|` inside `$…$` on a table line stands for a lone surrogate while the table is parsed; the private-use search and its error are deleted.
+- Tests decode images with `sharp` through `decodeImage` in `test/blog.js`; `pngjs` is gone.
+
