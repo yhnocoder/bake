@@ -8,3 +8,15 @@ export const headings = {
   cols: { type: 'number', min: 1, max: 6, step: 1, depth: 2 },
   rows: { type: 'number', min: 1, max: 200, step: 1, depth: 2 },
 };
+
+export const blocks = {
+  sticker: {
+    cols: { type: 'number', min: 1, max: 6, step: 1 },
+    rows: { type: 'number', min: 1, max: 200, step: 1 },
+  },
+  note: {
+    cols: { type: 'number', min: 1, max: 6, step: 1 },
+    rows: { type: 'number', min: 1, max: 200, step: 1 },
+    color: { type: 'enum', options: ['yellow', 'green', 'blue', 'pink'] },
+  },
+};

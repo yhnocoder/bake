@@ -141,6 +141,53 @@
   line-height: var(--bt-leading);
 }
 
+.bt-sticker {
+  display: grid;
+  place-content: center;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 20px;
+  --scroll-cover: var(--accent-soft);
+  background: var(--accent-soft);
+  box-shadow:
+    0 0 0 4px var(--surface),
+    0 0 0 5px var(--line),
+    0 10px 18px -10px var(--scroll-shadow);
+  rotate: var(--bt-tilt);
+  font-family: var(--font-heading);
+  font-size: calc(19px * var(--reader-scale));
+  line-height: 1.4;
+  text-align: center;
+  color: var(--accent);
+  text-wrap: balance;
+}
+
+.bt-sticker[data-emoji] {
+  font-size: calc(46px * var(--reader-scale));
+  line-height: 1.15;
+}
+
+.bt-note {
+  --bt-note: var(--series-4);
+  --scroll-cover: color-mix(in srgb, var(--bt-note) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--bt-note) 30%, var(--surface));
+  border-radius: 6px var(--bt-radius) var(--bt-radius) var(--bt-radius);
+  background: var(--scroll-cover);
+  font-size: calc((var(--bt-text-size) - 1px) * var(--reader-scale));
+}
+
+.bt-note[data-color='green'] {
+  --bt-note: var(--series-3);
+}
+
+.bt-note[data-color='blue'] {
+  --bt-note: var(--series-1);
+}
+
+.bt-note[data-color='pink'] {
+  --bt-note: var(--series-5);
+}
+
 @scope (.bk-article) to (.component-box) {
   .bt-card > :where(:not(.bk-block[data-width], .bt-notes)),
   .bt-card > .bk-block[data-type='math'][data-width='auto'] {
@@ -188,8 +235,24 @@
     text-wrap: pretty;
   }
 
-  .bt-card > .bt-recap > :last-child {
+  .bt-card > .bt-recap > :last-child,
+  .bt-block-body > :last-child {
     margin-bottom: 0;
+  }
+
+  .bt-block-body > :first-child {
+    margin-top: 0;
+  }
+
+  .bt-sticker img {
+    max-width: 100%;
+    max-height: 160px;
+    width: auto;
+    height: auto;
+  }
+
+  .bt-sticker .figure {
+    margin: 0;
   }
 
   .bt-card .embed h2 {
@@ -337,6 +400,19 @@
     padding: 0;
     border: 0;
     box-shadow: none;
+  }
+
+  .bt-sticker,
+  .bt-note {
+    padding: 8px 12px;
+    border: 1px solid var(--line-2);
+    break-inside: avoid;
+  }
+
+  .bt-sticker {
+    display: inline-grid;
+    margin-right: 12px;
+    rotate: none;
   }
 }
 

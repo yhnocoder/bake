@@ -64,9 +64,35 @@ Last line.
 `,
 });
 
+const gapsArticle = article({
+  title: 'Bento gaps',
+  slug: 'bento-gaps',
+  extra: 'category: writing\ntheme: bento\n',
+  body: `## Tall {cols=3 rows=12}
+
+Text.
+
+:::sticker{rows=3}
+🧪
+:::
+
+## Short {cols=3 rows=4}
+
+Text.
+
+## Across {cols=6 rows=4}
+
+Text.
+
+:::note{rows=4 color=green}
+A note.
+:::
+`,
+});
+
 test('the bento theme lays out sections as cards', async (t) => {
   const dir = copyExample(t);
-  writeFiles(dir, { 'content/posts/bento-cards/index.md': cardsArticle });
+  writeFiles(dir, { 'content/posts/bento-cards/index.md': cardsArticle, 'content/posts/bento-gaps/index.md': gapsArticle });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   assert.equal(result.status, 0);
@@ -106,6 +132,37 @@ test('the bento theme lays out sections as cards', async (t) => {
     await resize(page, 375);
     const phone = await page.evaluate(gridLayout, 1);
     assert.ok(phone.fullWidth && phone.inOrder, '375px');
+    await page.close();
+  });
+
+  await t.test('stickers and notes fill the gaps that the section cards leave from 1000 pixels up and follow the order of the article below', async () => {
+    const page = await open('bento-gaps');
+    const cards = () =>
+      page.evaluate(() => {
+        const grid = document.querySelector('.bt-grid');
+        const gap = parseFloat(getComputedStyle(grid).columnGap);
+        const column = (grid.clientWidth - 5 * gap) / 6;
+        return [...grid.children].map((card) => {
+          const box = card.getBoundingClientRect();
+          const origin = grid.getBoundingClientRect();
+          const style = getComputedStyle(card);
+          const packed = grid.hasAttribute('data-packed');
+          const left = packed ? parseFloat(style.getPropertyValue('--bt-x')) : box.left - origin.left;
+          const top = packed ? parseFloat(style.getPropertyValue('--bt-y')) : box.top - origin.top;
+          return { name: card.dataset.themeBlock ?? card.querySelector('h2 .bk-heading-text').textContent, start: Math.round(left / (column + gap)), top: Math.round(top) };
+        });
+      });
+    for (const width of [1440, 1100]) {
+      await resize(page, width);
+      const placed = Object.fromEntries((await cards()).map(({ name, start, top }) => [name, { start, top }]));
+      const short = 4 * ROW_HEIGHT + 3 * 6 + 6;
+      assert.deepEqual(placed, { Tall: { start: 0, top: 0 }, sticker: { start: 3, top: short }, Short: { start: 3, top: 0 }, Across: { start: 0, top: 12 * ROW_HEIGHT + 11 * 6 + 6 }, note: { start: 4, top: short } }, `${width}px`);
+      assert.deepEqual(await page.evaluate(overlappingCards), [], `${width}px`);
+    }
+    await resize(page, 375);
+    const narrow = await cards();
+    assert.deepEqual(narrow.map(({ name }) => name), ['Tall', 'sticker', 'Short', 'Across', 'note']);
+    assert.ok(narrow.every(({ top }, index) => index === 0 || top >= narrow[index - 1].top), JSON.stringify(narrow));
     await page.close();
   });
 
@@ -170,19 +227,19 @@ test('the bento theme lays out sections as cards', async (t) => {
           ([rowsByTitle, row]) => {
             const grid = document.querySelector('.bt-grid');
             const gap = parseFloat(getComputedStyle(grid).rowGap);
-            return [...grid.querySelectorAll('.bt-card')]
+            return [...grid.querySelectorAll('section.bt-card')]
               .map((card) => ({ card, rows: rowsByTitle[card.querySelector('h2 .bk-heading-text').textContent] }))
               .filter(({ rows }) => rows !== undefined)
               .map(({ card, rows }) => ({ rows, height: Math.round(card.getBoundingClientRect().height * 10) / 10, expected: Math.round((rows * row + (rows - 1) * gap) * 10) / 10 }));
           },
           [activationsRows, ROW_HEIGHT],
         );
-        assert.equal(heights.length, 10, `${width}px`);
+        assert.equal(heights.length, Object.keys(activationsRows).length, `${width}px`);
         assert.deepEqual(heights.filter(({ height, expected }) => Math.abs(height - expected) > 0.5), [], `${width}px`);
         continue;
       }
       const cards = await page.evaluate(() =>
-        [...document.querySelectorAll('.bt-card')].map((card) => {
+        [...document.querySelectorAll('section.bt-card')].map((card) => {
           const style = getComputedStyle(card);
           const contentBottom = card.getBoundingClientRect().bottom - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth);
           const notes = card.querySelector(':scope > .bt-notes');
@@ -207,17 +264,7 @@ test('the bento theme lays out sections as cards', async (t) => {
       const grid = await page.evaluate(gridLayout, 6);
       assert.deepEqual(grid.starts, { ReLU: 0, GELU: 2, SiLU: 4, 导数: 4, 怎么选: 2, 反向传播: 0, 实现: 0, '写成 Markdown': 4, 对比: 0, 参考文献: 4 }, `${width}px`);
       assert.ok(grid.inOrder, `${width}px`);
-      const gaps = await page.evaluate(() => {
-        const boxes = [...document.querySelectorAll('.bt-card')].map((card) => card.getBoundingClientRect());
-        const gap = parseFloat(getComputedStyle(document.querySelector('.bt-grid')).columnGap);
-        return boxes.flatMap((box) => {
-          const below = boxes.filter((other) => other.top > box.bottom - 0.5 && other.left < box.right - 1 && other.right > box.left + 1);
-          if (below.length === 0) return [];
-          const distance = Math.min(...below.map((other) => other.top)) - box.bottom;
-          return Math.abs(distance - gap) > 0.5 ? [distance] : [];
-        });
-      });
-      assert.deepEqual(gaps, [], `${width}px`);
+      assert.deepEqual(await page.evaluate(overlappingCards), [], `${width}px`);
     }
     await page.close();
   });
@@ -509,7 +556,7 @@ function gridLayout(columns) {
   const gap = parseFloat(getComputedStyle(grid).columnGap);
   const origin = grid.getBoundingClientRect();
   const track = (origin.width - gap * (columns - 1)) / columns;
-  const cards = [...grid.querySelectorAll(':scope > .bt-card')].map((card) => ({ title: card.querySelector('h2 .bk-heading-text').textContent, box: card.getBoundingClientRect() }));
+  const cards = [...grid.querySelectorAll(':scope > section.bt-card')].map((card) => ({ title: card.querySelector('h2 .bk-heading-text').textContent, box: card.getBoundingClientRect() }));
   const spans = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.width + gap) / (track + gap))]));
   const starts = Object.fromEntries(cards.map(({ title, box }) => [title, Math.round((box.left - origin.left) / (track + gap))]));
   const inOrder = cards.every(({ box }, index) =>
@@ -530,4 +577,22 @@ function largestDifference(first, second) {
     for (let index = y * first.width * 4; index < (y + 1) * first.width * 4; index += 1) largest = Math.max(largest, Math.abs(first.data[index] - second.data[index]));
   }
   return largest;
+}
+
+function overlappingCards() {
+  const gap = parseFloat(getComputedStyle(document.querySelector('.bt-grid')).columnGap);
+  // why: the bounding box of a tilted sticker is larger than the box the packing gives it
+  const layoutBox = (card) => {
+    const style = getComputedStyle(card);
+    const left = parseFloat(style.getPropertyValue('--bt-x'));
+    const top = parseFloat(style.getPropertyValue('--bt-y'));
+    return { left, top, right: left + card.offsetWidth, bottom: top + card.offsetHeight };
+  };
+  const cards = [...document.querySelectorAll('.bt-grid > .bt-card')].map((card) => ({ line: card.dataset.line ?? card.querySelector('h2').dataset.line, box: layoutBox(card) }));
+  return cards.flatMap(({ line, box }, index) =>
+    cards
+      .slice(index + 1)
+      .filter(({ box: other }) => box.left < other.right + gap - 0.5 && other.left < box.right + gap - 0.5 && box.top < other.bottom + gap - 0.5 && other.top < box.bottom + gap - 0.5)
+      .map((other) => `${line} and ${other.line}`),
+  );
 }

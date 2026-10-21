@@ -8,7 +8,7 @@ import * as essay from '../src/themes/essay/options.js';
 
 export const frontMatter = '---\ntitle: T\nslug: t\ndate: 2026-10-19\n---\n\n';
 export const essayTheme = { name: 'essay', headings: essay.headings, blocks: {} };
-export const bentoTheme = { name: 'bento', headings: bento.headings, blocks: bento.blocks ?? {} };
+export const bentoTheme = { name: 'bento', headings: bento.headings, blocks: bento.blocks };
 
 export async function parseArticle(file, source, errors, options = {}) {
   const article = await readArticle(file, source, errors, { theme: essayTheme, ...options });

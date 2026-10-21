@@ -33,23 +33,16 @@ export function placeCards(article) {
     spans.set(card, wideSpan);
     setStyle(card, '--bt-width', `${spanWidth(wideSpan)}px`);
   }
-  const boxes = cards.map((card) => ({ height: card.getBoundingClientRect().height, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, end: card.scrollTop + card.clientHeight >= card.scrollHeight - 1 }));
+  const boxes = new Map(cards.map((card) => [card, { height: card.getBoundingClientRect().height, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, end: card.scrollTop + card.clientHeight >= card.scrollHeight - 1 }]));
   const tops = Array(columns).fill(0);
+  const placed = [];
   const hint = devHint();
   const borders = cards.length === 0 ? 0 : verticalBorders(cards[0]);
-  cards.forEach((card, index) => {
+  const place = (card, start, top) => {
     const span = spans.get(card);
-    const { height, scrollHeight, clientHeight, end } = boxes[index];
-    let start = 0;
-    let top = Infinity;
-    for (let first = 0; first + span <= columns; first += 1) {
-      const level = Math.max(...tops.slice(first, first + span));
-      if (level < top - 0.5) {
-        top = level;
-        start = first;
-      }
-    }
-    for (let next = start; next < start + span; next += 1) tops[next] = top + height + gap;
+    const { height, scrollHeight, clientHeight, end } = boxes.get(card);
+    placed.push({ start, end: start + span, top, bottom: top + height });
+    for (let next = start; next < start + span; next += 1) tops[next] = Math.max(tops[next], top + height + gap);
     placedHeights.set(card, height);
     resizes.observe(card);
     setStyle(card, '--bt-x', `${start * (column + gap)}px`);
@@ -59,8 +52,36 @@ export function placeCards(article) {
     setAttribute(card, 'data-end', overflow > 1 && end ? '' : null);
     setAttribute(card, 'tabindex', overflow > 1 ? '0' : null);
     setAttribute(card, 'data-hint', hint !== null && overflow > 1 ? hint(Math.ceil(overflow), Math.ceil((scrollHeight + borders + gap) / (rowHeight + gap))) : null);
-  });
+  };
+  const isSection = (card) => card.dataset.themeBlock === undefined;
+  for (const card of cards.filter(isSection)) {
+    const span = spans.get(card);
+    let start = 0;
+    let top = Infinity;
+    for (let first = 0; first + span <= columns; first += 1) {
+      const level = Math.max(...tops.slice(first, first + span));
+      if (level < top - 0.5) {
+        top = level;
+        start = first;
+      }
+    }
+    place(card, start, top);
+  }
+  for (const card of cards.filter((card) => !isSection(card))) {
+    const { start, top } = highestFit(placed, spans.get(card), boxes.get(card).height, columns, gap);
+    place(card, start, top);
+  }
   setStyle(grid, '--bt-height', `${Math.max(0, ...tops) - gap}px`);
+}
+
+function highestFit(placed, span, height, columns, gap) {
+  const levels = [0, ...placed.map((box) => box.bottom + gap)].sort((a, b) => a - b);
+  for (const top of levels) {
+    for (let start = 0; start + span <= columns; start += 1) {
+      const free = placed.every((box) => box.end <= start || box.start >= start + span || top >= box.bottom + gap - 0.5 || top + height + gap <= box.top + 0.5);
+      if (free) return { start, top };
+    }
+  }
 }
 
 export function releaseCards() {

@@ -189,7 +189,7 @@ A block starts with a line of three or more colons and a name, and ends with a l
 | `:::embed` | Shows sections or paragraphs of other articles, see [Embedding other articles](#embedding-other-articles). |
 | `:::{width=wide}` | Sets the width of the one block inside it to `body`, `wide` or `page`. |
 
-A name with a `-` is an interactive component. Any other name is a block of the theme of the article, see [Themes](#themes); a name that the theme does not declare is an error, and so is an attribute the block does not know. A block of the theme holds ordinary Markdown, with math, links, footnotes and citations, and stands at the top level of the article, outside other blocks, lists and quotes.
+A name with a `-` is an interactive component. Any other name is a block of the theme of the article, such as `:::sticker` and `:::note` of the `bento` theme, see [Themes](#themes); a name that the theme does not declare is an error, and so is an attribute the block does not know. A block of the theme holds ordinary Markdown, with math, links, footnotes and citations, and stands at the top level of the article, outside other blocks, lists and quotes.
 
 ### Math
 
@@ -399,6 +399,20 @@ The `essay` theme has four table of contents styles, which its option `toc` sele
 A card lists the sections of the chapter with their recaps, marks the sections already read and the current one, and links to every heading. The keyboard reaches the tabs, the dots and the ticks before the rest of the page; focusing one opens the card of its chapter, and Tab moves through the links of the card to the next chapter. Below 1000 pixels every style shows a handle at the left edge that opens a drawer with the chapters on one side and the card of the chosen chapter on the other. Without scripts the page shows the plain list of headings with links. Headings and the title are set in LXGW WenKai, which Bake publishes with the site, and the text in the system's sans-serif font.
 
 The `bento` theme lays the same Markdown out as a grid of cards, one card per `##` section, with the colours and fonts of `essay`. The title, the summary and the text before the first `##` heading stand above the grid. From 1000 pixels up the grid has `themes.bento.columns` columns, and below 1000 pixels it has one column. A section asks for its width with `cols` or `width` on its heading: `body` is a third of the columns, `wide` is half of them and `page` is all of them, so with 6 columns these are 2, 3 and 6. A section without either spans the whole row when it contains a block with `:::{width=page}`, half of the columns when it contains a block with `:::{width=wide}` or a block that does not fit into a third, such as a long line of code or a component with a pixel width, and a third otherwise. From 1000 pixels up the cards are placed in the order of the article, each one in the columns whose lowest card ends highest. A card is as tall as its content, unless its heading sets `rows`: then the card is that many rows of `themes.bento.rowHeight` pixels tall, the content that does not fit is hidden under a fade at the bottom, and the card scrolls after the reader clicks it or moves keyboard focus into it. In `bake dev` such a card shows how many pixels do not fit and the smallest `rows` that fits them. The sidenotes of a section follow its last block at the bottom of its card. The recap of a section is shown under the title of its card, and the recap of a `###` section under its heading. The page has no table of contents, so `toc` on a heading is an error. Without scripts, every card keeps the span its width gives it and is as tall as its content.
+
+The `bento` theme has two blocks of its own, each drawn as a card of its own after the card of the section it is written in:
+
+```markdown
+:::sticker
+🧪
+:::
+
+:::note{cols=2 color=blue}
+PyTorch's `F.gelu(x, approximate="tanh")` is the approximation above.
+:::
+```
+
+`:::sticker` holds a short text, an emoji or a small image and is drawn as a tilted sticker; an emoji alone is drawn large. `:::note` holds any Markdown, with math, links and footnotes, on a tinted card; `color` is `yellow`, `green`, `blue` or `pink`, `yellow` by default. Both take `cols`, the card columns, 1 for a sticker and a third of the columns for a note by default, and `rows`, which works as on a heading. From 1000 pixels up the section cards are placed first, and then each sticker and note, in the order of the article, goes to the highest place where it fits next to the cards placed before it, which fills the gaps the section cards leave, and to the leftmost of equally high places. Below 1000 pixels and without scripts they follow the order of the article.
 
 A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and switch the text to LXGW WenKai, which is only downloaded when the reader chooses it. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style and marks the style of the article as the default; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the body font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 

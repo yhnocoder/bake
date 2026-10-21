@@ -10,7 +10,7 @@ theme: bento
 
 神经网络的每一层在线性变换之后接一个逐元素的非线性函数，也就是激活函数。下面比较三个常用的激活函数：ReLU、GELU 和 SiLU。
 
-## ReLU {cols=2 rows=28}
+## ReLU {cols=2 rows=24}
 
 ReLU 把负数变成 0，正数保持不变 [@relu]：
 
@@ -22,6 +22,10 @@ $$
 
 :::act-fn-plot{fn=relu}
 ReLU 和它的导数。拖动右上角的滑块改变横轴范围。
+:::
+
+:::sticker
+📈
 :::
 
 ## GELU {cols=2 rows=14}
@@ -40,6 +44,10 @@ $$
 
 [^gelu-min]: 最小值约为 $-0.17$，在 $x \approx -0.75$ 处取到。
 
+:::note{color=blue}
+PyTorch 的 `F.gelu(x, approximate="tanh")` 就是[实现](#实现)一节里的 `gelu_tanh`。
+:::
+
 ## SiLU {cols=2 rows=10}
 
 SiLU 把 $\Phi$ 换成 sigmoid 函数 $\sigma$ [@silu]：
@@ -49,6 +57,10 @@ $$
 $$
 
 它和 GELU 的形状很接近，计算更便宜。SwiGLU 用 SiLU 作为门控的激活函数。
+
+:::sticker
+$x\,\sigma(x)$
+:::
 
 ## 导数 {cols=2 rows=18}
 
@@ -78,12 +90,20 @@ $$
 $$
 :::
 
-## 怎么选 {cols=2 rows=14}
+## 怎么选 {cols=2}
 
 新模型多用 GELU 或 SiLU，它们在 0 附近的梯度更平滑。
 
 :::aside{title="实践建议"}
 沿用模型原来的激活函数。换成另一个函数后，学习率和初始化通常也要重新调。
+:::
+
+:::sticker
+🧪
+:::
+
+:::note{color=green}
+$x \to +\infty$ 时，三个函数的导数都趋于 1；$x \to -\infty$ 时都趋于 0。
 :::
 
 ## 反向传播 {cols=6 rows=17}
@@ -115,7 +135,7 @@ def silu(x):
     return x * torch.sigmoid(x)
 ```
 
-## 写成 Markdown {cols=2 rows=12}
+## 写成 Markdown {cols=2}
 
 这篇文章的行内公式写在一对美元符号之间：
 
@@ -131,7 +151,7 @@ GELU 的定义是 $\mathrm{GELU}(x) = x\,\Phi(x)$，其中 $\Phi$ 是标准正�
 | GELU | $x\,\Phi(x)$ | $0.5$ | 最小约 $-0.17$ | BERT、GPT-2 |
 | SiLU | $x\,\sigma(x)$ | $0.5$ | 最小约 $-0.28$ | SwiGLU 的门控、LLaMA |
 
-## 参考文献 {cols=2 rows=16}
+## 参考文献 {cols=2}
 
 :::references
 - [@relu] Nair, Hinton. *Rectified Linear Units Improve Restricted Boltzmann Machines*. 2010.
