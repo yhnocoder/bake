@@ -16,10 +16,6 @@ export function citationsAndMissingFootnotes() {
   (data.fromMarkdownExtensions ??= []).push(bracketFromMarkdown);
 }
 
-export const citationsToMarkdown = {
-  handlers: { citation: (node) => `[@${node.key}]` },
-};
-
 const bracketFromMarkdown = {
   enter: {
     citation(token) {

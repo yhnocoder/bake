@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
-import { parseAttributes, writeAttributes } from '../src/markdown/attributes.js';
-import { serializeMarkdown } from '../src/markdown/serialize.js';
+import { parseAttributes, writeAttribute } from '../src/markdown/attributes.js';
 import { formatError, sortErrors } from '../src/report.js';
-import { bentoTheme, components, folder, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
-
-const exampleBlog = fileURLToPath(new URL('../examples/blog/', import.meta.url));
+import { bentoTheme, components, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
 
 describe('headings and anchors', () => {
   test('numbers ## sections and lists ### headings under them in the table of contents', async () => {
@@ -120,8 +116,10 @@ describe('headings and anchors', () => {
 });
 
 describe('attributes', () => {
+  const written = (attributes) => `{${Object.entries(attributes).map(([name, value]) => writeAttribute(name, value)).join(' ')}}`;
+
   test('writes attributes in a form that the reader reads back to the same values', () => {
-    const written = [
+    const cases = [
       ['{toggle}', { toggle: true }],
       ['{title="text with spaces"}', { title: 'text with spaces' }],
       ['{#own .wide}', { id: 'own', class: 'wide' }],
@@ -129,136 +127,19 @@ describe('attributes', () => {
       [`{label='say "hi"' fn="a}b" toc="短标题" empty=""}`, { label: 'say "hi"', fn: 'a}b', toc: '短标题', empty: '' }],
       ['{id="two words" class="a=b"}', { id: 'two words', class: 'a=b' }],
     ];
-    for (const [text, attributes] of written) {
-      assert.equal(writeAttributes(attributes), text);
+    for (const [text, attributes] of cases) {
+      assert.equal(written(attributes), text);
       assert.deepEqual(parseAttributes(text).attributes, attributes);
     }
     for (const text of ['{#own}', "{title='single quoted'}", '{range="6"}', '{id=own}', '{.wide toggle}']) {
       const { attributes } = parseAttributes(text);
-      assert.deepEqual(parseAttributes(writeAttributes(attributes)).attributes, attributes);
+      assert.deepEqual(parseAttributes(written(attributes)).attributes, attributes);
     }
-    assert.equal(writeAttributes({ range: 6 }), '{range=6}');
-    assert.equal(writeAttributes({}), '');
+    assert.equal(writeAttribute('range', 6), 'range=6');
   });
 
-  test('refuses to write a value that holds both quote characters, which the attribute syntax cannot hold', () => {
-    assert.throws(() => writeAttributes({ title: `say "it's"` }), /the attribute title cannot be written/);
-  });
-});
-
-describe('writing Markdown', () => {
-  const text = (value) => ({ type: 'text', value });
-  const paragraph = (...children) => ({ type: 'paragraph', children });
-  const list = (...items) => ({ type: 'list', ordered: false, spread: false, children: items.map((children) => ({ type: 'listItem', spread: false, children })) });
-
-  test('writes Bake syntax that the parser reads back, and escapes text that it would read as syntax', async () => {
-    const tree = {
-      type: 'root',
-      children: [
-        { type: 'heading', depth: 2, children: [text('Gates')], attributes: { id: 'gates', toc: '门控' } },
-        paragraph({ type: 'highlight', children: [text('重点')] }, text('：见 '), { type: 'eqref', label: 'eq:ffn' }, text(' 和 '), { type: 'citation', key: 'shazeer2020' }, text('，旁注'), { type: 'footnoteReference', identifier: 'gemm', label: 'gemm' }, text('。')),
-        paragraph(text('a ==b== \\eqref{x} [@key] a * b *c*')),
-        paragraph(text(':::fold')),
-        {
-          type: 'bakeBlock',
-          name: 'fold',
-          attributes: { title: '推导' },
-          children: [{ type: 'bakeBlock', name: 'aside', attributes: {}, children: [paragraph({ type: 'image', url: 'relu.svg', alt: 'A', title: 'cap', attributes: { width: '64px' } })] }],
-        },
-        { type: 'bakeBlock', name: 'list-table', attributes: {}, children: [list([list([paragraph(text('a'))], [paragraph(text('b'))])], [list([paragraph({ type: 'inlineMath', value: '|x|' })], [list([paragraph(text('c'))])])])] },
-        { type: 'verbatim', value: '[^gemm]: epilogue' },
-        { type: 'bakeBlock', name: 'references', attributes: {}, children: [list([paragraph({ type: 'citation', key: 'shazeer2020' }, text(' Shazeer.'))])] },
-        { type: 'math', value: 'y = x \\label{eq:ffn}' },
-      ],
-    };
-    const markdown = serializeMarkdown(tree);
-    assert.equal(
-      markdown,
-      [
-        '## Gates {#gates toc="门控"}',
-        '',
-        '==重点==：见 \\eqref{eq:ffn} 和 [@shazeer2020]，旁注[^gemm]。',
-        '',
-        'a \\=\\=b\\=\\= \\\\eqref{x} \\[@key] a * b \\*c\\*',
-        '',
-        '\\:::fold',
-        '',
-        '::::fold{title="推导"}',
-        ':::aside',
-        '![A](relu.svg "cap"){width=64px}',
-        ':::',
-        '::::',
-        '',
-        ':::list-table',
-        '* - a',
-        '  - b',
-        '* - $|x|$',
-        '  - - c',
-        ':::',
-        '',
-        '[^gemm]: epilogue',
-        '',
-        ':::references',
-        '- [@shazeer2020] Shazeer.',
-        ':::',
-        '',
-        '$$',
-        'y = x \\label{eq:ffn}',
-        '$$',
-        '',
-      ].join('\n'),
-    );
-    const { article, errors } = await parse(markdown, { folder: folder(`${exampleBlog}content/posts/syntax`) });
-    assert.deepEqual(errors, []);
-    assert.deepEqual(article.sections[0].blocks.map((block) => block.type), ['paragraph', 'paragraph', 'paragraph', 'fold', 'list-table', 'references', 'math']);
-    assert.equal(outline(article.sections[0].blocks[1].html), '<p>a ==b== \\eqref{x} [@key] a * b *c*</p>');
-    assert.equal(outline(article.sections[0].blocks[2].html), '<p>:::fold</p>');
-  });
-
-  test('escapes a paragraph that ends like a paragraph anchor and a heading that ends like attributes, so the text renders unchanged', async () => {
-    const tree = {
-      type: 'root',
-      children: [
-        { type: 'heading', depth: 2, children: [text('Title {x}')] },
-        paragraph(text('see note ^b')),
-        { type: 'heading', depth: 3, children: [text('Kept {y}')], attributes: { id: 'kept' } },
-        paragraph(text('a ^b c')),
-      ],
-    };
-    const markdown = serializeMarkdown(tree);
-    assert.equal(markdown, '## Title \\{x}\n\nsee note \\^b\n\n### Kept {y} {#kept}\n\na ^b c\n');
-    const { article, errors } = await parse(markdown);
-    assert.deepEqual(errors, []);
-    assert.equal(article.sections[0].title, 'Title {x}');
-    assert.deepEqual(
-      article.sections[0].blocks.map((block) => outline(block.html)),
-      ['<p>see note ^b</p>', '<h3 id="kept" data-attributes="{&#x22;id&#x22;:&#x22;kept&#x22;}">Kept {y}</h3>', '<p>a ^b c</p>'],
-    );
-  });
-
-  test('escapes every asterisk of a run next to text, also in strong text, next to an escaped character and in a table cell, so the text renders unchanged', async () => {
-    const cell = (value) => ({ type: 'tableCell', children: [text(value)] });
-    const tree = {
-      type: 'root',
-      children: [
-        paragraph(text('x**a**')),
-        paragraph(text('中**文**')),
-        paragraph(text('2**10')),
-        paragraph(text('x **a** y')),
-        paragraph(text(' **a** ')),
-        paragraph({ type: 'strong', children: [text('2**3 = 8')] }),
-        paragraph(text('a *`b`* and *[c]* d')),
-        { type: 'table', align: [null], children: [{ type: 'tableRow', children: [cell('h')] }, { type: 'tableRow', children: [cell('**a**')] }] },
-      ],
-    };
-    const { article, errors } = await parse(serializeMarkdown(tree));
-    assert.deepEqual(errors, []);
-    assert.deepEqual(
-      article.intro.map((block) => outline(block.html).replace(/<[^>]+>|\s/g, '')),
-      ['x**a**', '中**文**', '2**10', 'x**a**y', '**a**', '2**3=8', 'a*`b`*and*[c]*d', 'h**a**'],
-    );
-    assert.equal(article.intro.some((block) => /<em>/.test(block.html)), false);
-    assert.equal(article.intro.filter((block) => /<strong>/.test(block.html)).length, 1);
+  test('cannot write a value that holds both quote characters, which the attribute syntax cannot hold', () => {
+    assert.equal(writeAttribute('title', `say "it's"`), null);
   });
 });
 
