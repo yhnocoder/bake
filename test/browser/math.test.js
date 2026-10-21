@@ -1,13 +1,8 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { launchBrowser, serveExample, settle } from './browser.js';
+import { settle, test } from './browser.js';
 
-test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async (t) => {
-  const origin = await serveExample(t);
-
-  const browser = await launchBrowser();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`${origin}/2026-10/syntax/`);
+test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async ({ page, browser }) => {
+  await page.goto('/2026-10/syntax/');
   await page.evaluate(() => document.fonts.ready);
   const report = await page.evaluate(() => {
     const containers = [...document.querySelectorAll('mjx-container')];
@@ -65,8 +60,8 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   assert.deepEqual(card.missingGlyphs, []);
   assert.deepEqual(card.duplicateIds, []);
 
-  const phone = await browser.newPage({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
-  await phone.goto(`${origin}/2026-10/syntax/`);
+  const phone = await browser.newPage({ baseURL: page.url(), viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
+  await phone.goto('/2026-10/syntax/');
   const opened = [];
   for (const number of report.notesWithMath) {
     await phone.locator(`a[href="#sidenote-${number}"]`).first().tap();

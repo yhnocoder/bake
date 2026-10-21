@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { article, cli, createBlog, validConfig, writeFiles } from './blog.js';
 
 function bake(...args) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
+}
+
+function bakeIn(dir, ...args) {
+  return spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: 'utf8' });
 }
 
 describe('bake cli', () => {
@@ -99,6 +103,25 @@ describe('bake cli', () => {
     const result = bake();
     assert.equal(result.status, 1);
     assert.match(result.stderr, /^Usage: bake <command>/);
+  });
+
+  test('build prints the page count and exits 0, and prints every problem and the error count and exits 1 without writing dist/', (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article() });
+    const { status, stdout, stderr } = bakeIn(dir, 'build');
+    assert.deepEqual({ status, stdout, stderr }, { status: 0, stdout: '1 page\ndist/ written\n', stderr: '' });
+    rmSync(join(dir, 'dist'), { recursive: true });
+    writeFiles(dir, { 'content/posts/rope/index.md': article({ body: 'A [^missing] note and $\\frac{$.\n' }) });
+    const failed = bakeIn(dir, 'build');
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /^(content\/posts\/rope\/index\.md:\d+:\d+ .+\n){2}2 errors, dist\/ was not written\n$/);
+    assert.equal(existsSync(join(dir, 'dist')), false);
+  });
+
+  test('build rejects arguments', (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const result = bakeIn(dir, 'build', 'now');
+    assert.equal(result.stderr, 'bake build: unexpected argument "now"\n');
+    assert.equal(result.status, 1);
   });
 
   test('unknown command is named in the error', () => {

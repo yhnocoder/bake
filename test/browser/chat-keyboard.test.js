@@ -1,25 +1,22 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { serveExample, settle } from './browser.js';
-import { QUESTION, ask, openBrowser, openSettings, scrollPage, setUpKey, shadow, text } from './chat-page.js';
+import { settle } from './browser.js';
+import { QUESTION, ask, openSettings, scrollPage, setUpKey, shadow, test, text } from './chat-page.js';
 
-test('the keyboard and the pointer in the AI chat on published pages', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('a chat closed right after the key is saved leaves the keyboard focus on the pet', async (t) => {
-    const { page } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+test.describe('the keyboard and the pointer in the AI chat on published pages', () => {
+  test('a chat closed right after the key is saved leaves the keyboard focus on the pet', async ({ openChat }) => {
+    const { page } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await page.keyboard.press('Escape');
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
     assert.equal(await shadow(page, 'return root.activeElement?.className ?? null;'), 'bk-chat-launcher');
   });
 
-  await t.test('Escape with the chat settings open closes only the settings, a second Escape closes the chat, and the settings read the pet of the site once', async (t) => {
-    const { page } = await openBrowser(t, base);
+  test('Escape with the chat settings open closes only the settings, a second Escape closes the chat, and the settings read the pet of the site once', async ({ openChat }) => {
+    const { page } = await openChat();
     const petReads = [];
     page.on('request', (request) => request.url().endsWith('/_bake/pet/pet.json') && petReads.push(request.url()));
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await openSettings(page);
     await page.locator('.bk-chat-credit').waitFor();
@@ -36,10 +33,10 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
     await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
   });
 
-  await t.test('one Escape closes only the chat while the keyboard focus is in it, and only an overlay of the theme while the focus is on the page', async (t) => {
-    const { page } = await openBrowser(t, base);
+  test('one Escape closes only the chat while the keyboard focus is in it, and only an overlay of the theme while the focus is on the page', async ({ openChat }) => {
+    const { page } = await openChat();
     await page.addInitScript(() => localStorage.setItem('bk-toc', 'dots'));
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     const chatOpen = () => page.locator('.bk-chat').evaluate((chat) => chat.hasAttribute('data-open'));
     const focusQuestion = () => page.locator(QUESTION).focus();
@@ -79,12 +76,13 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
     assert.equal(await page.locator('.bk-toc-popover.is-on').count(), 1, 'Escape in the chat closes the chapter card');
   });
 
-  await t.test('an Escape that ends the composition of an input method closes neither the chat nor an overlay of the theme', async (t) => {
-    const { page, context } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('an Escape that ends the composition of an input method closes neither the chat nor an overlay of the theme', async ({ openChat }) => {
+    const { page, context } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     const link = page.locator('.bk-article a.internal-link').first();
     await link.scrollIntoViewIfNeeded();
+    await settle(page);
     await link.hover();
     await page.locator('.bk-preview.is-on').waitFor();
     await page.locator(QUESTION).focus();
@@ -96,9 +94,9 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
     assert.equal(await page.locator('.bk-preview.is-on').count(), 1, 'Escape during a composition closes the preview card');
   });
 
-  await t.test('an Enter that confirms a candidate of an input method in Safari, with keyCode 229 after the composition ended, neither picks a scope nor sends the question', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('an Enter that confirms a candidate of an input method in Safari, with keyCode 229 after the composition ended, neither picks a scope nor sends the question', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     const input = page.locator(QUESTION);
     await input.pressSequentially('@');
@@ -111,13 +109,13 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
     assert.equal(api.requests.length, requests, 'the Enter sent the question');
   });
 
-  await t.test('a click where the bubbles were reaches the page while a closed chat fades out, at 1440 and 375 pixels', async (t) => {
+  test('a click where the bubbles were reaches the page while a closed chat fades out, at 1440 and 375 pixels', async ({ openChat }) => {
     for (const [width, height] of [
       [1440, 900],
       [375, 812],
     ]) {
-      const { page, api } = await openBrowser(t, base, { contextOptions: { viewport: { width, height } } });
-      await page.goto(`${base}/2026-10/syntax/`);
+      const { page, api } = await openChat({ contextOptions: { viewport: { width, height } } });
+      await page.goto('/2026-10/syntax/');
       await setUpKey(page);
       for (let round = 0; round < 3; round += 1) {
         api.answers.push({ body: text(`第 ${round + 1} 个回答。`) });
@@ -136,11 +134,11 @@ test('the keyboard and the pointer in the AI chat on published pages', async (t)
     }
   });
 
-  await t.test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides on a phone while the reader scrolls down fades out before it leaves the keyboard order', async (t) => {
-    const { context, page } = await openBrowser(t, base);
+  test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides on a phone while the reader scrolls down fades out before it leaves the keyboard order', async ({ openChat }) => {
+    const { context, page } = await openChat();
     const cdp = await context.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     const launcher = page.locator('.bk-chat-launcher');
     const focused = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'), null, { timeout: 2000 });
     for (let round = 0; round < 6; round += 1) {

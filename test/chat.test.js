@@ -12,7 +12,7 @@ import { HISTORY_CHARACTERS, HISTORY_LIMIT, NOTE_VERSION_LIMIT, addNoteVersion, 
 import { checkNote, citedEntries, exportMarkdown, noteFileName, noteHtml, notePrompt, noteRules, noteTitle } from '../src/chat/note.js';
 import { linkTarget, replyHtml } from '../src/chat/reply.js';
 import { openKey, sealKey } from '../src/chat/vault.js';
-import { article, bake, createBlog, readTree, validConfig } from './blog.js';
+import { article, build, createBlog, readTree, validConfig } from './blog.js';
 
 const root = 'https://example.com/blog/';
 
@@ -37,7 +37,7 @@ function fakeFetch(...responses) {
 }
 
 describe('AI chat build output', () => {
-  test('writes the catalog of published articles and the Markdown source of every article', (t) => {
+  test('writes the catalog of published articles and the Markdown source of every article', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', description: 'Notes.', categories: [{ id: 'ml', name: 'ML', color: '#2a78d6' }] };\n",
       'content/posts/rope/index.md': article({
@@ -50,8 +50,7 @@ describe('AI chat build output', () => {
       'content/posts/demo/demo.html': '<p>demo</p>\n',
       'content/posts/draft/index.md': article({ title: 'Draft', slug: 'draft', extra: 'category: ml\ndraft: true\n' }),
     });
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
+    assert.deepEqual(await build(dir), []);
     const tree = readTree(join(dir, 'dist'));
     assert.deepEqual(JSON.parse(tree['_bake/articles.json'].toString()), {
       title: 'Test Blog',
@@ -85,21 +84,21 @@ describe('AI chat build output', () => {
     assert.equal(tree['2026-09/demo/index.html'].toString(), '<p>demo</p>\n');
   });
 
-  test('writes the preamble for the chat', (t) => {
+  test('writes the preamble for the chat', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'preamble.sty': '\\newcommand{\\R}{\\mathbb{R}}\n', 'content/posts/rope/index.md': article({ body: 'In $\\R$.\n' }) });
-    assert.equal(bake(dir, 'build').stderr, '');
+    assert.deepEqual(await build(dir), []);
     assert.deepEqual(JSON.parse(readFileSync(join(dir, 'dist/_bake/preamble.json'), 'utf8')), ['\\newcommand{\\R}{\\mathbb{R}}']);
   });
 
-  test('writes an empty catalog for a blog without articles', (t) => {
+  test('writes an empty catalog for a blog without articles', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
-    assert.equal(bake(dir, 'build').status, 0);
+    assert.deepEqual(await build(dir), []);
     assert.deepEqual(JSON.parse(readFileSync(join(dir, 'dist/_bake/articles.json'), 'utf8')), { title: 'Test Blog', language: 'en', articles: [] });
   });
 });
 
 describe('AI chat replies', () => {
-  test('renders Markdown with formulas as placeholders that keep their TeX', () => {
+  test('renders Markdown with formulas as placeholders that keep their TeX', async () => {
     const html = replyHtml('The **norm** is $\\|x\\|$.\n\n$$\na^2 + b^2\n$$\n', { root });
     assert.equal(
       html,
@@ -107,13 +106,13 @@ describe('AI chat replies', () => {
     );
   });
 
-  test('keeps a | inside a formula in its table cell', () => {
+  test('keeps a | inside a formula in its table cell', async () => {
     const html = replyHtml('| a | b |\n| - | - |\n| $|x|$ | $\\{x \\mid x > 0\\}$ |\n', { root });
     assert.match(html, /<td><span class="bk-chat-math" data-tex="\|x\|">\|x\|<\/span><\/td>/);
     assert.match(html, /data-tex="\\\{x \\mid x > 0\\\}"/);
   });
 
-  test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', () => {
+  test('reads \\( \\) and \\[ \\] delimiters as formulas outside code, also across lines and next to escaped backslashes', async () => {
     const math = (tex, display = false) => `<${display ? 'div' : 'span'} class="bk-chat-math" data-tex="${tex}"${display ? ' data-display="true"' : ''}>${tex}</${display ? 'div' : 'span'}>`;
     assert.equal(replyHtml('Inline \\(x^2\\) and `\\(code\\)`.', { root }), `<p>Inline ${math('x^2')} and <code>\\(code\\)</code>.</p>`);
     assert.equal(replyHtml('\\[ \\sum_i x_i \\]', { root }), math('\\sum_i x_i', true));
@@ -125,7 +124,7 @@ describe('AI chat replies', () => {
     assert.equal(replyHtml('Blank \\( \\) and \\[\n\\] stay text.', { root }), '<p>Blank ( ) and [\n] stay text.</p>');
   });
 
-  test('resolves links against the site root, opens external links in a new tab and drops unsafe ones', () => {
+  test('resolves links against the site root, opens external links in a new tab and drops unsafe ones', async () => {
     assert.deepEqual(linkTarget('#angles', root), { href: '#angles', external: false });
     assert.deepEqual(linkTarget('#angles', root, '/2026-10/rope/'), { href: 'https://example.com/blog/2026-10/rope/#angles', external: false });
     assert.equal(linkTarget('#x', root, 'javascript:alert(1)//'), null);
@@ -253,7 +252,7 @@ describe('AI chat context', () => {
 
   const page = { address: '/2026-10/rope/', title: 'Rope', article: { source: '# Source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }, { id: 'pairs', depth: 3, title: 'Pairs' }] } };
 
-  test('lists every article with its address and sections in the prompt for the whole blog', () => {
+  test('lists every article with its address and sections in the prompt for the whole blog', async () => {
     const prompt = systemPrompt({ page: { address: '/', title: 'Test Blog', article: null }, catalog });
     assert.ok(prompt.startsWith(`${CHAT_RULES}\nThe blog is "Test Blog" (Notes.). The reader is on the page /.\n`));
     assert.ok(prompt.includes('{"address":"/2026-10/rope/","title":"Rope","date":"2026-10-19","summary":"Rotary.","sections":["#angles 01 Angles | #pairs Pairs"]}'));
@@ -261,14 +260,14 @@ describe('AI chat context', () => {
     assert.ok(!prompt.includes('<article'));
   });
 
-  test('puts the source and the headings of the article and then the other articles in the prompt on an article page', () => {
+  test('puts the source and the headings of the article and then the other articles in the prompt on an article page', async () => {
     const prompt = systemPrompt({ page, catalog });
     assert.ok(prompt.startsWith(`${CHAT_RULES}\nThe blog is "Test Blog" (Notes.). The reader is reading the article "Rope" at /2026-10/rope/.\n`));
     assert.match(prompt, /\n- #angles Angles\n {2}- #pairs Pairs\n<article>\n# Source\n<\/article>\n/);
     assert.ok(prompt.indexOf('</article>') < prompt.indexOf('{"address":"/2026-09/demo/"'));
   });
 
-  test('offers articles, months, categories and tags as scopes and filters them by the typed text', () => {
+  test('offers articles, months, categories and tags as scopes and filters them by the typed text', async () => {
     const options = scopeOptions({ ...catalog, articles: [...catalog.articles, { url: '2026-10/gelu/', title: 'GELU', date: '2026-10-02', category: 'ML', tags: ['html', 'act'], sections: [] }] }, chatLabels('zh-CN'));
     assert.deepEqual(
       options.map(({ kind, id, label, meta, urls }) => [kind, id, label, meta, urls.join(' ')]),
@@ -293,7 +292,7 @@ describe('AI chat context', () => {
     );
   });
 
-  test('limits the prompt to the chosen scopes, with the sources of chosen articles and the list of articles in chosen months and topics', () => {
+  test('limits the prompt to the chosen scopes, with the sources of chosen articles and the list of articles in chosen months and topics', async () => {
     const options = scopeOptions(catalog, chatLabels('en'));
     const scopes = ['article:2026-10/rope/', 'month:2026-09'].map((id) => options.find((option) => option.id === id));
     const prompt = systemPrompt({ page, catalog, scopes, sources: [{ url: '2026-10/rope/', title: 'Rope', content: '# Rope source' }] });
@@ -330,7 +329,7 @@ describe('AI chat notes', () => {
   const labels = chatLabels('zh');
   const round = (content, extra = {}) => ({ ask: { content: 'Q', scopes: [], bubble: { text: 'Q', quote: null, scopes: [] } }, content, reasoning: '', reads: [], ...extra });
 
-  test('keeps the links to articles and sections of the blog, turns the others into text and counts the cited articles', () => {
+  test('keeps the links to articles and sections of the blog, turns the others into text and counts the cited articles', async () => {
     const markdown = [
       '# Rope',
       '',
@@ -353,7 +352,7 @@ describe('AI chat notes', () => {
     assert.equal(checkNote('- [here](#pairs)', { root, catalog }).markdown, '- here');
   });
 
-  test('exports Markdown with absolute links and the line that names the conversation under the title', () => {
+  test('exports Markdown with absolute links and the line that names the conversation under the title', async () => {
     const note = '# Rope\n\n- One [Rope §01](/2026-10/rope/#angles) and [web](https://example.org/x).';
     assert.equal(
       exportMarkdown(note, { root, intro: labels.noteFrom('2026-10-20', { title: 'Rope', href: 'https://example.com/blog/2026-10/rope/' }) }),
@@ -366,14 +365,14 @@ describe('AI chat notes', () => {
     assert.equal(noteFileName(' / '), 'note.md');
   });
 
-  test('renders the title, the sections, the intro lines and the source line of a quote', () => {
+  test('renders the title, the sections, the intro lines and the source line of a quote', async () => {
     const html = noteHtml('# Rope\n\n## Angles\n\n- One.\n\n> Quoted.\n>\n> 出自[Rope §01](/2026-10/rope/#angles)', { root, citedFrom: '出自', intro: [labels.noteFrom('2026-10-20', { title: 'Rope', href: '/2026-10/rope/' }), labels.noteRequest('短一点')] });
     assert.match(html, /^<h4>Rope<\/h4>\n<p class="bk-chat-note-intro">整理自 2026-10-20 在<a href="https:\/\/example\.com\/blog\/2026-10\/rope\/">《Rope》<\/a>的对话。<\/p>\n<p class="bk-chat-note-intro">按要求重新整理：短一点<\/p>\n<h5>Angles<\/h5>/);
     assert.match(noteHtml('# T\n\n\\[a^2\\]', { root, citedFrom: '出自', intro: [] }), /^<h4>T<\/h4>\n<div class="bk-chat-math" data-tex="a\^2" data-display="true">/);
     assert.match(html, /<blockquote>\n<p>Quoted\.<\/p>\n<cite>出自<a href="https:\/\/example\.com\/blog\/2026-10\/rope\/#angles">Rope §01<\/a><\/cite>\n<\/blockquote>/);
   });
 
-  test('collects the articles that the conversation read, linked or chose, without the article of the page', () => {
+  test('collects the articles that the conversation read, linked or chose, without the article of the page', async () => {
     const rounds = [
       round('See [Rope](/2026-10/rope/) and [Demo](/2026-09/demo/#x).', { reads: [{ label: 'GELU', url: '2026-08/gelu/', failed: false }, { label: 'Lost', url: '2026-07/lost/', failed: true }] }),
       round('Again [Demo](/2026-09/demo/).', { ask: { content: 'Q', scopes: [{ kind: 'article', urls: ['2026-10/rope/'] }], bubble: {} } }),
@@ -388,7 +387,7 @@ describe('AI chat notes', () => {
     );
   });
 
-  test('asks for a note from the conversation and the articles, and for a rewrite of the previous note with the request of the reader', () => {
+  test('asks for a note from the conversation and the articles, and for a rewrite of the previous note with the request of the reader', async () => {
     const own = { entry: catalog.articles[0], source: '# Rope source' };
     const sources = [{ entry: catalog.articles[2], source: '# GELU source' }];
     const [system, user] = notePrompt({ catalog, own, sources, rounds: [round('A.')], labels, instructions: 'Be brief.' });
@@ -403,7 +402,7 @@ describe('AI chat notes', () => {
     assert.ok(rewrite.content.endsWith('</conversation>\n<note>\n# Old\n</note>\nRewrite this note as the reader asks: 写短一点\nKeep what the request does not ask to change.'));
   });
 
-  test('replaces the built-in rules of the chat and the note with the rules of the reader and keeps the context after them', () => {
+  test('replaces the built-in rules of the chat and the note with the rules of the reader and keeps the context after them', async () => {
     const page = { address: '/2026-10/rope/', title: 'Rope', article: { source: '# Source', outline: [] } };
     const prompt = systemPrompt({ page, catalog, rules: 'Answer in one sentence.' });
     assert.ok(prompt.startsWith('Answer in one sentence.\nThe blog is "Test Blog". The reader is reading the article "Rope" at /2026-10/rope/.\n'));
@@ -415,7 +414,7 @@ describe('AI chat notes', () => {
     assert.ok(system.content.includes('<article address="/2026-10/rope/" title="Rope">\n# Rope source\n</article>'));
   });
 
-  test('adds the instructions of the reader to the chat prompt and links into the article of a conversation continued on another page', () => {
+  test('adds the instructions of the reader to the chat prompt and links into the article of a conversation continued on another page', async () => {
     const page = { address: '/', title: 'Test Blog', article: { source: '# Rope source', outline: [{ id: 'angles', depth: 2, title: 'Angles' }], address: '/2026-10/rope/' } };
     const prompt = systemPrompt({ page: { ...page, title: 'Rope' }, catalog, instructions: 'Be brief.' });
     assert.match(prompt, /The reader is on the page \/ and continues a conversation about the article "Rope" at \/2026-10\/rope\/\./);
@@ -441,7 +440,7 @@ describe('AI chat history', () => {
   }
   const conversation = (id, address = '/2026-10/rope/') => ({ id, article: address === null ? null : { address, title: address }, date: '2026-10-20', rounds: [{ ask: { content: id, scopes: [], bubble: { text: id, quote: null, scopes: [] } }, content: 'A', reasoning: '', reads: [] }], note: null });
 
-  test('keeps the newest conversations of each site, at most 50, and drops the oldest when the storage is full', () => {
+  test('keeps the newest conversations of each site, at most 50, and drops the oldest when the storage is full', async () => {
     const storage = new Storage();
     assert.equal(historyKey(root), 'bk-chat-history:/blog/');
     for (let index = 0; index < HISTORY_LIMIT + 2; index += 1) saveConversation(root, conversation(`c${index}`), { storage });
@@ -464,7 +463,7 @@ describe('AI chat history', () => {
     assert.deepEqual(readHistory(root, { storage: small }), []);
   });
 
-  test('keeps at most one million characters and skips entries that do not have the shape of a conversation', () => {
+  test('keeps at most one million characters and skips entries that do not have the shape of a conversation', async () => {
     const storage = new Storage();
     const long = (id) => ({ ...conversation(id), rounds: [{ ...conversation(id).rounds[0], content: 'x'.repeat(300_000) }] });
     for (const id of ['a', 'b', 'c', 'd']) saveConversation(root, long(id), { storage });
@@ -495,21 +494,21 @@ describe('AI chat history', () => {
     );
   });
 
-  test('keeps the ten newest versions of a note and shows the newest', () => {
+  test('keeps the ten newest versions of a note and shows the newest', async () => {
     let note = null;
     for (let index = 0; index < NOTE_VERSION_LIMIT + 3; index += 1) note = addNoteVersion(note, { markdown: `# ${index}` });
     assert.equal(note.versions.length, 10);
     assert.deepEqual([note.versions[0].markdown, note.versions.at(-1).markdown, note.index], ['# 3', '# 12', 9]);
   });
 
-  test('gives an article page the address of its folder, also when it is opened as index.html', () => {
+  test('gives an article page the address of its folder, also when it is opened as index.html', async () => {
     assert.equal(pageAddress(root, '/blog/2026-10/rope/'), '/2026-10/rope/');
     assert.equal(pageAddress(root, '/blog/2026-10/rope/index.html'), '/2026-10/rope/');
     assert.equal(pageAddress(root, '/blog/'), '/');
     assert.equal(pageAddress(root, '/blog/index.html'), '/');
   });
 
-  test('lists the conversations of one article on its page and groups every conversation by article on the homepage', () => {
+  test('lists the conversations of one article on its page and groups every conversation by article on the homepage', async () => {
     const list = [conversation('a'), conversation('b', null), conversation('c', '/2026-09/demo/'), conversation('d')];
     assert.deepEqual(
       historyGroups(list, { address: '/2026-10/rope/', home: false }).map((group) => group.items.map((item) => item.id)),
@@ -526,7 +525,7 @@ describe('AI chat history', () => {
     );
   });
 
-  test('stores a finished reply as a round without the tool results and turns it back into a question and a reply', () => {
+  test('stores a finished reply as a round without the tool results and turns it back into a question and a reply', async () => {
     const ask = { content: 'Q', scopes: [], bubble: { text: 'Q', quote: null, scopes: [] } };
     const message = { role: 'assistant', content: 'A', reasoning: 'R', reads: [{ name: 'read_article', label: 'Rope', url: '2026-10/rope/', failed: false, done: true }], ask, sent: [{ role: 'assistant', tool_calls: [] }, { role: 'tool', content: 'long source' }, { role: 'assistant', content: 'A' }] };
     const stored = storedRound(message);

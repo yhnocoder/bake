@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { bake, createBlog, validConfig } from './blog.js';
+import { build, createBlog, validConfig } from './blog.js';
 
 const categoriesConfig = validConfig.replace("language: 'en'", "language: 'en', categories: [{ id: 'ml', name: 'ML', color: '#2a78d6' }]");
 
@@ -9,10 +9,8 @@ function withField(line, slug) {
   return `---\n${[line, ...required].join('\n')}\n---\n\nText.\n`;
 }
 
-function problems(t, files) {
-  const result = bake(createBlog(t, files), 'build');
-  assert.equal(result.status, 1);
-  return result.stderr.trimEnd().split('\n').slice(0, -1);
+async function problems(t, files) {
+  return build(createBlog(t, files));
 }
 
 function articles(sources) {
@@ -20,7 +18,7 @@ function articles(sources) {
 }
 
 describe('front matter', () => {
-  test('reports each problem of a front matter field at its value', (t) => {
+  test('reports each problem of a front matter field at its value', async (t) => {
     const cases = [
       ['title: @""', 'title must be a non-empty string, got ""'],
       ['title: @3', 'title must be a non-empty string, got 3'],
@@ -49,7 +47,7 @@ describe('front matter', () => {
       ['page: @demo.html', 'page file "demo.html" does not exist'],
       ['@layout: wide', 'unknown front matter field "layout"'],
     ];
-    const lines = problems(t, {
+    const lines = await problems(t, {
       'bake.config.js': validConfig,
       'themes/mine/page.jsx': 'export default function Page() {\n  return <html />;\n}\n',
       'themes/mine/client.jsx': 'export default () => () => {};\n',
@@ -61,8 +59,8 @@ describe('front matter', () => {
     );
   });
 
-  test('reports a file without front matter or a closing line, a repeated field, a list, missing fields and a body next to "page"', (t) => {
-    const lines = problems(t, {
+  test('reports a file without front matter or a closing line, a repeated field, a list, missing fields and a body next to "page"', async (t) => {
+    const lines = await problems(t, {
       'bake.config.js': validConfig,
       ...articles({
         heading: 'Rope\n',
@@ -87,9 +85,9 @@ describe('front matter', () => {
     ]);
   });
 
-  test('accepts every field and requires a category from bake.config.js when it defines categories', (t) => {
+  test('accepts every field and requires a category from bake.config.js when it defines categories', async (t) => {
     const every = '---\ntitle: Rope\nslug: rope\ndate: 2026-10-19\nsummary: Rotary embeddings.\ntags: [LLM, attention]\ncategory: ml\npreview: ./preview.js\ncover: images/cover.svg\ntheme: bento\ncolumns: 4\ndraft: false\n---\n\nText.\n';
-    const lines = problems(t, {
+    const lines = await problems(t, {
       'bake.config.js': categoriesConfig,
       ...articles({ every, missing: withField('summary: x', 'missing'), other: withField('category: x', 'other'), bento: withField('category: ml\ntheme: bento\ntoc: dots', 'bento') }),
       'content/posts/every/preview.js': 'export default () => ({ start() {}, stop() {} });\n',

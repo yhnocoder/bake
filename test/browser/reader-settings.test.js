@@ -2,9 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { test } from 'node:test';
-import { article, bake, createBlog, decodeImage } from '../blog.js';
-import { launchBrowser, serve, settle } from './browser.js';
+import { article, decodeImage } from '../blog.js';
+import { settle, test } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
 const motionBox = `export const layout = { height: 80 };
@@ -84,15 +83,12 @@ async function darkPixels(png) {
   return count;
 }
 
-test('reader settings', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': config, 'content/posts/gate/index.md': article({ title: '门控激活函数', slug: 'gate', body }), 'components/motion-box.js': motionBox });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  const url = `${await serve(t, join(dir, 'dist'))}/2026-10/gate/`;
-  const browser = await launchBrowser();
+test.describe('reader settings', () => {
+  test.use({ blog: { example: false, files: { 'bake.config.js': config, 'content/posts/gate/index.md': article({ title: '门控激活函数', slug: 'gate', body }), 'components/motion-box.js': motionBox } } });
+  const url = '/2026-10/gate/';
 
-  await t.test('the panel opens from the settings button and closes on Escape and on a click outside', async () => {
-    const page = await browser.newPage();
+  test('the panel opens from the settings button and closes on Escape and on a click outside', async ({ newPage }) => {
+    const page = await newPage();
     await page.goto(url);
     const panel = page.locator('.bk-settings-panel');
     assert.equal(await panel.isVisible(), false);
@@ -125,8 +121,8 @@ test('reader settings', async (t) => {
     await page.close();
   });
 
-  await t.test('the home link and the settings button stack as two round buttons from 1000 pixels up and in a tab on the left edge of a phone, labelled without visible text, and the settings button takes the accent colour on hover', async () => {
-    const page = await browser.newPage();
+  test('the home link and the settings button stack as two round buttons from 1000 pixels up and in a tab on the left edge of a phone, labelled without visible text, and the settings button takes the accent colour on hover', async ({ newPage }) => {
+    const page = await newPage();
     const read = () =>
       page.evaluate(() => {
         const button = document.querySelector('.bk-settings-toggle');
@@ -159,8 +155,8 @@ test('reader settings', async (t) => {
     await page.close();
   });
 
-  await t.test('theme and font change the page at once, survive a reload and are applied before the page script runs', async () => {
-    const context = await browser.newContext();
+  test('theme and font change the page at once, survive a reload and are applied before the page script runs', async ({ newContext }) => {
+    const context = await newContext();
     const page = await context.newPage();
     await page.goto(url);
     const initial = await readSettledPage(page);
@@ -198,8 +194,8 @@ test('reader settings', async (t) => {
   });
 
 
-  await t.test('text size, weight and spacing change the article text with a fade, survive a reload and leave components alone', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+  test('text size, weight and spacing change the article text with a fade, survive a reload and leave components alone', async ({ newContext }) => {
+    const context = await newContext({ viewport: { width: 1440, height: 800 } });
     const page = await context.newPage();
     await page.goto(url);
     const read = () =>
@@ -253,8 +249,8 @@ test('reader settings', async (t) => {
     await context.close();
   });
 
-  await t.test('each weight step changes the ink of Chinese body text when the sans stack finds a CJK font with light, regular and medium faces', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+  test('each weight step changes the ink of Chinese body text when the sans stack finds a CJK font with light, regular and medium faces', async ({ newContext }) => {
+    const context = await newContext({ viewport: { width: 1440, height: 800 } });
     await context.route('**/__cjk-font/*', (route) => route.fulfill({ path: join(wenkaiFolder, 'files', new URL(route.request().url()).pathname.split('/').pop()), contentType: 'font/woff2' }));
     const page = await context.newPage();
     const fontCss = cjkFontWithThreeWeights();
@@ -283,8 +279,8 @@ test('reader settings', async (t) => {
     await context.close();
   });
 
-  await t.test('the settings panel with every row stays inside a short phone screen', async () => {
-    const context = await browser.newContext({ viewport: { width: 375, height: 450 }, hasTouch: true, isMobile: true });
+  test('the settings panel with every row stays inside a short phone screen', async ({ newContext }) => {
+    const context = await newContext({ viewport: { width: 375, height: 450 }, hasTouch: true, isMobile: true });
     const page = await context.newPage();
     await page.goto(url);
     await page.getByRole('button', { name: '设置' }).click();
@@ -300,10 +296,10 @@ test('reader settings', async (t) => {
     await context.close();
   });
 
-  await t.test('the shadows of the settings button, the chosen option and the switch follow dark mode', async () => {
+  test('the shadows of the settings button, the chosen option and the switch follow dark mode', async ({ newPage, after }) => {
     const shadows = {};
     for (const colorScheme of ['light', 'dark']) {
-      const page = await browser.newPage({ colorScheme });
+      const page = await newPage({ colorScheme });
       await page.goto(url);
       shadows[colorScheme] = await page.evaluate(() => [
         getComputedStyle(document.querySelector('.bk-settings-toggle')).boxShadow,
@@ -316,8 +312,8 @@ test('reader settings', async (t) => {
     assert.deepEqual(shared, [['button', []], ['option', []], ['switch', []]]);
   });
 
-  await t.test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async () => {
-    const context = await browser.newContext({ reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
+  test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async ({ newContext }) => {
+    const context = await newContext({ reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await context.newPage();
     await page.goto(url);
     await page.locator('motion-box span').waitFor();
@@ -349,5 +345,4 @@ test('reader settings', async (t) => {
     );
     await context.close();
   });
-
 });

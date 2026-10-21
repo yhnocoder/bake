@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { test } from 'node:test';
 import sharp from 'sharp';
-import { serveExample, settle } from './browser.js';
-import { API_KEY, CORS, KEY, PETS, QUESTION, ask, backdropRoots, openBrowser, openSettings, petEntry, petSeen, scrollPage, setUpKey, shadow, text, watchPet } from './chat-page.js';
+import { settle } from './browser.js';
+import { API_KEY, CORS, KEY, PETS, QUESTION, ask, backdropRoots, openSettings, petEntry, petSeen, scrollPage, setUpKey, shadow, test, text, watchPet } from './chat-page.js';
 
 async function petNow(page, state) {
   await page.waitForFunction((entry) => JSON.stringify(window.bakeTest.pet.at(-1)) === JSON.stringify(entry), petEntry(state));
@@ -28,17 +27,15 @@ function petSheet(width, height, format = 'webp') {
     .toBuffer();
 }
 
-test('the pet of the AI chat on published pages', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('the pet shows its first frame until the pointer or the keyboard reaches it, waves once, and the chat opens and closes from it', async (t) => {
-    const { page } = await openBrowser(t, base);
+test.describe('the pet of the AI chat on published pages', () => {
+  test('the pet shows its first frame until the pointer or the keyboard reaches it, waves once, and the chat opens and closes from it', async ({ openChat }) => {
+    const { page } = await openChat();
     const pets = [];
     page.on('request', (request) => {
       const { pathname } = new URL(request.url());
       if (pathname.startsWith('/_bake/pet/')) pets.push(pathname);
     });
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await page.waitForLoadState('networkidle');
     assert.deepEqual(pets, ['/_bake/pet/frame.webp']);
     const launcher = page.locator('.bk-chat-launcher');
@@ -94,9 +91,9 @@ test('the pet of the AI chat on published pages', async (t) => {
     await closed();
   });
 
-  await t.test('the pet waits while the key is saved, runs while an answer streams, jumps when it is done and holds the failed pose after an error', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('the pet waits while the key is saved, runs while an answer streams, jumps when it is done and holds the failed pose after an error', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await watchPet(page);
     await setUpKey(page);
     await petSeen(page, 'unlocking');
@@ -125,9 +122,9 @@ test('the pet of the AI chat on published pages', async (t) => {
     assert.equal(await sheetTransform(page), 'matrix(1, 0, 0, 1, -504, 0)');
   });
 
-  await t.test('with reduced motion the pet shows the first frame of every state', async (t) => {
-    const { page, api } = await openBrowser(t, base, { contextOptions: { reducedMotion: 'reduce' } });
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('with reduced motion the pet shows the first frame of every state', async ({ openChat }) => {
+    const { page, api } = await openChat({ contextOptions: { reducedMotion: 'reduce' } });
+    await page.goto('/2026-10/syntax/');
     await watchPet(page);
     await page.locator('.bk-chat-launcher').hover();
     await petSeen(page, 'greet', { reduced: true });
@@ -146,11 +143,9 @@ test('the pet of the AI chat on published pages', async (t) => {
   });
 });
 
-test('the pets and the colours of the AI chat on published pages', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('a reader chooses a pet by the link of its pet.json, and a pet.json or a sheet that is too large or a sheet with the wrong size leaves the pet unchanged', async (t) => {
-    const { page, api } = await openBrowser(t, base);
+test.describe('the pets and the colours of the AI chat on published pages', () => {
+  test('a reader chooses a pet by the link of its pet.json, and a pet.json or a sheet that is too large or a sheet with the wrong size leaves the pet unchanged', async ({ site, openChat }) => {
+    const { page, api } = await openChat();
     api.pets['/bun/pet.json'] = JSON.stringify({ id: 'bun', displayName: '<b>Bun</b>', spritesheetPath: 'art/sheet.webp', script: 'alert(1)' });
     api.pets['/bun/art/sheet.webp'] = await petSheet(1536, 1872);
     api.pets['/big/pet.json'] = JSON.stringify({ displayName: 'Big', spritesheetPath: 'sheet.png' });
@@ -160,15 +155,15 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     api.pets['/text/pet.json'] = JSON.stringify({ displayName: 'Text', spritesheetPath: 'sheet.png' });
     api.pets['/text/sheet.png'] = '<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1872"/>';
     api.pets['/huge/pet.json'] = JSON.stringify({ displayName: 'Huge', spritesheetPath: 'sheet.png', padding: ' '.repeat(64 * 1024) });
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     const frame = () => shadow(page, "return root.querySelector('.bk-chat-launcher .bk-chat-pet-frame').src;");
     const siteFrame = await frame();
-    assert.equal(siteFrame, `${base}/_bake/pet/frame.webp`);
+    assert.equal(siteFrame, `${site.origin}/_bake/pet/frame.webp`);
     await openSettings(page);
     assert.equal(await shadow(page, "return root.querySelectorAll('form form').length;"), 0);
     const credit = page.locator('.bk-chat-credit a');
     assert.equal(await credit.textContent(), 'CRT Monitor，作者 wxy，CC BY 4.0，已裁成 9 行并转成有损 WebP');
-    assert.equal(await credit.getAttribute('href'), `${base}/_bake/pet/LICENSE.txt`);
+    assert.equal(await credit.getAttribute('href'), `${site.origin}/_bake/pet/LICENSE.txt`);
     const status = page.locator('.bk-chat-pet-status');
     const choose = async (path, key = false) => {
       const field = page.locator('.bk-chat-pet-form input[name="pet"]');
@@ -230,8 +225,8 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     assert.equal(await frame(), siteFrame);
   });
 
-  await t.test('a reader pet link that redirects resolves its spritesheetPath against the new address, and a link that does not answer within 30 seconds leaves the pet unchanged', async (t) => {
-    const { page, api } = await openBrowser(t, base);
+  test('a reader pet link that redirects resolves its spritesheetPath against the new address, and a link that does not answer within 30 seconds leaves the pet unchanged', async ({ openChat }) => {
+    const { page, api } = await openChat();
     const sheet = await petSheet(1536, 1872);
     const requested = [];
     const server = createServer((request, response) => {
@@ -242,10 +237,10 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
       else response.writeHead(404, CORS).end();
     });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-    t.after(() => server.close());
+    server.unref();
     api.pets['/slow/pet.json'] = { hang: true };
     await page.clock.install();
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await openSettings(page);
     const field = page.locator('.bk-chat-pet-form input[name="pet"]');
     const status = page.locator('.bk-chat-pet-status');
@@ -263,13 +258,14 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     await settled();
     assert.equal(await status.textContent(), '已换成 Bun。');
     assert.deepEqual(requested, ['/old/pet.json', '/new/pet.json', '/new/sheet.webp']);
+    server.close();
   });
 
   for (const reducedMotion of ['no-preference', 'reduce']) {
     const moves = reducedMotion === 'reduce' ? 'fades where it is' : 'slides out';
-    await t.test(`on a phone the pet ${moves} with the essay buttons while the reader scrolls down and while the drawer is open`, async (t) => {
-      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, hasTouch: true, reducedMotion } });
-      await page.goto(`${base}/2026-10/syntax/`);
+    test(`on a phone the pet ${moves} with the essay buttons while the reader scrolls down and while the drawer is open`, async ({ openChat }) => {
+      const { page } = await openChat({ contextOptions: { viewport: { width: 375, height: 700 }, hasTouch: true, reducedMotion } });
+      await page.goto('/2026-10/syntax/');
       const launcher = page.locator('.bk-chat-launcher');
       await launcher.waitFor();
       const placement = (state) =>
@@ -299,9 +295,9 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     });
   }
 
-  await t.test('the pet and the bubbles use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async (t) => {
-    const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 700 }, reducedMotion: 'reduce' } });
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('the pet and the bubbles use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async ({ openChat }) => {
+    const { page } = await openChat({ contextOptions: { viewport: { width: 375, height: 700 }, reducedMotion: 'reduce' } });
+    await page.goto('/2026-10/syntax/');
     const launcher = page.locator('.bk-chat-launcher');
     assert.equal(await launcher.evaluate((element) => getComputedStyle(element).cursor), 'pointer');
     await launcher.click();
@@ -336,11 +332,11 @@ test('the pets and the colours of the AI chat on published pages', async (t) => 
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
   });
 
-  await t.test('the launcher and the chat take the colours and the color scheme that the page shows, from the system or from the theme setting', async (t) => {
+  test('the launcher and the chat take the colours and the color scheme that the page shows, from the system or from the theme setting', async ({ openChat }) => {
     for (const [colorScheme, theme] of [['dark', 'system'], ['light', 'dark'], ['dark', 'light']]) {
-      const { context, page } = await openBrowser(t, base, { contextOptions: { colorScheme, reducedMotion: 'reduce' } });
+      const { context, page } = await openChat({ contextOptions: { colorScheme, reducedMotion: 'reduce' } });
       await context.addInitScript((value) => localStorage.setItem('bk-theme', value), theme);
-      await page.goto(`${base}/2026-10/syntax/`);
+      await page.goto('/2026-10/syntax/');
       const launcher = page.locator('.bk-chat-launcher');
       await launcher.click();
       const composer = page.locator('.bk-chat[data-open] .bk-chat-composer');

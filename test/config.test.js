@@ -2,14 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { article, bake, createBlog } from './blog.js';
+import { article, build, createBlog } from './blog.js';
 
 const base = "title: 'Test', url: 'https://example.com', language: 'en'";
 
 function problems(t, files) {
-  const result = bake(createBlog(t, { 'themes/mine/style.css': '', ...files }), 'build');
-  assert.equal(result.status, 1, result.stdout);
-  return result.stderr.trimEnd().split('\n').slice(0, -1);
+  return build(createBlog(t, { 'themes/mine/style.css': '', ...files }));
 }
 
 function config(...lines) {
@@ -17,7 +15,7 @@ function config(...lines) {
 }
 
 describe('bake.config.js', () => {
-  test('reports each wrong value at the value', (t) => {
+  test('reports each wrong value at the value', async (t) => {
     const rounds = [
       [
         ["title: @''", 'title must be a non-empty string, got ""'],
@@ -67,7 +65,7 @@ describe('bake.config.js', () => {
       ],
     ];
     for (const round of rounds) {
-      const lines = problems(t, { 'bake.config.js': config(`  ${base},`, ...round.map(([marked]) => `  ${marked.replace('@', '')},`)) });
+      const lines = await problems(t, { 'bake.config.js': config(`  ${base},`, ...round.map(([marked]) => `  ${marked.replace('@', '')},`)) });
       assert.deepEqual(
         lines,
         round.map(([marked, message], index) => `bake.config.js:${index + 3}:${marked.indexOf('@') + 3} ${message}`),
@@ -75,48 +73,45 @@ describe('bake.config.js', () => {
     }
   });
 
-  test('reports a syntax error, an error thrown while importing, a package.json that is CommonJS or has no type, and a default export that is not an object', (t) => {
-    assert.deepEqual(problems(t, { 'bake.config.js': 'export default {\n  title: ,\n};\n' }), ['bake.config.js:2:10 Unexpected token']);
-    assert.deepEqual(problems(t, { 'bake.config.js': 'export default { title: missingName };\n' }), ['bake.config.js:1:1 missingName is not defined']);
-    assert.deepEqual(problems(t, { 'package.json': '{ "type": "commonjs" }\n', 'bake.config.js': `export default { ${base} };\n` }), [
+  test('reports a syntax error, an error thrown while importing, a package.json that is CommonJS or has no type, and a default export that is not an object', async (t) => {
+    assert.deepEqual(await problems(t, { 'bake.config.js': 'export default {\n  title: ,\n};\n' }), ['bake.config.js:2:10 Unexpected token']);
+    assert.deepEqual(await problems(t, { 'bake.config.js': 'export default { title: missingName };\n' }), ['bake.config.js:1:1 missingName is not defined']);
+    assert.deepEqual(await problems(t, { 'package.json': '{ "type": "commonjs" }\n', 'bake.config.js': `export default { ${base} };\n` }), [
       'bake.config.js:1:1 bake.config.js is an ES module, but package.json sets "type": "commonjs", so Node reads it as CommonJS; set "type": "module" there',
     ]);
-    assert.deepEqual(problems(t, { 'package.json': '{ "private": true }\n', 'bake.config.js': `export default { ${base} };\n` }), [
+    assert.deepEqual(await problems(t, { 'package.json': '{ "private": true }\n', 'bake.config.js': `export default { ${base} };\n` }), [
       'bake.config.js:1:1 bake.config.js is an ES module, but package.json has no "type" field, so Node prints a warning while it detects that the file is an ES module; set "type": "module" there',
     ]);
-    assert.deepEqual(problems(t, { 'bake.config.js': "const name = 'blog';\nexport default name;\n" }), ['bake.config.js:2:1 the default export of bake.config.js must be an object, got "blog"']);
-    assert.deepEqual(problems(t, { 'bake.config.js': 'export const title = 1;\n' }), ['bake.config.js:1:1 the default export of bake.config.js must be an object, got undefined']);
+    assert.deepEqual(await problems(t, { 'bake.config.js': "const name = 'blog';\nexport default name;\n" }), ['bake.config.js:2:1 the default export of bake.config.js must be an object, got "blog"']);
+    assert.deepEqual(await problems(t, { 'bake.config.js': 'export const title = 1;\n' }), ['bake.config.js:1:1 the default export of bake.config.js must be an object, got undefined']);
   });
 
-  test('reads bake.config.js next to a package.json with "type": "module" and prints nothing to stderr', (t) => {
-    const result = bake(createBlog(t, { 'package.json': '{ "type": "module" }\n', 'bake.config.js': `export default { ${base} };\n` }), 'build');
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stderr, '');
-    assert.equal(result.stdout, '0 pages\ndist/ written\n');
+  test('reads bake.config.js next to a package.json with "type": "module"', async (t) => {
+    assert.deepEqual(await build(createBlog(t, { 'package.json': '{ "type": "module" }\n', 'bake.config.js': `export default { ${base} };\n` })), []);
   });
 
-  test('reports missing fields, nested values, unknown fields and reused category ids at their own position', (t) => {
-    assert.deepEqual(problems(t, { 'bake.config.js': "export default {\n  url: 'https://example.com',\n};\n" }), ['bake.config.js:1:16 config is missing "title"', 'bake.config.js:1:16 config is missing "language"']);
+  test('reports missing fields, nested values, unknown fields and reused category ids at their own position', async (t) => {
+    assert.deepEqual(await problems(t, { 'bake.config.js': "export default {\n  url: 'https://example.com',\n};\n" }), ['bake.config.js:1:16 config is missing "title"', 'bake.config.js:1:16 config is missing "language"']);
     const nested = config(`  ${base},`, '  home: { columns: 6 },', "  categories: [{ id: 'ml', name: 'ML', color: 'red' }, 'x'],");
-    assert.deepEqual(problems(t, { 'bake.config.js': nested }), [
+    assert.deepEqual(await problems(t, { 'bake.config.js': nested }), [
       'bake.config.js:3:20 home.columns must be 3, 4 or 5, got 6',
       'bake.config.js:4:47 categories[0].color must be a hex color in the form #rrggbb, got "red"',
       'bake.config.js:4:56 categories[1] must be an object, got "x"',
     ]);
     const unknown = config(`  ${base},`, '  colour: 1,', '  themes: { bento: { columns: 4, rows: 2 }, paper: {} },', "  categories: [{ id: 'ml', name: 'ML', color: '#000000', icon: 'x' }],");
-    assert.deepEqual(problems(t, { 'bake.config.js': unknown }), [
+    assert.deepEqual(await problems(t, { 'bake.config.js': unknown }), [
       'bake.config.js:3:3 unknown config field "colour"',
       'bake.config.js:4:34 unknown config field "themes.bento.rows"',
       'bake.config.js:4:45 themes.paper names no theme; the themes are essay, bento, mine',
       'bake.config.js:5:58 unknown config field "categories[0].icon"',
     ]);
-    assert.deepEqual(problems(t, { 'bake.config.js': config(`  ${base},`, '  bento: { columns: 4 },') }), ['bake.config.js:3:3 unknown config field "bento"; theme options are written under themes, such as themes: { bento: { columns: 4 } }']);
+    assert.deepEqual(await problems(t, { 'bake.config.js': config(`  ${base},`, '  bento: { columns: 4 },') }), ['bake.config.js:3:3 unknown config field "bento"; theme options are written under themes, such as themes: { bento: { columns: 4 } }']);
     const reused = config(`  ${base},`, '  categories: [', "    { id: 'ml', name: 'ML', color: '#000000' },", "    { id: 'ml', name: 'ML again', color: '#ffffff' },", "    { name: 'No id', color: '#ffffff' },", '  ],');
-    assert.deepEqual(problems(t, { 'bake.config.js': reused }), ['bake.config.js:5:11 categories[1].id "ml" is already used by categories[0]', 'bake.config.js:6:5 config is missing "categories[2].id"']);
-    assert.deepEqual(problems(t, { 'bake.config.js': `const home = { columns: 9 };\nexport default {\n  ${base},\n  home,\n};\n` }), ['bake.config.js:4:3 home.columns must be 3, 4 or 5, got 9']);
+    assert.deepEqual(await problems(t, { 'bake.config.js': reused }), ['bake.config.js:5:11 categories[1].id "ml" is already used by categories[0]', 'bake.config.js:6:5 config is missing "categories[2].id"']);
+    assert.deepEqual(await problems(t, { 'bake.config.js': `const home = { columns: 9 };\nexport default {\n  ${base},\n  home,\n};\n` }), ['bake.config.js:4:3 home.columns must be 3, 4 or 5, got 9']);
   });
 
-  test('gives a theme of the blog the options it declares, with their defaults, and reports wrong values and wrong declarations', (t) => {
+  test('gives a theme of the blog the options it declares, with their defaults, and reports wrong values and wrong declarations', async (t) => {
     const options = "export const options = { density: { label: 'Density', type: 'enum', options: ['loose', 'tight'], default: 'loose' }, rule: { label: 'Rule', type: 'boolean', default: true } };\n";
     const dir = createBlog(t, {
       'bake.config.js': `export default { ${base}, themes: { mine: { density: 'tight' } } };\n`,
@@ -126,10 +121,10 @@ describe('bake.config.js', () => {
       'content/posts/rope/index.md': article({ extra: 'theme: mine\n' }),
       'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: mine\nrule: false\n' }),
     });
-    assert.equal(bake(dir, 'build').stderr, '');
+    assert.deepEqual(await build(dir), []);
     assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<script type="application\/json">{"density":"tight","rule":true}<\/script>/);
     assert.match(readFileSync(join(dir, 'dist/2026-10/gelu/index.html'), 'utf8'), /<script type="application\/json">{"density":"tight","rule":false}<\/script>/);
-    assert.deepEqual(problems(t, { 'bake.config.js': config(`  ${base},`, "  themes: { mine: { density: 'dense' } },"), 'themes/mine/options.js': options }), [
+    assert.deepEqual(await problems(t, { 'bake.config.js': config(`  ${base},`, "  themes: { mine: { density: 'dense' } },"), 'themes/mine/options.js': options }), [
       'bake.config.js:3:30 themes.mine.density must be one of loose or tight, got "dense"',
     ]);
     const broken = [
@@ -137,7 +132,7 @@ describe('bake.config.js', () => {
       "export const settings = { font: { values: ['a'], default: 'a', control: 'list' }, Mode: { values: ['a'], default: 'a', control: 'list' }, ink: { values: ['a', 'b', 'c'], default: 'd', control: 'switch' }, rule: { values: ['on'], default: { option: 'rule' }, control: 'list', label: 'Rule' } };",
       '',
     ].join('\n');
-    assert.deepEqual(problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
+    assert.deepEqual(await problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
       'themes/mine/options.js:1:1 mine: the default of option "size" must be between 1 and 3, got 5',
       'themes/mine/options.js:1:1 mine: option "data" has the type "file"; a theme option is set in bake.config.js and cannot name a file of an article',
       'themes/mine/options.js:1:1 mine: option "plain" needs a label, the text shown next to its control',
@@ -151,14 +146,14 @@ describe('bake.config.js', () => {
     ]);
   });
 
-  test('reports wrong declarations of heading attributes and blocks in options.js of a theme', (t) => {
+  test('reports wrong declarations of heading attributes and blocks in options.js of a theme', async (t) => {
     const broken = [
       'export const options = {};',
       "export const headings = { id: { type: 'text' }, 'two words': { type: 'text' }, tone: { type: 'color' }, size: { type: 'number', min: 3, max: 1, depth: 1 }, kind: { type: 'enum', options: [] }, mark: { type: 'text', label: 'Mark' } };",
       "export const blocks = { aside: {}, 'my-card': {}, Card: {}, card: { tone: { type: 'text', depth: 2 } }, plain: 'x' };",
       '',
     ].join('\n');
-    assert.deepEqual(problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
+    assert.deepEqual(await problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
       'themes/mine/options.js:1:1 mine: heading attribute "id" is the anchor of a heading, which Bake reads itself',
       'themes/mine/options.js:1:1 mine: heading attribute "two words" cannot be written as a Markdown attribute; use letters, digits, "_" and "-", starting with a letter or "_"',
       'themes/mine/options.js:1:1 mine: heading attribute "tone" has the type "color"; use number, text, enum or boolean',

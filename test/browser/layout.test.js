@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
-import { test } from 'node:test';
 import sharp from 'sharp';
-import { article, bake, copyExample, writeFiles } from '../blog.js';
-import { launchBrowser, serve, settle } from './browser.js';
+import { article } from '../blog.js';
+import { test as base, settle } from './browser.js';
 
 const overflowWidths = [375, 600, 1000, 1339, 1340, 1440];
 
@@ -89,30 +87,31 @@ A paragraph before the references.
 `,
 });
 
-test('the essay theme lays out articles', async (t) => {
-  const dir = copyExample(t);
-  writeFiles(dir, {
+const test = base.extend({
+  open: async ({ newPage }, use) =>
+    use(async (path, options = {}) => {
+      const page = await newPage({ reducedMotion: 'reduce', ...options });
+      await page.goto(`/2026-10/${path}/`);
+      if (options.javaScriptEnabled !== false) await settle(page);
+      return page;
+    }),
+});
+
+test.describe('the essay theme lays out articles', () => {
+  test.use({
+    blog: {
+      files: {
     'content/posts/stress/index.md': stressArticle,
     'content/posts/widths/index.md': widthsArticle,
     'content/posts/notes/index.md': article({ title: 'Notes', slug: 'notes', extra: 'toc: notes\ncategory: writing\n', body: tocBody }),
     'content/posts/dots/index.md': article({ title: 'Dots', slug: 'dots', extra: 'toc: dots\ncategory: writing\n', body: tocBody }),
     'content/posts/many-blocks/index.md': article({ title: 'Many blocks', slug: 'many-blocks', extra: 'category: writing\n', body: manyBlocksBody }),
     'content/posts/many-cards/index.md': article({ title: 'Many cards', slug: 'many-cards', extra: 'category: writing\ntheme: bento\n', body: manyBlocksBody }),
+      },
+    },
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  assert.equal(result.status, 0);
-  const origin = await serve(t, join(dir, 'dist'));
 
-  const browser = await launchBrowser();
-  const open = async (path, options = {}) => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', ...options });
-    await page.goto(`${origin}/2026-10/${path}/`);
-    if (options.javaScriptEnabled !== false) await settle(page);
-    return page;
-  };
-
-  await t.test('no article scrolls horizontally at any breakpoint', async () => {
+  test('no article scrolls horizontally at any breakpoint', async ({ open }) => {
     const overflowing = [];
     for (const path of ['syntax', 'stress']) {
       const page = await open(path);
@@ -127,7 +126,7 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(overflowing, []);
   });
 
-  await t.test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async () => {
+  test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async ({ open }) => {
     const page = await open('widths');
     const measure = () =>
       page.evaluate(() => ({
@@ -157,16 +156,16 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('without scripts a formula and a code block wider than the body take the wide width, and a short one keeps the body width', async () => {
+  test('without scripts a formula and a code block wider than the body take the wide width, and a short one keeps the body width', async ({ open }) => {
     const page = await open('stress', { javaScriptEnabled: false });
     const widths = await page.evaluate(() => ['code', 'math'].map((type) => Math.round(document.querySelector(`.bk-block[data-type="${type}"]`).getBoundingClientRect().width)));
     assert.deepEqual(widths, [1100, 1100]);
-    await page.goto(`${origin}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-block[data-type="code"]').getBoundingClientRect().width)), 820);
     await page.close();
   });
 
-  await t.test('the notes style keeps the left column for the table of contents and the other styles centre the text right of the rail', async () => {
+  test('the notes style keeps the left column for the table of contents and the other styles centre the text right of the rail', async ({ open }) => {
     const left = async (path, width) => {
       const page = await open(path, { viewport: { width, height: 900 } });
       const result = await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left));
@@ -176,7 +175,7 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual([await left('notes', 1440), await left('dots', 1440), await left('notes', 1024), await left('dots', 1024)], [290, 198, 88, 88]);
   });
 
-  await t.test('examples show the source beside the result where there is room and above it on phones', async () => {
+  test('examples show the source beside the result where there is room and above it on phones', async ({ open }) => {
     const page = await open('syntax');
     const columns = async () =>
       page.evaluate(() => {
@@ -191,7 +190,7 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('a table wider than its column keeps the right border of its frame while it scrolls', async () => {
+  test('a table wider than its column keeps the right border of its frame while it scrolls', async ({ open }) => {
     for (const [path, width] of [
       ['syntax', 1440],
       ['syntax', 375],
@@ -237,7 +236,7 @@ test('the essay theme lays out articles', async (t) => {
     }
   });
 
-  await t.test('list table cells with text are at least 9em wide on a phone, so the table scrolls instead of stacking characters', async () => {
+  test('list table cells with text are at least 9em wide on a phone, so the table scrolls instead of stacking characters', async ({ open }) => {
     const page = await open('syntax', { viewport: { width: 375, height: 900 } });
     const narrow = await page.evaluate(() =>
       [...document.querySelectorAll('.bk-article table.list-table td')]
@@ -249,7 +248,7 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('display math in an example result fits the result beside the source and scrolls inside the result on a phone', async () => {
+  test('display math in an example result fits the result beside the source and scrolls inside the result on a phone', async ({ open }) => {
     const page = await open('syntax');
     const formulas = () =>
       page.evaluate(() =>
@@ -279,13 +278,13 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('a line with inline math, code, a highlight or a sidenote number keeps the line height of its paragraph at every text size, also in an example result on a first visit while the fonts load', async () => {
+  test('a line with inline math, code, a highlight or a sidenote number keeps the line height of its paragraph at every text size, also in an example result on a first visit while the fonts load', async ({ newPage }) => {
     const uneven = [];
     for (const width of [1440, 375]) {
       for (const size of ['small', 'medium', 'larger']) {
-        const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const page = await newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
         await page.addInitScript((value) => localStorage.setItem('bk-size', value), size);
-        await page.goto(`${origin}/2026-10/syntax/`);
+        await page.goto('/2026-10/syntax/');
         await settle(page);
         const gaps = await page.evaluate(() =>
           [...document.querySelectorAll('.bk-article p')]
@@ -312,7 +311,7 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(uneven, []);
   });
 
-  await t.test('dark mode follows the system colour scheme', async () => {
+  test('dark mode follows the system colour scheme', async ({ open }) => {
     const page = await open('widths', { colorScheme: 'dark' });
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)');
     await page.emulateMedia({ colorScheme: 'light' });
@@ -320,7 +319,7 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('display math fades into the page colour only at an overflowing side in both schemes, also in the first frame after the colour scheme changes', async () => {
+  test('display math fades into the page colour only at an overflowing side in both schemes, also in the first frame after the colour scheme changes', async ({ open }) => {
     const problems = [];
     for (const width of [1440, 375]) {
       const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
@@ -364,7 +363,7 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('tags are styled as inline code', async () => {
+  test('tags are styled as inline code', async ({ open }) => {
     const page = await open('stress');
     const tags = await page.evaluate(() => {
       const code = getComputedStyle(document.querySelector('.bk-article p code'));
@@ -380,7 +379,7 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('no separator of the masthead meta line starts a line on a phone', async () => {
+  test('no separator of the masthead meta line starts a line on a phone', async ({ open }) => {
     const page = await open('syntax', { viewport: { width: 375, height: 800 } });
     const items = await page.evaluate(() => {
       const meta = document.querySelector('.bk-meta').getBoundingClientRect();
@@ -401,7 +400,7 @@ test('the essay theme lays out articles', async (t) => {
 
 
 
-  await t.test('the references label is hidden right after a heading and shown otherwise', async () => {
+  test('the references label is hidden right after a heading and shown otherwise', async ({ open }) => {
     const labels = async (path) => {
       const page = await open(path);
       const shown = await page.evaluate(() => [...document.querySelectorAll('.bk-references-label')].filter((label) => label.getBoundingClientRect().height > 0).map((label) => label.textContent));
@@ -412,7 +411,7 @@ test('the essay theme lays out articles', async (t) => {
     assert.deepEqual(await labels('widths'), ['参考文献']);
   });
 
-  await t.test('placing blocks and cards forces a fixed number of layouts however many blocks an article has', async () => {
+  test('placing blocks and cards forces a fixed number of layouts however many blocks an article has', async ({ open }) => {
     const layoutsOnResize = async (path) => {
       const page = await open(path);
       const session = await page.context().newCDPSession(page);

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
-import { article, bake, createBlog, validConfig } from './blog.js';
+import { article, build, createBlog, validConfig } from './blog.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>';
 
@@ -30,10 +30,9 @@ const probeTheme = {
   'themes/probe/theme.css': 'body {\n  color: black;\n}\n',
 };
 
-function buildHome(t, files) {
+async function buildHome(t, files) {
   const dir = createBlog(t, files);
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   return { dir, html: readFileSync(join(dir, 'dist/index.html'), 'utf8') };
 }
 
@@ -77,8 +76,7 @@ describe('homepage', () => {
       'content/posts/demo/anim/preview.js': 'export default () => ({ start() {}, stop() {} });\n',
       'content/posts/draft/index.md': article({ title: 'Draft', slug: 'draft', date: '2026-10-05', extra: 'category: ml\ndraft: true\n' }),
     });
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
+    assert.deepEqual(await build(dir), []);
     const props = probed(dir, 'index.html');
     const { styles, scripts } = props.assets;
     assert.equal(styles.length, 1);
@@ -120,8 +118,8 @@ describe('homepage', () => {
     assert.equal(readFileSync(join(dir, 'dist/2026-09/demo/anim/preview.js'), 'utf8'), 'export default () => ({ start() {}, stop() {} });\n');
   });
 
-  test('groups cards by category in config order and by month, newest first, with counts', (t) => {
-    const { html } = buildHome(t, {
+  test('groups cards by category in config order and by month, newest first, with counts', async (t) => {
+    const { html } = await buildHome(t, {
       'bake.config.js': categoriesConfig,
       'content/posts/rope/index.md': article({ title: 'Rope', slug: 'rope', date: '2026-10-02', extra: 'category: ml\n' }),
       'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', date: '2026-10-14', extra: 'category: ml\n' }),
@@ -145,8 +143,8 @@ describe('homepage', () => {
     ]);
   });
 
-  test('without categories the homepage has only the month grouping and a tag filter', (t) => {
-    const { html } = buildHome(t, {
+  test('without categories the homepage has only the month grouping and a tag filter', async (t) => {
+    const { html } = await buildHome(t, {
       'bake.config.js': validConfig,
       'content/posts/rope/index.md': article({ title: 'Rope', slug: 'rope', extra: 'tags: [llm, position]\n' }),
     });
@@ -158,7 +156,7 @@ describe('homepage', () => {
 
   test('a card shows its first image, a colour block with the title when there is none, the date and the tags', async (t) => {
     const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
-    const { html } = buildHome(t, {
+    const { html } = await buildHome(t, {
       'bake.config.js': validConfig,
       'content/posts/photo/index.md': article({ title: 'Photo', slug: 'photo', date: '2026-10-03', extra: 'summary: One sentence.\ntags: [a, b]\n', body: '![](<my photo.png>)\n' }),
       'content/posts/photo/my photo.png': photo,
@@ -179,7 +177,7 @@ describe('homepage', () => {
 
   test('a card gives the preview and the image of an article URL-encoded addresses when their file names hold #, ? or %', async (t) => {
     const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
-    const { dir, html } = buildHome(t, {
+    const { dir, html } = await buildHome(t, {
       'bake.config.js': validConfig,
       'content/posts/photo/index.md': article({ title: 'Photo', slug: 'photo', date: '2026-10-03', body: '![](<photo%231%3F100%25.png>)\n' }),
       'content/posts/photo/photo#1?100%.png': photo,
@@ -197,7 +195,7 @@ describe('homepage', () => {
   test('a card never shows a component frame: it uses an image of the caption or the colour block, and the homepage loads no component code', async (t) => {
     const photo = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
     const component = "export const params = { data: { label: 'Data', type: 'file', default: '' } };\nexport const layout = { height: 200 };\n\nexport default class DataView extends HTMLElement {}\n";
-    const { dir, html } = buildHome(t, {
+    const { dir, html } = await buildHome(t, {
       'bake.config.js': validConfig,
       'components/data-view.js': component,
       'content/posts/caption/index.md': article({ title: 'Caption', slug: 'caption', date: '2026-10-03', body: ':::data-view\nThe caption with ![a photo](photo.png).\n:::\n' }),
@@ -213,51 +211,44 @@ describe('homepage', () => {
     assert.match(readFileSync(join(dir, 'dist/2026-10/caption/index.html'), 'utf8'), /<figure class="component" data-component="data-view"/);
   });
 
-  test('the essay theme says in Chinese that a Chinese blog has no posts yet', (t) => {
-    const { html } = buildHome(t, { 'bake.config.js': validConfig.replace("language: 'en'", "language: 'zh-CN'") });
+  test('the essay theme says in Chinese that a Chinese blog has no posts yet', async (t) => {
+    const { html } = await buildHome(t, { 'bake.config.js': validConfig.replace("language: 'en'", "language: 'zh-CN'") });
     assert.match(html, /<p class="bk-home-empty">还没有文章<\/p>/);
   });
 
-  test('writes the homepage when the blog has no articles', (t) => {
-    const { dir, html } = buildHome(t, { 'bake.config.js': validConfig });
+  test('writes the homepage when the blog has no articles', async (t) => {
+    const { dir, html } = await buildHome(t, { 'bake.config.js': validConfig });
     assert.match(html, /<h1 class="bk-home-title">Test Blog<\/h1>/);
     assert.equal(grouping(html, 'month'), null);
     assert.match(html, /<p class="bk-home-empty">No posts yet<\/p>/);
     assert.doesNotMatch(html, /bk-home-bar|data-control="columns"/);
-    assert.equal(bake(dir, 'build').stdout, '0 pages\ndist/ written\n');
   });
 
-  test('reports a public/index.html that the homepage also writes', (t) => {
+  test('reports a public/index.html that the homepage also writes', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'public/index.html': '<p>mine</p>\n' });
-    assert.equal(bake(dir, 'build').stderr, 'public/index.html:1:1 dist/index.html is also written by the homepage\n1 error, dist/ was not written\n');
+    assert.deepEqual(await build(dir), ['public/index.html:1:1 dist/index.html is also written by the homepage']);
   });
 
-  test('reports a site theme without home.jsx, not-found.jsx or theme.css, and needs none of them in a theme that only articles use', (t) => {
+  test('reports a site theme without home.jsx, not-found.jsx or theme.css, and needs none of them in a theme that only articles use', async (t) => {
     const { 'themes/probe/home.jsx': home, 'themes/probe/not-found.jsx': notFound, 'themes/probe/theme.css': styles, ...withoutHome } = probeTheme;
     assert.ok(home && notFound && styles);
     const missing = createBlog(t, { 'bake.config.js': validConfig.replace("language: 'en'", "language: 'en', theme: 'probe'"), ...withoutHome });
-    assert.equal(
-      bake(missing, 'build').stderr,
-      [
+    assert.deepEqual(await build(missing), [
         'themes/probe:1:1 theme "probe" has no home.jsx',
         'themes/probe:1:1 theme "probe" has no not-found.jsx',
         'themes/probe:1:1 theme "probe" has no theme.css',
-        '3 errors, dist/ was not written',
-        '',
-      ].join('\n'),
-    );
+      ]);
     const articleOnly = createBlog(t, { 'bake.config.js': validConfig, ...withoutHome, 'content/posts/rope/index.md': article({ extra: 'theme: probe\n' }) });
-    const result = bake(articleOnly, 'build');
-    assert.equal(result.stderr, '');
+    assert.deepEqual(await build(articleOnly), []);
     assert.match(readFileSync(join(articleOnly, 'dist/index.html'), 'utf8'), /<h1 class="bk-home-title">/);
   });
 
-  test('reports a homepage that the site theme cannot render at the theme folder', (t) => {
+  test('reports a homepage that the site theme cannot render at the theme folder', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig.replace("language: 'en'", "language: 'en', theme: 'probe'"),
       ...probeTheme,
       'themes/probe/home.jsx': "export default function Home() {\n  throw new Error('no cards');\n}\n",
     });
-    assert.equal(bake(dir, 'build').stderr, 'themes/probe:1:1 the probe theme cannot render the homepage: no cards\n1 error, dist/ was not written\n');
+    assert.deepEqual(await build(dir), ['themes/probe:1:1 the probe theme cannot render the homepage: no cards']);
   });
 });

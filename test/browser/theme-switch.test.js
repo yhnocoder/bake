@@ -1,15 +1,32 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { launchBrowser, serveExample } from './browser.js';
+import { test } from './browser.js';
 
-const fading = () => document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 const notFading = () => !document.getAnimations().some((animation) => animation.playState === 'running' && String(animation.effect?.pseudoElement).startsWith('::view-transition'));
 
-test('a change of the system colour scheme fades without showing the new colours first, and a press during the fade ends it and keeps the settings open', async (t) => {
-  const origin = await serveExample(t);
-  const browser = await launchBrowser();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
-  await page.goto(`${origin}/2026-10/syntax/`);
+// why: a fade lasts a fraction of a second, which a loaded machine can let pass before the test looks, so a watcher in every frame records it and can hold it
+function watchFade(page, { hold = false } = {}) {
+  return page.evaluate((hold) => {
+    window.sawFade = false;
+    const watch = () => {
+      const fades = document.getAnimations().filter((animation) => String(animation.effect?.pseudoElement).startsWith('::view-transition'));
+      if (fades.length === 0) return requestAnimationFrame(watch);
+      window.sawFade = true;
+      if (hold) for (const fade of fades) fade.pause();
+    };
+    requestAnimationFrame(watch);
+  }, hold);
+}
+
+async function fades(page, change) {
+  await watchFade(page);
+  await change();
+  await page.waitForFunction(() => window.sawFade);
+  await page.waitForFunction(notFading);
+}
+
+test('a change of the system colour scheme fades without showing the new colours first, and a press during the fade ends it and keeps the settings open', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/2026-10/syntax/');
   await page.evaluate(() => document.fonts.ready);
   const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
@@ -37,10 +54,11 @@ test('a change of the system colour scheme fades without showing the new colours
   const option = (text) => page.locator('.bk-settings-options button', { hasText: new RegExp(`^\\s*${text}\\s*$`) });
   assert.equal(await option('跟随系统').getAttribute('aria-pressed'), 'true');
   const dark = await option('深').boundingBox();
+  await watchFade(page, { hold: true });
   await option('浅').click();
-  await page.waitForFunction(fading);
+  await page.waitForFunction(() => window.sawFade);
   await page.mouse.click(dark.x + dark.width / 2, dark.y + dark.height / 2);
-  assert.equal(await page.evaluate(fading), false);
+  assert.equal(await page.evaluate(() => document.getAnimations().some((animation) => String(animation.effect?.pseudoElement).startsWith('::view-transition'))), false);
   assert.equal(await page.locator('.bk-settings-panel').isVisible(), true);
   assert.equal(await option('浅').getAttribute('aria-pressed'), 'true');
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), light);
@@ -49,30 +67,22 @@ test('a change of the system colour scheme fades without showing the new colours
   assert.equal(await option('深').getAttribute('aria-pressed'), 'true');
 });
 
-test('switching the theme and the text spacing fades into the new look in the essay and bento themes', async (t) => {
-  const origin = await serveExample(t);
-  const browser = await launchBrowser();
-
-  for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) for (const width of [1440, 375]) {
-    await t.test(`${theme} at ${width} pixels`, async () => {
-      const page = await browser.newPage({ viewport: { width, height: 900 } });
-      await page.goto(`${origin}${path}`);
+for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) {
+  for (const width of [1440, 375]) {
+    test(`switching the theme and the text spacing fades into the new look in the ${theme} theme at ${width} pixels`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(path);
       await page.evaluate(() => document.fonts.ready);
       await page.getByRole('button', { name: '设置' }).click();
       await page.waitForFunction(() => document.querySelector('.bk-settings').getAnimations({ subtree: true }).length === 0);
 
       const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      await page.locator('.bk-settings-options button', { hasText: /^\s*深\s*$/ }).click();
-      await page.waitForFunction(fading);
-      await page.waitForFunction(notFading);
+      await fades(page, () => page.locator('.bk-settings-options button', { hasText: /^\s*深\s*$/ }).click());
       assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), background);
 
       const lineHeight = await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight);
-      await page.locator('.bk-settings-row[data-setting="spacing"] button[data-value="loose"]').click();
-      await page.waitForFunction(fading);
-      await page.waitForFunction(notFading);
+      await fades(page, () => page.locator('.bk-settings-row[data-setting="spacing"] button[data-value="loose"]').click());
       assert.notEqual(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight), lineHeight);
-      await page.close();
     });
   }
-});
+}

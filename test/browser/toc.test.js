@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
-import { test } from 'node:test';
-import { article, bake, createBlog } from '../blog.js';
-import { launchBrowser, nextFrame, serve, settle, until } from './browser.js';
+import { article } from '../blog.js';
+import { test as base, expect, settle } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
 const STYLES = ['notes', 'dots', 'ticks'];
@@ -158,6 +156,10 @@ async function restingBox(locator) {
   return locator.boundingBox();
 }
 
+function nextFrame(page) {
+  return page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+}
+
 async function scrollInSteps(page, delta) {
   for (let step = 0; step < 5; step += 1) {
     await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
@@ -171,31 +173,38 @@ async function scrollToHeading(page, id) {
   await settle(page);
 }
 
-test('the table of contents', async (t) => {
-  const dir = createBlog(t, {
-    'bake.config.js': config,
-    'content/posts/toc/index.md': article({ title: '目录', slug: 'toc', body }),
-    ...Object.fromEntries(STYLES.flatMap((style) => [
-      [`content/posts/toc-${style}/index.md`, article({ title: '目录', slug: `toc-${style}`, extra: `toc: ${style}\n`, body })],
-      [`content/posts/long-${style}/index.md`, article({ title: 'Long', slug: `long-${style}`, extra: `toc: ${style}\n`, body: longBody })],
-    ])),
-    'content/posts/plain/index.md': article({ title: '无目录', slug: 'plain', body: filler('正文', 12) }),
-    'components/page-box.js': pageBox,
-  });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  const base = await serve(t, join(dir, 'dist'));
-  const url = `${base}/2026-10/toc/`;
-  const browser = await launchBrowser();
-  const open = async ({ style, path = 'toc', viewport = { width: 1440, height: 900 }, ...options } = {}) => {
-    const context = await browser.newContext({ viewport, reducedMotion: 'reduce', ...options });
-    const page = await context.newPage();
-    await page.goto(`${base}/2026-10/${style === undefined ? path : `${path}-${style}`}/`);
-    await settle(page);
-    return { page, context };
-  };
+const url = '/2026-10/toc/';
 
-  await t.test('the current entry follows the reading position in every style', async () => {
+const test = base.extend({
+  open: async ({ newContext }, use) => {
+    await use(async ({ style, path = 'toc', viewport = { width: 1440, height: 900 }, ...options } = {}) => {
+      const context = await newContext({ viewport, reducedMotion: 'reduce', ...options });
+      const page = await context.newPage();
+      await page.goto(`/2026-10/${style === undefined ? path : `${path}-${style}`}/`);
+      await settle(page);
+      return { page, context };
+    });
+  },
+});
+
+test.use({
+  blog: {
+    example: false,
+    files: {
+        'bake.config.js': config,
+        'content/posts/toc/index.md': article({ title: '目录', slug: 'toc', body }),
+        ...Object.fromEntries(STYLES.flatMap((style) => [
+          [`content/posts/toc-${style}/index.md`, article({ title: '目录', slug: `toc-${style}`, extra: `toc: ${style}\n`, body })],
+          [`content/posts/long-${style}/index.md`, article({ title: 'Long', slug: `long-${style}`, extra: `toc: ${style}\n`, body: longBody })],
+        ])),
+        'content/posts/plain/index.md': article({ title: '无目录', slug: 'plain', body: filler('正文', 12) }),
+        'components/page-box.js': pageBox,
+    },
+  },
+});
+
+test.describe('the table of contents', () => {
+  test('the current entry follows the reading position in every style', async ({ open }) => {
     for (const [style, width] of [...STYLES.map((name) => [name, 1440]), ['rail', 1100]]) {
       const { page, context } = await open({ style: style === 'rail' ? 'notes' : style, viewport: { width, height: 900 } });
       const readCurrent = () => page.evaluate(current, style);
@@ -207,11 +216,10 @@ test('the table of contents', async (t) => {
       assert.equal(await readCurrent(), 'chapter-3', `${style} at the third chapter`);
       await scrollToHeading(page, 'chapter-4-a');
       assert.equal(await readCurrent(), chapterLevel ? 'chapter-4' : 'chapter-4-a', `${style} in the section of the fourth chapter`);
-      await context.close();
     }
   });
 
-  await t.test('the notes style shows the recap of read sections and fades the chapters ahead', async () => {
+  test('the notes style shows the recap of read sections and fades the chapters ahead', async ({ open }) => {
     const { page, context } = await open();
     await scrollToHeading(page, 'chapter-2');
     const state = await page.evaluate(() => ({
@@ -226,10 +234,9 @@ test('the table of contents', async (t) => {
     ]);
     assert.notEqual(state.ahead, state.read);
     assert.ok(state.marker > 0 && state.marker < 30, `the marker starts ${state.marker}px below the current chapter title`);
-    await context.close();
   });
 
-  await t.test('the notes style shows the recap of a section once 85 percent of it is above the middle of the viewport', async () => {
+  test('the notes style shows the recap of a section once 85 percent of it is above the middle of the viewport', async ({ open }) => {
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 1440, height: 600 },
@@ -249,11 +256,10 @@ test('the table of contents', async (t) => {
       };
       assert.equal(await readAt(0.84), false, `the recap shows just under the threshold at ${viewport.width}×${viewport.height}`);
       assert.equal(await readAt(0.86), true, `the recap stays hidden just over the threshold at ${viewport.width}×${viewport.height}`);
-      await context.close();
     }
   });
 
-  await t.test('hover cards stay inside the viewport and show the recap, else the first sentence, without highlights', async () => {
+  test('hover cards stay inside the viewport and show the recap, else the first sentence, without highlights', async ({ open }) => {
     const triggers = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' };
     for (const viewport of [
       { width: 1440, height: 900 },
@@ -286,13 +292,12 @@ test('the table of contents', async (t) => {
         await page.waitForFunction((name) => document.querySelector(name).textContent.includes('第6章'), selector);
         const last = await page.evaluate(cardReport, selector);
         assert.deepEqual([last.inside, last.clearOfSettings, last.head, last.summary, last.sections], [true, true, '06', '第6章的第一句话。', [['第6章的小节', '第6章的小节的第 1 段。']]], `${style} on the last chapter`);
-        await context.close();
       }
     }
   });
 
 
-  await t.test('the cards of the table of contents keep their own look on article pages, and the homepage cards keep theirs', async () => {
+  test('the cards of the table of contents keep their own look on article pages, and the homepage cards keep theirs', async ({ open }) => {
     for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style });
       const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
@@ -322,10 +327,9 @@ test('the table of contents', async (t) => {
         { border: '0px', radius: '0px', shadow: 'none', background: 'rgba(0, 0, 0, 0)', width: true, titleSize: '17px', titleWrap: 'balance', frameRadius: '12px', frameShadow: true },
         `the ${style} card`,
       );
-      await context.close();
     }
     const { page, context } = await open();
-    await page.goto(`${base}/`);
+    await page.goto('/');
     const home = await page.evaluate(() => {
       const card = document.querySelector('.bk-home .bk-card');
       const cardStyle = getComputedStyle(card);
@@ -333,10 +337,9 @@ test('the table of contents', async (t) => {
       return { border: cardStyle.borderTopWidth, radius: cardStyle.borderTopLeftRadius, shadow: cardStyle.boxShadow !== 'none', titleWeight: titleStyle.fontWeight, titleWrap: titleStyle.textWrapStyle, titleMargin: titleStyle.marginTop };
     });
     assert.deepEqual(home, { border: '1px', radius: '14px', shadow: true, titleWeight: '700', titleWrap: 'pretty', titleMargin: '0px' });
-    await context.close();
   });
 
-  await t.test('the drawer tabs, the drawer close button and the settings button use the ink colour', async () => {
+  test('the drawer tabs, the drawer close button and the settings button use the ink colour', async ({ open }) => {
     for (const [colorScheme, ink] of [
       ['light', 'rgb(22, 26, 29)'],
       ['dark', 'rgb(233, 236, 231)'],
@@ -361,7 +364,7 @@ test('the table of contents', async (t) => {
     }
   });
 
-  await t.test('the shadow of the phone handle follows dark mode', async () => {
+  test('the shadow of the phone handle follows dark mode', async ({ open }) => {
     const shadows = {};
     for (const colorScheme of ['light', 'dark']) {
       const phone = await open({ style: 'ticks', colorScheme, viewport: { width: 375, height: 760 } });
@@ -371,14 +374,13 @@ test('the table of contents', async (t) => {
     assert.deepEqual(sharedShadowLayers(shadows.light, shadows.dark), []);
   });
 
-  await t.test('the notes style keeps the top padding of the first chapter', async () => {
+  test('the notes style keeps the top padding of the first chapter', async ({ open }) => {
     const { page, context } = await open({ style: 'notes' });
     const padding = await page.evaluate(() => [...document.querySelectorAll('.bk-toc .bk-toc-chapter-title')].slice(0, 2).map((title) => getComputedStyle(title).paddingTop));
     assert.deepEqual(padding, ['20px', '20px']);
-    await context.close();
   });
 
-  await t.test('the dots and ticks cards may reach 12 pixels above the bottom of the screen', async () => {
+  test('the dots and ticks cards may reach 12 pixels above the bottom of the screen', async ({ open }) => {
     for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style, path: 'long', viewport: { width: 1440, height: 600 } });
       const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
@@ -390,11 +392,10 @@ test('the table of contents', async (t) => {
         return { maxHeight: parseFloat(getComputedStyle(frame).maxHeight), screen: innerHeight - 24 };
       }, box);
       assert.equal(limit.maxHeight, limit.screen, `${style}: ${JSON.stringify(limit)}`);
-      await context.close();
     }
   });
 
-  await t.test('the keyboard reaches the dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter, and the notes panel closes when the focus leaves it', async () => {
+  test('the keyboard reaches the dots and ticks first, and moves from the entries of each chapter into the links of its card and on to the next chapter, and the notes panel closes when the focus leaves it', async ({ open }) => {
     for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style });
       const entry = 'entry';
@@ -413,7 +414,6 @@ test('the table of contents', async (t) => {
       await page.keyboard.press('Shift+Tab');
       await page.keyboard.press('Shift+Tab');
       assert.equal(await focused(), style === 'ticks' ? `${entry} #chapter-6-a` : `${entry} #chapter-6`, `${style}: shift and tab go back from the card to the last entry of its chapter`);
-      await context.close();
     }
     const { page, context } = await open({ style: 'notes', viewport: { width: 1100, height: 700 } });
     const isOpen = () => page.evaluate(shownCard, '.bk-toc-panel');
@@ -429,10 +429,9 @@ test('the table of contents', async (t) => {
       assert.ok(steps < 60, 'the focus never leaves the rail and the panel');
     }
     await page.waitForFunction(hiddenCard, '.bk-toc-panel', { timeout: 2000 });
-    await context.close();
   });
 
-  await t.test('Escape closes the chapter card of the dots and ticks styles, returns the focus from the card to its entry, and after a keyboard Escape the pointer opens the card of that entry again', async () => {
+  test('Escape closes the chapter card of the dots and ticks styles, returns the focus from the card to its entry, and after a keyboard Escape the pointer opens the card of that entry again', async ({ open }) => {
     for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style, reducedMotion: 'no-preference' });
       const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
@@ -482,11 +481,10 @@ test('the table of contents', async (t) => {
         () => false,
       );
       assert.equal(opened, true, `${style}: the card stays closed when the pointer reaches the entry that the keyboard closed it from`);
-      await context.close();
     }
   });
 
-  await t.test('while a wide block crosses the notes column, its entries take no keyboard focus until the block is gone', async () => {
+  test('while a wide block crosses the notes column, its entries take no keyboard focus until the block is gone', async ({ open }) => {
     const { page, context } = await open({ style: 'notes', path: 'long' });
     await scrollToHeading(page, 'chapter-9');
     const focusable = () =>
@@ -517,10 +515,9 @@ test('the table of contents', async (t) => {
     await settle(page);
     const shown = await focusable();
     assert.equal(shown.reached, shown.links, `the column stays hidden: ${JSON.stringify(shown)}`);
-    await context.close();
   });
 
-  await t.test('on phones the capsule of the dots handle fills with the reading progress', async () => {
+  test('on phones the capsule of the dots handle fills with the reading progress', async ({ open }) => {
     const { page, context } = await open({ style: 'dots', path: 'long', viewport: { width: 375, height: 760 } });
     await scrollToHeading(page, 'chapter-5');
     const fill = await page.evaluate(() => {
@@ -528,10 +525,9 @@ test('the table of contents', async (t) => {
       return { capsule: capsule.getBoundingClientRect().height, filled: capsule.querySelector('i').getBoundingClientRect().height };
     });
     assert.ok(fill.filled > 0 && fill.filled < fill.capsule, `the capsule fill does not show the progress: ${JSON.stringify(fill)}`);
-    await context.close();
   });
 
-  await t.test('the notes panel opens from the tick rail between 1000 and 1340 pixels and closes when the pointer leaves', async () => {
+  test('the notes panel opens from the tick rail between 1000 and 1340 pixels and closes when the pointer leaves', async ({ open }) => {
     const { page, context } = await open({ style: 'notes', viewport: { width: 1100, height: 700 } });
     await scrollToHeading(page, 'chapter-2');
     assert.deepEqual(await page.evaluate(() => [document.querySelector('.bk-toc').checkVisibility(), document.querySelector('.bk-toc-ticks.is-rail').textContent]), [false, '']);
@@ -549,10 +545,9 @@ test('the table of contents', async (t) => {
     assert.deepEqual(panel, { label: '前文笔记', recaps: 2, covered: false });
     await page.mouse.move(900, 400);
     await page.waitForFunction(hiddenCard, '.bk-toc-panel');
-    await context.close();
   });
 
-  await t.test('a jump from the dots to another chapter folds the capsule, lights the dots it passes and opens the capsule of the target chapter once', async () => {
+  test('a jump from the dots to another chapter folds the capsule, lights the dots it passes and opens the capsule of the target chapter once', async ({ open }) => {
     const { page, context } = await open({ style: 'dots', reducedMotion: 'no-preference' });
     await page.evaluate(() => {
       window.seen = [];
@@ -575,10 +570,9 @@ test('the table of contents', async (t) => {
     });
     assert.deepEqual(seen, [0, -1, 4], `the dots showed the chapters ${seen} during the jump`);
     assert.ok(passed.length > 0 && passed.every((index) => index < 4), `the dots passed ${passed}`);
-    await context.close();
   });
 
-  await t.test('a change of the text metrics, such as a font that finishes loading, moves the dots and the notes marker without a transition', async () => {
+  test('a change of the text metrics, such as a font that finishes loading, moves the dots and the notes marker without a transition', async ({ open }) => {
     for (const style of ['dots', 'notes']) {
       const { page, context } = await open({ style, reducedMotion: 'no-preference' });
       await scrollToHeading(page, 'chapter-3');
@@ -600,14 +594,13 @@ test('the table of contents', async (t) => {
       });
       assert.ok(moved, `the ${style} entries stayed in place`);
       assert.deepEqual(moving, [], `${style} animated ${moving.join(', ')}`);
-      await context.close();
     }
   });
 
   const capsules = (page) => page.locator('.bk-toc-handle .bk-toc-handle-capsule').count();
   const handleFocused = (page) => page.locator('.bk-toc-handle').evaluate((handle) => handle === document.activeElement);
 
-  await t.test('on phones a handle opens the drawer of chapters, a link in it jumps and closes it, and closing it returns the focus to the handle', async () => {
+  test('on phones a handle opens the drawer of chapters, a link in it jumps and closes it, and closing it returns the focus to the handle', async ({ open }) => {
     for (const style of STYLES) {
       const { page, context } = await open({ style, viewport: { width: 375, height: 760 }, reducedMotion: 'no-preference' });
       const handle = page.locator('.bk-toc-handle');
@@ -635,11 +628,10 @@ test('the table of contents', async (t) => {
       await page.click('.bk-toc-drawer-close');
       await page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().right <= 0);
       assert.equal(await handleFocused(page), true, `${style}: the close button returns the focus to the handle`);
-      await context.close();
     }
   });
 
-  await t.test('on phones choosing another style in the settings rebuilds the handle and the drawer at once', async () => {
+  test('on phones choosing another style in the settings rebuilds the handle and the drawer at once', async ({ open }) => {
     const { page, context } = await open({ style: 'ticks', viewport: { width: 375, height: 760 } });
     const read = async () => {
       const capsule = await capsules(page);
@@ -661,10 +653,9 @@ test('the table of contents', async (t) => {
       await settle(page);
       assert.deepEqual(await read(), { capsule, dots, tabs }, name);
     }
-    await context.close();
   });
 
-  await t.test('on phones the handle and the settings button slide out of view to the left without reduced motion', async () => {
+  test('on phones the handle and the settings button slide out of view to the left without reduced motion', async ({ open }) => {
     const { page, context } = await open({ viewport: { width: 375, height: 760 }, hasTouch: true, reducedMotion: 'no-preference' });
     const rightEdges = () => page.evaluate(() => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].map((element) => element.getBoundingClientRect().right));
     const [handle, settings] = await rightEdges();
@@ -674,10 +665,9 @@ test('the table of contents', async (t) => {
       await nextFrame(page);
     }
     await page.waitForFunction(() => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].every((element) => element.getBoundingClientRect().right <= 0));
-    await context.close();
   });
 
-  await t.test('on phones scrolling down fades the buttons out in place with reduced motion, scrolling up shows them, and the setting turns this off', async () => {
+  test('on phones scrolling down fades the buttons out in place with reduced motion, scrolling up shows them, and the setting turns this off', async ({ open }) => {
     const { page, context } = await open({ viewport: { width: 375, height: 760 }, hasTouch: true });
     const placed = (opacity) =>
       page
@@ -699,13 +689,7 @@ test('the table of contents', async (t) => {
           return focused;
         }),
       );
-    const scrollBy = async (delta) => {
-      for (let step = 0; step < 5; step += 1) {
-        await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-        await nextFrame(page);
-      }
-      await settle(page);
-    };
+    const scrollBy = (delta) => scrollInSteps(page, delta);
     assert.equal(await placed(1), true);
     await page.evaluate(() => {
       const handle = document.querySelector('.bk-toc-handle');
@@ -747,10 +731,9 @@ test('the table of contents', async (t) => {
     await settle(page);
     await scrollBy(800);
     assert.equal(await placed(1), true, 'the buttons hide again after a reload');
-    await context.close();
   });
 
-  await t.test('on phones an article without a table of contents hides the settings button while scrolling down and shows it on scrolling up', async () => {
+  test('on phones an article without a table of contents hides the settings button while scrolling down and shows it on scrolling up', async ({ open }) => {
     const { page, context } = await open({ path: 'plain', viewport: { width: 375, height: 760 }, hasTouch: true });
     const state = () =>
       page.evaluate(() => {
@@ -763,49 +746,52 @@ test('the table of contents', async (t) => {
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden', null, { timeout: 2000 });
     assert.equal(await state(), 0);
     await scrollInSteps(page, -200);
-    await until(async () => (await state()) === 1, 'the settings button does not show again');
-    await context.close();
+    await expect.poll(state, { message: 'the settings button does not show again' }).toBe(1);
   });
 
-  await t.test('the style chosen in the settings applies at once, survives a reload and is applied before the page script runs', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  test('the style chosen in the settings applies at once, survives a reload and is applied before the page script runs', async ({ newContext }) => {
+    const context = await newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const page = await context.newPage();
-    await page.goto(`${base}/2026-10/toc-dots/`);
+    await page.goto(`/2026-10/toc-dots/`);
     await settle(page);
     const read = () =>
       page.evaluate(() => ({
         views: ['.bk-toc', '.bk-toc-dots', '.bk-toc-ticks'].filter((selector) => document.querySelector(selector)?.checkVisibility()),
         left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
       }));
-    assert.deepEqual(await read(), { views: ['.bk-toc-dots'], left: 198 });
+    const narrow = await read();
+    assert.deepEqual(narrow.views, ['.bk-toc-dots']);
     assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '字号', '字重', '间距', '字体', '按钮']);
     await page.click('.bk-settings-toggle');
     await page.getByRole('radio', { name: /刻度线/ }).click();
     await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: 198 });
+    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: narrow.left });
     await page.getByRole('radio', { name: /前文笔记/ }).click();
     await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc'], left: 290 });
+    const notes = await read();
+    assert.deepEqual(notes.views, ['.bk-toc']);
+    assert.ok(notes.left > narrow.left, `the notes style leaves a column of ${notes.left} pixels for the table of contents, the dots style ${narrow.left}`);
     await page.getByRole('radio', { name: /刻度线/ }).click();
     await page.reload();
     await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: 198 });
+    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: narrow.left });
     await page.route('**/assets/*.js', (route) => route.abort());
     await page.goto(url);
-    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left)), 198);
-    await context.close();
+    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left)), narrow.left);
   });
 
-  await t.test('without scripts every style shows a readable table of contents whose links jump', async () => {
+  test('without scripts every style shows a readable table of contents whose links jump', async ({ newContext, open }) => {
+    const { page: scripted } = await open();
+    const notesLeft = await scripted.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left));
     for (const [path, viewport] of [
       ['toc', { width: 1440, height: 900 }],
       ['toc-dots', { width: 1440, height: 900 }],
       ['toc-dots', { width: 1100, height: 900 }],
       ['toc', { width: 375, height: 760 }],
     ]) {
-      const context = await browser.newContext({ viewport, javaScriptEnabled: false });
+      const context = await newContext({ viewport, javaScriptEnabled: false });
       const page = await context.newPage();
-      await page.goto(`${base}/2026-10/${path}/`);
+      await page.goto(`/2026-10/${path}/`);
       const shown = await page.evaluate(() => ({
         label: document.querySelector('.bk-toc-label').innerText,
         entries: [...document.querySelectorAll('.bk-toc a')].filter((link) => link.checkVisibility({ opacityProperty: true }) && link.getBoundingClientRect().height > 10).map((link) => link.innerText.replace(/\s+/g, ' ')),
@@ -814,28 +800,27 @@ test('the table of contents', async (t) => {
       assert.equal(shown.label, '目录');
       assert.deepEqual(shown.entries.slice(0, 4), ['01 第一章', '一之一', '一之二', '02 第2章'], `${path} at ${viewport.width}px`);
       assert.equal(shown.entries.length, 13);
-      if (viewport.width === 1440) assert.equal(shown.left, 290, `${path} keeps the left column for the table of contents`);
+      if (viewport.width === 1440) assert.equal(shown.left, notesLeft, `${path} keeps the left column for the table of contents`);
       await page.locator('.bk-toc a', { hasText: '第4章的小节' }).click();
       await page.waitForFunction(() => location.hash === '#chapter-4-a' && Math.abs(document.getElementById('chapter-4-a').getBoundingClientRect().top - 24) < 2);
-      await context.close();
     }
   });
 
-  await t.test('without scripts the section titles of the table of contents have the secondary ink colour', async () => {
-    for (const [colorScheme, ink2] of [
-      ['light', 'rgb(79, 87, 94)'],
-      ['dark', 'rgb(180, 186, 181)'],
-    ]) {
-      const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
+  test('without scripts the section titles of the table of contents have the secondary ink colour', async ({ newContext }) => {
+    for (const colorScheme of ['light', 'dark']) {
+      const context = await newContext({ javaScriptEnabled: false, colorScheme });
       const page = await context.newPage();
       await page.goto(url);
-      const colors = await page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-toc-section-title')].map((title) => getComputedStyle(title).color))]);
+      const { colors, ink2 } = await page.evaluate(() => {
+        const probe = document.body.appendChild(document.createElement('span'));
+        probe.style.color = 'var(--ink-2)';
+        return { colors: [...new Set([...document.querySelectorAll('.bk-toc-section-title')].map((title) => getComputedStyle(title).color))], ink2: getComputedStyle(probe).color };
+      });
       assert.deepEqual(colors, [ink2], colorScheme);
-      await context.close();
     }
   });
 
-  await t.test('the settings button covers no entry of the table of contents at short and tall viewports in an article with page-wide components', async () => {
+  test('the settings button covers no entry of the table of contents at short and tall viewports in an article with page-wide components', async ({ open }) => {
     for (const style of STYLES) {
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -856,7 +841,6 @@ test('the table of contents', async (t) => {
           return { top: Math.min(...all.map((rect) => rect.top)), bottom: Math.max(...all.map((rect) => rect.bottom)) };
         }, style === 'notes' && viewport.width >= 1340 ? '.bk-toc-column' : selector);
         assert.ok(box.top >= 0 && box.bottom <= viewport.height, `${style} reaches outside the screen at ${viewport.width}×${viewport.height}: ${JSON.stringify(box)}`);
-        await context.close();
       }
     }
   });

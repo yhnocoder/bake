@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
 import { CHAT_RULES } from '../../src/chat/context.js';
 import { chatLabels } from '../../src/chat/labels.js';
 import { noteRules } from '../../src/chat/note.js';
 import { exampleBlog } from '../blog.js';
-import { serveExample } from './browser.js';
-import { API_KEY, QUESTION, ask, openBrowser, scrollPage, setUpKey, storage, text } from './chat-page.js';
+import { API_KEY, QUESTION, ask, scrollPage, setUpKey, storage, test, text } from './chat-page.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
@@ -49,12 +47,10 @@ const NOTE = [
   '- 中文标题的锚点怎么生成。',
 ].join('\n');
 
-test('the history of the AI chat', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('conversations are saved in this browser as they go, listed per article on article pages and grouped by article on the homepage, and can be opened, continued and deleted', async (t) => {
-    const { page, api, problems } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+test.describe('the history of the AI chat', () => {
+  test('conversations are saved in this browser as they go, listed per article on article pages and grouped by article on the homepage, and can be opened, continued and deleted', async ({ context, site, openChat }) => {
+    const { page, api, problems } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     api.answers.push({ body: text('第一个回答，见 [标题](#标题与锚点)。') }, { body: text('第二个回答。') });
     await ask(page, '第一个问题');
@@ -97,13 +93,13 @@ test('the history of the AI chat', async (t) => {
       ],
     );
 
-    await page.goto(`${base}/2026-10/jacobian/`);
+    await page.goto('/2026-10/jacobian/');
     await page.locator('.bk-chat-launcher').click();
     await page.locator(QUESTION).waitFor();
     await openHistory(page);
     assert.equal(await page.locator('.bk-chat-history-row').count(), 0);
 
-    await page.goto(`${base}/`);
+    await page.goto('/');
     await page.locator('.bk-chat-launcher').click();
     await page.locator(QUESTION).waitFor();
     await openHistory(page);
@@ -112,14 +108,14 @@ test('the history of the AI chat', async (t) => {
     await page.locator('.bk-chat-history-open').click();
     await page.locator('.bk-chat-note').filter({ hasText: '这段对话来自《Bake 写法一览》，接着问时会读这篇文章。' }).waitFor();
     assert.deepEqual(await page.locator('.bk-chat-user').allTextContents(), ['第一个问题', '第二个问题', '第三个问题']);
-    assert.equal(await page.locator('.bk-chat-answer a').first().getAttribute('href'), `${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`);
+    assert.equal(await page.locator('.bk-chat-answer a').first().getAttribute('href'), `${site.origin}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`);
     api.answers.push({ body: text('第四个回答，见 [标题](#标题与锚点)。') });
     await ask(page, '第四个问题');
     await answered(page, 4);
     const system = chatRequests(api).at(-1).body.messages[0].content;
     assert.ok(system.includes(`<article>\n${syntaxSource}\n</article>`), 'the article of a conversation opened on the homepage is its context');
     assert.ok(system.includes('[the heading](/2026-10/syntax/#id)'));
-    assert.equal(await page.locator('.bk-chat-answer a').last().getAttribute('href'), `${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`);
+    assert.equal(await page.locator('.bk-chat-answer a').last().getAttribute('href'), `${site.origin}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`);
 
     await openMenu(page);
     await page.locator('.bk-chat-menu-item', { hasText: '新对话' }).click();
@@ -137,10 +133,10 @@ test('the history of the AI chat', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('clearing the key keeps the history, and a conversation of an earlier day is listed with its date', async (t) => {
-    const { page, api } = await openBrowser(t, base);
+  test('clearing the key keeps the history, and a conversation of an earlier day is listed with its date', async ({ openChat }) => {
+    const { page, api } = await openChat();
     await page.clock.install({ time: new Date('2026-03-01T10:00:00') });
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     api.answers.push({ body: text('旧回答。') });
     await ask(page, '旧问题');
@@ -155,12 +151,10 @@ test('the history of the AI chat', async (t) => {
   });
 });
 
-test('the notes of the AI chat', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('a conversation becomes a note with checked links, which is copied, rewritten on request, kept in versions and saved with its conversation', async (t) => {
-    const { page, api, problems } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+test.describe('the notes of the AI chat', () => {
+  test('a conversation becomes a note with checked links, which is copied, rewritten on request, kept in versions and saved with its conversation', async ({ site, openChat }) => {
+    const { page, api, problems } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     const read = { index: 0, id: 'call_1', type: 'function', function: { name: 'read_article', arguments: '{"address":"/2026-10/jacobian/"}' } };
     api.answers.push({ body: `data: ${JSON.stringify({ choices: [{ index: 0, delta: { tool_calls: [read] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n` });
@@ -190,8 +184,8 @@ test('the notes of the AI chat', async (t) => {
     assert.deepEqual(
       await card.locator('.bk-chat-note-body li a').evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')])),
       [
-        ['Bake 写法一览 §02', `${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`],
-        ['雅可比矩阵 §01', `${base}/2026-10/jacobian/#%E5%AE%9A%E4%B9%89`],
+        ['Bake 写法一览 §02', `${site.origin}/2026-10/syntax/#${encodeURIComponent('标题与锚点')}`],
+        ['雅可比矩阵 §01', `${site.origin}/2026-10/jacobian/#%E5%AE%9A%E4%B9%89`],
       ],
     );
     assert.deepEqual(await card.locator('.bk-chat-note-body li').nth(2).textContent(), '这一条指向不存在的文章。不存在');
@@ -203,9 +197,9 @@ test('the notes of the AI chat', async (t) => {
     await card.getByRole('button', { name: 'Markdown', exact: true }).click();
     const markdown = await card.locator('.bk-chat-note-source').textContent();
     assert.ok(markdown.startsWith(`# 标题与锚点的写法\n\n整理自 `));
-    assert.ok(markdown.includes(`在[《Bake 写法一览》](${base}/2026-10/syntax/)的对话。`));
-    assert.ok(markdown.includes(`[Bake 写法一览 §02](${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
-    assert.ok(markdown.includes(`> 出自[《Bake 写法一览》§02](${base}/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
+    assert.ok(markdown.includes(`在[《Bake 写法一览》](${site.origin}/2026-10/syntax/)的对话。`));
+    assert.ok(markdown.includes(`[Bake 写法一览 §02](${site.origin}/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
+    assert.ok(markdown.includes(`> 出自[《Bake 写法一览》§02](${site.origin}/2026-10/syntax/#${encodeURIComponent('标题与锚点')})`));
     assert.ok(markdown.includes('- 这一条指向不存在的文章。不存在\n'));
     await card.getByRole('button', { name: '复制 Markdown' }).click();
     await card.locator('.bk-chat-note-hint', { hasText: '已复制 Markdown。' }).waitFor();
@@ -310,9 +304,9 @@ test('the notes of the AI chat', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('a note that the model cannot write is reported, and a blocked clipboard selects the Markdown instead', async (t) => {
-    const { page, api } = await openBrowser(t, base, { contextOptions: { permissions: [] } });
-    await page.goto(`${base}/`);
+  test('a note that the model cannot write is reported, and a blocked clipboard selects the Markdown instead', async ({ openChat }) => {
+    const { page, api } = await openChat({ contextOptions: { permissions: [] } });
+    await page.goto('/');
     await setUpKey(page);
     api.answers.push({ body: text('回答。') });
     await ask(page, '问题');
@@ -337,18 +331,16 @@ test('the notes of the AI chat', async (t) => {
   });
 });
 
-test('the instructions and the prompts of the AI chat', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('the tabs of the prompt form fit the form in Chinese and in English at 320 and 375 pixels and break only between words', async (t) => {
+test.describe('the instructions and the prompts of the AI chat', () => {
+  test('the tabs of the prompt form fit the form in Chinese and in English at 320 and 375 pixels and break only between words', async ({ site, openChat }) => {
     for (const width of [320, 375]) {
       for (const lang of ['zh-CN', 'en']) {
-        const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width, height: 812 } } });
-        await page.route(`${base}/2026-10/syntax/`, async (route) => {
+        const { page } = await openChat({ contextOptions: { viewport: { width, height: 812 } } });
+        await page.route(`${site.origin}/2026-10/syntax/`, async (route) => {
           const response = await route.fetch();
           await route.fulfill({ response, body: (await response.text()).replace('<html lang="zh-CN"', `<html lang="${lang}"`) });
         });
-        await page.goto(`${base}/2026-10/syntax/`);
+        await page.goto('/2026-10/syntax/');
         await setUpKey(page);
         await page.locator('.bk-chat-icon').last().click();
         await page.locator('.bk-chat-menu-item').filter({ hasText: lang === 'en' ? 'Prompts' : '提示词' }).click();
@@ -380,8 +372,8 @@ test('the instructions and the prompts of the AI chat', async (t) => {
     }
   });
 
-  await t.test('prompts that cannot all be stored change nothing in storage and stay in the form', async (t) => {
-    const { page } = await openBrowser(t, base);
+  test('prompts that cannot all be stored change nothing in storage and stay in the form', async ({ openChat }) => {
+    const { page } = await openChat();
     await page.addInitScript(() => {
       const setItem = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key, value) {
@@ -389,7 +381,7 @@ test('the instructions and the prompts of the AI chat', async (t) => {
         return setItem.call(this, key, value);
       };
     });
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await openMenu(page);
     await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
@@ -414,9 +406,9 @@ test('the instructions and the prompts of the AI chat', async (t) => {
     assert.equal(await form.locator('#bk-chat-prompt-text').inputValue(), '');
   });
 
-  await t.test('instructions and built-in prompts written in the chat settings are stored in this browser and used in every request', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('instructions and built-in prompts written in the chat settings are stored in this browser and used in every request', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await openMenu(page);
     await page.locator('.bk-chat-menu-item', { hasText: '提示词' }).click();
