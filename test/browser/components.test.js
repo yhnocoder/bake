@@ -424,6 +424,23 @@ test('components run in the browser', async (t) => {
     await page.close();
   });
 
+  await t.test('a Solid component starts when the first request for its shared Solid wrapper fails', async () => {
+    const page = await open(null);
+    await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'connection', { get: () => ({ saveData: true }) }));
+    // why: page.route turns off the HTTP cache that the download before the import relies on, so the request is failed in the network layer instead
+    const session = await page.context().newCDPSession(page);
+    await session.send('Network.enable');
+    await session.send('Network.setBlockedURLs', { urls: ['*/solid-element-*'] });
+    page.on('requestfailed', (request) => {
+      if (/[/]solid-element-[\w-]{8}\.js$/.test(request.url())) session.send('Network.setBlockedURLs', { urls: [] });
+    });
+    await page.goto(`${origin}/2026-10/rope/`);
+    const frame = 'figure.component[data-component="count-view"]';
+    await page.waitForFunction((selector) => ['ready', 'failed'].includes(document.querySelector(selector).dataset.state), frame);
+    assert.equal(await page.locator(frame).getAttribute('data-state'), 'ready');
+    await page.close();
+  });
+
   await t.test('the article styles of the essay theme do not reach the headings, paragraphs, code, links and lists of a component', async () => {
     const page = await open('text');
     await waitForReady(page);

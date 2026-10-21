@@ -7,6 +7,8 @@ const NEAR_DISTANCE = 800;
 const NEAR_SCREENS = 1.5;
 const definitions = new Map();
 const SLOW_CONNECTIONS = ['slow-2g', '2g'];
+const DOWNLOAD_ATTEMPTS = 3;
+const RETRY_DELAY = 500;
 const prefetchQueue = [];
 let prefetching = null;
 let starting = 0;
@@ -16,17 +18,19 @@ function define(name) {
   if (!definitions.has(name)) {
     definitions.set(
       name,
-      loaders[name]().then(
-        async (module) => {
-          const Component = module.default;
-          if (Component.prototype instanceof HTMLElement) customElements.define(name, Component);
-          else customElements.define(name, (await import('./solid-element.js')).solidElement(Component));
-        },
-        (error) => {
-          definitions.delete(name);
-          throw error;
-        },
-      ),
+      download(name)
+        .then(() => loaders[name]())
+        .then(
+          async (module) => {
+            const Component = module.default;
+            if (Component.prototype instanceof HTMLElement) customElements.define(name, Component);
+            else customElements.define(name, (await import('./solid-element.js')).solidElement(Component));
+          },
+          (error) => {
+            definitions.delete(name);
+            throw error;
+          },
+        ),
     );
   }
   return definitions.get(name);
@@ -122,16 +126,30 @@ function prefetchNext() {
   if (definitions.has(name)) return prefetchNext();
   const controller = new AbortController();
   prefetching = { name, controller };
-  const addresses = files[name].map((file) => new URL(file, import.meta.url).href).filter((address) => !prefetched.has(address) && !requestedByPage(address));
-  const download = (address) =>
-    fetch(address, { signal: controller.signal, priority: 'low' })
-      .then((response) => response.arrayBuffer())
-      .then(() => prefetched.add(address));
-  Promise.allSettled(addresses.map(download)).then(() => {
+  download(name, { signal: controller.signal, priority: 'low' }).then(() => {
     if (prefetching?.controller !== controller) return;
     prefetching = null;
     prefetchNext();
   });
+}
+
+// why: Chromium keeps a failed module request in the module map of the page, so an import() of that module, or of any module that imports it, fails again without a request until the page reloads; downloading the files first, with retries, lets the import read them from the HTTP cache
+function download(name, { signal, priority } = {}) {
+  // why: bake dev builds the components without the lists of their files
+  const addresses = (files[name] ?? []).map((file) => new URL(file, import.meta.url).href).filter((address) => !prefetched.has(address) && !requestedByPage(address));
+  const attempt = async (address, number) => {
+    try {
+      const response = await fetch(address, { signal, priority });
+      if (!response.ok) throw new Error(`${address} answered ${response.status}`);
+      await response.arrayBuffer();
+      prefetched.add(address);
+    } catch (error) {
+      if (number === DOWNLOAD_ATTEMPTS || signal?.aborted) throw error;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * number));
+      await attempt(address, number + 1);
+    }
+  };
+  return Promise.allSettled(addresses.map((address) => attempt(address, 1)));
 }
 
 function requestedByPage(address) {
