@@ -329,3 +329,14 @@ No npm publish workflow in this branch. The full test suites run in CI on the pu
 - A `|` inside `$…$` on a table line stands for a lone surrogate while the table is parsed; the private-use search and its error are deleted.
 - Tests decode images with `sharp` through `decodeImage` in `test/blog.js`; `pngjs` is gone.
 
+
+#### Step 7: theme declarations of Markdown, bento stickers, notes and narrow columns
+
+- `ArticleParser` is split: `article.js` keeps the `Article` state and `readArticle`; `parse.js`, `link.js`, `structure.js` and `tree.js` hold the rest.
+- `options.js` may export `headings` and `blocks`; an attribute is `{ type }` with `number` (`min`, `max`, `step`), `text`, `enum` (`options`) or `boolean`, and a heading attribute can add `depth`. A theme block name has lowercase letters and digits only, so a name with `-` stays a component; it cannot be a built-in block, must stand at the top level, and reaches the theme as `{ type: 'themeBlock', name, attributes, html }`.
+- The core table of contents and the chat catalog show the full heading text; essay's table of contents reads `attributes.toc` itself.
+- `optionProblem` lives in `src/components/declarations.js`; `listAll` is shared in `src/report.js`.
+- Narrow bento: the unit is the registered property `--bt-unit`, computed from `--bt-wide-gutter` (104 px) without the scrollbar; "half the columns" means half of the narrow grid; the narrow span starts from the span written in the article. The 768 px screenshots show gaps where a narrow card stands alone before a full-row card; the component cleanup round replaces the narrow grid with rows that share their free width.
+- A sticker card is transparent and stretches with its row; the visible sticker is its tilted `.bt-block-body`. Sticker and note cards carry `data-theme-block`.
+- Bento browser tests check that no two cards overlap instead of equal gaps.
+- Copy regression from part 13: a partial selection inside a pipe table copies whole rows without the header row; fix in the component cleanup round.
