@@ -161,26 +161,22 @@ test.describe('the keyboard and the pointer in the AI chat on published pages', 
     await page.setViewportSize({ width: 375, height: 812 });
     await launcher.click();
     await focused();
+    // why: under load the fade can pass between two frames, so the test records that an opacity transition starts before the input field is hidden
     const fading = page.evaluate(
       () =>
         new Promise((resolve) => {
-          const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
-          const composer = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-composer');
-          const frames = [];
+          const root = document.querySelector('[data-bake-chat]').shadowRoot;
+          const composer = root.querySelector('.bk-chat-composer');
+          const events = [];
+          for (const target of [root, document]) target.addEventListener('transitionstart', (event) => event.propertyName === 'opacity' && events.push('fade'), { capture: true });
           const sample = () => {
-            const visibility = getComputedStyle(composer).visibility;
-            frames.push({ opacity: seenOpacity(composer), visibility });
-            if (visibility === 'hidden') resolve(frames);
+            if (getComputedStyle(composer).visibility === 'hidden') resolve([...events, 'hidden']);
             else requestAnimationFrame(sample);
           };
           sample();
         }),
     );
     await scrollPage(page, 800);
-    const frames = await fading;
-    assert.ok(
-      frames.some((frame) => frame.visibility === 'visible' && frame.opacity > 0 && frame.opacity < 1),
-      `the chat that the theme hides while the reader scrolls fades out before it leaves the keyboard order: ${JSON.stringify(frames)}`,
-    );
+    assert.deepEqual((await fading).slice(0, 1), ['fade'], 'the chat that the theme hides while the reader scrolls leaves the keyboard order without fading out');
   });
 });
