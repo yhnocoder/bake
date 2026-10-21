@@ -44,7 +44,7 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     await ask(page, '这篇文章讲什么？');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer').filter({ hasText: '结束。' }).waitFor();
     await page.locator('.bk-chat-answer .bk-chat-math[data-state="ready"] svg').nth(1).waitFor();
-    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), '#标题与锚点');
+    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), `#${encodeURIComponent('标题与锚点')}`);
     assert.equal(await page.locator('.bk-chat-user').textContent(), '这篇文章讲什么？');
     const request = api.requests.at(-1);
     assert.equal(request.path, '/chat/completions');

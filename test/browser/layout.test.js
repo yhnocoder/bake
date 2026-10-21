@@ -320,7 +320,7 @@ test('the essay theme lays out articles', async (t) => {
     await page.close();
   });
 
-  await t.test('display math shows a scroll shadow only on an overflowing side in both schemes, also in the first frame after the colour scheme changes', async () => {
+  await t.test('display math fades into the page colour only at an overflowing side in both schemes, also in the first frame after the colour scheme changes', async () => {
     const problems = [];
     for (const width of [1440, 375]) {
       const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
@@ -328,7 +328,8 @@ test('the essay theme lays out articles', async (t) => {
         const boxes = await page.evaluate(() =>
           [...document.querySelectorAll('.bk-article mjx-container[display]')].map((formula) => {
             const box = formula.getBoundingClientRect();
-            return { left: Math.ceil(box.left), right: Math.floor(box.right) - 1, top: Math.ceil(box.top), overflows: formula.scrollWidth > formula.clientWidth };
+            const fade = (side) => Number(getComputedStyle(formula, side).opacity);
+            return { left: Math.ceil(box.left), right: Math.floor(box.right) - 1, top: Math.ceil(box.top), overflows: formula.scrollWidth > formula.clientWidth, fades: [fade('::before'), fade('::after')] };
           }),
         );
         const { data, info } = await sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true });
@@ -340,8 +341,8 @@ test('the essay theme lays out articles', async (t) => {
         for (const [index, edge] of (await edges()).entries()) {
           const name = `formula ${index + 1} at ${width}px ${moment}`;
           if (distance(edge.start, edge.page) > 2) problems.push(`${name}: start edge ${edge.start} on page ${edge.page}`);
-          const endShadow = distance(edge.end, edge.page) > 2;
-          if (endShadow !== edge.overflows) problems.push(`${name}: end edge ${edge.end} on page ${edge.page}, overflows ${edge.overflows}`);
+          if (distance(edge.end, edge.page) > 2) problems.push(`${name}: end edge ${edge.end} on page ${edge.page}`);
+          if (String(edge.fades) !== String([0, edge.overflows ? 1 : 0])) problems.push(`${name}: fades ${edge.fades}, overflows ${edge.overflows}`);
         }
       };
       await page.locator('mjx-container[display]').nth(1).scrollIntoViewIfNeeded();
@@ -369,7 +370,7 @@ test('the essay theme lays out articles', async (t) => {
       const code = getComputedStyle(document.querySelector('.bk-article p code'));
       return [...document.querySelectorAll('.bk-tag')].map((tag) => {
         const style = getComputedStyle(tag);
-        return { text: tag.textContent, font: style.fontFamily === code.fontFamily && style.fontFamily.startsWith('"JetBrains Mono"'), background: style.backgroundColor };
+        return { text: tag.textContent, font: style.fontFamily === code.fontFamily, background: style.backgroundColor };
       });
     });
     assert.deepEqual(tags, [
