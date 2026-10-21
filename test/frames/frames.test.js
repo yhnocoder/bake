@@ -19,6 +19,7 @@ const knownFailures = [
   { name: 'scrolling the whole llm-act-fns article at 1440 pixels', reason: 'the longest frame takes 50 to 67 ms in ten of ten runs', task: 'long-article-frames' },
   { name: 'scrolling the whole matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 ms or more in five of five runs', task: 'long-article-frames' },
   { name: 'scrolling the whole matrix-calculus article at 375 pixels', reason: 'the longest frame takes 50 to 67 ms in five of five runs', task: 'long-article-frames' },
+  { name: 'dragging a slider of matrix-gradient-field in the matrix-calculus article at 1440 pixels', reason: 'the longest frame takes 50 to 117 ms in three of thirteen runs', task: 'long-article-frames' },
   { name: 'resizing the bento article at 1440 pixels', reason: 'the longest frame takes 50 to 100 ms in two of ten runs', task: 'bento-redesign' },
 ];
 
