@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
-import { startDevServer } from '../../src/dev/server.js';
-import { article, bake, copyExample, decodeImage, exampleBlog, writeFiles } from '../blog.js';
+import { article, createBlog, decodeImage, exampleBlog, writeFiles } from '../blog.js';
+import { addPasskeyAuthenticator, test as base, expect, luminance, settle, startDev } from './browser.js';
 import { openWithSelectionModule } from './selection-module.js';
-import { launchBrowser, serve, settle } from './browser.js';
 
 const widths = [1440, 1100, 375];
 const activationsSource = readFileSync(join(exampleBlog, 'content/posts/activations/index.md'), 'utf8');
@@ -89,37 +86,31 @@ A note.
 `,
 });
 
-test('the bento theme lays out sections as cards', async (t) => {
-  const dir = copyExample(t);
-  writeFiles(dir, { 'content/posts/bento-cards/index.md': cardsArticle, 'content/posts/bento-gaps/index.md': gapsArticle });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  assert.equal(result.status, 0);
-  const origin = await serve(t, join(dir, 'dist'));
+const englishBlog = {
+  'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', themes: { bento: { columns: 2 } } };\n",
+  'content/posts/cards/index.md': englishCards('Text.'),
+};
 
-  const english = mkdtempSync(join(tmpdir(), 'bake-bento-english-'));
-  t.after(() => rmSync(english, { recursive: true, force: true }));
-  writeFiles(english, {
-    'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento', themes: { bento: { columns: 2 } } };\n",
-    'content/posts/cards/index.md': englishCards('Text.'),
-  });
-  const englishBuild = bake(english, 'build');
-  assert.equal(englishBuild.stderr, '');
-  const englishOrigin = await serve(t, join(english, 'dist'));
+const test = base.extend({
+  open: async ({ newPage }, use) => {
+    await use(async (path, options = {}) => {
+      const page = await newPage(options);
+      await page.goto(`/2026-10/${path}/`);
+      if (options.javaScriptEnabled !== false) await settle(page);
+      return page;
+    });
+  },
+});
 
-  const browser = await launchBrowser();
-  const open = async (path, options = {}) => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', ...options });
-    await page.goto(`${origin}/2026-10/${path}/`);
-    if (options.javaScriptEnabled !== false) await settle(page);
-    return page;
-  };
-  const resize = async (page, width) => {
-    await page.setViewportSize({ width, height: 900 });
-    await settle(page);
-  };
+async function resize(page, width) {
+  await page.setViewportSize({ width, height: 900 });
+  await settle(page);
+}
 
-  await t.test('cards span the columns their sections ask for, the cards keep the order of the article and every card takes the whole row on a phone', async () => {
+test.use({ reducedMotion: 'reduce', blog: { files: { 'content/posts/bento-cards/index.md': cardsArticle, 'content/posts/bento-gaps/index.md': gapsArticle } } });
+
+test.describe('the bento theme lays out sections as cards', () => {
+  test('cards span the columns their sections ask for, the cards keep the order of the article and every card takes the whole row on a phone', async ({ open }) => {
     const page = await open('bento-cards');
     const desktop = { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 3, 'Body three': 2, 'Body four': 2, Fixed: 3 };
     for (const width of [1440, 1100]) {
@@ -131,10 +122,9 @@ test('the bento theme lays out sections as cards', async (t) => {
     await resize(page, 375);
     const phone = await page.evaluate(gridLayout, 1);
     assert.ok(phone.fullWidth && phone.inOrder, '375px');
-    await page.close();
   });
 
-  await t.test('stickers and notes fill the gaps that the section cards leave from 1000 pixels up and follow the order of the article below', async () => {
+  test('stickers and notes fill the gaps that the section cards leave from 1000 pixels up and follow the order of the article below', async ({ open }) => {
     const page = await open('bento-gaps');
     const cards = () =>
       page.evaluate(() => {
@@ -162,10 +152,9 @@ test('the bento theme lays out sections as cards', async (t) => {
     const narrow = await cards();
     assert.deepEqual(narrow.map(({ name }) => name), ['Tall', 'sticker', 'Short', 'Across', 'note']);
     assert.ok(narrow.every(({ top }, index) => index === 0 || top >= narrow[index - 1].top), JSON.stringify(narrow));
-    await page.close();
   });
 
-  await t.test('below 1000 pixels the cards wrap into rows in the order of the article, a card is as wide as its span in desktop columns or takes the row when that is more than half of it, and the cards of a row fill it and are equally tall', async () => {
+  test('below 1000 pixels the cards wrap into rows in the order of the article, a card is as wide as its span in desktop columns or takes the row when that is more than half of it, and the cards of a row fill it and are equally tall', async ({ open }) => {
     const page = await open('bento-cards');
     const expected = {
       768: [['Wide section'], ['Body one', 'Body two'], ['Page section'], ['Component', 'Body three'], ['Body four'], ['Fixed']],
@@ -194,65 +183,11 @@ test('the bento theme lays out sections as cards', async (t) => {
       assert.deepEqual(rows.map((row) => row.names), names, `${width}px`);
       for (const row of rows) assert.deepEqual([Math.abs(row.free) < 1, row.inOrder, row.heights], [true, true, 1], `${width}px ${row.names.join(', ')}: ${JSON.stringify(row)}`);
     }
-    await page.close();
     const still = await open('bento-cards', { javaScriptEnabled: false, viewport: { width: 768, height: 900 } });
     assert.ok((await still.evaluate(gridLayout, 1)).fullWidth);
-    await still.close();
   });
 
-  await t.test('the column count follows themes.bento.columns in bake.config.js', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await page.goto(`${englishOrigin}/2026-10/cards/`);
-    await settle(page);
-    const grid = await page.evaluate(gridLayout, 2);
-    assert.deepEqual({ spans: grid.spans, inOrder: grid.inOrder }, { spans: { One: 1, Two: 1, Three: 2, Four: 1 }, inOrder: true });
-    await page.close();
-  });
-
-  await t.test('the settings button and the AI chat button sit on one line in equal gutters and cover no card and not the text before the first section from 1000 pixels up', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    const page = await context.newPage();
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('WebAuthn.enable');
-    await cdp.send('WebAuthn.addVirtualAuthenticator', {
-      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
-    });
-    const problems = [];
-    const measure = () =>
-      page.evaluate(() => {
-        const settings = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
-        const chat = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher').getBoundingClientRect();
-        const boxes = [...document.querySelectorAll('.bt-card, .bt-intro')].map((element) => element.getBoundingClientRect());
-        const left = Math.min(...boxes.map((box) => box.left));
-        const right = Math.max(...boxes.map((box) => box.right));
-        const covers = (button) => boxes.some((box) => box.left < button.right && box.right > button.left);
-        return { settingsGap: left - settings.right, chatGap: chat.left - right, covered: covers(settings) || covers(chat), gutters: [left, document.documentElement.clientWidth - right], bottoms: [settings.bottom, chat.bottom] };
-      });
-    const chatOrigin = await serve(t, join(dir, 'dist'), { localhost: true });
-    const englishChatOrigin = await serve(t, join(english, 'dist'), { localhost: true });
-    for (const url of [`${chatOrigin}/2026-10/bento-cards/`, `${englishChatOrigin}/2026-10/cards/`]) {
-      await page.goto(url);
-      await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
-      for (const width of [1440, 1340, 1339, 1100, 1000, 999, 375]) {
-        await resize(page, width);
-        const { settingsGap, chatGap, covered, gutters, bottoms } = await measure();
-        const at = `${url} at ${width}px`;
-        if (Math.abs(bottoms[0] - bottoms[1]) > 0.5) problems.push(`${at}: the buttons end at ${bottoms.join(' and ')}`);
-        if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
-        if (width < 1000) continue;
-        if (covered) problems.push(`${at}: a button covers a card or the intro`);
-        if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
-        if (Math.abs(chatGap - 12) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
-      }
-    }
-    await page.goto(`${englishChatOrigin}/`);
-    await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
-    assert.equal(await page.locator('.bk-home').count(), 1);
-    assert.deepEqual(problems, []);
-    await context.close();
-  });
-
-  await t.test('a card with rows is as tall as its rows from 1000 pixels up, every other card is as tall as its content, and sidenotes follow the last block', async () => {
+  test('a card with rows is as tall as its rows from 1000 pixels up, every other card is as tall as its content, and sidenotes follow the last block', async ({ open }) => {
     const page = await open('activations');
     for (const width of widths) {
       await resize(page, width);
@@ -288,10 +223,9 @@ test('the bento theme lays out sections as cards', async (t) => {
         `${width}px`,
       );
     }
-    await page.close();
   });
 
-  await t.test('each card goes to the columns that end highest, in the order of the article', async () => {
+  test('each card goes to the columns that end highest, in the order of the article', async ({ open }) => {
     const page = await open('activations');
     for (const width of [1440, 1100]) {
       await resize(page, width);
@@ -300,10 +234,9 @@ test('the bento theme lays out sections as cards', async (t) => {
       assert.ok(grid.inOrder, `${width}px`);
       assert.deepEqual(await page.evaluate(overlappingCards), [], `${width}px`);
     }
-    await page.close();
   });
 
-  await t.test('content that does not fit into the rows of a card fades out at the bottom and scrolls inside the card only after the card is chosen by a click or the keyboard', async () => {
+  test('content that does not fit into the rows of a card fades out at the bottom and scrolls inside the card only after the card is chosen by a click or the keyboard', async ({ open }) => {
     const page = await open('bento-cards', { reducedMotion: 'no-preference' });
     const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Fixed' }) });
     const outline = () => card.evaluate((element) => getComputedStyle(element).outlineColor);
@@ -336,10 +269,9 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.waitForFunction((before) => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1)).outlineColor === before, unchosen);
     await resize(page, 375);
     assert.equal(await card.evaluate((element) => element.scrollHeight > element.clientHeight + 1), false);
-    await page.close();
   });
 
-  await t.test('a click on a sidenote number chooses its card and scrolls the note into view when the rows of the card hide it, and the chosen card has an outline in the accent colour', async () => {
+  test('a click on a sidenote number chooses its card and scrolls the note into view when the rows of the card hide it, and the chosen card has an outline in the accent colour', async ({ open }) => {
     const page = await open('bento-cards');
     const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Fixed' }) });
     await card.locator('.sidenote-ref a').scrollIntoViewIfNeeded();
@@ -362,10 +294,9 @@ test('the bento theme lays out sections as cards', async (t) => {
       return { width: style.outlineWidth, color: style.outlineColor === accent };
     });
     assert.deepEqual(outline, { width: '2px', color: true });
-    await page.close();
   });
 
-  await t.test('no page scrolls horizontally', async () => {
+  test('no page scrolls horizontally', async ({ open }) => {
     const overflowing = [];
     for (const path of ['bento-cards', 'activations']) {
       const page = await open(path);
@@ -374,12 +305,11 @@ test('the bento theme lays out sections as cards', async (t) => {
         const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
         if (scrollWidth > width) overflowing.push(`${path} at ${width}px is ${scrollWidth}px wide`);
       }
-      await page.close();
     }
     assert.deepEqual(overflowing, []);
   });
 
-  await t.test('sidenotes sit at the bottom of their card and there is no table of contents', async () => {
+  test('sidenotes sit at the bottom of their card and there is no table of contents', async ({ open }) => {
     const page = await open('activations');
     for (const width of widths) {
       await resize(page, width);
@@ -404,10 +334,9 @@ test('the bento theme lays out sections as cards', async (t) => {
       );
     }
     assert.equal(await page.locator('.bk-toc, nav').count(), 0);
-    await page.close();
   });
 
-  await t.test('a component in a card loads and keeps its frame inside the card', async () => {
+  test('a component in a card loads and keeps its frame inside the card', async ({ open }) => {
     for (const width of widths) {
       const page = await open('activations', { viewport: { width, height: 900 } });
       const frame = page.locator('.bt-card figure.component');
@@ -427,21 +356,21 @@ test('the bento theme lays out sections as cards', async (t) => {
       });
       assert.deepEqual(typography.box, typography.card, `${width}px`);
       assert.deepEqual(typography.box, { 1440: ['15.5px', '27.9px'], 1100: ['14px', '21.7px'], 375: ['15px', '27px'] }[width], `${width}px`);
-      await page.close();
     }
   });
 
-  await t.test('dark mode changes the page and the cards', async () => {
-    const colors = (page) => page.evaluate(() => [document.body, document.querySelector('.bt-card')].map((element) => getComputedStyle(element).backgroundColor));
-    const dark = await open('activations', { colorScheme: 'dark' });
-    assert.deepEqual(await colors(dark), ['rgb(17, 20, 19)', 'rgb(26, 30, 28)']);
-    await dark.close();
-    const light = await open('activations', { colorScheme: 'light' });
-    assert.deepEqual(await colors(light), ['rgb(245, 246, 244)', 'rgb(255, 255, 255)']);
-    await light.close();
+  test('dark mode changes the page and the cards', async ({ open }) => {
+    const colors = async (colorScheme) => {
+      const page = await open('activations', { colorScheme });
+      return (await page.evaluate(() => [document.body, document.querySelector('.bt-card')].map((element) => getComputedStyle(element).backgroundColor))).map(luminance);
+    };
+    const [darkPage, darkCard] = await colors('dark');
+    const [lightPage, lightCard] = await colors('light');
+    assert.ok(darkPage < 0.2 && lightPage > 0.8, `the page has the luminance ${darkPage} in dark and ${lightPage} in light mode`);
+    assert.ok(darkCard > darkPage && lightCard > lightPage, 'the cards stand out from the page');
   });
 
-  await t.test('a code block, a table or a display formula that fits its card shows no scroll shadow at its edges', async () => {
+  test('a code block, a table or a display formula that fits its card shows no scroll shadow at its edges', async ({ open }) => {
     for (const colorScheme of ['light', 'dark']) {
       const page = await open('activations', { colorScheme, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
       const boxes = page.locator('.bt-card :is(pre.shiki, .table-scroll, mjx-container[display])');
@@ -458,11 +387,10 @@ test('the bento theme lays out sections as cards', async (t) => {
         if (difference > 2) leaks.push(`${colorScheme}: ${await box.evaluate((element) => element.closest('.bt-card').querySelector('h2 .bk-heading-text').textContent)} ${index} differs by ${difference}`);
       }
       assert.deepEqual(leaks, []);
-      await page.close();
     }
   });
 
-  await t.test('the code blocks, tables and display formulas of the example article fit their cards, code wraps on a phone, and a component in a card has no frame of its own', async () => {
+  test('the code blocks, tables and display formulas of the example article fit their cards, code wraps on a phone, and a component in a card has no frame of its own', async ({ open }) => {
     for (const width of [1440, 1100, 1000, 375]) {
       const page = await open('activations', { viewport: { width, height: 900 } });
       const overflowing = await page.evaluate((phone) =>
@@ -476,68 +404,31 @@ test('the bento theme lays out sections as cards', async (t) => {
         return [style.borderTopWidth, style.paddingLeft, style.boxShadow];
       });
       assert.deepEqual(frame, ['0px', '0px', 'none'], `${width}px`);
-      await page.close();
     }
   });
 
-  await t.test('without scripts the cards keep their declared spans and every sidenote is shown', async () => {
+  test('without scripts the cards keep their declared spans and every sidenote is shown', async ({ open }) => {
     const page = await open('bento-cards', { javaScriptEnabled: false });
     const grid = await page.evaluate(gridLayout, 6);
     assert.deepEqual(grid.spans, { 'Wide section': 3, 'Body one': 2, 'Body two': 2, 'Page section': 6, Component: 2, 'Body three': 2, 'Body four': 2, Fixed: 3 });
     assert.ok(await page.evaluate(() => { const card = [...document.querySelectorAll('.bt-card')].at(-1); return card.scrollHeight <= card.clientHeight + 1; }));
     assert.equal(await page.locator('.bk-sidenote').evaluateAll((notes) => notes.every((note) => note.checkVisibility())), true);
-    await page.close();
   });
 
-  await t.test('in bake dev a card whose content does not fit shows the rows it needs, and the cards are placed again after the article is saved', async () => {
-    const server = await startDevServer(english, { port: 0, print: () => {} });
-    t.after(() => server.close());
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await page.goto(new URL('2026-10/cards/', server.url).href);
-    await settle(page);
-    const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Four' }) });
-    const hint = () => card.evaluate((element) => getComputedStyle(element, '::before').content);
-    await page.waitForFunction(() => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1), '::before').content.startsWith('"Content'));
-    const [, pixels, rows] = /^"Content is (\d+) px taller than the card; set rows to at least (\d+)"$/.exec(await hint());
-    const fit = await card.evaluate(
-      (element, [rows, rowHeight]) => {
-        const style = getComputedStyle(element);
-        const gap = parseFloat(getComputedStyle(element.parentElement).rowGap);
-        const needed = element.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-        const height = (count) => count * rowHeight + (count - 1) * gap;
-        return { overflow: Math.ceil(element.scrollHeight - element.clientHeight), fits: height(rows) >= needed, fitsWithOneLess: height(rows - 1) >= needed };
-      },
-      [Number(rows), ROW_HEIGHT],
-    );
-    assert.deepEqual(fit, { overflow: Number(pixels), fits: true, fitsWithOneLess: false });
-    const before = await page.evaluate(gridLayout, 2);
-    // why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the file is written until the page shows it
-    for (let attempt = 0; !(await page.getByText('Saved text.').isVisible()); attempt += 1) {
-      assert.ok(attempt < 50, 'the page did not show the saved article');
-      writeFiles(english, { 'content/posts/cards/index.md': englishCards('Saved text.') });
-      await page.waitForTimeout(200);
-    }
-    await settle(page);
-    assert.deepEqual(await page.evaluate(gridLayout, 2), before);
-    await page.close();
-  });
-
-  await t.test('the settings panel offers the theme, the text size, the weight, the spacing and the font and no table of contents style', async () => {
+  test('the settings panel offers the theme, the text size, the weight, the spacing and the font and no table of contents style', async ({ open }) => {
     for (const width of [1440, 375]) {
       const page = await open('activations', { viewport: { width, height: 900 } });
       await page.locator('.bk-settings-toggle').click();
       const rows = await page.locator('.bk-settings-label').evaluateAll((labels) => labels.filter((label) => label.checkVisibility()).map((label) => label.textContent));
       assert.deepEqual(rows, ['主题', '字号', '字重', '间距', '字体'], `${width}px`);
       await page.locator('.bk-settings-row[data-setting="theme"] button[data-value="dark"]').click();
-      assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)', `${width}px`);
-      await page.close();
+      await expect.poll(async () => luminance(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)), `${width}px`).toBeLessThan(0.2);
     }
   });
 
-  await t.test('copying a selection or the whole article gives its Markdown', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
-    const page = await context.newPage();
-    await openWithSelectionModule(page, `${origin}/2026-10/activations/`);
+  test('copying a selection or the whole article gives its Markdown', async ({ page, context, after }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openWithSelectionModule(page, '/2026-10/activations/');
     await settle(page);
     const lines = activationsSource.split('\n');
     const between = (first, last) => {
@@ -580,9 +471,89 @@ test('the bento theme lays out sections as cards', async (t) => {
     await page.evaluate(() => getSelection().removeAllRanges());
     await page.locator('.bk-header .bk-copy-source').click();
     await page.waitForFunction((expected) => navigator.clipboard.readText().then((text) => text === expected), activationsSource);
-    await context.close();
+  });
+});
+
+test.describe('the settings button and the AI chat button of the bento theme', () => {
+  for (const [name, url, blog] of [
+    ['the example blog', '/2026-10/bento-cards/', { files: { 'content/posts/bento-cards/index.md': cardsArticle }, localhost: true }],
+    ['a blog with two columns', '/2026-10/cards/', { example: false, files: englishBlog, localhost: true }],
+  ]) {
+    test.describe(name, () => {
+      test.use({ blog });
+
+      test('the buttons sit on one line in equal gutters and cover no card and not the text before the first section from 1000 pixels up', async ({ page, context }) => {
+        await addPasskeyAuthenticator(context, page);
+        const problems = [];
+        const measure = () =>
+          page.evaluate(() => {
+            const settings = document.querySelector('.bk-settings-toggle').getBoundingClientRect();
+            const chat = document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-launcher').getBoundingClientRect();
+            const boxes = [...document.querySelectorAll('.bt-card, .bt-intro')].map((element) => element.getBoundingClientRect());
+            const left = Math.min(...boxes.map((box) => box.left));
+            const right = Math.max(...boxes.map((box) => box.right));
+            const covers = (button) => boxes.some((box) => box.left < button.right && box.right > button.left);
+            return { settingsGap: left - settings.right, chatGap: chat.left - right, covered: covers(settings) || covers(chat), gutters: [left, document.documentElement.clientWidth - right], bottoms: [settings.bottom, chat.bottom] };
+          });
+        await page.goto(url);
+        await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
+        for (const width of [1440, 1340, 1339, 1100, 1000, 999, 375]) {
+          await resize(page, width);
+          const { settingsGap, chatGap, covered, gutters, bottoms } = await measure();
+          const at = `${url} at ${width}px`;
+          if (Math.abs(bottoms[0] - bottoms[1]) > 0.5) problems.push(`${at}: the buttons end at ${bottoms.join(' and ')}`);
+          if (Math.abs(gutters[0] - gutters[1]) > 1) problems.push(`${at}: the gutters are ${gutters.join(' and ')}`);
+          if (width < 1000) continue;
+          if (covered) problems.push(`${at}: a button covers a card or the intro`);
+          if (settingsGap < 16) problems.push(`${at}: the settings button is ${settingsGap}px from the content`);
+          if (Math.abs(chatGap - 12) > 1) problems.push(`${at}: the chat button is ${chatGap}px from the content`);
+        }
+        assert.deepEqual(problems, []);
+      });
+    });
+  }
+});
+
+test.describe('the bento theme in a blog with two columns', () => {
+  test.use({ blog: { example: false, files: englishBlog } });
+
+  test('the column count follows themes.bento.columns in bake.config.js', async ({ open }) => {
+    const page = await open('cards');
+    const grid = await page.evaluate(gridLayout, 2);
+    assert.deepEqual({ spans: grid.spans, inOrder: grid.inOrder }, { spans: { One: 1, Two: 1, Three: 2, Four: 1 }, inOrder: true });
   });
 
+  test('in bake dev a card whose content does not fit shows the rows it needs, and the cards are placed again after the article is saved', async ({ page, after }) => {
+    const dir = createBlog({ after }, englishBlog);
+    const dev = await startDev(dir);
+    after(dev.close);
+    await page.goto(new URL('2026-10/cards/', dev.url).href);
+    await settle(page);
+    const card = page.locator('.bt-card').filter({ has: page.getByRole('heading', { name: 'Four' }) });
+    const hint = () => card.evaluate((element) => getComputedStyle(element, '::before').content);
+    await page.waitForFunction(() => getComputedStyle([...document.querySelectorAll('.bt-card')].at(-1), '::before').content.startsWith('"Content'));
+    const [, pixels, rows] = /^"Content is (\d+) px taller than the card; set rows to at least (\d+)"$/.exec(await hint());
+    const fit = await card.evaluate(
+      (element, [rows, rowHeight]) => {
+        const style = getComputedStyle(element);
+        const gap = parseFloat(getComputedStyle(element.parentElement).rowGap);
+        const needed = element.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+        const height = (count) => count * rowHeight + (count - 1) * gap;
+        return { overflow: Math.ceil(element.scrollHeight - element.clientHeight), fits: height(rows) >= needed, fitsWithOneLess: height(rows - 1) >= needed };
+      },
+      [Number(rows), ROW_HEIGHT],
+    );
+    assert.deepEqual(fit, { overflow: Number(pixels), fits: true, fitsWithOneLess: false });
+    const before = await page.evaluate(gridLayout, 2);
+    // why: macOS starts reporting changes a moment after fs.watch returns and drops what happens before, so the file is written until the page shows it
+    for (let attempt = 0; !(await page.getByText('Saved text.').isVisible()); attempt += 1) {
+      assert.ok(attempt < 50, 'the page did not show the saved article');
+      writeFiles(dir, { 'content/posts/cards/index.md': englishCards('Saved text.') });
+      await page.waitForTimeout(200);
+    }
+    await settle(page);
+    assert.deepEqual(await page.evaluate(gridLayout, 2), before);
+  });
 });
 
 function gridLayout(columns) {

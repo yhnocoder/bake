@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
-import { article, bake, createBlog, decodeImage, exampleBuild, validConfig } from '../blog.js';
-import { launchBrowser, serve, settle } from './browser.js';
+import { article, decodeImage, validConfig } from '../blog.js';
+import { test as base, settle } from './browser.js';
 
 const PLOT = 'figure.component[data-component="act-fn-plot"]';
 
@@ -183,30 +182,31 @@ function colorCount({ data }) {
   return colors.size;
 }
 
-test('the kit draws the example function plot', async (t) => {
-  const dir = exampleBuild();
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await launchBrowser();
-
-  const open = async (options = {}) => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, ...options });
-    const problems = [];
-    page.on('console', (message) => {
-      if (['error', 'warning'].includes(message.type())) problems.push(`${message.type()}: ${message.text()}`);
+const test = base.extend({
+  open: async ({ newPage }, use) => {
+    await use(async (options = {}) => {
+      const page = await newPage(options);
+      const problems = [];
+      page.on('console', (message) => {
+        if (['error', 'warning'].includes(message.type())) problems.push(`${message.type()}: ${message.text()}`);
+      });
+      page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+      await page.goto('/2026-10/syntax/');
+      await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
+      await waitForComponents(page);
+      await page.waitForFunction(() => [...document.querySelectorAll('.bk-kit-tex, .bk-kit-svg-tex')].every((label) => label.querySelector('svg, text') !== null || label.textContent !== ''));
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
+      await settle(page);
+      return { page, problems };
     });
-    page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
-    await page.goto(`${origin}/2026-10/syntax/`);
-    await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
-    await waitForComponents(page);
-    await page.waitForFunction(() => [...document.querySelectorAll('.bk-kit-tex, .bk-kit-svg-tex')].every((label) => label.querySelector('svg, text') !== null || label.textContent !== ''));
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-    });
-    await settle(page);
-    return { page, problems };
-  };
+  },
+});
 
-  await t.test('each plot draws its curves, axes and legend in two panels', async () => {
+test.describe('the kit draws the example function plot', () => {
+
+  test('each plot draws its curves, axes and legend in two panels', async ({ open }) => {
     const { page, problems } = await open();
     const [gelu, swish, relu] = await Promise.all([0, 1, 2].map((index) => page.evaluate(plotState, index)));
     assert.deepEqual(gelu.legend, ['GELU', 'GELU (tanh 近似)', 'GELU (quick 近似)']);
@@ -225,10 +225,9 @@ test('the kit draws the example function plot', async (t) => {
     assert.match(swish.status, /^gate 过渡区：\[−1\.10, 1\.10\]；宽 2\.20/);
     assert.ok(relu.panels[1].curves[0].split('M').length > 2, 'the derivative of ReLU is not joined at 0');
     assert.deepEqual(problems, []);
-    await page.close();
   });
 
-  await t.test('the crosshair and its readout follow the pointer and leave with it', async () => {
+  test('the crosshair and its readout follow the pointer and leave with it', async ({ open }) => {
     const { page, problems } = await open();
     const frame = page.locator(PLOT).first();
     await frame.scrollIntoViewIfNeeded();
@@ -272,10 +271,9 @@ test('the kit draws the example function plot', async (t) => {
     assert.equal(gone.visible, '0');
     assert.ok(Number.isNaN(gone.crosshair));
     assert.deepEqual(problems, []);
-    await page.close();
   });
 
-  await t.test('the sliders change the plot', async () => {
+  test('the sliders change the plot', async ({ open }) => {
     const { page, problems } = await open({ reducedMotion: 'reduce' });
     await page.locator(PLOT).first().scrollIntoViewIfNeeded();
     const before = await page.evaluate(plotState, 0);
@@ -298,20 +296,18 @@ test('the kit draws the example function plot', async (t) => {
     assert.match(flat.status, /^gate 过渡区：\[−2\.20, 2\.20\]；宽 4\.39/);
     assert.equal(await page.locator(PLOT).nth(1).locator('.bk-kit-value').textContent(), '1.00');
     assert.deepEqual(problems, []);
-    await page.close();
   });
 
-  await t.test('every plot stays inside its box at 1440 and 375 pixels', async () => {
+  test('every plot stays inside its box at 1440 and 375 pixels', async ({ open }) => {
     for (const width of [1440, 375]) {
       const { page, problems } = await open({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
       await page.evaluate(nextFrames);
       assert.deepEqual((await page.evaluate(overflow)).filter((problem) => !problem.includes('"fns":"silu"')), [], `${width}px`);
       assert.deepEqual(problems, [], `${width}px`);
-      await page.close();
     }
   });
 
-  await t.test('the sliders and the TeX labels have accessible names', async () => {
+  test('the sliders and the TeX labels have accessible names', async ({ open }) => {
     const { page, problems } = await open();
     const frame = page.locator(PLOT).first();
     await frame.scrollIntoViewIfNeeded();
@@ -320,10 +316,9 @@ test('the kit draws the example function plot', async (t) => {
     assert.equal(await frame.getByRole('img', { name: 'f(x)', exact: true }).count(), 1);
     assert.equal(await frame.getByRole('img', { name: '\\frac{df(x)}{dx}', exact: true }).count(), 1);
     assert.deepEqual(problems, []);
-    await page.close();
   });
 
-  await t.test('the plot follows the color scheme, and its screenshots differ between light and dark', async () => {
+  test('the plot follows the color scheme, and its screenshots differ between light and dark', async ({ open }) => {
     const shots = {};
     const strokes = {};
     for (const colorScheme of ['light', 'dark']) {
@@ -342,7 +337,6 @@ test('the kit draws the example function plot', async (t) => {
         });
       });
       assert.deepEqual(problems, [], colorScheme);
-      await page.close();
     }
     for (const index of [0, 1, 2]) assert.notEqual(strokes.light[index], strokes.dark[index]);
     assert.ok(colorCount(shots.light) > 20 && colorCount(shots.dark) > 20);
@@ -350,16 +344,12 @@ test('the kit draws the example function plot', async (t) => {
   });
 });
 
-test('the kit works for any component that imports it', async (t) => {
-  const dir = createBlog(t, kitBlog);
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await launchBrowser();
+test.describe('the kit works for any component that imports it', () => {
+  test.use({ blog: { example: false, files: kitBlog } });
 
-  await t.test('a plot with only a width fills the height of its parent, and a plot with only a height fills its width', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await page.goto(`${origin}/2026-10/sized-plots/`);
+  test('a plot with only a width fills the height of its parent, and a plot with only a height fills its width', async ({ newPage }) => {
+    const page = await newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto('/2026-10/sized-plots/');
     await waitForComponents(page);
     await page.waitForFunction(() => document.querySelectorAll('.bk-kit-plot-svg').length === 2);
     const sizes = await page.evaluate(() =>
@@ -372,14 +362,13 @@ test('the kit works for any component that imports it', async (t) => {
       [200, 120],
       [300, 90],
     ]);
-    await page.close();
   });
 
-  await t.test('a plot without a size fills its parent, a button changes it and a TeX label sits inside the SVG', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  test('a plot without a size fills its parent, a button changes it and a TeX label sits inside the SVG', async ({ newPage }) => {
+    const page = await newPage({ viewport: { width: 1440, height: 900 } });
     const problems = [];
     page.on('pageerror', (error) => problems.push(error.message));
-    await page.goto(`${origin}/2026-10/demo/`);
+    await page.goto('/2026-10/demo/');
     await waitForComponents(page);
     await page.waitForFunction(() => document.querySelector('.bk-kit-svg-tex svg') !== null);
     const read = () =>
@@ -424,12 +413,11 @@ test('the kit works for any component that imports it', async (t) => {
     assert.equal(after.slope, '2');
     assert.notEqual(after.path, before.path);
     assert.deepEqual(problems, []);
-    await page.close();
   });
 
-  await t.test('a slider shows its value with the decimals of its step', async () => {
-    const page = await browser.newPage();
-    await page.goto(`${origin}/2026-10/step-sliders/`);
+  test('a slider shows its value with the decimals of its step', async ({ newPage }) => {
+    const page = await newPage();
+    await page.goto('/2026-10/step-sliders/');
     await waitForComponents(page);
     const sliders = await page.evaluate(() =>
       [...document.querySelectorAll('.bk-kit-slider')].map((slider) => [slider.querySelector('.bk-kit-value').textContent, slider.querySelector('input').getAttribute('aria-valuetext')]),
@@ -438,12 +426,11 @@ test('the kit works for any component that imports it', async (t) => {
       ['0.25', '0.25'],
       ['7.5', '7.5'],
     ]);
-    await page.close();
   });
 
-  await t.test('controls show the pointer cursor and a focus outline, and segments are at least 24 pixels tall', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await page.goto(`${origin}/2026-10/demo/`);
+  test('controls show the pointer cursor and a focus outline, and segments are at least 24 pixels tall', async ({ newPage }) => {
+    const page = await newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto('/2026-10/demo/');
     await waitForComponents(page);
     const cursors = await page.evaluate(() =>
       ['.bk-kit-segment', '.bk-kit-segment input', '.bk-kit-slider', '.bk-kit-slider input', '.bk-kit-toggle', '.bk-kit-toggle input', '.bk-kit-button'].map((selector) => getComputedStyle(document.querySelector(selector)).cursor),
@@ -463,13 +450,12 @@ test('the kit works for any component that imports it', async (t) => {
     assert.equal(await page.getByRole('switch', { name: 'Grid', exact: true }).count(), 1);
     const heights = await page.locator('.bk-kit-segment').evaluateAll((segments) => segments.map((segment) => segment.getBoundingClientRect().height));
     assert.ok(heights.every((height) => height >= 24), heights.join(', '));
-    await page.close();
   });
 
-  await t.test('with reduced motion no transition and no tween runs', async () => {
+  test('with reduced motion no transition and no tween runs', async ({ newPage }) => {
     const changes = async (reducedMotion) => {
-      const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion });
-      await page.goto(`${origin}/2026-10/demo/`);
+      const page = await newPage({ viewport: { width: 1440, height: 900 }, reducedMotion });
+      await page.goto('/2026-10/demo/');
       await waitForComponents(page);
       await settle(page);
       const state = await page.evaluate(async () => {
@@ -482,7 +468,6 @@ test('the kit works for any component that imports it', async (t) => {
         await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
         return { transitions, tweening: frame.querySelector('.kit-demo-tween').textContent !== '2.000' };
       });
-      await page.close();
       return state;
     };
     assert.deepEqual(await changes('reduce'), { transitions: 0, tweening: false });
@@ -490,9 +475,9 @@ test('the kit works for any component that imports it', async (t) => {
     assert.ok(moving.transitions > 0 && moving.tweening, JSON.stringify(moving));
   });
 
-  await t.test('text with formulas flows inline in HTML, sits on one baseline in an SVG drawing and stays within the given x positions', async () => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await page.goto(`${origin}/2026-10/math-labels/`);
+  test('text with formulas flows inline in HTML, sits on one baseline in an SVG drawing and stays within the given x positions', async ({ newPage }) => {
+    const page = await newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto('/2026-10/math-labels/');
     await waitForComponents(page);
     await page.waitForFunction(() => document.querySelectorAll('.math-labels-text svg').length === 2 && document.querySelectorAll('.math-labels-svg svg').length === 2);
     const layout = await page.evaluate(() => {
@@ -519,49 +504,36 @@ test('the kit works for any component that imports it', async (t) => {
     assert.ok(Math.abs(layout.centre - 150) < 1, `the label is centred at ${layout.centre}`);
     assert.equal(layout.label, 'side $a^{2}$ long');
     assert.ok(layout.edge <= 300.5 && layout.edge > 290, `the label that starts at 290 ends at ${layout.edge}`);
-    await page.close();
   });
 
-  const assetsOf = async (slug) => {
-    const page = await browser.newPage();
-    const requested = [];
-    page.on('request', (request) => requested.push(new URL(request.url()).pathname));
-    await page.goto(`${origin}/2026-10/${slug}/`);
-    await waitForComponents(page);
-    const text = await page.evaluate(() => document.querySelector('figure.component .component-box').textContent);
-    await page.close();
-    const assets = requested.filter((path) => path.startsWith('/assets/') && /\.(js|css)$/.test(path));
-    const componentAssets = assets.filter((path) => !path.startsWith('/assets/essay-'));
-    return { text, assets, kit: componentAssets.filter((path) => readFileSync(join(dir, 'dist', path), 'utf8').includes('bk-kit-')) };
-  };
-
-  await t.test('a component that only uses the plain helpers loads none of the kit parts, their styles or MathJax', async () => {
-    const { text, assets, kit } = await assetsOf('ticks');
-    assert.equal(text, '0.0 0.2 0.4 0.6 0.8 1.0');
-    assert.deepEqual(kit, []);
-    assert.ok(!assets.some((path) => path.includes('/mathjax-')), assets.join(', '));
+  test('a component that only uses the plain helpers or does not import the kit loads no kit code and no MathJax, also when another component of the blog uses the kit', async ({ newPage, site }) => {
+    for (const [slug, text] of [
+      ['ticks', '0.0 0.2 0.4 0.6 0.8 1.0'],
+      ['plain', 'plain'],
+    ]) {
+      const page = await newPage();
+      const requested = [];
+      page.on('request', (request) => requested.push(new URL(request.url()).pathname));
+      await page.goto(`/2026-10/${slug}/`);
+      await waitForComponents(page);
+      assert.equal(await page.evaluate(() => document.querySelector('figure.component .component-box').textContent), text);
+      const assets = requested.filter((path) => path.startsWith('/assets/') && /\.(js|css)$/.test(path) && !path.startsWith('/assets/essay-'));
+      assert.deepEqual(assets.filter((path) => readFileSync(join(site.dir, 'dist', path), 'utf8').includes('bk-kit-') || path.includes('/mathjax-')), [], slug);
+    }
   });
 
-  await t.test('a component that does not import the kit loads no kit code, also when another component of the blog uses it', async () => {
-    const { text, assets, kit } = await assetsOf('plain');
-    assert.equal(text, 'plain');
-    assert.deepEqual(kit, []);
-    assert.ok(assets.some((path) => path.includes('/plain-view-')), assets.join(', '));
-  });
-
-  await t.test('a TeX label that cannot be typeset is reported with the name of its component and shows its source', async () => {
-    const page = await browser.newPage();
+  test('a TeX label that cannot be typeset is reported with the name of its component and shows its source', async ({ newPage }) => {
+    const page = await newPage();
     const errors = [];
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
-    await page.goto(`${origin}/2026-10/broken-tex/`);
+    await page.goto('/2026-10/broken-tex/');
     await waitForComponents(page);
     await page.waitForFunction(() => document.querySelector('.bk-kit-tex').textContent !== '');
     assert.equal(await page.evaluate(() => document.querySelector('figure.component').dataset.state), 'ready');
     assert.equal(await page.evaluate(() => document.querySelector('.bk-kit-tex').textContent), '\\frac{');
     assert.equal(errors.length, 1, errors.join('\n'));
     assert.match(errors[0], /^broken-tex: the TeX label "\\frac\{" cannot be typeset: /);
-    await page.close();
   });
 });

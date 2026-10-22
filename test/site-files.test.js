@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { article, bake, createBlog, validConfig } from './blog.js';
+import { article, build, createBlog, validConfig } from './blog.js';
 
 const subPathConfig = `export default {
   title: 'Notes & <Models>',
@@ -47,10 +47,9 @@ function essaySiteTheme(themeCss) {
   };
 }
 
-function built(t, files) {
+async function built(t, files) {
   const dir = createBlog(t, files);
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   return { dir, read: (path) => readFileSync(join(dir, 'dist', path), 'utf8') };
 }
 
@@ -59,8 +58,8 @@ function probed(html) {
 }
 
 describe('site files', () => {
-  test('feed.xml lists the published articles and plain HTML pages newest first with absolute links and summaries only', (t) => {
-    const { read } = built(t, blogFiles);
+  test('feed.xml lists the published articles and plain HTML pages newest first with absolute links and summaries only', async (t) => {
+    const { read } = await built(t, blogFiles);
     assert.equal(
       read('feed.xml'),
       [
@@ -102,16 +101,16 @@ describe('site files', () => {
     );
   });
 
-  test('feed.xml uses the site title as the channel description when the site has none', (t) => {
-    const { read } = built(t, { 'bake.config.js': validConfig.replace("url: 'https://example.com'", "url: 'https://example.com/'") });
+  test('feed.xml uses the site title as the channel description when the site has none', async (t) => {
+    const { read } = await built(t, { 'bake.config.js': validConfig.replace("url: 'https://example.com'", "url: 'https://example.com/'") });
     const feed = read('feed.xml');
     assert.match(feed, /<link>https:\/\/example.com\/<\/link>\n<description>Test Blog<\/description>/);
     assert.match(feed, /<atom:link href="https:\/\/example.com\/feed.xml"/);
     assert.doesNotMatch(feed, /<item>/);
   });
 
-  test('sitemap.xml lists the homepage and every published article and plain HTML page without drafts', (t) => {
-    const { read } = built(t, blogFiles);
+  test('sitemap.xml lists the homepage and every published article and plain HTML page without drafts', async (t) => {
+    const { read } = await built(t, blogFiles);
     assert.equal(
       read('sitemap.xml'),
       [
@@ -127,8 +126,8 @@ describe('site files', () => {
     );
   });
 
-  test('the 404 page gets the published articles and asset paths from the base path of the site', (t) => {
-    const { read } = built(t, { ...blogFiles, 'bake.config.js': subPathConfig.replace("language: 'en',", "language: 'en',\n  theme: 'probe',"), ...probeNotFound });
+  test('the 404 page gets the published articles and asset paths from the base path of the site', async (t) => {
+    const { read } = await built(t, { ...blogFiles, 'bake.config.js': subPathConfig.replace("language: 'en',", "language: 'en',\n  theme: 'probe',"), ...probeNotFound });
     const props = probed(read('404.html'));
     const { styles, scripts } = props.assets;
     assert.equal(styles.length, 1);
@@ -148,8 +147,8 @@ describe('site files', () => {
     assert.equal(probed(read('2026-10/rope/index.html')), 'https://x.github.io/bake/2026-10/rope/');
   });
 
-  test('the essay theme writes a 404 page with absolute asset paths, a hidden list of candidates and a link home', (t) => {
-    const { read } = built(t, blogFiles);
+  test('the essay theme writes a 404 page with absolute asset paths, a hidden list of candidates and a link home', async (t) => {
+    const { read } = await built(t, blogFiles);
     const html = read('404.html');
     assert.match(html, /^<!doctype html>\n<html lang="en"/);
     assert.match(html, /<meta name="robots" content="noindex"><title>This page does not exist · Notes &amp; &lt;Models><\/title>/);
@@ -161,17 +160,17 @@ describe('site files', () => {
     assert.doesNotMatch(html, /draft/);
   });
 
-  test('reports a 404 page that the site theme cannot render at the theme folder', (t) => {
+  test('reports a 404 page that the site theme cannot render at the theme folder', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig.replace("language: 'en'", "language: 'en', theme: 'probe'"),
       ...probeNotFound,
       'themes/probe/not-found.jsx': "export default function NotFound() {\n  throw new Error('no page');\n}\n",
     });
-    assert.equal(bake(dir, 'build').stderr, 'themes/probe:1:1 the probe theme cannot render the 404 page: no page\n1 error, dist/ was not written\n');
+    assert.deepEqual(await build(dir), ['themes/probe:1:1 the probe theme cannot render the 404 page: no page']);
   });
 
-  test('the essay theme gives article pages and the homepage Open Graph tags, a canonical address and the feed', (t) => {
-    const { read } = built(t, blogFiles);
+  test('the essay theme gives article pages and the homepage Open Graph tags, a canonical address and the feed', async (t) => {
+    const { read } = await built(t, blogFiles);
     const page = read('2026-10/rope/index.html');
     assert.ok(
       page.includes(
@@ -194,16 +193,16 @@ describe('site files', () => {
     assert.match(home, /<link rel="canonical" href="https:\/\/x.github.io\/bake\/"><link rel="alternate" type="application\/rss\+xml" href=".\/feed.xml" title="Notes &amp; <Models>"><meta property="og:type" content="website"><meta property="og:title" content="Notes &amp; <Models>"><meta property="og:description" content="Short &quot;notes&quot;.">/);
   });
 
-  test('_bake/theme.css holds the colours of the site theme, and plain HTML pages are published unchanged', (t) => {
+  test('_bake/theme.css holds the colours of the site theme, and plain HTML pages are published unchanged', async (t) => {
     const themeCss = "@import 'bake/theme/styles/tokens.css';\n@import 'bake/theme/styles/base.css';\n\n:root {\n  --bg: #123456;\n}\n";
-    const { read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss) });
+    const { read } = await built(t, { ...blogFiles, ...essaySiteTheme(themeCss) });
     const styles = read('_bake/theme.css');
     assert.match(styles, /--bg:#123456/);
     assert.match(styles, /body\{[^}]*background:var\(--bg\)/);
     assert.equal(read('2026-09/demo/index.html'), pageHtml);
   });
 
-  test('_bake/theme.css resolves every form of @import of a file in the theme folder and of a stylesheet of bake/theme', (t) => {
+  test('_bake/theme.css resolves every form of @import of a file in the theme folder and of a stylesheet of bake/theme', async (t) => {
     const themeCss = [
       '@import url(./styles/a.css);',
       "@import url( './styles/b.css' );",
@@ -214,7 +213,7 @@ describe('site files', () => {
       '',
     ].join('\n');
     const own = Object.fromEntries(['a', 'b', 'c', 'd'].map((name) => [`themes/mine/styles/${name}.css`, `.own-${name} {\n  color: red;\n}\n`]));
-    const { read } = built(t, { ...blogFiles, ...essaySiteTheme(themeCss), ...own });
+    const { read } = await built(t, { ...blogFiles, ...essaySiteTheme(themeCss), ...own });
     const styles = read('_bake/theme.css');
     assert.doesNotMatch(styles, /@import/i);
     assert.match(styles, /\.own-a,\.own-b,\.own-c,\.own-d\{color:red\}/);
@@ -222,7 +221,7 @@ describe('site files', () => {
     assert.match(styles, /\.bk-card-frame\{/);
   });
 
-  test('reports public files at the addresses of the feed, the sitemap, the 404 page and in _bake/', (t) => {
+  test('reports public files at the addresses of the feed, the sitemap, the 404 page and in _bake/', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'public/feed.xml': '<rss/>\n',
@@ -231,17 +230,12 @@ describe('site files', () => {
       'public/_bake/theme.css': 'body {}\n',
       'public/_bake/extra.css': 'body {}\n',
     });
-    assert.equal(
-      bake(dir, 'build').stderr,
-      [
+    assert.deepEqual(await build(dir), [
         'public/404.html:1:1 dist/404.html is also written by the 404 page',
         'public/_bake/extra.css:1:1 dist/_bake/ is reserved for the files Bake writes',
         'public/_bake/theme.css:1:1 dist/_bake/theme.css is also written by the essay theme',
         'public/feed.xml:1:1 dist/feed.xml is also written by the RSS feed',
         'public/sitemap.xml:1:1 dist/sitemap.xml is also written by the sitemap',
-        '5 errors, dist/ was not written',
-        '',
-      ].join('\n'),
-    );
+      ]);
   });
 });

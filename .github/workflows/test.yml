@@ -43,7 +43,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 "test/browser/*.test.js"
+      - run: npx playwright test --shard=${{ matrix.shard }}/3
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: browser-traces-${{ matrix.shard }}
+          path: test-out/playwright
+          retention-days: 7
 
   test:
     needs: [lint, unit, browser]

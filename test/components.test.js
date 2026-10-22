@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { components as declare, parse, parsed } from './article.js';
-import { article, bake, createBlog, validConfig } from './blog.js';
+import { article, build, createBlog, validConfig } from './blog.js';
 
 const component = "export default function Component() {\n  return null;\n}\n";
 const height = 'export const layout = { height: 100 };\n';
@@ -21,7 +21,7 @@ const plot = {
 const components = declare({ 'act-fn-plot': { params: plot }, 'glu-heatmap': {} });
 
 describe('component files', () => {
-  test('reports every problem of the component files together with the problems of the articles and writes nothing', (t) => {
+  test('reports every problem of the component files together with the problems of the articles and writes nothing', async (t) => {
     const reserved = ['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'];
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
@@ -48,8 +48,7 @@ describe('component files', () => {
       'components/README.md': 'Not a component.\n',
       'content/posts/rope/index.md': article({ body: ':::top-plot\n:::\n\n:::grid-view{size=12}\n:::\n\n:::other-view\n:::\n\n:::const-plot{fn=c n-max=-3}\n:::\n' }),
     });
-    const result = bake(dir, 'build');
-    const lines = result.stderr.trimEnd().split('\n');
+    const lines = await build(dir);
     const literals = 'strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value';
     const expected = [
       ...reserved.map((name) => `components/${name}.js:1:1 ${name}: the HTML standard reserves "${name}" and does not allow it as a custom element name; give the component another name`),
@@ -85,9 +84,7 @@ describe('component files', () => {
       'content/posts/rope/index.md:16:15 parameter "fn" of const-plot must be one of a or b, got "c"',
       'content/posts/rope/index.md:16:20 parameter "n-max" of const-plot must be at least -2, got -3',
     ];
-    assert.equal(lines.pop(), `${expected.length} errors, dist/ was not written`);
     assert.deepEqual(lines.toSorted(), expected.toSorted());
-    assert.equal(result.status, 1);
   });
 });
 
@@ -163,7 +160,7 @@ describe('component blocks', () => {
 });
 
 describe('building components', () => {
-  test('publishes only the components that published articles use and loads the component runtime only on pages with components', (t) => {
+  test('publishes only the components that published articles use and loads the component runtime only on pages with components', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'components/lib/shared.js': 'export const scale = 2;\n',
@@ -179,8 +176,7 @@ describe('building components', () => {
       'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'No components.\n' }),
       'content/posts/draft/index.md': article({ slug: 'draft', extra: 'draft: true\n', body: ':::unused-view\n:::\n' }),
     });
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
+    assert.deepEqual(await build(dir), []);
     const assets = readdirSync(join(dir, 'dist/assets'));
     const runtime = assets.find((name) => /^components-[\w-]+\.js$/.test(name));
     const rope = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
@@ -197,7 +193,7 @@ describe('building components', () => {
     assert.ok(!sources.some((source) => source.includes('bk-kit-')), 'no component asset contains code of bake/kit');
   });
 
-  test('a component in the components/ folder of an article, at any depth, works in that article and is not published as a file of it', (t) => {
+  test('a component in the components/ folder of an article, at any depth, works in that article and is not published as a file of it', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'components/shared-view.js': `${height}export default class SharedView extends HTMLElement {}\n`,
@@ -207,8 +203,7 @@ describe('building components', () => {
       'content/posts/2026/gelu/index.md': article({ slug: 'gelu', body: ':::gelu-plot\n:::\n' }),
       'content/posts/2026/gelu/components/gelu-plot.js': `${height}export default class GeluPlot extends HTMLElement {}\n`,
     });
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
+    assert.deepEqual(await build(dir), []);
     const assets = readdirSync(join(dir, 'dist/assets'));
     assert.ok(assets.some((name) => /^rope-plot-[\w-]+\.js$/.test(name)));
     assert.ok(assets.some((name) => /^gelu-plot-[\w-]+\.js$/.test(name)));
@@ -216,7 +211,7 @@ describe('building components', () => {
     assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/gelu')).sort(), ['index.html', 'index.md']);
   });
 
-  test('reports a component that another article uses at its use, and a component name defined twice at both files', (t) => {
+  test('reports a component that another article uses at its use, and a component name defined twice at both files', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'components/twice-view.js': `${height}export default class TwiceView extends HTMLElement {}\n`,
@@ -225,17 +220,16 @@ describe('building components', () => {
       'content/posts/rope/components/twice-view.jsx': `${height}export default function TwiceView() {\n  return null;\n}\n`,
       'content/posts/gelu/index.md': article({ slug: 'gelu', body: 'Text.\n\n:::rope-plot\n:::\n\n:::twice-view\n:::\n' }),
     });
-    const result = bake(dir, 'build');
+    const errors = await build(dir);
     const twice = 'twice-view: components/twice-view.js and content/posts/rope/components/twice-view.jsx both define the component; a component name is unique in the blog, so rename or remove all but one of them';
-    assert.deepEqual(result.stderr.trimEnd().split('\n'), [
+    assert.deepEqual(errors, [
       `components/twice-view.js:1:1 ${twice}`,
       'content/posts/gelu/index.md:9:1 component "rope-plot" belongs to content/posts/rope and works only in that article; move content/posts/rope/components/rope-plot.js to components/ to use it in other articles',
       `content/posts/rope/components/twice-view.jsx:1:1 ${twice}`,
-      '3 errors, dist/ was not written',
     ]);
   });
 
-  test('bundles the parts of bake/kit and their styles with the components that use them, and the plain helpers without the styles', (t) => {
+  test('bundles the parts of bake/kit and their styles with the components that use them, and the plain helpers without the styles', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
       'components/line-plot.jsx':
@@ -243,8 +237,7 @@ describe('building components', () => {
       'components/tick-list.js': "import { niceTicks } from 'bake/kit';\n\nexport const layout = { height: 100 };\n\nexport default class TickList extends HTMLElement {\n  connectedCallback() {\n    this.textContent = niceTicks(0, 1, 2).length;\n  }\n}\n",
       'content/posts/rope/index.md': article({ body: ':::line-plot\n:::\n\n:::tick-list\n:::\n' }),
     });
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
+    assert.deepEqual(await build(dir), []);
     const assets = readdirSync(join(dir, 'dist/assets')).filter((name) => /\.(js|css)$/.test(name) && !name.startsWith('essay-'));
     const withKit = assets.filter((name) => readFileSync(join(dir, 'dist/assets', name), 'utf8').includes('bk-kit-')).map((name) => name.replace(/-[\w-]{8}\./, '.'));
     assert.deepEqual(withKit.sort(), ['line-plot.css', 'line-plot.js']);

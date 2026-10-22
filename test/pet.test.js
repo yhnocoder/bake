@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
@@ -8,7 +6,7 @@ import { describe, test } from 'node:test';
 import sharp from 'sharp';
 import { readPet } from '../src/chat/pet-files.js';
 import { startDevServer } from '../src/dev/server.js';
-import { bake, cli, createBlog, readTree, writeFiles } from './blog.js';
+import { build, createBlog, readTree, writeFiles } from './blog.js';
 
 const builtIn = join(import.meta.dirname, '../src/chat/pets');
 
@@ -39,14 +37,7 @@ async function noiseSheet() {
 }
 
 async function petFiles(dir) {
-  // why: the build runs in a child process without blocking, so the pet server of the test can answer it
-  const child = spawn(process.execPath, [cli, 'build'], { cwd: dir });
-  let stderr = '';
-  child.stderr.on('data', (chunk) => {
-    stderr += chunk;
-  });
-  const [status] = await once(child, 'exit');
-  const errors = status === 0 ? [] : stderr.trimEnd().split('\n').slice(0, -1);
+  const errors = await build(dir);
   const pet = join(dir, 'dist/_bake/pet');
   return { errors, files: existsSync(pet) ? Object.fromEntries(Object.entries(readTree(pet)).map(([path, content]) => [`_bake/pet/${path}`, content])) : {} };
 }
@@ -69,7 +60,7 @@ async function serveFiles(t, files) {
 describe('chat pets', () => {
   test('publishes the built-in CRT Monitor with its first frame, its credit and its license when bake.config.js names no pet', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en' };\n" });
-    assert.equal(bake(dir, 'build').stderr, '');
+    assert.deepEqual(await build(dir), []);
     const tree = readTree(join(dir, 'dist'));
     assert.deepEqual(JSON.parse(tree['_bake/pet/pet.json']), { displayName: 'CRT Monitor', spritesheetPath: 'spritesheet.webp', credit: { author: 'wxy', license: 'CC BY 4.0', href: 'LICENSE.txt' } });
     assert.deepEqual(tree['_bake/pet/spritesheet.webp'], readFileSync(join(builtIn, 'crt-monitor/spritesheet.webp')));
@@ -147,9 +138,7 @@ describe('chat pets', () => {
       ['ftp://example.com/pet.json', 'chat.pet must be an http or https URL of a pet.json, got "ftp://example.com/pet.json"'],
     ]) {
       const dir = createBlog(t, { 'bake.config.js': config(pet) });
-      const result = bake(dir, 'build');
-      assert.equal(result.status, 1);
-      assert.match(result.stderr, new RegExp(`^bake\\.config\\.js:5:16 ${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\n`));
+      assert.equal((await build(dir))[0], `bake.config.js:5:16 ${message}`);
     }
   });
 

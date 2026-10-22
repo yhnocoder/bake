@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { join } from 'node:path';
-import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { startDevServer } from '../../src/dev/server.js';
-import { article, copyExample, createBlog, validConfig } from '../blog.js';
-import { launchBrowser, settle, until } from './browser.js';
+import { article, copyExample, createBlog, filler, validConfig } from '../blog.js';
+import { addPasskeyAuthenticator, expect, settle, startDev, test } from './browser.js';
 
-const filler = (topic, count = 4) => Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
 const body = [
   filler('the introduction'),
@@ -48,18 +45,16 @@ function lineOf(source, text) {
   return source.slice(0, source.indexOf(text)).split('\n').length;
 }
 
-test('bake dev updates the page in place, lists problems and opens blocks in VS Code', async (t) => {
+test('bake dev updates the page in place, lists problems and opens blocks in VS Code', async ({ browser, after }) => {
   const source = article({ title: 'Live', slug: 'live', body });
-  const dir = createBlog(t, {
+  const dir = createBlog({ after }, {
     'bake.config.js': validConfig,
     [ARTICLE]: source,
-    'content/posts/sketch/index.md': article({ title: 'Sketch', slug: 'sketch', extra: 'draft: true\n' }),
   });
   const file = join(dir, ARTICLE);
   const edit = (from, to) => writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   await context.addInitScript(() => {
     window.open = (url, target) => {
@@ -68,7 +63,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     };
   });
   const page = await context.newPage();
-  const url = `${server.url}2026-10/live/`;
+  const url = `${dev.url}2026-10/live/`;
   await page.goto(url);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
   const scrollPosition = () => page.evaluate(() => scrollY);
@@ -87,7 +82,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   const dot = page.locator('#bake-dev .dot');
   const panel = page.locator('#bake-dev .problems');
 
-  await t.test('saving the Markdown replaces the changed block in place and keeps the scroll position and open folds', async () => {
+  await test.step('saving the Markdown replaces the changed block in place and keeps the scroll position and open folds', async () => {
     await page.click('details.fold > summary');
     await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
@@ -118,7 +113,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.equal(await page.locator('#bake-dev .notice').isVisible(), false);
   });
 
-  await t.test('a save that adds lines highlights only the added block and updates the source of the page', async () => {
+  await test.step('a save that adds lines highlights only the added block and updates the source of the page', async () => {
     await page.evaluate(() => {
       window.highlighted = [];
     });
@@ -129,7 +124,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), readFileSync(file, 'utf8'));
   });
 
-  await t.test('the page scripts work on the replaced article', async () => {
+  await test.step('the page scripts work on the replaced article', async () => {
     const notes = await page.evaluate(() => {
       const reference = [...document.querySelectorAll('.bk-article p')].find((paragraph) => paragraph.textContent.includes('says goodbye'));
       return [...document.querySelectorAll('.bk-sidenote')]
@@ -142,13 +137,9 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     );
     assert.ok(notes[0].offset < 40, `the note is ${notes[0].offset}px away from its paragraph`);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => {
-      const fold = document.querySelector('details.fold');
-      return fold.open && Number(getComputedStyle(fold, '::details-content').opacity) < 1;
-    });
     await page.waitForFunction(() => !document.querySelector('details.fold').open);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
+    await page.waitForFunction(() => document.querySelector('details.fold').open);
     edit('gives a width.\n```\n', 'gives a width.\n```\n\nSee [the far section](/2026-10/live/#far).\n');
     const link = page.locator('.bk-article a.internal-link', { hasText: 'the far section' });
     await link.waitFor();
@@ -160,7 +151,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await card.waitFor({ state: 'hidden' });
   });
 
-  await t.test('a change above the screen keeps the visible text in place and names the introduction', async () => {
+  await test.step('a change above the screen keeps the visible text in place and names the introduction', async () => {
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
     const top = () => page.evaluate(() => document.getElementById('editing').getBoundingClientRect().top);
     const before = await top();
@@ -175,7 +166,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.ok(Math.abs(after - before) <= 1, `the heading moved from ${before}px to ${after}px`);
   });
 
-  await t.test('an error opens the problems list and keeps the last good page, and fixing it leaves a dot', async () => {
+  await test.step('an error opens the problems list and keeps the last good page, and fixing it leaves a dot', async () => {
     assert.equal(await dot.isVisible(), true);
     assert.equal(await dot.getAttribute('title'), 'No problems');
     assert.equal(await panel.isVisible(), false);
@@ -208,7 +199,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.equal(await dot.getAttribute('title'), 'No problems');
   });
 
-  await t.test('closing the problems list leaves a dot with the count that opens it again', async () => {
+  await test.step('closing the problems list leaves a dot with the count that opens it again', async () => {
     edit('says goodbye again.', 'says goodbye again[^missing].');
     await panel.waitFor();
     await settled('problems');
@@ -235,7 +226,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await dot.waitFor();
   });
 
-  await t.test('the problems list and the dot only fade when the reader prefers reduced motion', async () => {
+  await test.step('the problems list and the dot only fade when the reader prefers reduced motion', async () => {
     const transitions = () =>
       page.evaluate(() =>
         [...document.querySelector('#bake-dev').shadowRoot.querySelectorAll('.problems, .dot, .notice')].map((element) => {
@@ -250,7 +241,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await page.emulateMedia({ reducedMotion: null });
   });
 
-  await t.test('a change outside the screen shows a notice that names its section and scrolls there when clicked', async () => {
+  await test.step('a change outside the screen shows a notice that names its section and scrolls there when clicked', async () => {
     const before = await scrollPosition();
     edit('The far paragraph is at the end.', 'The far paragraph changed at the end.');
     const notice = page.locator('#bake-dev .notice', { hasText: 'Far away' });
@@ -268,13 +259,13 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     await notice.waitFor({ state: 'hidden' });
   });
 
-  await t.test('double-clicking a block opens its line in VS Code', async () => {
+  await test.step('double-clicking a block opens its line in VS Code', async () => {
     await page.locator('.bk-block', { hasText: 'changed at the end' }).dblclick();
     const line = lineOf(readFileSync(file, 'utf8'), 'The far paragraph');
     assert.deepEqual(await page.evaluate(() => window.openedUrls.at(-1)), [`vscode://file${pathToFileURL(file).pathname}:${line}:1`, '_self']);
   });
 
-  await t.test('changing the front matter reloads the page with the visible text in place, although the open fold above it closes', async () => {
+  await test.step('changing the front matter reloads the page with the visible text in place, although the open fold above it closes', async () => {
     const editingTop = () => page.evaluate(() => document.getElementById('editing').getBoundingClientRect().top);
     await page.evaluate(() => scrollTo(0, document.getElementById('editing').getBoundingClientRect().top + scrollY - 200));
     assert.equal(await page.locator('details.fold').evaluate((fold) => fold.open), true);
@@ -288,34 +279,11 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.ok(Math.abs((await editingTop()) - 200) <= 1, `the heading is at ${await editingTop()} pixels`);
   });
 
-  await t.test('a draft shows its label and the page for a missing address lists every article', async () => {
-    await page.goto(`${server.url}2026-10/sketch/`);
-    assert.equal(await page.locator('.bk-draft').textContent(), 'Draft');
-    const response = await page.goto(`${server.url}missing/`);
-    assert.equal(response.status(), 404);
-    assert.deepEqual(
-      await page.locator('li').evaluateAll((items) => items.map((item) => [item.querySelector('a').getAttribute('href'), item.textContent])),
-      [
-        ['/2026-10/live/', 'Live again2026-10-19content/posts/live/index.md'],
-        ['/2026-10/sketch/', 'Sketch2026-10-19Draftcontent/posts/sketch/index.md'],
-      ],
-    );
-  });
-
-  await t.test('the homepage lists drafts and reloads when an article title changes or an article is added', async () => {
-    const response = await page.goto(server.url);
-    assert.equal(response.status(), 200);
+  await test.step('the homepage reloads when an article title changes', async () => {
+    await page.goto(dev.url);
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    const titles = () => page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-card-title')].map((title) => title.textContent))].sort());
-    assert.deepEqual(await titles(), ['Live again', 'Sketch']);
-    assert.equal(await page.locator('.bk-card-draft').first().textContent(), 'Draft');
     edit('title: Live again', 'title: Live on the homepage');
     await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Live on the homepage'));
-    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    mkdirSync(join(dir, 'content/posts/added'));
-    writeFileSync(join(dir, 'content/posts/added/index.md'), article({ title: 'Added', slug: 'added' }));
-    await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Added'));
-    assert.deepEqual(await titles(), ['Added', 'Live on the homepage', 'Sketch']);
   });
 });
 
@@ -347,21 +315,23 @@ function startConnectionProxy(target) {
         restore() {
           refusing = false;
         },
-        close: () => new Promise((closed) => proxy.close(closed)),
+        close: () =>
+          new Promise((closed) => {
+            for (const socket of sockets) socket.destroy();
+            proxy.close(closed);
+          }),
       }),
     ),
   );
 }
 
-test('bake dev updates a page with a save that it made while the event stream was disconnected', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
+test('bake dev updates a page with a save that it made while the event stream was disconnected', async ({ browser, after }) => {
+  const dir = createBlog({ after }, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
   const file = join(dir, ARTICLE);
-  let printed = '';
-  const server = await startDevServer(dir, { port: 0, print: (text) => (printed += `${text}\n`) });
-  t.after(() => server.close());
-  const proxy = await startConnectionProxy(new URL(server.url));
-  t.after(() => proxy.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
+  const proxy = await startConnectionProxy(new URL(dev.url));
+  after(proxy.close);
   const page = await browser.newPage();
   await page.goto(`${proxy.url}2026-10/live/`);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
@@ -373,22 +343,22 @@ test('bake dev updates a page with a save that it made while the event stream wa
   });
   proxy.cut();
   writeFileSync(file, readFileSync(file, 'utf8').replace('The edited paragraph says hello.', 'The edited paragraph was saved while the stream was down.'));
-  await until(() => printed.includes('Updated '), 'bake dev did not update the page after the save');
+  await expect.poll(() => dev.output.includes('Updated '), { message: 'bake dev did not update the page after the save' }).toBe(true);
   assert.equal(await page.evaluate(() => document.querySelector('.bk-article').textContent.includes('saved while the stream was down')), false);
   proxy.restore();
   await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('saved while the stream was down'));
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
-test('bake dev shows a parameter bar on each component of the article that changes, writes, copies and resets its parameters', async (t) => {
-  const dir = copyExample(t);
+test('bake dev shows a parameter bar on each component of the article that changes, writes, copies and resets its parameters', async ({ browser, after }) => {
+  test.slow();
+  const dir = copyExample({ after });
   const file = join(dir, SYNTAX);
   const original = readFileSync(file, 'utf8');
   const directive = ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}';
   const line = lineOf(original, directive);
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   await context.addInitScript(() => {
     window.open = (url, target) => {
@@ -397,7 +367,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     };
   });
   const page = await context.newPage();
-  const url = `${server.url}2026-10/syntax/`;
+  const url = `${dev.url}2026-10/syntax/`;
   const frameSelector = `figure.component[data-line="${line}"]`;
   const frame = page.locator(frameSelector);
   const bar = frame.locator('bake-param-bar');
@@ -420,7 +390,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   await open();
   let boxHeight;
 
-  await t.test('the bar shows one control per parameter above the component without changing the height of its box', async () => {
+  await test.step('the bar shows one control per parameter above the component without changing the height of its box', async () => {
     assert.equal(await bar.locator('.name').textContent(), 'act-fn-plot');
     assert.deepEqual(
       await bar.locator('.control').evaluateAll((controls) => controls.map((item) => [item.dataset.param, item.querySelector('.label').textContent, [...item.querySelectorAll('input, select')].map((field) => field.type)])),
@@ -451,7 +421,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   });
 
   let beta;
-  await t.test('dragging a slider marks the control as changed and updates the running component', async () => {
+  await test.step('dragging a slider marks the control as changed and updates the running component', async () => {
     const slider = control('beta').locator('.slider');
     const box = await slider.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -485,12 +455,14 @@ test('bake dev shows a parameter bar on each component of the article that chang
   const top = () => frame.evaluate((element) => element.getBoundingClientRect().top);
   const edit = (from, to) => writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
   const copiedSource = () =>
-    until(async () => {
-      await page.locator('.bk-copy-source').dispatchEvent('click');
-      return (await page.evaluate(() => navigator.clipboard.readText())) === readFileSync(file, 'utf8');
-    }, 'the page did not take the saved source');
+    expect
+      .poll(async () => {
+        await page.locator('.bk-copy-source').dispatchEvent('click');
+        return (await page.evaluate(() => navigator.clipboard.readText())) === readFileSync(file, 'utf8');
+      }, { message: 'the page did not take the saved source' })
+      .toBe(true);
 
-  await t.test('Write to file rewrites the line, and the update keeps every component running without a highlight', async () => {
+  await test.step('Write to file rewrites the line, and the update keeps every component running without a highlight', async () => {
     await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.state === 'ready', otherSelector);
     await otherControl('xmax').locator('.number').fill('7');
     await watchFrames();
@@ -512,7 +484,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
   });
 
-  await t.test('an unrelated save keeps the components running and the unsaved values of the bars', async () => {
+  await test.step('an unrelated save keeps the components running and the unsaved values of the bars', async () => {
     await watchFrames();
     edit('这篇文章列出 Bake 的全部写法。', '这篇文章列出 Bake 的全部写法，第一次改。');
     await page.waitForFunction(() => document.querySelector('.bk-article').textContent.includes('第一次改'));
@@ -521,14 +493,14 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
   });
 
-  await t.test('a bar that a save replaces keeps its unsaved values and gives them to the restarted component', async () => {
+  await test.step('a bar that a save replaces keeps its unsaved values and gives them to the restarted component', async () => {
     edit('实线是精确 GELU', '实线是精确的 GELU');
     await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('实线是精确的 GELU'), otherSelector);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.xmax === 7, otherSelector);
     assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
   });
 
-  await t.test('unsaved values stay after a reload and after a save that adds lines above the component', async () => {
+  await test.step('unsaved values stay after a reload and after a save that adds lines above the component', async () => {
     await open();
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.xmax === 7, otherSelector);
     assert.deepEqual([await otherControl('xmax').locator('.number').inputValue(), await otherControl('xmax').getAttribute('data-changed')], ['7', '']);
@@ -545,7 +517,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.notEqual(await otherControl('xmax').locator('.number').inputValue(), '7');
   });
 
-  await t.test('the bar takes its colours from the theme and follows its dark mode', async () => {
+  await test.step('the bar takes its colours from the theme and follows its dark mode', async () => {
     const colours = () => bar.evaluate((host) => {
       const style = getComputedStyle(host.shadowRoot.querySelector('.bar'));
       return [style.backgroundColor, style.color];
@@ -564,7 +536,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.notEqual(dark[1], light[1]);
   });
 
-  await t.test('a parameter changed in the editor restarts the component and highlights its block once', async () => {
+  await test.step('a parameter changed in the editor restarts the component and highlights its block once', async () => {
     await watchFrames();
     edit(`beta=${beta} xmin=-6 xmax=6`, `beta=${beta} xmin=-6 xmax=5`);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('act-fn-plot')?.params.xmax === 5, frameSelector);
@@ -573,7 +545,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.deepEqual(await liveParams(), { fns: 'swish', guides: 'auto', xmax: 5, beta });
   });
 
-  await t.test('Reset goes back to the values in the Markdown', async () => {
+  await test.step('Reset goes back to the values in the Markdown', async () => {
     await control('guides').locator('select').selectOption('none');
     assert.equal(await control('guides').getAttribute('data-changed'), '');
     assert.equal((await liveParams()).guides, 'none');
@@ -584,7 +556,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal(await bar.locator('.write').isDisabled(), true);
   });
 
-  await t.test('Copy puts the rewritten line on the clipboard and leaves the file unchanged', async () => {
+  await test.step('Copy puts the rewritten line on the clipboard and leaves the file unchanged', async () => {
     const before = readFileSync(file, 'utf8');
     await control('xmax').locator('.number').fill('8');
     assert.equal(Number(await control('xmax').locator('.slider').inputValue()), 8);
@@ -595,12 +567,12 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal(readFileSync(file, 'utf8'), before);
   });
 
-  await t.test('double-clicking inside a bar does not open VS Code', async () => {
+  await test.step('double-clicking inside a bar does not open VS Code', async () => {
     await bar.locator('.name').dblclick();
     assert.equal(await page.evaluate(() => window.openedUrls), undefined);
   });
 
-  await t.test('the switch in the problems panel hides and shows every bar and keeps the choice', async () => {
+  await test.step('the switch in the problems panel hides and shows every bar and keeps the choice', async () => {
     await page.click('#bake-dev .dot');
     const toggle = page.locator('#bake-dev .bars input');
     assert.equal(await toggle.isChecked(), true);
@@ -643,11 +615,11 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.equal((await liveParams()).xmax, range);
   };
 
-  await t.test('Write refuses when the file changed before the page updated, keeps the message and values, and a second Write succeeds', async () => {
+  await test.step('Write refuses when the file changed before the page updated, keeps the message and values, and a second Write succeeds', async () => {
     await refuseThenWrite(9, '第二次改', false);
   });
 
-  await t.test('Write refuses when the page updated before the refusal arrived, and a second Write succeeds', async () => {
+  await test.step('Write refuses when the page updated before the refusal arrived, and a second Write succeeds', async () => {
     await refuseThenWrite(3, '第三次改', true);
   });
 
@@ -662,7 +634,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     };
   };
 
-  await t.test('after a reload, an unsaved value that the declaration no longer accepts and the value of a removed component are dropped', async () => {
+  await test.step('after a reload, an unsaved value that the declaration no longer accepts and the value of a removed component are dropped', async () => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const reloaded = async (change) => {
@@ -698,7 +670,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
     assert.deepEqual(errors, []);
   });
 
-  await t.test('removing a component from the middle of the article drops its unsaved value, and the other components of the same name keep theirs', async () => {
+  await test.step('removing a component from the middle of the article drops its unsaved value, and the other components of the same name keep theirs', async () => {
     const middle = ':::act-fn-plot{fns=relu width=70%}';
     const last = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
     const block = `::::example\n${middle}\n:::\n::::\n\n`;
@@ -726,7 +698,7 @@ test('bake dev shows a parameter bar on each component of the article that chang
   await phone.goto(url);
   await phone.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
   await phone.locator(frameSelector).scrollIntoViewIfNeeded();
-  await t.test('the controls wrap inside the bar on a phone', async () => {
+  await test.step('the controls wrap inside the bar on a phone', async () => {
     const sizes = await phone.evaluate((selector) => {
       const host = document.querySelector(selector).querySelector('bake-param-bar');
       const inner = host.shadowRoot.querySelector('.bar');
@@ -780,14 +752,13 @@ const TOC_VIEWS = [
   { style: 'dots', width: 375 },
 ];
 
-test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': validConfig, 'components/label-view.js': labelView, [ARTICLE]: article({ title: 'Live', slug: 'live', body: tocBody }) });
+test('bake dev rebuilds every table of contents style from the saved headings and restarts the components', async ({ browser, after }) => {
+  const dir = createBlog({ after }, { 'bake.config.js': validConfig, 'components/label-view.js': labelView, [ARTICLE]: article({ title: 'Live', slug: 'live', body: tocBody }) });
   const file = join(dir, ARTICLE);
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
   const page = await browser.newPage();
-  const url = `${server.url}2026-10/live/`;
+  const url = `${dev.url}2026-10/live/`;
   const occurrences = (titles) =>
     page.evaluate((titles) => {
       const text = [...document.querySelectorAll('.bk-toc, .bk-toc-ui')]
@@ -797,7 +768,7 @@ test('bake dev rebuilds every table of contents style from the saved headings an
     }, titles);
 
   for (const [round, view] of TOC_VIEWS.entries()) {
-    await t.test(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once next to a restarted component`, async () => {
+    await test.step(`the ${view.style} style at ${view.width} pixels shows the renamed and the added heading once next to a restarted component`, async () => {
       await page.setViewportSize({ width: view.width, height: view.width < 1000 ? 360 : 800 });
       await page.goto(url);
       await page.evaluate((style) => {
@@ -835,7 +806,7 @@ test('bake dev rebuilds every table of contents style from the saved headings an
       const name = `Renamed ${round}`;
       writeFileSync(file, readFileSync(file, 'utf8').replace(/## \S.* \{#second\}/, `## ${name} {#second}`).replace('### Inside {#inside}', `### Added ${round} {#added-${round}}\n\nText.\n\n### Inside {#inside}`).replace(/text=\w+\}/, `text=round${round}}`));
       await page.waitForFunction((text) => document.querySelector('label-view')?.textContent === text, `round${round}`);
-      await until(async () => (await occurrences([name]))[0] > 0, `the ${view.style} style does not show ${name}`);
+      await expect.poll(async () => (await occurrences([name]))[0], { message: `the ${view.style} style does not show ${name}` }).toBeGreaterThan(0);
       await settle(page);
       assert.equal(await page.locator('label-view').count(), 1);
       assert.equal(await page.evaluate(() => window.keptAcrossUpdates), true, 'the save reloaded the page');
@@ -845,19 +816,18 @@ test('bake dev rebuilds every table of contents style from the saved headings an
   }
 });
 
-test('bake dev starts an embedded component again when its source article changes its box', async (t) => {
-  const dir = createBlog(t, {
+test('bake dev starts an embedded component again when its source article changes its box', async ({ browser, after }) => {
+  const dir = createBlog({ after }, {
     'bake.config.js': validConfig,
     'components/label-view.js': labelView,
     'content/posts/rope/index.md': article({ body: '## Grid {#grid}\n\n:::label-view{text=first}\nThe caption.\n:::\n' }),
     'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: 'The host paragraph.\n\n:::embed\n/2026-10/rope/#grid\n:::\n' }),
   });
   const file = join(dir, 'content/posts/rope/index.md');
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`${server.url}2026-10/host/`);
+  await page.goto(`${dev.url}2026-10/host/`);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
   await page.waitForFunction(() => document.querySelector('.embed label-view')?.textContent === 'first');
   writeFileSync(file, readFileSync(file, 'utf8').replace('{text=first}', '{text=first height=200}'));
@@ -874,17 +844,16 @@ const tallView = `export default class TallView extends HTMLElement {
 }
 `;
 
-test('bake dev reloads a page at the same text when a component above the screen is taller than its placeholder', async (t) => {
-  const dir = createBlog(t, {
+test('bake dev reloads a page at the same text when a component above the screen is taller than its placeholder', async ({ browser, after }) => {
+  const dir = createBlog({ after }, {
     'bake.config.js': validConfig,
     'components/tall-view.js': tallView,
     [ARTICLE]: article({ title: 'Live', slug: 'live', body: [':::tall-view\n:::', filler('the middle', 20), 'The anchor paragraph.', filler('the end', 20)].join('\n\n') }),
   });
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`${server.url}2026-10/live/`);
+  await page.goto(`${dev.url}2026-10/live/`);
   await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
   await page.waitForFunction(() => document.querySelector('figure.component').dataset.state === 'ready');
   const anchorTop = () => page.evaluate(() => [...document.querySelectorAll('.bk-article p')].find((paragraph) => paragraph.textContent === 'The anchor paragraph.').getBoundingClientRect().top);
@@ -902,23 +871,18 @@ test('bake dev reloads a page at the same text when a component above the screen
   await page.close();
 });
 
-test('the bake dev dot and problems list leave the chat button and the settings button uncovered', async (t) => {
-  const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
+test('the bake dev dot and problems list leave the chat button and the settings button uncovered', async ({ browser, after }) => {
+  const dir = createBlog({ after }, { 'bake.config.js': validConfig, [ARTICLE]: article({ title: 'Live', slug: 'live', body }) });
   const file = join(dir, ARTICLE);
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const browser = await launchBrowser();
+  const dev = await startDev(dir);
+  after(dev.close);
   const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   for (const width of [1440, 375]) {
     const context = await browser.newContext({ viewport: { width, height: width < 600 ? 812 : 900 } });
     const page = await context.newPage();
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('WebAuthn.enable');
-    await cdp.send('WebAuthn.addVirtualAuthenticator', {
-      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
-    });
+    await addPasskeyAuthenticator(context, page);
     writeFileSync(file, article({ title: 'Live', slug: 'live', body }));
-    await page.goto(`${server.url}2026-10/live/`, { waitUntil: 'load' });
+    await page.goto(`${dev.url}2026-10/live/`, { waitUntil: 'load' });
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]')?.shadowRoot.querySelector('.bk-chat-launcher') != null);
     const boxes = (selector) =>

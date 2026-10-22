@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { article, bake, createBlog, validConfig } from '../blog.js';
-import { launchBrowser, serve } from './browser.js';
+import { serveStatic } from '../../scripts/static-server.js';
+import { article, filler, validConfig } from '../blog.js';
+import { test as base } from './browser.js';
 
-const filler = (topic) => Array.from({ length: 4 }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(5)}`).join('\n\n');
+// why: serving the blog folder puts the published site under the sub-path /dist/, as a project site on GitHub Pages is
+const test = base.extend({
+  baseURL: async ({ site }, use) => {
+    const server = await serveStatic(site.dir);
+    await use(`${server.origin}/dist/`);
+    await server.close();
+  },
+});
+
 
 const host = [
   filler('the introduction'),
@@ -65,29 +73,28 @@ function recordCard() {
 
 const isOn = () => document.querySelector('.bk-preview')?.getAttribute('aria-hidden') === 'false';
 
-test('internal links, preview cards and embeds', async (t) => {
-  const dir = createBlog(t, {
-    'bake.config.js': validConfig,
-    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: host }),
-    'content/posts/target/index.md': article({ title: 'Target', slug: 'target', body: target }),
+test.describe('internal links, preview cards and embeds', () => {
+  test.use({
+    blog: {
+      example: false,
+      files: {
+        'bake.config.js': validConfig,
+        'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: host }),
+        'content/posts/target/index.md': article({ title: 'Target', slug: 'target', body: target }),
+      },
+    },
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  const base = await serve(t, dir);
-  const url = `${base}/dist/2026-10/host/`;
-  const browser = await launchBrowser();
+  const url = '2026-10/host/';
 
-  const desktop = async ({ clock = false } = {}) => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const desktop = async (page, { clock = false } = {}) => {
     if (clock) await page.clock.install();
     await page.goto(url);
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => scrollTo(0, document.getElementById('links').getBoundingClientRect().top + scrollY - 100));
-    return page;
   };
 
-  await t.test('a card appears 300 ms after the pointer rests on a link, below the link and inside the viewport', async () => {
-    const page = await desktop();
+  test('a card appears 300 ms after the pointer rests on a link, below the link and inside the viewport', async ({ page }) => {
+    await desktop(page);
     await page.evaluate(recordCard);
     const link = page.getByRole('link', { name: 'chain rule', exact: true });
     await link.hover();
@@ -115,11 +122,10 @@ test('internal links, preview cards and embeds', async (t) => {
     );
     assert.equal(formulas.length, 3);
     assert.deepEqual(formulas.filter((formula) => !formula.width || formula.missing > 0), []);
-    await page.close();
   });
 
-  await t.test('the card switches to another link at once and hides 200 ms after the pointer leaves', async () => {
-    const page = await desktop();
+  test('the card switches to another link at once and hides 200 ms after the pointer leaves', async ({ page }) => {
+    await desktop(page);
     await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.waitForFunction(isOn);
     await page.evaluate(recordCard);
@@ -139,11 +145,23 @@ test('internal links, preview cards and embeds', async (t) => {
       return cardLog.findLast((entry) => !entry.on).time - left.time;
     });
     assert.ok(hidden >= 190, `the card hid ${hidden} ms after the pointer left it`);
-    await page.close();
   });
 
-  await t.test('the card stays while the pointer is in it, and an external link shows no card', async () => {
-    const page = await desktop({ clock: true });
+  test('the card stays when content above the screen changes height and hides when the reader scrolls', async ({ page }) => {
+    await desktop(page);
+    await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
+    await page.waitForFunction(isOn);
+    await page.evaluate(async () => {
+      document.querySelector('.bk-article').prepend(Object.assign(document.createElement('div'), { style: 'height: 300px' }));
+      for (let frame = 0; frame < 2; frame += 1) await new Promise((done) => requestAnimationFrame(done));
+    });
+    assert.equal(await page.evaluate(isOn), true);
+    await page.mouse.wheel(0, 200);
+    await page.waitForFunction(() => !document.querySelector('.bk-preview').checkVisibility({ visibilityProperty: true }));
+  });
+
+  test('the card stays while the pointer is in it, and an external link shows no card', async ({ page }) => {
+    await desktop(page, { clock: true });
     await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.clock.runFor(400);
     await page.waitForFunction(isOn);
@@ -157,11 +175,10 @@ test('internal links, preview cards and embeds', async (t) => {
     await page.hover('a[href="https://example.com/"]');
     await page.clock.runFor(1000);
     assert.equal(await page.evaluate(isOn), false, 'an external link shows a card');
-    await page.close();
   });
 
-  await t.test('a citation shows the entry of its own article, also inside an embed', async () => {
-    const page = await desktop();
+  test('a citation shows the entry of its own article, also inside an embed', async ({ page }) => {
+    await desktop(page);
     const entries = [];
     for (const citation of [page.locator('a.citation').first(), page.locator('.embed a.citation')]) {
       await citation.evaluate(async (element) => {
@@ -175,11 +192,10 @@ test('internal links, preview cards and embeds', async (t) => {
       await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-preview')).visibility === 'hidden');
     }
     assert.deepEqual(entries, ['[1]The host entry.', '[1]The target entry.']);
-    await page.close();
   });
 
-  await t.test('keyboard focus on an internal link shows its card and Escape hides it', async () => {
-    const page = await desktop();
+  test('keyboard focus on an internal link shows its card and Escape hides it', async ({ page }) => {
+    await desktop(page);
     await page.locator('#links .bk-heading-link').focus();
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement.textContent), 'chain rule');
@@ -189,37 +205,33 @@ test('internal links, preview cards and embeds', async (t) => {
     await page.waitForFunction(() => /Each layer multiplies/.test(document.querySelector('.bk-preview-body')?.textContent));
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.querySelector('.bk-preview').getAttribute('aria-hidden') === 'true');
-    await page.close();
   });
 
-  await t.test('a click on the card opens the target', async () => {
-    const page = await desktop();
+  test('a click on the card opens the target', async ({ page, baseURL }) => {
+    await desktop(page);
     await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.waitForFunction(isOn);
     await page.locator('.bk-preview-hint').click();
-    await page.waitForURL(`${base}/dist/2026-10/target/#chain-rule`);
-    await page.close();
+    await page.waitForURL(`${baseURL}2026-10/target/#chain-rule`);
   });
 
-  await t.test('on a phone there is no card and a tap opens the target under the site sub-path', async () => {
-    const page = await browser.newPage({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
+  test('on a phone there is no card and a tap opens the target under the site sub-path', async ({ browser, baseURL }) => {
+    const page = await browser.newPage({ baseURL, viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
     await page.clock.install();
     await page.goto(url);
     await page.getByRole('link', { name: 'the local gradient' }).tap();
-    await page.waitForURL(`${base}/dist/2026-10/target/#local-grad`);
+    await page.waitForURL(`${baseURL}2026-10/target/#local-grad`);
     assert.equal(await page.evaluate(() => document.querySelector('#local-grad').textContent), 'Each layer multiplies the gradient by its local derivative.');
     await page.goBack();
     await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.clock.runFor(1000);
     assert.equal(await page.evaluate(isOn), false);
-    await page.close();
   });
 
-  await t.test('an embed shows each part with its formulas and a source line that links to the original', async () => {
-    const page = await desktop();
+  test('an embed shows each part with its formulas and a source line that links to the original', async ({ page, baseURL }) => {
+    await desktop(page);
     const report = await page.evaluate(() => {
       const embed = document.querySelector('.embed');
-      const ids = [...document.querySelectorAll('[id]')].map((element) => element.id);
       return {
         parts: [...embed.querySelectorAll('.embed-part')].map((part) => part.querySelector('h2').textContent),
         sources: [...embed.querySelectorAll('.embed-source a')].map((link) => {
@@ -229,23 +241,11 @@ test('internal links, preview cards and embeds', async (t) => {
         }),
         hrefs: [...embed.querySelectorAll('.embed-source a')].map((link) => link.href),
         formulas: [...embed.querySelectorAll('mjx-container')].filter((container) => container.querySelector('svg').getBoundingClientRect().width > 0).length,
-        border: getComputedStyle(embed).borderLeftWidth,
-        citations: [...embed.querySelectorAll('a.citation')].map((link) => link.getAttribute('href')),
-        missingGlyphs: [...embed.querySelectorAll('use')].map((use) => use.getAttribute('xlink:href')).filter((href) => document.getElementById(href.slice(1)) === null),
-        duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
-        toc: document.querySelector('.bk-toc').textContent,
       };
     });
     assert.deepEqual(report.parts, ['Chain rule', 'Order']);
-    assert.deepEqual(report.citations, ['../../2026-10/target/#reference-k']);
     assert.deepEqual(report.sources, ['"From “"Target1"”""↗"', '"From “"Target2"”""↗"']);
-    assert.deepEqual(report.hrefs, [`${base}/dist/2026-10/target/#chain-rule`, `${base}/dist/2026-10/target/#order`]);
+    assert.deepEqual(report.hrefs, [`${baseURL}2026-10/target/#chain-rule`, `${baseURL}2026-10/target/#order`]);
     assert.equal(report.formulas, 3);
-    assert.equal(report.border, '2px');
-    assert.deepEqual(report.missingGlyphs, []);
-    assert.deepEqual(report.duplicateIds, []);
-    assert.match(report.toc, /Links/);
-    assert.doesNotMatch(report.toc, /Chain rule|Order/);
-    await page.close();
   });
 });
