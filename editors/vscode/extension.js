@@ -247,7 +247,19 @@ function answerPage(message) {
   }
   if (message.bake === 'open' && typeof message.file === 'string' && Number.isInteger(message.line)) {
     const position = new vscode.Position(message.line - 1, 0);
-    vscode.window.showTextDocument(vscode.Uri.file(path.join(preview.root, message.file)), { viewColumn: preview.column, selection: new vscode.Range(position, position) });
+    const uri = vscode.Uri.file(path.join(preview.root, message.file));
+    const custom = vscode.window.tabGroups.all.flatMap((group) => group.tabs.map((tab) => ({ group, input: tab.input }))).find(({ input }) => input instanceof vscode.TabInputCustom && input.uri.fsPath === uri.fsPath);
+    // why: the editor of another Markdown extension offers no way to move to a line, so it is only brought to the front instead of opening a text editor next to it
+    if (custom !== undefined) return vscode.commands.executeCommand('vscode.openWith', uri, custom.input.viewType, custom.group.viewColumn);
+    const opened = preview;
+    // why: the editor scrolls to the double-clicked block, and the preview, which already shows it, stays where the reader left it
+    opened.quietUntil = Infinity;
+    vscode.window
+      .showTextDocument(uri, { viewColumn: opened.column, selection: new vscode.Range(position, position) })
+      .then(
+        () => (opened.quietUntil = Date.now() + FOLLOW_QUIET_TIME),
+        () => (opened.quietUntil = 0),
+      );
   }
 }
 
