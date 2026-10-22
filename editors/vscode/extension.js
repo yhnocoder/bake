@@ -1,13 +1,13 @@
 const { spawn } = require('node:child_process');
 const { randomBytes } = require('node:crypto');
-const { existsSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const vscode = require('vscode');
 const { completionsAt } = require('./completions.js');
 
 const CONFIG_FILE = 'bake.config.js';
 const POSTS_DIR = 'content/posts';
-const BAKE_CLI = ['node_modules', '@yhnocoder', 'bake', 'src', 'cli.js'];
+const BAKE_PACKAGE = '@yhnocoder/bake';
 const SERVING = /^Serving the blog at (\S+)$/m;
 const SOURCE_DELAY = 300;
 const COMPLETION_KINDS = {
@@ -45,7 +45,7 @@ function activate(context) {
     vscode.workspace.onDidChangeTextDocument(({ document }) => sendSourceLater(document)),
     vscode.workspace.onDidCloseTextDocument((document) => sendSource(document, null)),
     vscode.languages.registerCompletionItemProvider({ language: 'markdown', scheme: 'file' }, { provideCompletionItems }, ':', '{', ' ', '=', '@', '^'),
-    { dispose: () => blogs.forEach((blog) => blog.process.kill()) },
+    { dispose: () => blogs.forEach((blog) => blog.process?.kill()) },
   );
   for (const document of vscode.workspace.textDocuments) {
     const article = articleOf(document);
@@ -63,11 +63,39 @@ function articleOf(document) {
   return null;
 }
 
+// Finds Bake as Node finds a package, in node_modules/ of the blog or of a folder above it, or the Bake repository itself for a blog inside it, such as examples/blog/.
+function bakeCli(root) {
+  for (let dir = root; dir !== path.dirname(dir); dir = path.dirname(dir)) {
+    const installed = path.join(dir, 'node_modules', ...BAKE_PACKAGE.split('/'));
+    if (existsSync(path.join(installed, 'src', 'cli.js'))) return path.join(installed, 'src', 'cli.js');
+    if (packageName(dir) === BAKE_PACKAGE) return path.join(dir, 'src', 'cli.js');
+  }
+  return null;
+}
+
+function packageName(dir) {
+  try {
+    return JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')).name;
+  } catch {
+    return undefined;
+  }
+}
+
 function startBlog(root) {
   if (blogs.has(root)) return blogs.get(root);
-  output.appendLine(`Starting bake dev in ${root}`);
+  const cli = bakeCli(root);
+  if (cli === null) {
+    const message = `Bake is not installed for the blog in ${root}; run npm install there and reload the window`;
+    output.appendLine(message);
+    vscode.window.showErrorMessage(message);
+    const blog = { root, process: null, blocks: new Map(), url: Promise.reject(new Error(message)) };
+    blog.url.catch(() => {});
+    blogs.set(root, blog);
+    return blog;
+  }
+  output.appendLine(`Starting bake dev in ${root} with ${cli}`);
   // why: node runs Bake itself, so that stopping the process stops the server; a wrapper such as npx would leave it running
-  const child = spawn('node', [path.join(root, ...BAKE_CLI), 'dev', '--no-open'], { cwd: root });
+  const child = spawn('node', [cli, 'dev', '--no-open'], { cwd: root });
   const blog = { root, process: child, blocks: new Map(), url: null };
   blogs.set(root, blog);
   blog.url = new Promise((done, fail) => {

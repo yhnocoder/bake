@@ -69,7 +69,7 @@ npx @vscode/vsce package --skip-license --out bake.vsix
 code --install-extension bake.vsix
 ```
 
-When you open the `index.md` of an article in a blog whose npm packages are installed, the extension starts `bake dev --no-open` for that blog with the `node` command, from `node_modules/@yhnocoder/bake`, and stops it when VS Code closes. The Bake channel of the Output panel shows what `bake dev` prints, such as the address it serves. The extension then adds these features to the article:
+When you open the `index.md` of an article in a blog whose npm packages are installed, the extension starts `bake dev --no-open` for that blog with the `node` command and stops it when VS Code closes. It finds Bake in `node_modules/` of the blog or of a folder above it, or uses the Bake repository itself for a blog inside it, such as `examples/blog/`. The Bake channel of the Output panel shows what `bake dev` prints, such as the address it serves. The extension then adds these features to the article:
 
 - **Bake: Open Preview to the Side**, also a button at the top of the editor, shows the page of the article next to the editor as `bake dev` serves it, with its components and their parameter bars. When you switch to the editor of another article, the preview shows that article.
 - Scrolling the editor scrolls the preview to the block that starts at the top line of the editor, and double-clicking a block in the preview moves the editor to the line where the block starts.
