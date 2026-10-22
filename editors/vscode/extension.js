@@ -19,6 +19,7 @@ const COMPLETION_KINDS = {
   citation: vscode.CompletionItemKind.Reference,
   footnote: vscode.CompletionItemKind.Reference,
   equation: vscode.CompletionItemKind.Reference,
+  snippet: vscode.CompletionItemKind.Snippet,
 };
 
 const blogs = new Map();
@@ -46,7 +47,7 @@ function activate(context) {
     }),
     vscode.workspace.onDidChangeTextDocument(({ document }) => sendSourceLater(document)),
     vscode.workspace.onDidCloseTextDocument((document) => sendSource(document, null)),
-    vscode.languages.registerCompletionItemProvider({ language: 'markdown', scheme: 'file' }, { provideCompletionItems }, ':', '{', ' ', '=', '@', '^'),
+    vscode.languages.registerCompletionItemProvider({ language: 'markdown', scheme: 'file' }, { provideCompletionItems }, ':', '{', ' ', '=', '@', '^', '/'),
     { dispose: () => blogs.forEach((blog) => blog.process?.kill()) },
   );
   for (const document of vscode.workspace.textDocuments) {
@@ -290,12 +291,15 @@ async function provideCompletionItems(document, position) {
   const article = articleOf(document.uri);
   if (article === null) return [];
   const blocks = await blocksOf(article).catch(() => []);
-  return completionsAt(document.getText(), position.line, position.character, blocks).map((completion) => {
+  return completionsAt(document.getText(), position.line, position.character, blocks).map((completion, index) => {
     const item = new vscode.CompletionItem(completion.label, COMPLETION_KINDS[completion.kind]);
     item.detail = completion.detail;
     item.documentation = completion.documentation;
     item.insertText = new vscode.SnippetString(completion.snippet);
     item.range = new vscode.Range(position.line, completion.from, position.line, position.character);
+    item.sortText = String(index).padStart(4, '0');
+    if (completion.filter !== undefined) item.filterText = completion.filter;
+    if (completion.suggest) item.command = { command: 'editor.action.triggerSuggest', title: 'List the completions' };
     return item;
   });
 }

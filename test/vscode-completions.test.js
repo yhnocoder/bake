@@ -16,6 +16,7 @@ const blocks = [
       grid: { label: 'Grid', type: 'boolean', default: true },
     },
   },
+  { name: 'recap', kind: 'built-in', attributes: {} },
 ];
 
 function complete(lines, cursorLine, character = lines[cursorLine].length) {
@@ -23,25 +24,28 @@ function complete(lines, cursorLine, character = lines[cursorLine].length) {
 }
 
 describe('VS Code completions', () => {
-  test('list the blocks after ::: and add the closing line before an empty line', () => {
+  test('list the blocks after :::, put the cursor in the braces of a block with attributes and add the closing line before an empty line', () => {
     const found = complete(['Text.', '', ':::', ''], 2);
     assert.deepEqual(
-      found.map(({ label, detail, snippet, from }) => ({ label, detail, snippet, from })),
+      found.map(({ label, detail, snippet, from, suggest }) => ({ label, detail, snippet, from, suggest })),
       [
-        { label: 'aside', detail: 'block of Bake', snippet: 'aside\n$0\n:::', from: 3 },
-        { label: 'note', detail: 'block of the theme', snippet: 'note\n$0\n:::', from: 3 },
-        { label: 'act-fn-plot', detail: 'component', snippet: 'act-fn-plot\n$0\n:::', from: 3 },
+        { label: 'aside', detail: 'block of Bake', snippet: 'aside{$1}\n$0\n:::', from: 3, suggest: true },
+        { label: 'note', detail: 'block of the theme', snippet: 'note{$1}\n$0\n:::', from: 3, suggest: true },
+        { label: 'act-fn-plot', detail: 'component', snippet: 'act-fn-plot{$1}\n$0\n:::', from: 3, suggest: true },
+        { label: 'recap', detail: 'block of Bake', snippet: 'recap\n$0\n:::', from: 3, suggest: false },
       ],
     );
     assert.deepEqual(
       complete(['> ::::act', '> Text.'], 0).map(({ snippet, from }) => ({ snippet, from })),
-      blocks.map((block) => ({ snippet: block.name, from: 6 })),
+      blocks.map((block) => ({ snippet: block.name === 'recap' ? 'recap' : `${block.name}{$1}`, from: 6 })),
     );
+    assert.equal(complete(['> :::', ''], 0)[0].snippet, 'aside{$1}\n> $0\n> :::');
   });
 
   test('offer nothing for the ::: line that closes an open block or for ::: inside a code block', () => {
     assert.deepEqual(complete([':::aside', 'Text.', ':::'], 2), []);
-    assert.equal(complete(['```markdown', ':::aside', '```', '', ':::'], 4).length, 3);
+    assert.equal(complete(['```markdown', ':::aside', '```', '', ':::'], 4).length, blocks.length);
+    assert.deepEqual(complete(['```markdown', ':::'], 1), []);
     assert.deepEqual(complete(['Text ::: more'], 0, 8), []);
   });
 
@@ -75,6 +79,24 @@ describe('VS Code completions', () => {
       { label: 'green', from: 14 },
     ]);
     assert.deepEqual(complete([':::act-fn-plot{range='], 0), []);
+  });
+
+  test('list the blocks and Markdown snippets after / at the start of a line and the inline snippets after / in the text', () => {
+    const atStart = complete(['Text.', '', '/ma'], 2);
+    assert.deepEqual(atStart.map(({ label }) => label), ['aside', 'note', 'act-fn-plot', 'recap', 'heading', 'subheading', 'math', 'code', 'table', 'image', 'width', 'citation', 'footnote', 'eqref', 'inline-math', 'highlight', 'link']);
+    assert.ok(atStart.every(({ from, filter, label }) => from === 0 && filter === `/${label}`));
+    const byLabel = new Map(atStart.map((item) => [item.label, item]));
+    assert.equal(byLabel.get('act-fn-plot').snippet, ':::act-fn-plot{$1}\n$0\n:::');
+    assert.equal(byLabel.get('math').snippet, '$$\n$0\n$$');
+    assert.equal(byLabel.get('citation').suggest, true);
+    assert.equal(complete(['> /'], 0).find(({ label }) => label === 'math').snippet, '$$\n> $0\n> $$');
+    const inline = complete(['梯度的公式/ci'], 0);
+    assert.deepEqual(inline.map(({ label }) => label), ['citation', 'footnote', 'eqref', 'inline-math', 'highlight', 'link']);
+    assert.ok(inline.every(({ from }) => from === 5));
+    assert.equal(inline.find(({ label }) => label === 'eqref').snippet, '\\\\eqref{$1}');
+    assert.deepEqual(complete(['See https://example.com/a'], 0), []);
+    assert.deepEqual(complete(['A ratio a/b'], 0), []);
+    assert.deepEqual(complete(['```sh', 'cd /'], 1), []);
   });
 
   test('list the references, footnotes and equation labels of the article', () => {

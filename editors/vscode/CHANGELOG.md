@@ -12,4 +12,5 @@ The first version. It needs a version of Bake that serves `/__bake/source`, `/__
 - Scrolling of the preview and the editor together, and a double click in the preview that moves the editor to the block.
 - The unsaved text of the editor in the preview, and the problems of `bake dev` in the Problems panel.
 - Completions for blocks, attributes, parameter values, citations, footnotes and equation labels.
+- A menu of blocks and Markdown snippets after `/`.
 - Highlighting for `:::` lines, heading attributes, paragraph anchors, citations and `\eqref`.

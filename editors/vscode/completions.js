@@ -13,28 +13,53 @@ const EQREF = /\\eqref\{([^}]*)$/;
 const REFERENCE_ENTRY = /^[ \t]*[-*+][ \t]+\[@([^\]\s]+)\][ \t]*(.*)$/gm;
 const FOOTNOTE_DEFINITION = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/gm;
 const LABEL = /\\label\{([^}]+)\}/g;
+const SLASH_AT_LINE_START = new RegExp(`^(${QUOTE})\\/([\\w-]*)$`);
+// why: a slash after a letter, a digit or the characters of an address belongs to a path or a URL, such as a/b or https://
+const SLASH = /(?:^|[^\w:/.~\-\]\)])\/([\w-]*)$/;
+const LINE_SNIPPETS = [
+  { label: 'heading', detail: 'a section, ##', snippet: '## $0' },
+  { label: 'subheading', detail: 'a subsection, ###', snippet: '### $0' },
+  { label: 'math', detail: 'a display formula, $$', lines: ['$$', '$0', '$$'] },
+  { label: 'code', detail: 'a code block', lines: ['```${1:text}', '$0', '```'] },
+  { label: 'table', detail: 'a GFM table', lines: ['| $1 | $2 |', '| --- | --- |', '| $3 | $0 |'] },
+  { label: 'image', detail: 'an image of the article folder', snippet: '![$1]($2)' },
+  { label: 'width', detail: 'the width of the block inside, :::{width=…}', lines: [':::{width=${1|wide,page,body|}}', '$0', ':::'] },
+];
+const INLINE_SNIPPETS = [
+  { label: 'citation', detail: 'a citation of :::references, [@key]', snippet: '[@$1]', suggest: true },
+  { label: 'footnote', detail: 'a sidenote, [^name]', snippet: '[^$1]', suggest: true },
+  { label: 'eqref', detail: 'a reference to an equation, \\eqref{label}', snippet: '\\\\eqref{$1}', suggest: true },
+  { label: 'inline-math', detail: 'a formula in the text, $…$', snippet: '\\$$1\\$' },
+  { label: 'highlight', detail: 'highlighted text, ==…==', snippet: '==$1==' },
+  { label: 'link', detail: 'a link, [text](address)', snippet: '[$1]($2)' },
+];
 
-// Returns the completions at a position of an article: block names after :::, attributes inside the braces of a block line, and the citations, footnotes and equation labels of the article.
-// Each completion replaces the characters of the line from `from` to the cursor with `snippet`, a VS Code snippet.
+// Returns the completions at a position of an article: block names after :::, attributes inside the braces of a block line, the citations, footnotes and equation labels of the article, and a menu of blocks and Markdown after /.
+// Each completion replaces the characters of the line from `from` to the cursor with `snippet`, a VS Code snippet. VS Code matches what was typed against `filter`, or against `label` when there is no `filter`. `suggest` asks for the completions again after the snippet is inserted.
 function completionsAt(text, line, character, blocks) {
   const lines = text.split('\n');
   const before = lines[line].slice(0, character);
   const after = lines[line].slice(character);
+  if (fenceAt(lines.slice(0, line)) !== null) return [];
   const name = BLOCK_NAME.exec(before);
   if (name !== null && after.trim() === '') {
     const [, quote, colons, typed = ''] = name;
     if (typed === '' && openBlocks(lines.slice(0, line)) > 0) return [];
-    const closing = (lines[line + 1] ?? '').trim() === '' ? `\n$0\n${quote}${colons}` : '';
+    const closing = (lines[line + 1] ?? '').trim() === '' ? `\n${quote}$0\n${quote}${colons}` : '';
     return blocks
       .filter((block) => block.name !== '')
-      .map((block) => ({
-        kind: 'block',
-        label: block.name,
-        detail: BLOCK_KINDS[block.kind],
-        documentation: describeAttributes(block.attributes),
-        from: character - typed.length,
-        snippet: `${block.name}${closing}`,
-      }));
+      .map((block) => ({ ...blockCompletion(block, closing), from: character - typed.length, snippet: `${block.name}${braces(block)}${closing}` }));
+  }
+  const slash = SLASH_AT_LINE_START.exec(before);
+  if (slash !== null && after.trim() === '') {
+    const [, quote, typed] = slash;
+    const from = character - typed.length - 1;
+    const menu = [
+      ...blocks.filter((block) => block.name !== '').map((block) => ({ ...blockCompletion(block), snippet: lineSnippet([`:::${block.name}${braces(block)}`, '$0', ':::'], quote) })),
+      ...LINE_SNIPPETS.map(({ lines: snippetLines, snippet, ...item }) => ({ ...item, kind: 'snippet', snippet: snippetLines === undefined ? snippet : lineSnippet(snippetLines, quote) })),
+      ...INLINE_SNIPPETS.map((item) => ({ ...item, kind: 'snippet' })),
+    ];
+    return menu.map((item) => ({ ...item, from, filter: `/${item.label}` }));
   }
   const attributes = BLOCK_ATTRIBUTES.exec(before);
   if (attributes !== null) {
@@ -47,7 +72,22 @@ function completionsAt(text, line, character, blocks) {
   if (footnote !== null) return entries(text, FOOTNOTE_DEFINITION, 'footnote', character - footnote[1].length);
   const eqref = EQREF.exec(before);
   if (eqref !== null) return entries(text, LABEL, 'equation', character - eqref[1].length);
+  const inline = SLASH.exec(before);
+  if (inline !== null) return INLINE_SNIPPETS.map((item) => ({ ...item, kind: 'snippet', from: character - inline[1].length - 1, filter: `/${item.label}` }));
   return [];
+}
+
+function blockCompletion(block) {
+  return { kind: 'block', label: block.name, detail: BLOCK_KINDS[block.kind], documentation: describeAttributes(block.attributes), suggest: Object.keys(block.attributes).length > 0 };
+}
+
+// why: the cursor goes into the braces, and the completions then list the attributes of the block
+function braces(block) {
+  return Object.keys(block.attributes).length > 0 ? '{$1}' : '';
+}
+
+function lineSnippet(snippetLines, quote) {
+  return snippetLines.map((text, index) => (index === 0 ? text : `${quote}${text}`)).join('\n');
 }
 
 const BLOCK_KINDS = { 'built-in': 'block of Bake', theme: 'block of the theme', component: 'component' };
@@ -56,18 +96,23 @@ function openBlocks(lines) {
   let open = 0;
   let fence = null;
   for (const text of lines) {
-    const marker = FENCE.exec(text)?.[1];
-    if (fence !== null) {
-      if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
-    } else if (marker !== undefined) {
-      fence = marker;
-    } else if (OPENING_LINE.test(text)) {
-      open += 1;
-    } else if (CLOSING_LINE.test(text) && open > 0) {
-      open -= 1;
-    }
+    fence = nextFence(fence, text);
+    if (fence !== null || FENCE.test(text)) continue;
+    if (OPENING_LINE.test(text)) open += 1;
+    else if (CLOSING_LINE.test(text) && open > 0) open -= 1;
   }
   return open;
+}
+
+function fenceAt(lines) {
+  return lines.reduce(nextFence, null);
+}
+
+function nextFence(fence, text) {
+  const marker = FENCE.exec(text)?.[1];
+  if (marker === undefined) return fence;
+  if (fence === null) return marker;
+  return marker[0] === fence[0] && marker.length >= fence.length ? null : fence;
 }
 
 function attributeCompletions(block, written, character) {
