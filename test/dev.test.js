@@ -314,14 +314,14 @@ describe('updates while bake dev runs', () => {
     await save(dir, { 'themes/mine/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
   });
 
-  test('reports the missing files of a theme that becomes the site theme', async (t) => {
+  test('reports the missing theme.css of a theme that becomes the site theme', async (t) => {
     const { dir, lines } = await serve(t, {
       'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
       'themes/plain/page.jsx': 'export default function Page(props) {\n  return <html><body>{props.article.title}</body></html>;\n}\n',
       'themes/plain/client.jsx': 'export default () => () => {};\n',
     });
-    await save(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('3 errors'), `bake dev printed ${JSON.stringify(lines)}`);
-    assert.deepEqual(lines.slice(-4), ['themes/plain:1:1 theme "plain" has no home.jsx', 'themes/plain:1:1 theme "plain" has no not-found.jsx', 'themes/plain:1:1 theme "plain" has no theme.css', '3 errors']);
+    await save(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
+    assert.deepEqual(lines.slice(-2), ['themes/plain:1:1 theme "plain" has no theme.css', '1 error']);
   });
 
   test('updates the homepage when the front matter of an article changes and when an article is added or removed', async (t) => {

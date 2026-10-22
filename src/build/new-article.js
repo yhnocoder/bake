@@ -3,9 +3,9 @@ import { dirname, join } from 'node:path';
 import { stringify } from 'yaml';
 import { configNotFoundError, hasConfig } from '../config/bake-config.js';
 import { slugProblem } from '../config/rules.js';
-import { errorAt, fileStart, formatError } from '../report.js';
+import { errorAt, fileStart, formatError } from '../shared/report.js';
 import { POSTS_DIR } from './articles.js';
-import { articleUrl } from '../urls.js';
+import { articleUrl } from '../shared/urls.js';
 
 export function newArticle(root, path, date) {
   if (!hasConfig(root)) return { error: formatError(configNotFoundError()) };

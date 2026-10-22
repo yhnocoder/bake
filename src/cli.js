@@ -58,7 +58,7 @@ async function runNew(args) {
 async function runBuild(args) {
   if (args.length > 0) return fail(`bake build: unexpected argument ${JSON.stringify(args[0])}`);
   const { build } = await import('./build/build.js');
-  const { errorCountLine, formatError } = await import('./report.js');
+  const { errorCountLine, formatError } = await import('./shared/report.js');
   const result = await build(process.cwd());
   if (result.errors.length > 0) {
     return fail([...result.errors.map(formatError), errorCountLine(result.errors.length)].join('\n'));
@@ -70,7 +70,7 @@ async function runDev(args) {
   const options = devOptions(args);
   if (options === null) return fail('Usage: bake dev [--port <number>] [--host <address>] [--no-open]');
   const { configNotFoundError, hasConfig } = await import('./config/bake-config.js');
-  const { formatError } = await import('./report.js');
+  const { formatError } = await import('./shared/report.js');
   if (!hasConfig(process.cwd())) return fail(formatError(configNotFoundError()));
   const { startDevServer } = await import('./dev/server.js');
   const { openInBrowser } = await import('./dev/open.js');

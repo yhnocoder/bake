@@ -1,14 +1,14 @@
-import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
-import { build } from 'vite';
+import { compileFunction } from 'node:vm';
 import solid from 'vite-plugin-solid';
 import { buildCache, filesIn } from '../bundle/cache.js';
 import { publicModules, virtualModules } from '../bundle/modules.js';
-import { BAKE_ROOT, blogPath, browserBuild, compileProblem, outputOf, viteConfig } from '../bundle/vite.js';
+import { BAKE_ROOT, blogPath, browserBuild, compileProblem, viteBuild, viteConfig } from '../bundle/vite.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
-import { errorAt, fileStart } from '../report.js';
+import { errorAt, fileStart } from '../shared/report.js';
 
-export const THEMES_DIR = 'themes';
+const THEMES_DIR = 'themes';
 const PAGE_FILE = 'page.jsx';
 const CLIENT_FILE = 'client.jsx';
 const HOME_FILE = 'home.jsx';
@@ -17,15 +17,44 @@ const THEME_STYLES_FILE = 'theme.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
-const BUILD_FILES = [join(import.meta.dirname, '../theme'), BUILT_IN_DIR, join(import.meta.dirname, '../kit/controls.css'), join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
+const KIT_DIR = join(import.meta.dirname, '../theme-kit');
+const KIT_HOME = join(KIT_DIR, 'homepage.jsx');
+const KIT_NOT_FOUND = join(KIT_DIR, 'not-found-page.jsx');
+const BUILD_FILES = [KIT_DIR, BUILT_IN_DIR, join(import.meta.dirname, '../kit/controls.css'), join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
 const RENDER_ENTRY = 'bake:render';
 const CLIENT_ENTRY = 'bake:client';
 const MISSING_BINDING = /"([^"]+)" is not exported/;
 
-export function builtInThemeFolders(root) {
-  return BUILT_IN_THEMES.filter((name) => existsSync(join(root, THEMES_DIR, name))).map((name) =>
+export function builtInThemeFolders(files) {
+  return BUILT_IN_THEMES.filter((name) => files.stat(join(files.root, THEMES_DIR, name)) !== undefined).map((name) =>
     errorAt(`${THEMES_DIR}/${name}`, fileStart, `a theme folder of the blog cannot have the name of the built-in theme "${name}"; to change ${name}, name the folder differently and import the parts it keeps from bake/themes/${name}`),
   );
+}
+
+// why: the site theme compiles while the articles are read; a failure is reported when compileThemes asks for it again
+export function startSiteTheme(site) {
+  themeOf(site, site.settings.config.theme, true).catch(() => {});
+}
+
+export async function compileThemes(site, published, errors) {
+  const { config } = site.settings;
+  const names = [...new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => articleTheme(article, config))])].sort();
+  const compiled = await Promise.all(names.map((name) => themeOf(site, name, name === config.theme)));
+  errors.push(...compiled.flatMap((result) => result.errors));
+  return new Map(names.map((name, index) => [name, compiled[index].theme]));
+}
+
+export function articleTheme(article, config) {
+  return article.fields.theme ?? config.theme;
+}
+
+// The entry holds the promise, so that the site theme started before the articles are read is not compiled a second time.
+function themeOf(site, name, siteTheme) {
+  return site.memo.get(`theme ${name}`, { siteTheme }, async (files) => {
+    const errors = [];
+    const theme = await compileTheme(files, name, { siteTheme: files.value((context) => context.siteTheme) }, errors);
+    return { theme, errors };
+  });
 }
 
 export function themeFolder(root, name) {
@@ -36,46 +65,60 @@ export function themeLocation(root, name) {
   return blogPath(root, themeFolder(root, name));
 }
 
-export async function compileTheme(root, name, { siteTheme }, errors) {
+async function compileTheme(files, name, { siteTheme }, errors) {
+  const { root } = files;
   const folder = themeFolder(root, name);
-  const locate = (file) => (existsSync(join(folder, file)) ? join(folder, file) : null);
+  const locate = (file) => (files.stat(join(folder, file)) === undefined ? null : join(folder, file));
   const count = errors.length;
-  for (const file of [PAGE_FILE, CLIENT_FILE, ...(siteTheme ? [HOME_FILE, NOT_FOUND_FILE, THEME_STYLES_FILE] : [])]) {
+  for (const file of [PAGE_FILE, CLIENT_FILE, ...(siteTheme ? [THEME_STYLES_FILE] : [])]) {
     if (locate(file) === null) errors.push(errorAt(themeLocation(root, name), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
+  const pages = { article: locate(PAGE_FILE), ...(siteTheme ? { home: locate(HOME_FILE) ?? KIT_HOME, notFound: locate(NOT_FOUND_FILE) ?? KIT_NOT_FOUND } : {}) };
+  const pageFiles = Object.fromEntries(Object.entries(pages).map(([page, file]) => [page, blogPath(root, file)]));
+  const started = Date.now();
   const cache = buildCache('theme', `${BAKE_ROOT}\0${name}\0${siteTheme}`, resolve(root));
   const required = filesIn([folder, ...BUILD_FILES].map((path) => resolve(path)));
+  // why: a stylesheet that another stylesheet imports is not a module of the build, so every file of a theme folder of the blog is an input
+  files.modules(required, started);
   const cached = cache.read(required);
-  if (cached !== null) return loadTheme(cached.data, cached.files, new Set(cached.inputs));
-  const started = Date.now();
+  if (cached !== null) {
+    files.modules(cached.inputs, started);
+    return loadTheme(cached.data, cached.files, pageFiles);
+  }
   const alias = publicModules('themes');
   let data;
+  let modules;
   let theme;
   try {
     const [server, client, styles] = await Promise.all([
-      build(serverConfig(alias, locate, siteTheme)),
+      viteBuild(serverConfig(alias, pages)),
       browserBuild({ input: { [name]: CLIENT_ENTRY }, plugins: [clientEntry(locate(CLIENT_FILE)), solid()], alias }),
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
     ]);
     data = {
-      server: outputOf(server)[0].code,
+      server: server.outputs[0].code,
       styles: client.stylesheets,
       script: client.entry,
     };
-    const files = [client, styles].flatMap((output) => output?.files ?? []);
-    theme = await loadTheme(data, files, new Set([...[client, styles].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]));
+    modules = [server, client, styles].flatMap((output) => output?.modules ?? []);
+    theme = loadTheme(data, [client, styles].flatMap((output) => output?.files ?? []), pageFiles);
   } catch (error) {
+    files.everything();
     errors.push(compileError(root, name, locate(CLIENT_FILE), error));
     return null;
   }
-  cache.write(data, theme.files, [...required, ...theme.sources], started);
+  files.modules(modules, started);
+  cache.write(data, theme.files, [...required, ...modules], started);
   return theme;
 }
 
-async function loadTheme({ server, ...data }, files, sources) {
-  const module = await import(`data:text/javascript;base64,${Buffer.from(server).toString('base64')}`);
-  return { render: module.render, renderHome: module.renderHome, renderNotFound: module.renderNotFound, files, ...data, sources };
+// pages names the file of the blog that renders each page, where the problems of the page are reported.
+function loadTheme({ server, ...data }, files, pages) {
+  const module = {};
+  // why: the bundle keeps the Node built-in modules that a page.jsx imports as calls of require
+  compileFunction(server, ['exports', 'require'], { filename: RENDER_ENTRY })(module, createRequire(import.meta.url));
+  return { render: module.render, renderHome: module.renderHome, renderNotFound: module.renderNotFound, files, ...data, pages };
 }
 
 function clientEntry(file) {
@@ -84,23 +127,24 @@ function clientEntry(file) {
   });
 }
 
-function renderEntry(locate, siteTheme) {
-  const components = [['Page', PAGE_FILE, 'render'], ...(siteTheme ? [['Home', HOME_FILE, 'renderHome'], ['NotFound', NOT_FOUND_FILE, 'renderNotFound']] : [])];
+// A site theme without home.jsx or not-found.jsx renders that page with the Home or NotFound of bake/theme.
+function renderEntry(pages) {
+  const components = [['Page', pages.article, 'render'], ...(pages.home === undefined ? [] : [['Home', pages.home, 'renderHome'], ['NotFound', pages.notFound, 'renderNotFound']])];
   return virtualModules('bake-render-entry', {
     [RENDER_ENTRY]: () =>
       [
         "import { createComponent, renderToString } from 'solid-js/web';",
-        ...components.map(([component, file]) => `import ${component} from ${JSON.stringify(locate(file))};`),
+        ...components.map(([component, file]) => `import ${component} from ${JSON.stringify(file)};`),
         ...components.flatMap(([component, , exported]) => [`export function ${exported}(props) {`, `  return renderToString(() => createComponent(${component}, props));`, '}']),
       ].join('\n'),
   });
 }
 
-function serverConfig(alias, locate, siteTheme) {
+function serverConfig(alias, pages) {
   return {
-    ...viteConfig({ plugins: [renderEntry(locate, siteTheme), solid({ ssr: true, solid: { hydratable: false } })], alias }),
+    ...viteConfig({ plugins: [renderEntry(pages), solid({ ssr: true, solid: { hydratable: false } })], alias }),
     ssr: { noExternal: true },
-    build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { codeSplitting: false } } },
+    build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { format: 'cjs', codeSplitting: false } } },
   };
 }
 

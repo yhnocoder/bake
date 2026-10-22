@@ -11,7 +11,7 @@ Bake is a static site generator for a technical blog with interactive components
 - Write no abstraction for a need that does not exist yet. Prefer deleting code to adding it.
 - No shims, fallbacks, legacy aliases or dual code paths. Replace old behavior outright and delete code that is no longer used.
 - Fix the root cause, in the shared code that every caller goes through.
-- Every problem Bake finds in a blog is reported as `file:line:col message`, with the path relative to the blog root, and one run reports all problems (`src/report.js`).
+- Every problem Bake finds in a blog is reported as `file:line:col message`, with the path relative to the blog root, and one run reports all problems (`src/shared/report.js`).
 - Layers, enforced by `test/layers.test.js`: the directories of `src/` import each other without a cycle, only `src/cli.js` and `src/dev/` import `src/build/`, and modules that run in the browser import no Node built-in module.
 - Dependencies: use a mature library for a general problem (parsing, typesetting, highlighting, diffing, sanitizing), and write Bake's own core by hand (the article structure, the theme interface, the component interface, copying as Markdown). Accept a library's native behavior instead of wrapping it. Add a dependency in the change that uses it.
 

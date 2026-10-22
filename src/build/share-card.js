@@ -1,4 +1,4 @@
-import { escapeMarkup } from '../escape.js';
+import { escapeMarkup } from '../shared/escape.js';
 
 const STYLE = `
 html,

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { indexPages } from '../src/build/links.js';
 import { readArticle } from '../src/markdown/article.js';
-import { formatError, sortErrors } from '../src/report.js';
+import { formatError, sortErrors } from '../src/shared/report.js';
 import * as bento from '../src/themes/bento/options.js';
 import * as essay from '../src/themes/essay/options.js';
 
@@ -13,7 +14,7 @@ export const bentoTheme = { name: 'bento', headings: bento.headings, blocks: ben
 export async function parseArticle(file, source, errors, options = {}) {
   const article = await readArticle(file, source, errors, { theme: essayTheme, ...options });
   article.link(indexPages([{ url: article.url, title: '', draft: false, article }]), errors);
-  return withoutCopySource(article.structure());
+  return withoutCopySource(article.structure(errors));
 }
 
 export async function parse(body, options) {
@@ -37,7 +38,7 @@ export async function parseSite(pages, options = {}) {
   }
   const site = indexPages(entries);
   for (const { article } of entries) article.link(site, errors);
-  const articles = Object.fromEntries(entries.map(({ url, article }) => [url, withoutCopySource(article.structure())]));
+  const articles = Object.fromEntries(entries.map(({ url, article }) => [url, withoutCopySource(article.structure(errors))]));
   return { articles, errors: sortErrors(errors).map(formatError) };
 }
 
@@ -67,5 +68,5 @@ export function components(declarations) {
 }
 
 export function folder(path) {
-  return { path, files: readdirSync(path) };
+  return { files: readdirSync(path), read: (file) => readFileSync(join(path, file)) };
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { parseAttributes, writeAttribute } from '../src/markdown/attributes.js';
-import { formatError, sortErrors } from '../src/report.js';
+import { formatError, sortErrors } from '../src/shared/report.js';
 import { bentoTheme, components, frontMatter, html, outline, parse, parseArticle, parsed } from './article.js';
 
 describe('headings and anchors', () => {

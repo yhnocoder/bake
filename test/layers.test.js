@@ -98,6 +98,13 @@ describe('layers of src/', () => {
     assert.deepEqual(offending, []);
   });
 
+  test('src/shared/ imports no other directory of src/', () => {
+    const offending = [...imports].flatMap(([file, list]) =>
+      layerOf(file) !== 'shared/' ? [] : list.filter(({ target }) => target !== null && target.startsWith(`${SRC}${sep}`) && layerOf(target) !== 'shared/').map(({ specifier }) => `${name(file)} imports ${specifier}`),
+    );
+    assert.deepEqual(offending, []);
+  });
+
   test('the modules that run in the browser import no Node built-in module', () => {
     const modules = browserModules();
     assert.ok(modules.includes(join(SRC, 'chat/bubbles.jsx')));

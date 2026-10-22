@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createSignal, onMount } from 'solid-js';
-import { composing } from '../keys.js';
+import { composing } from '../shared/keys.js';
 import { exportMarkdown, markdownText, noteFileName, noteHtml, noteTitle } from './note.js';
 import { typesetMath } from './typeset.js';
 

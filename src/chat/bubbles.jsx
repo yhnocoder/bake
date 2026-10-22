@@ -2,7 +2,7 @@ import { Show, createSignal, onCleanup } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { selectionMarkdown } from '../copy/copy.js';
-import { composing } from '../keys.js';
+import { composing } from '../shared/keys.js';
 import styles from './bubbles.css?inline';
 import { CHAT_RULES, READ_ARTICLE, articlePage, chatTools, currentPage, loadCatalog, readArticle, systemPrompt } from './context.js';
 import { answer } from './conversation.js';

@@ -1,5 +1,5 @@
-import { compareText } from '../report.js';
-import { absoluteLink, encodePath } from '../urls.js';
+import { compareText } from '../shared/report.js';
+import { absoluteLink, encodePath } from '../shared/urls.js';
 
 export function articleEntry(article, config) {
   const { fields, content, url } = article;

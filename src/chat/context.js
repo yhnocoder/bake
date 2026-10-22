@@ -1,6 +1,6 @@
-import { escapeMarkup } from '../escape.js';
+import { escapeMarkup } from '../shared/escape.js';
 import { articleSource } from '../copy/copy.js';
-import { REGIONS, UI, regionSelector } from '../regions.js';
+import { REGIONS, UI, regionSelector } from '../shared/regions.js';
 import { instructionLines } from './instructions.js';
 
 const CATALOG_PATH = '_bake/articles.json';

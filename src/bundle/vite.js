@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { build } from 'vite';
-import { fileStart } from '../report.js';
+import { fileStart } from '../shared/report.js';
 import { MATHJAX_CHUNK, isMathJaxModule } from './modules.js';
 
 export const BAKE_ROOT = join(import.meta.dirname, '../..');
@@ -22,8 +22,21 @@ export function viteConfig({ plugins = [], alias = [] }) {
   };
 }
 
+// The modules are those of the whole module graph: a chunk leaves out a module whose exports were inlined, and its output still depends on it.
+export async function viteBuild(config) {
+  const modules = [];
+  const graph = {
+    name: 'bake-module-graph',
+    buildEnd() {
+      modules.push(...this.getModuleIds());
+    },
+  };
+  const result = await build({ ...config, plugins: [...config.plugins, graph] });
+  return { outputs: (Array.isArray(result) ? result[0] : result).output, modules };
+}
+
 export async function browserBuild({ input, plugins = [], alias = [], stylesheet }) {
-  const result = await build({
+  const { outputs, modules } = await viteBuild({
     ...viteConfig({ plugins, alias }),
     base: './',
     build: {
@@ -42,7 +55,6 @@ export async function browserBuild({ input, plugins = [], alias = [], stylesheet
       },
     },
   });
-  const outputs = outputOf(result);
   const chunks = new Map(outputs.filter((output) => output.type === 'chunk').map((chunk) => [chunk.fileName, chunk]));
   const entry = [...chunks.values()].find((chunk) => chunk.isEntry);
   const stylesheets = entry === undefined ? [] : staticStylesheets(entry, chunks);
@@ -50,12 +62,8 @@ export async function browserBuild({ input, plugins = [], alias = [], stylesheet
     entry: entry?.fileName,
     stylesheets,
     files: outputs.map((output) => ({ path: output.fileName, source: output.type === 'chunk' ? output.code : output.source })),
-    modules: [...chunks.values()].flatMap((chunk) => chunk.moduleIds),
+    modules,
   };
-}
-
-export function outputOf(result) {
-  return (Array.isArray(result) ? result[0] : result).output;
 }
 
 export function blogPath(root, file) {

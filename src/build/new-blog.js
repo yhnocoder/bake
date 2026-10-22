@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { CONFIG_FILE } from '../config/bake-config.js';
 import { POSTS_DIR } from './articles.js';
 import { BUILD_DIRS } from './dist.js';
-import { articleUrl } from '../urls.js';
+import { articleUrl } from '../shared/urls.js';
 
 const EXAMPLE_SLUG = 'hello';
 

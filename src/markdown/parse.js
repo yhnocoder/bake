@@ -1,4 +1,5 @@
-import { join, posix } from 'node:path';
+import assert from 'node:assert/strict';
+import { posix } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -6,12 +7,12 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { convertAttribute, optionProblem, resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, folderFile, parseSize, sizeProblem } from '../config/rules.js';
-import { percentDecode, referenceId, sidenoteId } from '../fragments.js';
+import { percentDecode, referenceId, sidenoteId } from '../shared/fragments.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, typesetMath } from '../render/math.js';
-import { listAll, listChoices } from '../report.js';
-import { encodePath } from '../urls.js';
+import { listAll, listChoices } from '../shared/report.js';
+import { encodePath } from '../shared/urls.js';
 import { HEADING_ATTRIBUTE_SUFFIX, PARAGRAPH_ANCHOR_SUFFIX, parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
 import { citationsAndMissingFootnotes } from './bracket-syntax.js';
@@ -58,29 +59,44 @@ const IMAGE_ATTRIBUTE_TEXT = /^\{[^{}\n]*\}/;
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const WHITESPACE = /\s/;
 
+// The stages run in this order on the syntax tree of the article, and each one reads what the stages before it wrote.
+const STAGES = [
+  // reads the blocks, headings and paragraphs, the theme and the components; writes their names, attributes, components and anchors, and article.anchors
+  readBlocksAndAnchors,
+  // reads the link definitions; replaces each link and image reference with the link or image it defines and removes the definitions
+  (article, tree) => resolveLinkReferences(tree),
+  // reads the text after each image; writes the attributes of the image and turns an image that starts a paragraph into a figure
+  readImageAttributes,
+  // reads the footnote definitions and references; writes article.definitions and article.sidenotes, which walkWithSidenotes follows
+  readFootnotes,
+  // reads :::references and the citations; writes article.citations and article.references
+  readCitations,
+  // reads each :::list-table; writes its rows
+  readListTables,
+  // reads the source of each :::example; writes its source text
+  readExamples,
+  // reads each raw HTML node; writes its ids, the addresses it links to and its HTML without the ids
+  readHtmlNodes,
+  // reads the formulas, the \eqref references and the preamble; writes the rendered formulas, article.equations, article.equationIds and article.glyphs
+  renderMath,
+  // reads article.anchors and the ids of the sidenotes, references and equations; reports an anchor that is also one of those ids
+  checkGeneratedIds,
+  // reads the headings, article.anchors and the ids of the sidenotes, references and equations; writes the id of each heading
+  assignHeadingIds,
+  // reads the language of each code block; writes the language and article.context.highlighter
+  loadCodeLanguages,
+  // reads the images, their attributes, the folder, the links, the addresses of the raw HTML and the component parameters; writes article.images, article.image and the published form of each image
+  readImages,
+];
+// why: run before the stages that write the anchors and the generated ids, the id stages read empty maps without failing, and a duplicate id would go unreported
+for (const writer of [readBlocksAndAnchors, readFootnotes, readCitations, renderMath]) {
+  for (const reader of [checkGeneratedIds, assignHeadingIds]) assert.ok(STAGES.indexOf(writer) < STAGES.indexOf(reader), `${writer.name} must run before ${reader.name}`);
+}
+
 export async function parseArticle(article) {
   const tree = parseWithPipesInMath(processor, article.source);
   tree.children = tree.children.filter((node) => node.type !== 'yaml');
-  walk(tree, (node, parent) => {
-    if (node.type === 'bakeBlock') readBlock(article, node, parent);
-    if (node.type === 'heading') readHeading(article, node);
-    if (node.type === 'paragraph') {
-      readStrayClosingLines(article, node);
-      readParagraphAnchor(article, node);
-    }
-  });
-  resolveLinkReferences(tree);
-  readImageAttributes(article, tree);
-  readFootnotes(article, tree);
-  readCitations(article, tree);
-  readListTables(article, tree);
-  readExamples(article, tree);
-  readHtmlNodes(article, tree);
-  await renderMath(article, tree);
-  checkGeneratedIds(article);
-  assignHeadingIds(article, tree);
-  await loadCodeLanguages(article, tree);
-  await readImages(article, tree);
+  for (const stage of STAGES) await stage(article, tree);
   article.tree = tree;
 }
 
@@ -91,6 +107,17 @@ export function generatedIds(article) {
   const labelled = new Map([...article.equations].map(([label, { id }]) => [id, label]));
   for (const id of article.equationIds.keys()) ids.set(id, labelled.has(id) ? `the equation \\label{${labelled.get(id)}}` : `the equation (${id.slice(EQUATION_ID_PREFIX.length)})`);
   return ids;
+}
+
+function readBlocksAndAnchors(article, tree) {
+  walk(tree, (node, parent) => {
+    if (node.type === 'bakeBlock') readBlock(article, node, parent);
+    if (node.type === 'heading') readHeading(article, node);
+    if (node.type === 'paragraph') {
+      readStrayClosingLines(article, node);
+      readParagraphAnchor(article, node);
+    }
+  });
 }
 
 function readBlock(article, node, parent) {
@@ -379,7 +406,7 @@ async function readImages(article, tree) {
       article.report(node.position.start, `image ${node.url} is not a file in the article folder`);
       continue;
     }
-    if (!sources.has(source)) sources.set(source, { image: await readImage(join(article.folder.path, source)), nodes: [] });
+    if (!sources.has(source)) sources.set(source, { image: await readImage(article.folder.read(source)), nodes: [] });
     const entry = sources.get(source);
     if (entry.image.error !== undefined) article.report(node.position.start, `image ${source} cannot be read: ${entry.image.error}`);
     else if (entry.image.format === null) article.report(node.position.start, `image ${source} is not a ${IMAGE_FORMATS} file`);

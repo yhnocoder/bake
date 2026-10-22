@@ -185,7 +185,7 @@ describe('chat pets', () => {
     const base = await serveFiles(t, { '/slow/pet.json': () => requested() });
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const problems = [];
-    const reading = readPet(import.meta.dirname, `${base}/slow/pet.json`, (file, message) => problems.push(message));
+    const reading = readPet(null, `${base}/slow/pet.json`, (file, message) => problems.push(message));
     await reached;
     t.mock.timers.tick(29_999);
     await new Promise((resolve) => setImmediate(resolve));

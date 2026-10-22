@@ -1,5 +1,5 @@
 import { files, loaders } from 'bake:component-loaders';
-import { livePage } from '../live.js';
+import { livePage } from '../shared/live.js';
 
 const FRAME = 'figure.component[data-component]';
 const BOX = '.component-box';

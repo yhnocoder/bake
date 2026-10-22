@@ -1,6 +1,6 @@
-import { livePage } from '../live.js';
-import { REGIONS, regionSelector } from '../regions.js';
-import { oncePerFrame } from '../theme/scripts/motion.js';
+import { livePage } from '../shared/live.js';
+import { REGIONS, regionSelector } from '../shared/regions.js';
+import { oncePerFrame } from '../theme-kit/scripts/motion.js';
 import styles from './entry.css?inline';
 import { chatLabels } from './labels.js';
 import petStyles from './pet.css?inline';

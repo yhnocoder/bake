@@ -10,11 +10,8 @@ const ENTRY = join(import.meta.dirname, 'entry.js');
 const BUILD_DIRS = [import.meta.dirname, join(import.meta.dirname, '../bundle')];
 const cache = buildCache('chat', BAKE_ROOT);
 
-let bundle = null;
-
-export function chatBundle() {
-  bundle ??= Promise.resolve(cachedBundle() ?? buildBundle());
-  return bundle;
+export async function chatBundle() {
+  return cachedBundle() ?? buildBundle();
 }
 
 function cachedBundle() {

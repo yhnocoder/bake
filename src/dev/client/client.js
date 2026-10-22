@@ -143,7 +143,7 @@ async function refresh() {
   if (!changed) return;
   restoreDetails(details);
   barControls?.scan();
-  // why: src/live.js starts the scripts of the page again on this event
+  // why: src/shared/live.js starts the scripts of the page again on this event
   document.dispatchEvent(new CustomEvent('bake:update'));
   if (anchor !== null) {
     anchor.align();

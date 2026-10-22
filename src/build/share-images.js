@@ -4,12 +4,12 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { errorAt, fileStart } from '../report.js';
-import { contentType } from '../content-types.js';
+import { errorAt, fileStart } from '../shared/report.js';
+import { contentType } from '../shared/content-types.js';
 import { DIST_DIR } from './dist.js';
 import { cardHtml } from './share-card.js';
 import { THEME_STYLES_PATH } from './theme.js';
-import { encodePath } from '../urls.js';
+import { encodePath } from '../shared/urls.js';
 
 export const SHARE_IMAGE_DIR = 'og';
 export const SHARE_IMAGE_WIDTH = 1200;
@@ -33,7 +33,26 @@ const PUBLISHED_COVERS = {
   webp: { extension: '.webp', type: 'image/webp' },
 };
 
-export function shareImageOf(root, { article, entry }, config, assets) {
+// The share images are known before the pages, which link to them, and are drawn after them, when the problems of every article are known.
+export function shareImagesOf(site, entries, { themes, assetFiles }, errors) {
+  const { config } = site.settings;
+  if (!site.shareImages || themes.get(config.theme) === null) return new Map();
+  const failed = new Set(errors.map((error) => error.file));
+  const listed = entries.filter(({ article, entry }) => !entry.draft && article.fields.page === undefined && !failed.has(article.file));
+  const sources = assetSources(assetFiles);
+  return new Map(listed.map((page) => [page.article.file, shareImageOf(site.root, page, config, sources)]));
+}
+
+export function shareImageFiles({ root, shareImages, assetFiles, errors }) {
+  const failed = new Set(errors.map((error) => error.file));
+  return shareImageOutputs(root, [...shareImages.values()].filter((image) => !failed.has(image.owner)), assetSources(assetFiles), errors);
+}
+
+function assetSources(assetFiles) {
+  return new Map(assetFiles.map((file) => [file.path, file.render()]));
+}
+
+function shareImageOf(root, { article, entry }, config, assets) {
   const { fields } = article;
   const name = `${SHARE_IMAGE_DIR}${entry.url.slice(0, -1)}`;
   if (fields.cover !== undefined) {
@@ -70,7 +89,7 @@ export function shareImageOf(root, { article, entry }, config, assets) {
   };
 }
 
-export async function shareImageOutputs(root, images, assets, errors) {
+async function shareImageOutputs(root, images, assets, errors) {
   const outputs = [];
   const pending = [];
   for (const image of images) {

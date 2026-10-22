@@ -1,0 +1,124 @@
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+import sharp from 'sharp';
+import { createSite, updateSite } from '../src/build/site.js';
+import { article, createBlog, validConfig, writeFiles } from './blog.js';
+
+const plainPage = `import { For } from 'solid-js';
+
+export default function Page(props) {
+  return (
+    <html lang={props.site.language}>
+      <head>
+        <title>{props.site.title}</title>
+        <For each={props.assets.styles}>{(href) => <link rel="stylesheet" href={href} />}</For>
+        <For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>
+      </head>
+      <body>
+        <div data-edge="start" />
+        <div data-edge="end" />
+        <script type="application/json" class="bk-source" data-region="source" />
+        <main data-region="article" innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
+      </body>
+    </html>
+  );
+}
+`;
+
+function png(width) {
+  return sharp({ create: { width, height: 1, channels: 4, background: '#ffffff' } })
+    .png()
+    .toBuffer();
+}
+
+function customElement(text) {
+  return `export const layout = { height: 100 };\n\nexport default class extends HTMLElement {\n  connectedCallback() {\n    this.textContent = ${text};\n  }\n}\n`;
+}
+
+async function blogFiles() {
+  return {
+    'bake.config.js': validConfig,
+    'preamble.sty': '\\newcommand{\\R}{\\mathbb{R}}\n',
+    'content/posts/rope/index.md': article({ extra: 'theme: plain\n', body: 'In $\\R$.\n\n![Figure](figure.png)\n\n:::rope-plot\n:::\n\n:::rope-local\n:::\n' }),
+    'content/posts/rope/figure.png': await png(4),
+    'content/posts/rope/components/rope-local.js': customElement("'local'"),
+    'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: 'Plain text.\n' }),
+    'components/rope-plot.js': `import { scale } from '../lib/scale.js';\n\n${customElement('String(scale)')}`,
+    'lib/scale.js': 'export const scale = 2;\n',
+    'themes/plain/page.jsx': plainPage,
+    'themes/plain/client.jsx': "import './plain.css';\n\nexport default () => () => {};\n",
+    'themes/plain/plain.css': 'main {\n  color: red;\n}\n',
+  };
+}
+
+async function outputs(result) {
+  const rendered = new Map();
+  for (const output of [...result.pages.flatMap((page) => page.outputs), result.home, ...result.siteFiles, ...result.assetFiles]) {
+    if (output.render !== undefined) rendered.set(output.path, String(await output.render()));
+  }
+  return rendered;
+}
+
+function changedOutputs(before, after) {
+  return [...new Set([...before.keys(), ...after.keys()])].filter((path) => before.get(path) !== after.get(path)).sort();
+}
+
+function articleOf(result, file) {
+  return result.articles.find((candidate) => candidate.file === file);
+}
+
+function pageOf(result, name) {
+  return result.pages.find((page) => page.article.file === `content/posts/${name}/index.md`).outputs.find((output) => output.path.endsWith('/index.html'));
+}
+
+describe('updating a site', () => {
+  test('rereads what a changed file affects and keeps the other articles', async (t) => {
+    const dir = createBlog(t, await blogFiles());
+    const site = createSite(dir);
+    let result = await updateSite(site);
+    assert.deepEqual(result.errors, []);
+    const changes = [
+      ['bake.config.js', validConfig.replace('Test Blog', 'Renamed Blog'), (paths) => paths.includes('index.html')],
+      ['preamble.sty', '\\newcommand{\\R}{\\mathbb{Z}}\n', (paths) => paths.includes('2026-10/rope/index.html')],
+      ['content/posts/rope/index.md', article({ extra: 'theme: plain\n', body: 'In $\\R$, changed.\n\n![Figure](figure.png)\n\n:::rope-plot\n:::\n\n:::rope-local\n:::\n' }), (paths) => paths.includes('2026-10/rope/index.html')],
+      ['content/posts/rope/figure.png', await png(2), (paths) => paths.includes('2026-10/rope/index.html') && paths.includes('2026-10/rope/figure.webp')],
+      ['components/rope-plot.js', `import { scale } from '../lib/scale.js';\n\n${customElement('String(scale * 3)')}`, (paths) => paths.some((path) => path.startsWith('assets/'))],
+      ['content/posts/rope/components/rope-local.js', customElement("'changed'"), (paths) => paths.some((path) => path.startsWith('assets/'))],
+      ['themes/plain/plain.css', 'main {\n  color: blue;\n}\n', (paths) => paths.some((path) => path.startsWith('assets/plain-'))],
+      ['lib/scale.js', 'export const scale = 5;\n', (paths) => paths.some((path) => path.startsWith('assets/'))],
+    ];
+    for (const [path, content, affected] of changes) {
+      const before = await outputs(result);
+      const gelu = articleOf(result, 'content/posts/gelu/index.md');
+      writeFiles(dir, { [path]: content });
+      result = await updateSite(site, [path]);
+      assert.deepEqual(result.errors, [], path);
+      const changed = changedOutputs(before, await outputs(result));
+      assert.ok(affected(changed), `${path} changed ${changed.join(', ')}`);
+      assert.equal(articleOf(result, 'content/posts/gelu/index.md'), gelu, `${path} reread the unrelated article`);
+    }
+  });
+
+  test('renders again only the changed article and the articles that show a part of it or link to an address it now has', async (t) => {
+    const names = ['gelu', 'rope', 'swish', 'silu'];
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: '## Intro {#intro}\n\nGELU text.\n' }),
+      'content/posts/rope/index.md': article({ body: 'See [GELU](/2026-10/gelu/#intro) and [SiLU](/2026-10/silu/).\n' }),
+      'content/posts/swish/index.md': article({ title: 'Swish', slug: 'swish', body: 'Unrelated.\n' }),
+    });
+    const site = createSite(dir);
+    let result = await updateSite(site);
+    assert.deepEqual(result.errors.map((error) => error.message), ['link target /2026-10/silu/ does not exist']);
+    const update = async (path, content) => {
+      const before = new Map(names.filter((name) => result.pages.some((page) => page.article.file.includes(`/${name}/`))).map((name) => [name, pageOf(result, name)]));
+      writeFiles(dir, { [path]: content });
+      result = await updateSite(site, [path]);
+      return [...before].filter(([name, output]) => pageOf(result, name) !== output).map(([name]) => name);
+    };
+    assert.deepEqual(await update('content/posts/gelu/index.md', article({ title: 'GELU', slug: 'gelu', body: '## Introduction {#intro}\n\nGELU text.\n' })), ['gelu', 'rope']);
+    assert.deepEqual(await update('content/posts/rope/index.md', article({ body: 'See [GELU](/2026-10/gelu/#intro), and [SiLU](/2026-10/silu/).\n' })), ['rope']);
+    assert.deepEqual(await update('content/posts/silu/index.md', article({ title: 'SiLU', slug: 'silu', body: 'SiLU text.\n' })), ['rope']);
+    assert.deepEqual(result.errors, []);
+  });
+});

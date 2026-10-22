@@ -1,4 +1,4 @@
-import { HOME_COLUMNS } from '../choices.js';
+import { HOME_COLUMNS } from '../shared/choices.js';
 
 export const READING_SETTINGS = Object.freeze({
   theme: { values: ['system', 'light', 'dark'], default: 'system' },

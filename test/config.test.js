@@ -169,4 +169,12 @@ describe('bake.config.js', () => {
       "themes/mine/options.js:1:1 mine: block \"plain\" must be declared as an object that maps each of its attributes to its declaration, such as { cols: { type: 'number', min: 1, max: 6, step: 1 } }, got \"x\"",
     ]);
   });
+
+  test('reads options.js of a theme without running it and reports a value that is not a literal or a file that cannot be parsed', async (t) => {
+    const imported = ["import { size } from './sizes.js';", '', 'export const options = { size };', ''].join('\n');
+    assert.deepEqual(await problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': imported, 'themes/mine/sizes.js': 'export const size = {};\n' }), [
+      'themes/mine/options.js:3:26 mine: the build reads options without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got "size", which is not a constant of this file with such a value',
+    ]);
+    assert.deepEqual(await problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': 'export const options = {\n' }), ['themes/mine/options.js:2:1 mine: options.js cannot be read: Expected `}` but found `EOF`']);
+  });
 });

@@ -1,7 +1,7 @@
 import { defaultHandlers } from 'mdast-util-to-hast';
 import { toString } from 'mdast-util-to-string';
-import { escapeMarkup } from '../escape.js';
-import { fragmentOf, percentDecode } from '../fragments.js';
+import { escapeMarkup } from '../shared/escape.js';
+import { fragmentOf, percentDecode } from '../shared/fragments.js';
 import { catalogEntry, catalogLines } from './context.js';
 import { instructionLines } from './instructions.js';
 import { markdownHtml, markdownTree, paragraphElement } from './reply.js';

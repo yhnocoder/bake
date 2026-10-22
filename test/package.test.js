@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { PUBLIC_MODULES } from '../src/bundle/modules.js';
 
 const root = join(import.meta.dirname, '..');
 
@@ -27,4 +28,19 @@ test('the package is published as @yhnocoder/bake with the command bake, whose f
   assert.deepEqual(Object.keys(bin), ['bake']);
   assert.ok(packedFiles().includes(bin.bake));
   assert.match(readFileSync(join(root, bin.bake), 'utf8'), /^#!\/usr\/bin\/env node\n/);
+});
+
+test('the package exports none of its modules, whose bake/ names only the build of themes and components resolves', () => {
+  assert.equal(import.meta.resolve('@yhnocoder/bake/package.json'), new URL('../package.json', import.meta.url).href);
+  const paths = ['src/cli.js', 'src/kit/index.js', ...PUBLIC_MODULES.map((module) => module.name.replace(/^bake\//, ''))];
+  const exported = paths.filter((path) => {
+    try {
+      import.meta.resolve(`@yhnocoder/bake/${path}`);
+      return true;
+    } catch (error) {
+      assert.equal(error.code, 'ERR_PACKAGE_PATH_NOT_EXPORTED', path);
+      return false;
+    }
+  });
+  assert.deepEqual(exported, []);
 });

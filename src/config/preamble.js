@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { errorAt } from '../report.js';
+import { errorAt } from '../shared/report.js';
 
 export const PREAMBLE_FILE = 'preamble.sty';
 
@@ -22,15 +21,9 @@ const PACKAGE_COMMANDS = {
 const ACCEPTED = [...Object.keys(GRAMMARS), ...Object.keys(PACKAGE_COMMANDS)].map((name) => `\\${name}`);
 const LETTER = /[A-Za-z@]/;
 
-export function readPreamble(root, errors) {
-  let source;
-  try {
-    source = readFileSync(join(root, PREAMBLE_FILE), 'utf8');
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  }
-  return parsePreamble(source, errors);
+export function readPreamble(files, errors) {
+  const source = files.read(join(files.root, PREAMBLE_FILE), 'utf8');
+  return source === null ? [] : parsePreamble(source, errors);
 }
 
 export function parsePreamble(source, errors) {

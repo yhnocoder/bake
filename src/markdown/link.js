@@ -1,8 +1,8 @@
 import { toString } from 'mdast-util-to-string';
-import { idOfFragment, referenceId, sidenoteId } from '../fragments.js';
+import { idOfFragment, referenceId, sidenoteId } from '../shared/fragments.js';
 import { renderChildrenHtml, renderHast, renderInlineHtml } from '../render/html.js';
-import { meantName } from '../suggest.js';
-import { INVALID_PERCENT_ENCODING, addressHref, parseAddress } from '../urls.js';
+import { meantName } from '../shared/suggest.js';
+import { INVALID_PERCENT_ENCODING, addressHref, parseAddress } from '../shared/urls.js';
 import { generatedIds } from './parse.js';
 import { walk, walkWithSidenotes } from './tree.js';
 
@@ -48,21 +48,28 @@ export function indexTargets(article) {
   }
 }
 
+// Returns the paths of the site that the article looked up, the pages its links and embeds depend on.
 export function linkArticle(article, site, errors) {
   article.errors = errors;
-  article.linked.clear();
-  article.borrowed.clear();
+  const paths = new Set();
+  const recorded = {
+    find(address, source) {
+      paths.add(address.path);
+      return site.find(address, source);
+    },
+  };
   const ids = pageIds(article);
   walkWithSidenotes(article, article.tree, (node) => {
     if (node.type === 'link') {
       delete node.target;
-      checkLink(article, node, site, ids);
+      checkLink(article, node, recorded, ids);
     }
     if (node.type === 'bakeBlock' && node.name === 'embed') {
-      readEmbed(article, node, site);
+      readEmbed(article, node, recorded);
       return false;
     }
   });
+  return paths;
 }
 
 function pageIds(article) {

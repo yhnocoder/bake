@@ -12,6 +12,7 @@ export function createPreview(root) {
   let publicFiles = new Map();
   const assetFiles = new Map();
   let articles = [];
+  let read = new Map();
   let problems = [];
   let changedPaths = [];
 
@@ -27,6 +28,7 @@ export function createPreview(root) {
     if (home?.html !== nextHome.html) changes.reload = changes.reload === 'all' ? 'all' : ['/', ...changes.reload];
     pages = next;
     home = nextHome;
+    read = new Map(result.articles.map((article) => [article.file, article]));
     articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.draft }));
     siteFiles = new Map(result.siteFiles.map((output) => [output.path, output]));
     publicFiles = new Map(result.publicFiles.map((output) => [output.path, output]));
@@ -68,7 +70,7 @@ export function createPreview(root) {
 
   function syntax(file) {
     const { settings } = site;
-    const article = site.articles.get(file)?.article;
+    const article = read.get(file);
     if (settings?.markdown === undefined || article === undefined) return null;
     const theme = settings.markdown.get(article.fields?.theme ?? settings.rules.theme);
     const dir = posix.dirname(file);
