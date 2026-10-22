@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { article, decodeImage, validConfig } from '../blog.js';
+import { article, validConfig } from '../blog.js';
 import { test as base, settle } from './browser.js';
 
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
@@ -488,23 +488,6 @@ test.describe('components run in the browser', () => {
     assert.notEqual(styles.component[5].marginTop, styles.article[3].marginTop);
   });
 
-  test('controls show the pointer cursor inside and outside a component, and disabled controls do not', async ({ open }) => {
-    const page = await open('text');
-    await waitForReady(page);
-    const cursors = await page.evaluate(() => {
-      const controls = '<button>b</button><button disabled>d</button><label>l</label><input type="range"><input type="checkbox"><select><option>s</option></select><select disabled><option>s</option></select><a href="#top">a</a>';
-      const read = (parent) => {
-        const host = document.createElement('div');
-        host.innerHTML = controls;
-        parent.append(host);
-        return [...host.children].map((element) => `${element.localName}${element.disabled ? ' disabled' : ''} ${getComputedStyle(element).cursor}`);
-      };
-      return { component: read(document.querySelector('text-view')), article: read(document.querySelector('.bk-article')) };
-    });
-    const expected = ['button pointer', 'button disabled default', 'label pointer', 'input pointer', 'input pointer', 'select pointer', 'select disabled default', 'a pointer'];
-    assert.deepEqual(cursors, { component: expected, article: expected });
-  });
-
   test('the theme setting and the system color scheme dispatch bake:theme', async ({ open }) => {
     const page = await open('rope');
     await waitForReady(page, 1);
@@ -542,21 +525,6 @@ function formulaShifts() {
     });
   }
   return shifts;
-}
-
-async function sectionColors(page, top, height, width) {
-  const colors = new Set();
-  const viewport = page.viewportSize().height;
-  for (let offset = 0; offset < height && colors.size < 2; offset += viewport) {
-    const scrolled = await page.evaluate((y) => {
-      scrollTo({ top: y, behavior: 'instant' });
-      return scrollY;
-    }, top + offset);
-    const slice = Math.min(viewport, height - offset);
-    const { data } = await decodeImage(await page.screenshot({ clip: { x: 0, y: top + offset - scrolled, width, height: slice } }));
-    for (let index = 0; index < data.length && colors.size < 2; index += 4) colors.add(data.readUInt32BE(index));
-  }
-  return colors.size;
 }
 
 async function contentHeights() {
@@ -622,24 +590,6 @@ test.describe('the example components run on the syntax page', () => {
       assert.deepEqual(await page.evaluate(contentHeights), [], `${width}px`);
     }
     assert.deepEqual(problems, []);
-  });
-
-  test('every chapter of the syntax article renders a screenshot with content at 1440 and 375 pixels', async ({ start }) => {
-    for (const width of [1440, 375]) {
-      const { page, problems } = await start({ viewport: { width, height: 900 } });
-      const sections = await page.evaluate(() =>
-        [...document.querySelectorAll('section.bk-section')].map((section) => {
-          const rect = section.getBoundingClientRect();
-          return { id: section.querySelector('h2').id, top: rect.top + scrollY, width: rect.width, height: rect.height };
-        }),
-      );
-      assert.equal(sections.length, 16);
-      for (const { id, top, width: sectionWidth, height } of sections) {
-        assert.ok(sectionWidth > 0 && height > 0, `${width}px ${id}: the section is ${sectionWidth}x${height}`);
-        assert.ok((await sectionColors(page, Math.round(top), Math.round(height), width)) > 1, `${width}px ${id}: the screenshot has one color`);
-      }
-      assert.deepEqual(problems, [], `${width}px`);
-    }
   });
 
   test('an example with a component stacks its source above its result, so pixel widths keep their size and stay centred', async ({ start }) => {

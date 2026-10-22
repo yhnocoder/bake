@@ -1,20 +1,145 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import sharp from 'sharp';
 import { parse } from '../article.js';
-import { article, exampleBlog, validConfig } from '../blog.js';
-import { luminance, test } from './browser.js';
+import { article, validConfig } from '../blog.js';
+import { test } from './browser.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
 
-const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
-const lines = source.split('\n');
-const linkedLines = readFileSync(join(exampleBlog, 'content/posts/syntax-linked/index.md'), 'utf8').split('\n');
+const copySource = article({
+  title: 'Copying',
+  slug: 'copy',
+  body: `This article lists what copying gives. Change it first.
+
+## Copy as Markdown
+
+Select and copy on the page.
+
+A whole block is copied as its source. A partly selected block is copied as the source of its part, with ==a highlight== and **bold** as written, the formula $\\sigma(x)$ as TeX, and the definition of a footnote at the end[^copy-notes].
+
+- Section numbers, the \`#\` beside a heading and sidenote numbers are left out.
+- A selection that starts outside the article copies only the part in the article.
+- Headings, a row of a table, formulas and embedded content are copied whole.
+
+$$
+\\mathrm{SiLU}(x) = x\\,\\sigma(x)
+$$
+
+\`\`\`python
+def silu(x):
+    return x / (1 + math.exp(-x))
+\`\`\`
+
+:::demo-plot{size=2}
+Any part of a component copies its whole block.
+:::
+
+[^copy-notes]: Each definition is appended once, as written in \`index.md\`.
+
+## Fields
+
+| Field | Meaning |
+|---|---|
+| \`slug\` | The last part of the address. |
+| \`date\` | The date of writing. |
+| \`updated\` | The date of the last change. |
+| \`summary\` | A summary of one sentence. |
+| \`draft\` | With true the article is not published. |
+| \`page\` | A plain HTML page. |
+
+The script that preview names is a module.
+
+## Sidenotes
+
+:::example
+At inference the elementwise operation fuses into the epilogue[^gemm], without extra bandwidth.
+
+[^gemm]: The epilogue is the stage of a matrix kernel that handles each result.
+:::
+
+## Tables
+
+::::example
+:::list-table
+* - Function
+  - Formula
+  - Notes
+  - Curve
+* - ReLU
+  - $\\max(0, x)$
+  - - One comparison
+    - Zero gradient on the negative half
+  - ![](relu.svg){width=64px}
+:::
+::::
+
+## Links and images
+
+:::example
+The backward pass follows the [chain rule](/2026-10/linked/#chain-rule), see [the linked article](/2026-10/linked/).
+:::
+
+:::example
+![Shapes](shapes.svg "The shapes of the layer.")
+:::
+
+## Headings
+
+:::example
+### Third level {#third-level toc="Short"}
+:::
+
+## Folds
+
+::::example
+:::fold{title="Derivation: the derivative"}
+Apply the product rule to $x\\Phi(x)$.
+:::
+::::
+
+## Components
+
+::::example
+:::demo-plot{size=3 width=body}
+:::
+::::
+
+## Embeds
+
+:::embed
+/2026-10/linked/#jacobian-products
+:::
+`,
+});
+const linkedLines = article({
+  title: 'Linked',
+  slug: 'linked',
+  body: `## Chain rule
+
+The chain rule multiplies the local derivatives.
+
+## Jacobian products {#jacobian-products}
+
+Compute the products of vectors and Jacobians.
+
+### Gate derivative
+
+:::demo-plot{size=1}
+The shape of SiLU.
+:::
+
+## Order
+
+Visit the nodes in reverse order.
+`,
+}).split('\n');
+const lines = copySource.split('\n');
+const svg = (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32"><rect width="64" height="32" fill="${color}"/></svg>\n`;
+const demoPlot = "export const params = { size: { label: 'Size', type: 'number', default: 1 } };\nexport const layout = { height: 120 };\n\nexport default class DemoPlot extends HTMLElement {\n  connectedCallback() {\n    this.textContent = 'plot';\n  }\n}\n";
 
 function sourceLines(first, last) {
   const start = lines.findIndex((line) => line.startsWith(first));
   const end = lines.findIndex((line, index) => index >= start && line === last);
-  assert.ok(start !== -1 && end !== -1, `the syntax article has no lines from "${first}" to "${last}"`);
+  assert.ok(start !== -1 && end !== -1, `the article has no lines from "${first}" to "${last}"`);
   return lines.slice(start, end + 1).join('\n');
 }
 
@@ -71,173 +196,164 @@ async function copied(page) {
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
 test.describe('copying from an article gives the Markdown source of the selection', () => {
+  test.use({
+    blog: {
+      example: false,
+      files: {
+        'bake.config.js': "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n",
+        'content/posts/copy/index.md': copySource,
+        'content/posts/copy/relu.svg': svg('#985b57'),
+        'content/posts/copy/shapes.svg': svg('#2a78d6'),
+        'content/posts/linked/index.md': linkedLines.join('\n'),
+        'components/demo-plot.js': demoPlot,
+      },
+    },
+  });
   test.beforeEach(async ({ page }) => {
-    await openWithSelectionModule(page, '/2026-10/syntax/');
+    await openWithSelectionModule(page, '/2026-10/copy/');
     await page.waitForFunction(() => document.querySelector('.bk-notes-layer') !== null);
   });
-  const copyChapter = '#复制为-markdown ~ .bk-block';
+  const copyChapter = '#copy-as-markdown ~ .bk-block';
 
   test('part of a paragraph keeps highlights, math and the footnote, and the definition is appended', async ({ page }) => {
-    await select(page, { selector: copyChapter, text: '只选中一部分的块' }, { selector: copyChapter, contains: '附在末尾', text: '。', after: true, last: true });
-    const paragraph = sourceLine('完整选中的块');
-    const expected = `${paragraph.slice(paragraph.indexOf('只选中一部分的块'))}\n\n${sourceLine('[^copy-notes]:')}`;
+    await select(page, { selector: copyChapter, text: 'A partly selected block' }, { selector: copyChapter, contains: 'at the end', text: '.', after: true, last: true });
+    const paragraph = sourceLine('A whole block');
+    const expected = `${paragraph.slice(paragraph.indexOf('A partly selected block'))}\n\n${sourceLine('[^copy-notes]:')}`;
     assert.equal((await copied(page)).text, expected);
   });
 
   test('a sidenote number inside an example becomes the reference with its label and its definition', async ({ page }) => {
-    await select(page, { selector: '#旁注 ~ .bk-block .example-result', text: '推理时' }, { selector: '#旁注 ~ .bk-block .example-result', text: '不额外占带宽', after: true });
-    assert.equal((await copied(page)).text, `推理时这个逐元素操作要能融合进 GEMM 的 epilogue[^gemm]，不额外占带宽\n\n${sourceLine('[^gemm]:')}`);
+    await select(page, { selector: '#sidenotes ~ .bk-block .example-result', text: 'At inference' }, { selector: '#sidenotes ~ .bk-block .example-result', text: 'without extra bandwidth', after: true });
+    assert.equal((await copied(page)).text, `At inference the elementwise operation fuses into the epilogue[^gemm], without extra bandwidth\n\n${sourceLine('[^gemm]:')}`);
   });
 
   test('whole blocks are copied as their source lines, and a component counts as whole when part of it is selected', async ({ page }) => {
-    await select(page, { selector: copyChapter, text: '章节编号' }, { selector: `${copyChapter} figcaption`, text: '选中', after: true });
-    assert.equal((await copied(page)).text, sourceLines('- 章节编号', ':::'));
+    await select(page, { selector: copyChapter, text: 'Section numbers' }, { selector: `${copyChapter} figcaption`, text: 'Any part', after: true });
+    assert.equal((await copied(page)).text, sourceLines('- Section numbers', ':::'));
   });
 
   test('a selection inside the caption of a component gives its block and keeps the figure in the HTML', async ({ page }) => {
-    await select(page, { selector: `${copyChapter} figcaption`, text: '任何部分' }, { selector: `${copyChapter} figcaption`, text: '整个', after: true });
+    await select(page, { selector: `${copyChapter} figcaption`, text: 'part of' }, { selector: `${copyChapter} figcaption`, text: 'whole', after: true });
     const caption = await copied(page);
-    assert.equal(caption.text, sourceLines(':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}', ':::'));
-    assert.match(caption.html, /^<figure><figcaption>任何部分，复制的都是它的整个<\/figcaption><\/figure>$/);
+    assert.equal(caption.text, sourceLines(':::demo-plot{size=2}', ':::'));
+    assert.match(caption.html, /^<figure><figcaption>part of a component copies its whole<\/figcaption><\/figure>$/);
   });
 
   test('a selection inside a list item gives its inline Markdown, and one across items gives list items', async ({ page }) => {
-    await select(page, { selector: `${copyChapter} li`, text: '标题旁的' }, { selector: `${copyChapter} li code`, text: '#', after: true });
-    assert.equal((await copied(page)).text, '标题旁的 `#`');
-    await select(page, { selector: `${copyChapter} li`, text: '页边的旁注编号' }, { selector: `${copyChapter} li`, text: '选区从文章外面开始时', after: true });
-    assert.equal((await copied(page)).text, '- 页边的旁注编号可以选中，复制的内容里没有它们。\n- 选区从文章外面开始时');
+    await select(page, { selector: `${copyChapter} li`, text: 'the ' }, { selector: `${copyChapter} li code`, text: '#', after: true });
+    assert.equal((await copied(page)).text, 'the `#`');
+    await select(page, { selector: `${copyChapter} li`, text: 'sidenote numbers' }, { selector: `${copyChapter} li`, text: 'A selection that starts', after: true });
+    assert.equal((await copied(page)).text, '- sidenote numbers are left out.\n- A selection that starts');
   });
 
   test('a selection across the rows of a pipe table gives whole rows under the header and delimiter rows', async ({ page }) => {
-    const table = '#文章开头的-front-matter ~ .bk-block table';
-    const header = [sourceLine('| 字段 |'), sourceLine('|---|')];
-    await select(page, { selector: `${table} td`, text: '网址的最后一段' }, { selector: `${table} td`, text: '一句摘要', after: true });
+    const table = '#fields ~ .bk-block table';
+    const header = [sourceLine('| Field |'), sourceLine('|---|')];
+    await select(page, { selector: `${table} td`, text: 'last part' }, { selector: `${table} td`, text: 'A summary', after: true });
     assert.equal((await copied(page)).text, [...header, sourceLine('| `slug` |'), sourceLine('| `date` |'), sourceLine('| `updated` |'), sourceLine('| `summary` |')].join('\n'));
-    await select(page, { selector: `${table} td`, text: '时不发布' }, { selector: '#文章开头的-front-matter ~ .bk-block p', contains: '指向的脚本' });
+    await select(page, { selector: `${table} td`, text: 'not published' }, { selector: '#fields ~ .bk-block p', contains: 'preview names' });
     assert.equal((await copied(page)).text, [...header, sourceLine('| `draft` |'), sourceLine('| `page` |')].join('\n'));
   });
 
   test('a partly selected example converts its result, with the math and images of list-table cells', async ({ page }) => {
-    await select(page, { selector: '#表格与-list-table ~ .bk-block .example-result .list-table', text: '激活函数' }, { selector: '#表格与-list-table ~ .bk-block .example-result .list-table', text: '负半轴梯度为 0', after: true });
-    assert.equal((await copied(page)).text, [':::list-table', '* - 激活函数', '  - 公式', '  - 特点', '  - 曲线', '* - ReLU', '  - $\\max(0, x)$', '  - - 计算只需要一次比较', '    - 负半轴梯度为 0', '  - ![](relu.svg){width=64px}', ':::'].join('\n'));
+    const table = '#tables ~ .bk-block .example-result .list-table';
+    await select(page, { selector: table, text: 'Function' }, { selector: table, text: 'Zero gradient on the negative half', after: true });
+    assert.equal((await copied(page)).text, [':::list-table', '* - Function', '  - Formula', '  - Notes', '  - Curve', '* - ReLU', '  - $\\max(0, x)$', '  - - One comparison', '    - Zero gradient on the negative half', '  - ![](relu.svg){width=64px}', ':::'].join('\n'));
   });
 
   test('a selection that starts outside the article copies the article part', async ({ page }) => {
-    await select(page, { selector: '.bk-title', text: 'Bake' }, { selector: '.bk-article > .bk-block', text: '先改这篇文章。', after: true });
-    assert.equal((await copied(page)).text, sourceLine('这篇文章列出 Bake 的全部写法'));
+    await select(page, { selector: '.bk-title', text: 'Copying' }, { selector: '.bk-article > .bk-block', text: 'Change it first.', after: true });
+    assert.equal((await copied(page)).text, sourceLine('This article lists'));
   });
 
   test('section numbers and heading links are left out of the Markdown and the HTML, and math is TeX in the HTML', async ({ page }) => {
-    await select(page, { selector: '#复制为-markdown .bk-heading-text', text: 'Markdown' }, { selector: copyChapter, text: '只选中一部分的块也复制选中部分的原文，', after: true });
+    await select(page, { selector: '#copy-as-markdown .bk-heading-text', text: 'Markdown' }, { selector: copyChapter, text: 'copied as the source of its part,', after: true });
     const partial = await copied(page);
-    assert.equal(partial.text, `${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n完整选中的块按 \`index.md\` 里的原文复制。只选中一部分的块也复制选中部分的原文，`);
-    await select(page, { selector: '#复制为-markdown', text: '15' }, { selector: copyChapter, contains: '附在末尾', text: '。', after: true, last: true });
+    assert.equal(partial.text, `${sourceLine('## Copy as Markdown')}\n\n${sourceLine('Select and copy')}\n\nA whole block is copied as its source. A partly selected block is copied as the source of its part,`);
+    await select(page, { selector: '#copy-as-markdown', text: '01' }, { selector: copyChapter, contains: 'at the end', text: '.', after: true, last: true });
     const whole = await copied(page);
-    assert.ok(whole.text.startsWith(`${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n${sourceLine('完整选中的块')}`), whole.text);
+    assert.ok(whole.text.startsWith(`${sourceLine('## Copy as Markdown')}\n\n${sourceLine('Select and copy')}\n\n${sourceLine('A whole block')}`), whole.text);
     assert.ok(whole.text.endsWith(`\n\n${sourceLine('[^copy-notes]:')}`), whole.text);
-    assert.doesNotMatch(whole.html, />15<|>#<|<mjx-container|<svg|<div|<section|<span|<aside|\sclass=|\sdata-|\sstyle=/);
-    assert.match(whole.html, /<mark>重点标记<\/mark>/);
-    assert.match(whole.html, /公式 \$\\sigma\(x\)\$ 写成/);
-    assert.match(whole.html, /<h2>复制为 Markdown<\/h2>/);
-    assert.match(whole.html, /附在末尾<sup><a href="[^"]*#footnote-3">3<\/a><\/sup>。/);
-    assert.match(whole.html, /<hr><ol><li value="3" id="footnote-3"><p>每个脚注的定义只附一次，按 <code>index.md<\/code> 里的原文复制。<\/p><\/li><\/ol>$/);
+    assert.doesNotMatch(whole.html, />01<|>#<|<mjx-container|<svg|<div|<section|<span|<aside|\sclass=|\sdata-|\sstyle=/);
+    assert.match(whole.html, /<mark>a highlight<\/mark>/);
+    assert.match(whole.html, /the formula \$\\sigma\(x\)\$ as TeX/);
+    assert.match(whole.html, /<h2>Copy as Markdown<\/h2>/);
+    assert.match(whole.html, /at the end<sup><a href="[^"]*#footnote-1">1<\/a><\/sup>\./);
+    assert.match(whole.html, /<hr><ol><li value="1" id="footnote-1"><p>Each definition is appended once, as written in <code>index\.md<\/code>\.<\/p><\/li><\/ol>$/);
   });
 
   test('the HTML has absolute addresses for links and images', async ({ page, baseURL: base }) => {
-    await select(page, { selector: '#站内链接与嵌入 ~ .bk-block .example-result', text: 'SwiGLU' }, { selector: '#站内链接与嵌入 ~ .bk-block .example-result', text: '被引用的文章', after: true });
-    const links = await copied(page);
-    assert.match(links.html, new RegExp(`<a href="${base}/2026-10/syntax-linked/#${encodeURIComponent('链式法则')}">链式法则</a>`));
-    assert.match(links.text, /\[链式法则\]\(\/2026-10\/syntax-linked\/#链式法则\)/);
-    await select(page, { selector: '#图片与浮动 ~ .bk-block .example-result figure' }, { selector: '#图片与浮动 ~ .bk-block .example-result figure', after: true });
-    assert.match((await copied(page)).html, new RegExp(`<img src="${base}/2026-10/syntax/ffn-shapes.svg"`));
+    const links = '#links-and-images ~ .bk-block .example-result';
+    await select(page, { selector: links, text: 'The backward' }, { selector: links, text: 'the linked article', after: true });
+    const copiedLinks = await copied(page);
+    assert.match(copiedLinks.html, new RegExp(`<a href="${base}/2026-10/linked/#chain-rule">chain rule</a>`));
+    assert.match(copiedLinks.text, /\[chain rule\]\(\/2026-10\/linked\/#chain-rule\)/);
+    await select(page, { selector: `${links} figure` }, { selector: `${links} figure`, after: true });
+    assert.match((await copied(page)).html, new RegExp(`<img src="${base}/2026-10/copy/shapes.svg"`));
   });
 
   test('a selection from the source of an example into its result gives the source of the result once, with the attributes of a heading and a component', async ({ page }) => {
-    await select(page, { selector: '#标题与锚点 ~ .bk-block .example-source', text: '三级标题' }, { selector: '#标题与锚点 ~ .bk-block .example-result h3', text: '三级标题', after: true });
-    assert.equal((await copied(page)).text, '### 三级标题 {#third-level toc="短标题"}');
-    await select(page, { selector: '#交互组件 ~ .bk-block .example-source', text: 'width=body}' }, { selector: '#交互组件 ~ .bk-block .example-result figure[data-attributes*="body"]', after: true });
-    assert.equal((await copied(page)).text, ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}\n:::');
+    await select(page, { selector: '#headings ~ .bk-block .example-source', text: 'Third level' }, { selector: '#headings ~ .bk-block .example-result h3', text: 'Third level', after: true });
+    assert.equal((await copied(page)).text, '### Third level {#third-level toc="Short"}');
+    await select(page, { selector: '#components ~ .bk-block .example-source', text: 'width=body}' }, { selector: '#components ~ .bk-block .example-result figure[data-attributes*="body"]', after: true });
+    assert.equal((await copied(page)).text, ':::demo-plot{size=3 width=body}\n:::');
   });
 
   test('a selection of only the title of a fold gives the title', async ({ page }) => {
     await page.evaluate(() => {
-      const fold = [...document.querySelectorAll('.example-result details.fold')].find((details) => details.textContent.includes('GELU 的导数'));
+      const fold = document.querySelector('.example-result details.fold');
       const range = document.createRange();
       range.setStart(fold, 0);
       range.setEnd(fold, 1);
       getSelection().removeAllRanges();
       getSelection().addRange(range);
     });
-    assert.equal((await copied(page)).text, '推导：GELU 的导数');
+    assert.equal((await copied(page)).text, 'Derivation: the derivative');
   });
 
   test('a whole sidenote in the margin is copied as its text without its number', async ({ page }) => {
-    await select(page, { selector: '.bk-notes-layer .bk-sidenote-body', text: '每个脚注' }, { selector: '.bk-notes-layer .bk-sidenote-body', text: '原文复制。', after: true });
+    await select(page, { selector: '.bk-notes-layer .bk-sidenote-body', text: 'Each definition' }, { selector: '.bk-notes-layer .bk-sidenote-body', contains: 'Each definition', text: '.', after: true, last: true });
     assert.equal((await copied(page)).text, sourceLine('[^copy-notes]:').replace('[^copy-notes]: ', ''));
   });
 
   test('headings and a component in embedded content are copied as the lines of the embedded article', async ({ page }) => {
-    const embed = '.embed-part';
-    await select(page, { selector: `${embed} h2`, contains: '向量与雅可比矩阵的乘积' }, { selector: `${embed} figcaption`, contains: 'SiLU', after: true });
-    const start = linkedLines.findIndex((line) => line.startsWith('## 向量与雅可比矩阵的乘积'));
+    await select(page, { selector: '.embed-part h2', contains: 'Jacobian products' }, { selector: '.embed-part figcaption', contains: 'SiLU', after: true });
+    const start = linkedLines.findIndex((line) => line.startsWith('## Jacobian products'));
     const end = linkedLines.findIndex((line, index) => index > start && line === ':::');
     assert.equal((await copied(page)).text, linkedLines.slice(start, end + 1).join('\n'));
   });
 
   test('copying shows one toast with the Markdown message', async ({ page }) => {
     await toastHidden(page);
-    await select(page, { selector: copyChapter, text: '只选中' }, { selector: copyChapter, text: '只选中', after: true });
+    await select(page, { selector: copyChapter, text: 'partly' }, { selector: copyChapter, text: 'partly', after: true });
     await copied(page);
     await toastShown(page);
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.bk-toast')].filter((toast) => getComputedStyle(toast).opacity !== '0').map((toast) => toast.textContent)), ['已复制为 Markdown']);
   });
 
-  test('the copy button copies the whole index.md, uses the pointer cursor and shows the toast', async ({ page }) => {
+  test('the copy button copies the whole index.md and shows the toast', async ({ page }) => {
     await page.evaluate(() => getSelection().removeAllRanges());
     await toastHidden(page);
     const button = page.locator('.bk-header .bk-copy-source');
     assert.equal(await button.textContent(), '复制为 Markdown');
-    assert.equal(await button.evaluate((element) => getComputedStyle(element).cursor), 'pointer');
     await button.click();
     await toastShown(page);
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), source);
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), copySource);
     assert.equal(await page.locator('.bk-toast').textContent(), '已复制为 Markdown');
-  });
-
-  test('the toast takes the colours of the light and the dark scheme and does not cover the settings button', async ({ page }) => {
-    for (const width of [1440, 375]) {
-      for (const colorScheme of ['light', 'dark']) {
-        await page.setViewportSize({ width, height: 800 });
-        await page.emulateMedia({ colorScheme });
-        await toastHidden(page);
-        await page.locator('.bk-header .bk-copy-source').evaluate((button) => button.click());
-        await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-toast')).opacity === '1');
-        const { toast, background, own, settings } = await page.evaluate(() => ({
-          toast: getComputedStyle(document.querySelector('.bk-toast')).backgroundColor,
-          background: getComputedStyle(document.body).backgroundColor,
-          own: document.querySelector('.bk-toast').getBoundingClientRect().toJSON(),
-          settings: document.querySelector('.bk-settings-toggle').getBoundingClientRect().toJSON(),
-        }));
-        const at = `${colorScheme} at ${width}px`;
-        assert.ok(Math.abs(luminance(toast) - luminance(background)) < 0.2, `${at}: the toast ${toast} on the page ${background}`);
-        assert.ok(own.right <= settings.left || own.left >= settings.right || own.bottom <= settings.top || own.top >= settings.bottom, `${at}: the toast ${JSON.stringify(own)} covers the settings button ${JSON.stringify(settings)}`);
-        assert.ok(own.left >= 0 && own.right <= width, `${at}: the toast ${JSON.stringify(own)} leaves the screen`);
-      }
-    }
   });
 
   test('starting the copy module on a page without the source script is an error', async ({ newPage }) => {
     const stripped = await newPage();
     const errors = [];
     stripped.on('pageerror', (error) => errors.push(error.message));
-    await stripped.route('**/2026-10/syntax/', async (route) => {
+    await stripped.route('**/2026-10/copy/', async (route) => {
       const response = await route.fetch();
       const html = await response.text();
       const withoutSource = html.replace(/<script type="application\/json" class="bk-source"[^>]*>[\s\S]*?<\/script>/, '');
       assert.notEqual(withoutSource, html);
       await route.fulfill({ response, body: withoutSource });
     });
-    await stripped.goto('/2026-10/syntax/', { waitUntil: 'load' });
+    await stripped.goto('/2026-10/copy/', { waitUntil: 'load' });
     assert.deepEqual(errors, ['bake/copy needs the source of the article in script.bk-source']);
   });
 });

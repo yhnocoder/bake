@@ -1,5 +1,6 @@
 import { join, posix } from 'node:path';
 import { COMPONENTS_DIR } from '../components/read.js';
+import { POSTS_DIR } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { readArticle } from '../markdown/article.js';
 import { IMAGE_FORMATS, readImage } from '../render/images.js';
@@ -7,8 +8,6 @@ import { errorAt } from '../shared/report.js';
 import { articleUrl } from '../shared/urls.js';
 import { listFiles } from './files.js';
 import { PUBLIC_DIR } from './public.js';
-
-export const POSTS_DIR = 'content/posts';
 
 export function findArticles(root) {
   const files = listFiles(join(root, POSTS_DIR), (name) => !name.startsWith('.'));

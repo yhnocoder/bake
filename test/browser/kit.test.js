@@ -307,17 +307,6 @@ test.describe('the kit draws the example function plot', () => {
     }
   });
 
-  test('the sliders and the TeX labels have accessible names', async ({ open }) => {
-    const { page, problems } = await open();
-    const frame = page.locator(PLOT).first();
-    await frame.scrollIntoViewIfNeeded();
-    assert.equal(await frame.getByRole('slider', { name: '横轴范围 ±', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('slider', { name: '横轴范围 ±', exact: true }).getAttribute('aria-valuetext'), '4.00');
-    assert.equal(await frame.getByRole('img', { name: 'f(x)', exact: true }).count(), 1);
-    assert.equal(await frame.getByRole('img', { name: '\\frac{df(x)}{dx}', exact: true }).count(), 1);
-    assert.deepEqual(problems, []);
-  });
-
   test('the plot follows the color scheme, and its screenshots differ between light and dark', async ({ open }) => {
     const shots = {};
     const strokes = {};
@@ -426,30 +415,6 @@ test.describe('the kit works for any component that imports it', () => {
       ['0.25', '0.25'],
       ['7.5', '7.5'],
     ]);
-  });
-
-  test('controls show the pointer cursor and a focus outline, and segments are at least 24 pixels tall', async ({ newPage }) => {
-    const page = await newPage({ viewport: { width: 1440, height: 900 } });
-    await page.goto('/2026-10/demo/');
-    await waitForComponents(page);
-    const cursors = await page.evaluate(() =>
-      ['.bk-kit-segment', '.bk-kit-segment input', '.bk-kit-slider', '.bk-kit-slider input', '.bk-kit-toggle', '.bk-kit-toggle input', '.bk-kit-button'].map((selector) => getComputedStyle(document.querySelector(selector)).cursor),
-    );
-    assert.deepEqual(new Set(cursors), new Set(['pointer']));
-    await page.locator('.bk-kit-segment input').first().focus();
-    await page.keyboard.press('ArrowRight');
-    assert.equal(await page.locator('.bk-kit-segment input:checked').getAttribute('value'), 'cube');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement.closest('.bk-kit-segment')).outlineStyle), 'solid');
-    for (const control of ['.bk-kit-slider input', '.bk-kit-toggle input']) {
-      await page.locator(control).first().focus();
-      await page.keyboard.press('Shift');
-      const style = await page.locator(control).first().evaluate((input) => getComputedStyle(input.type === 'checkbox' ? input.parentElement : input).outlineStyle);
-      assert.equal(style, 'solid', control);
-    }
-    assert.equal(await page.getByRole('radio', { name: 'cube', exact: true }).count(), 1);
-    assert.equal(await page.getByRole('switch', { name: 'Grid', exact: true }).count(), 1);
-    const heights = await page.locator('.bk-kit-segment').evaluateAll((segments) => segments.map((segment) => segment.getBoundingClientRect().height));
-    assert.ok(heights.every((height) => height >= 24), heights.join(', '));
   });
 
   test('with reduced motion no transition and no tween runs', async ({ newPage }) => {

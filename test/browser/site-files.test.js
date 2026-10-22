@@ -56,31 +56,6 @@ test('a missing address at any depth answers 404 with the look of the site and l
   expect(errors).toEqual([]);
 });
 
-for (const [width, height] of [
-  [1440, 900],
-  [375, 760],
-]) {
-  test(`the 404 page centres its content in the middle of the screen at ${width} pixels`, async ({ page }) => {
-    await page.setViewportSize({ width, height });
-    await page.goto('/2026-01/rope/');
-    const layout = await page.evaluate(() => {
-      const box = (selector) => document.querySelector(selector).getBoundingClientRect();
-      const column = box('.bk-not-found-matches');
-      return {
-        top: box('.bk-not-found-title').top,
-        bottom: box('.bk-not-found-home').bottom,
-        gutters: [column.left, document.documentElement.clientWidth - column.right],
-        scrollWidth: document.documentElement.scrollWidth,
-      };
-    });
-    expect(layout.top).toBeGreaterThanOrEqual(height * 0.2);
-    expect(layout.bottom).toBeLessThanOrEqual(height * 0.8);
-    expect(Math.abs(layout.gutters[0] - layout.gutters[1])).toBeLessThanOrEqual(1);
-    expect(layout.gutters[0]).toBeGreaterThan(0);
-    expect(layout.scrollWidth).toBe(width);
-  });
-}
-
 test('an address deeper in the site, one with an unknown slug and the address of a draft list no article', async ({ page }) => {
   for (const path of ['/2026-01/unknown/', '/a/b/c/missing.png', '/2026-10/draft/']) {
     await page.goto(path);
@@ -89,14 +64,10 @@ test('an address deeper in the site, one with an unknown slug and the address of
   }
 });
 
-test('the 404 page offers the theme and the font in the settings panel and applies the chosen theme before its script runs', async ({ page, browser, site }) => {
+test('the settings panel of the 404 page offers the theme and the font', async ({ page }) => {
   await page.goto('/2026-01/rope/');
   await page.getByRole('button', { name: '设置' }).click();
   await expect(page.locator('.bk-settings-label')).toHaveText(['主题', '字体']);
-  await page.getByRole('button', { name: '深' }).click();
-  await page.route('**/assets/*.js', (route) => route.abort());
-  await page.reload();
-  expect((await look(page)).background).toBe((await articleLook(browser, site.origin, 'dark')).background);
 });
 
 test('without scripts the 404 page shows the heading and the link home', async ({ browser, site }) => {

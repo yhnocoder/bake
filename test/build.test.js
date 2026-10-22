@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fromHtml } from 'hast-util-from-html';
@@ -40,6 +40,21 @@ function stagingFolders(dir) {
 }
 
 describe('bake build', () => {
+  test('links the first of favicon.svg, favicon.png and favicon.ico in public/ as the icon of every page', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/rope/index.md': article(),
+      'public/favicon.ico': 'ico\n',
+      'public/favicon.png': pngBytes,
+      'public/favicon.svg': '<svg/>\n',
+    });
+    assert.deepEqual(await build(dir), []);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<link rel="icon" href="\.\.\/\.\.\/favicon\.svg">/);
+    rmSync(join(dir, 'public/favicon.svg'));
+    assert.deepEqual(await build(dir), []);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<link rel="icon" href="\.\.\/\.\.\/favicon\.png">/);
+  });
+
   test('writes published articles, their files and public/ into a fresh dist/', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

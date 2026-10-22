@@ -2,8 +2,11 @@
 
 import { spawn } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, enableCompileCache } from 'node:module';
 import { dirname, join } from 'node:path';
+
+// why: each command imports its modules after this line, and the cache of their compiled code saves most of the start time of a command after the first
+enableCompileCache();
 
 const usage = `Usage: bake <command>
 

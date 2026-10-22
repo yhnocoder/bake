@@ -1,10 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { stringify } from 'yaml';
-import { configNotFoundError, hasConfig } from '../config/bake-config.js';
+import { POSTS_DIR, configNotFoundError, hasConfig } from '../config/bake-config.js';
 import { slugProblem } from '../config/rules.js';
 import { errorAt, fileStart, formatError } from '../shared/report.js';
-import { POSTS_DIR } from './articles.js';
 import { articleUrl } from '../shared/urls.js';
 
 // The optional fields, as comments that the writer removes the # of.

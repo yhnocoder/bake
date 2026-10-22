@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
-import { POSTS_DIR, findArticles } from '../build/articles.js';
+import { findArticles } from '../build/articles.js';
+import { POSTS_DIR } from '../config/bake-config.js';
 import { createSite, updateSite } from '../build/site.js';
 import { BUILT_IN_BLOCKS, IMAGE_ATTRIBUTES } from '../markdown/parse.js';
 import { sourceVersion } from './params.js';

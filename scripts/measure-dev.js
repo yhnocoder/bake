@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -10,6 +10,8 @@ import { formatValue, screens } from './measure-pages.js';
 const runs = 5;
 
 export const metrics = [
+  { key: 'buildMs', title: 'build', unit: 'ms' },
+  { key: 'newMs', title: 'new', unit: 'ms' },
   { key: 'devStartupMs', title: 'startup', unit: 'ms' },
   { key: 'articleUpdateMs', title: 'article edit', unit: 'ms' },
   { key: 'componentUpdateMs', title: 'component edit', unit: 'ms' },
@@ -20,29 +22,15 @@ const exampleBlog = new URL('../examples/blog/', import.meta.url).pathname;
 const cli = new URL('../src/cli.js', import.meta.url).pathname;
 const BUILD_OUTPUTS = new Set(['dist', '.dist-staging', '.dist-previous', 'node_modules']);
 const screen = screens[0];
+const articles = ['syntax', 'llm-act-fns', 'matrix-calculus'];
+const probe = (text) => `export const layout = { height: 40 };\n\nexport default class MeasureProbe extends HTMLElement {\n  connectedCallback() {\n    this.textContent = '${text}';\n  }\n}\n`;
 
-const configEdit = { file: 'bake.config.js', anchor: "title: 'Bake Example'", change: (run) => `title: 'Bake Example MEASURE${run}'`, text: (run) => `Bake Example MEASURE${run}` };
-
-const pages = [
-  {
-    path: '/2026-10/syntax/',
-    articleUpdateMs: articleEdit('syntax', '这篇文章列出 Bake 的全部写法。'),
-    componentUpdateMs: labelEdit('act-fn-plot', '近似'),
-    configUpdateMs: configEdit,
-  },
-  {
-    path: '/2026-09/llm-act-fns/',
-    articleUpdateMs: articleEdit('llm-act-fns', '一个 decoder block 由注意力和前馈网络（FFN）两部分组成。'),
-    componentUpdateMs: labelEdit('llm-act-plot', '横轴范围 ±', '"zoom":true'),
-    configUpdateMs: configEdit,
-  },
-  {
-    path: '/2026-09/matrix-calculus/',
-    articleUpdateMs: articleEdit('matrix-calculus', '深度学习里的反向传播，本质上是在回答一个问题：'),
-    componentUpdateMs: componentEdit('matrix-loss-logits', 'reset'),
-    configUpdateMs: configEdit,
-  },
-];
+// The edits write only text of their own, so a change of the example articles does not break the measurement
+const edits = (slug) => ({
+  articleUpdateMs: { file: `content/posts/${slug}/index.md`, change: (original, run) => `${original}\nARTICLE${run}\n`, text: (run) => `ARTICLE${run}` },
+  componentUpdateMs: { file: 'components/measure-probe.js', change: (original, run) => probe(`PROBE${run}`), text: (run) => `PROBE${run}`, frame: 'measure-probe' },
+  configUpdateMs: { file: 'bake.config.js', change: (original, run) => original.replace(/title: '/, `title: 'TITLE${run} `), text: (run) => `TITLE${run}` },
+});
 
 const usage = 'Usage: node scripts/measure-dev.js [--out report.json]';
 
@@ -59,21 +47,39 @@ async function main(args) {
 }
 
 async function measureDev() {
+  // why: the first run reads the modules from disk, which later runs and the author's own runs find in the cache
+  await measureCommand(['build']);
+  const build = [];
+  for (let run = 0; run < 3; run += 1) build.push(await measureCommand(['build']));
+  const created = [];
+  for (let run = 0; run < runs; run += 1) created.push(await measureCommand(['new', `Measured article ${run}`]));
   const startup = [];
-  // why: the first start reads the modules from disk, which later starts and the author's own starts find in the cache
   await measureStartup();
   for (let run = 0; run < runs; run += 1) startup.push(await measureStartup());
   return {
     runs,
     metrics: metrics.map((metric) => metric.key),
-    measurements: [{ devStartupMs: median(startup) }, ...(await measureUpdates())],
+    measurements: [{ buildMs: median(build), newMs: median(created), devStartupMs: median(startup) }, ...(await measureUpdates())],
   };
 }
 
 function copyBlog() {
   const dir = mkdtempSync(join(tmpdir(), 'bake-dev-'));
   cpSync(exampleBlog, dir, { recursive: true, filter: (path) => !BUILD_OUTPUTS.has(basename(path)) });
+  writeFileSync(join(dir, 'components/measure-probe.js'), probe('PROBE0'));
+  for (const slug of articles) appendFileSync(join(dir, 'content/posts', slug, 'index.md'), '\n:::measure-probe\n:::\n');
   return dir;
+}
+
+async function measureCommand(args) {
+  const blog = copyBlog();
+  try {
+    const start = performance.now();
+    execFileSync(process.execPath, [cli, ...args], { cwd: blog, stdio: 'ignore' });
+    return performance.now() - start;
+  } finally {
+    rmSync(blog, { recursive: true, force: true });
+  }
 }
 
 async function startDev(blog) {
@@ -116,24 +122,6 @@ async function measureStartup() {
   }
 }
 
-function articleEdit(slug, anchor) {
-  return { file: `content/posts/${slug}/index.md`, anchor, change: (run) => `${anchor}MEASURE${run}`, text: (run) => `MEASURE${run}` };
-}
-
-function componentEdit(name, label, frameParams = '') {
-  return {
-    file: `components/${name}.jsx`,
-    anchor: `>${label}<`,
-    change: (run) => `>${label}MEASURE${run}<`,
-    text: (run) => `${label}MEASURE${run}`,
-    frame: { name, frameParams },
-  };
-}
-
-function labelEdit(name, label, frameParams) {
-  return { ...componentEdit(name, label, frameParams), anchor: `label="${label}"`, change: (run) => `label="${label}MEASURE${run}"` };
-}
-
 async function measureUpdates() {
   const blog = copyBlog();
   const dev = await startDev(blog);
@@ -141,11 +129,12 @@ async function measureUpdates() {
   try {
     const page = await browser.newPage({ viewport: { width: screen.width, height: screen.height } });
     const measurements = [];
-    for (const { path, ...edits } of pages) {
+    for (const slug of articles) {
+      const path = /^date: (\d{4}-\d{2})/m.exec(readFileSync(join(blog, 'content/posts', slug, 'index.md'), 'utf8'))[1] + `/${slug}/`;
       await page.goto(new URL(path, dev.url).href);
       await quiet(page);
-      const measurement = { page: path, width: screen.width };
-      for (const [metric, edit] of Object.entries(edits)) measurement[metric] = await measureEdit(page, join(blog, edit.file), edit);
+      const measurement = { page: `/${path}`, width: screen.width };
+      for (const [metric, edit] of Object.entries(edits(slug))) measurement[metric] = await measureEdit(page, join(blog, edit.file), edit);
       measurements.push(measurement);
     }
     return measurements;
@@ -158,12 +147,11 @@ async function measureUpdates() {
 
 async function measureEdit(page, file, edit) {
   const original = readFileSync(file, 'utf8');
-  if (original.split(edit.anchor).length !== 2) throw new Error(`${file} does not contain ${edit.anchor} exactly once`);
   if (edit.frame !== undefined) await showFrame(page, edit.frame);
   const times = [];
   for (let run = 1; run <= runs; run += 1) {
     const start = performance.now();
-    writeFileSync(file, original.replace(edit.anchor, edit.change(run)));
+    writeFileSync(file, edit.change(original, run));
     await untilReloaded(page, visibleText, edit.text(run));
     times.push(performance.now() - start);
     await quiet(page);
@@ -174,11 +162,8 @@ async function measureEdit(page, file, edit) {
   return median(times);
 }
 
-async function showFrame(page, { name, frameParams }) {
-  const frames = page.locator(`figure.component[data-component="${name}"]`);
-  const index = await frames.evaluateAll((elements, frameParams) => elements.findIndex((element) => element.dataset.params.includes(frameParams)), frameParams);
-  if (index < 0) throw new Error(`${name} with ${frameParams} is not on the page`);
-  const frame = frames.nth(index);
+async function showFrame(page, name) {
+  const frame = page.locator(`figure.component[data-component="${name}"]`);
   await frame.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await page.waitForFunction((element) => element.dataset.state === 'ready', await frame.elementHandle());
   await quiet(page);

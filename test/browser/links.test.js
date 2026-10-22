@@ -152,7 +152,7 @@ test.describe('internal links, preview cards and embeds', () => {
     await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
     await page.waitForFunction(isOn);
     await page.evaluate(async () => {
-      document.querySelector('.bk-article').prepend(Object.assign(document.createElement('div'), { style: 'height: 300px' }));
+      document.querySelector('.bk-article').prepend(Object.assign(document.createElement('div'), { style: 'height: 300.4px' }));
       for (let frame = 0; frame < 2; frame += 1) await new Promise((done) => requestAnimationFrame(done));
     });
     assert.equal(await page.evaluate(isOn), true);

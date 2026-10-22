@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article } from '../blog.js';
-import { test as base, expect, scrollInSteps, settle, sharedShadowLayers } from './browser.js';
+import { test as base, expect, scrollInSteps, settle } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
 const STYLES = ['notes', 'dots', 'ticks'];
@@ -285,89 +285,6 @@ test.describe('the table of contents', () => {
   });
 
 
-  test('the cards of the table of contents keep their own look on article pages, and the homepage cards keep theirs', async ({ open }) => {
-    for (const style of ['dots', 'ticks']) {
-      const { page, context } = await open({ style });
-      const trigger = { dots: '.bk-toc-dot-item', ticks: '.bk-toc-tick.is-chapter' }[style];
-      const box = '.bk-toc-popover';
-      await pointAt(page, page.locator(trigger).nth(1));
-      await page.waitForFunction((selector) => document.querySelector(selector).textContent.includes('第2章'), box);
-      const look = await page.evaluate((selector) => {
-        const frame = document.querySelector(selector);
-        const card = frame.querySelector('.bk-toc-card');
-        const frameStyle = getComputedStyle(frame);
-        const cardStyle = getComputedStyle(card);
-        const titleStyle = getComputedStyle(card.querySelector('.bk-toc-card-title'));
-        return {
-          border: cardStyle.borderTopWidth,
-          radius: cardStyle.borderTopLeftRadius,
-          shadow: cardStyle.boxShadow,
-          background: cardStyle.backgroundColor,
-          width: Math.round(card.getBoundingClientRect().width) === Math.round(frame.clientWidth - parseFloat(frameStyle.paddingLeft) - parseFloat(frameStyle.paddingRight)),
-          titleSize: titleStyle.fontSize,
-          titleWrap: titleStyle.textWrapStyle,
-          frameRadius: frameStyle.borderTopLeftRadius,
-          frameShadow: frameStyle.boxShadow !== 'none',
-        };
-      }, box);
-      assert.deepEqual(
-        look,
-        { border: '0px', radius: '0px', shadow: 'none', background: 'rgba(0, 0, 0, 0)', width: true, titleSize: '17px', titleWrap: 'balance', frameRadius: '12px', frameShadow: true },
-        `the ${style} card`,
-      );
-    }
-    const { page, context } = await open();
-    await page.goto('/');
-    const home = await page.evaluate(() => {
-      const card = document.querySelector('.bk-home .bk-card');
-      const cardStyle = getComputedStyle(card);
-      const titleStyle = getComputedStyle(card.querySelector('.bk-card-title'));
-      return { border: cardStyle.borderTopWidth, radius: cardStyle.borderTopLeftRadius, shadow: cardStyle.boxShadow !== 'none', titleWeight: titleStyle.fontWeight, titleWrap: titleStyle.textWrapStyle, titleMargin: titleStyle.marginTop };
-    });
-    assert.deepEqual(home, { border: '1px', radius: '14px', shadow: true, titleWeight: '700', titleWrap: 'pretty', titleMargin: '0px' });
-  });
-
-  test('the drawer tabs, the drawer close button and the settings button use the ink colour', async ({ open }) => {
-    for (const [colorScheme, ink] of [
-      ['light', 'rgb(22, 26, 29)'],
-      ['dark', 'rgb(233, 236, 231)'],
-    ]) {
-      const desk = await open({ style: 'dots', colorScheme });
-      assert.equal(await desk.page.evaluate(() => getComputedStyle(document.querySelector('.bk-settings-toggle')).color), ink, colorScheme);
-      await desk.context.close();
-      const phone = await open({ style: 'ticks', colorScheme, viewport: { width: 375, height: 760 } });
-      await phone.page.click('.bk-settings-toggle');
-      await phone.page.getByRole('switch').click();
-      await phone.page.keyboard.press('Escape');
-      await scrollToHeading(phone.page, 'chapter-2');
-      await phone.page.click('.bk-toc-handle');
-      await phone.page.waitForFunction(() => document.querySelector('.bk-toc-drawer').getBoundingClientRect().left === 0);
-      const drawer = await phone.page.evaluate(() => ({
-        ahead: getComputedStyle(document.querySelectorAll('.bk-toc-drawer-tab')[4]).color,
-        close: getComputedStyle(document.querySelector('.bk-toc-drawer-close')).color,
-        settings: getComputedStyle(document.querySelector('.bk-settings-toggle')).color,
-      }));
-      assert.deepEqual(drawer, { ahead: ink, close: ink, settings: ink }, `${colorScheme} on a phone`);
-      await phone.context.close();
-    }
-  });
-
-  test('the shadow of the phone handle follows dark mode', async ({ open }) => {
-    const shadows = {};
-    for (const colorScheme of ['light', 'dark']) {
-      const phone = await open({ style: 'ticks', colorScheme, viewport: { width: 375, height: 760 } });
-      shadows[colorScheme] = await phone.page.evaluate(() => getComputedStyle(document.querySelector('.bk-toc-handle.is-tab')).boxShadow);
-      await phone.context.close();
-    }
-    assert.deepEqual(sharedShadowLayers(shadows.light, shadows.dark), []);
-  });
-
-  test('the notes style keeps the top padding of the first chapter', async ({ open }) => {
-    const { page, context } = await open({ style: 'notes' });
-    const padding = await page.evaluate(() => [...document.querySelectorAll('.bk-toc .bk-toc-chapter-title')].slice(0, 2).map((title) => getComputedStyle(title).paddingTop));
-    assert.deepEqual(padding, ['20px', '20px']);
-  });
-
   test('the dots and ticks cards may reach 12 pixels above the bottom of the screen', async ({ open }) => {
     for (const style of ['dots', 'ticks']) {
       const { page, context } = await open({ style, path: 'long', viewport: { width: 1440, height: 600 } });
@@ -560,31 +477,6 @@ test.describe('the table of contents', () => {
     assert.ok(passed.length > 0 && passed.every((index) => index < 4), `the dots passed ${passed}`);
   });
 
-  test('a change of the text metrics, such as a font that finishes loading, moves the dots and the notes marker without a transition', async ({ open }) => {
-    for (const style of ['dots', 'notes']) {
-      const { page, context } = await open({ style, reducedMotion: 'no-preference' });
-      await scrollToHeading(page, 'chapter-3');
-      const { moved, moving } = await page.evaluate(async () => {
-        const entries = () => [...document.querySelectorAll('.bk-toc-dot-item, .bk-toc-marker')].map((entry) => `${getComputedStyle(entry).translate} ${getComputedStyle(entry).transform}`).join();
-        const before = entries();
-        const style = document.createElement('style');
-        style.textContent = '.bk-toc-ui *, .bk-toc * { font-size: 19px !important; letter-spacing: 0.3em !important; }';
-        document.head.append(style);
-        window.dispatchEvent(new Event('resize'));
-        for (let frame = 0; frame < 4; frame += 1) await new Promise((done) => requestAnimationFrame(done));
-        const running = document
-          .getAnimations()
-          .filter((animation) => animation instanceof CSSTransition && ['transform', 'translate'].includes(animation.transitionProperty))
-          .filter((animation) => animation.effect.target.closest('.bk-toc-ui, .bk-toc'))
-          .map((animation) => `${animation.effect.target.className} ${animation.transitionProperty}`);
-        for (const animation of document.getAnimations()) animation.finish();
-        return { moved: entries() !== before, moving: running };
-      });
-      assert.ok(moved, `the ${style} entries stayed in place`);
-      assert.deepEqual(moving, [], `${style} animated ${moving.join(', ')}`);
-    }
-  });
-
   const capsules = (page) => page.locator('.bk-toc-handle .bk-toc-handle-capsule').count();
   const handleFocused = (page) => page.locator('.bk-toc-handle').evaluate((handle) => handle === document.activeElement);
 
@@ -737,37 +629,6 @@ test.describe('the table of contents', () => {
     await expect.poll(state, { message: 'the settings button does not show again' }).toBe(1);
   });
 
-  test('the style chosen in the settings applies at once, survives a reload and is applied before the page script runs', async ({ newContext }) => {
-    const context = await newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    const page = await context.newPage();
-    await page.goto(`/2026-10/toc-dots/`);
-    await settle(page);
-    const read = () =>
-      page.evaluate(() => ({
-        views: ['.bk-toc', '.bk-toc-dots', '.bk-toc-ticks'].filter((selector) => document.querySelector(selector)?.checkVisibility()),
-        left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
-      }));
-    const narrow = await read();
-    assert.deepEqual(narrow.views, ['.bk-toc-dots']);
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '字号', '字重', '间距', '字体', '按钮']);
-    await page.click('.bk-settings-toggle');
-    await page.getByRole('radio', { name: /刻度线/ }).click();
-    await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: narrow.left });
-    await page.getByRole('radio', { name: /前文笔记/ }).click();
-    await settle(page);
-    const notes = await read();
-    assert.deepEqual(notes.views, ['.bk-toc']);
-    assert.ok(notes.left > narrow.left, `the notes style leaves a column of ${notes.left} pixels for the table of contents, the dots style ${narrow.left}`);
-    await page.getByRole('radio', { name: /刻度线/ }).click();
-    await page.reload();
-    await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: narrow.left });
-    await page.route('**/assets/*.js', (route) => route.abort());
-    await page.goto(url);
-    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left)), narrow.left);
-  });
-
   test('without scripts every style shows a readable table of contents whose links jump', async ({ newContext, open }) => {
     const { page: scripted } = await open();
     const notesLeft = await scripted.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left));
@@ -791,20 +652,6 @@ test.describe('the table of contents', () => {
       if (viewport.width === 1440) assert.equal(shown.left, notesLeft, `${path} keeps the left column for the table of contents`);
       await page.locator('.bk-toc a', { hasText: '第4章的小节' }).click();
       await page.waitForFunction(() => location.hash === '#chapter-4-a' && Math.abs(document.getElementById('chapter-4-a').getBoundingClientRect().top - 24) < 2);
-    }
-  });
-
-  test('without scripts the section titles of the table of contents have the secondary ink colour', async ({ newContext }) => {
-    for (const colorScheme of ['light', 'dark']) {
-      const context = await newContext({ javaScriptEnabled: false, colorScheme });
-      const page = await context.newPage();
-      await page.goto(url);
-      const { colors, ink2 } = await page.evaluate(() => {
-        const probe = document.body.appendChild(document.createElement('span'));
-        probe.style.color = 'var(--ink-2)';
-        return { colors: [...new Set([...document.querySelectorAll('.bk-toc-section-title')].map((title) => getComputedStyle(title).color))], ink2: getComputedStyle(probe).color };
-      });
-      assert.deepEqual(colors, [ink2], colorScheme);
     }
   });
 

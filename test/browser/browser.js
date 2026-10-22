@@ -18,16 +18,20 @@ export const test = base.extend({
     },
     { scope: 'worker' },
   ],
-  site: async ({ blog, sites }, use) => {
-    const { example = true, files = {}, localhost = false } = blog;
-    const key = JSON.stringify([example, files, localhost]);
-    if (!sites.has(key)) {
-      const dir = builtSite(example, files);
-      const server = await serveStatic(join(dir, 'dist'), { localhost });
-      sites.set(key, { dir, origin: server.origin, close: server.close });
-    }
-    await use(sites.get(key));
-  },
+  // why: the first test of a worker that opens a blog builds it, which takes a minute on a loaded machine, so building has a time limit of its own instead of counting against the test
+  site: [
+    async ({ blog, sites }, use) => {
+      const { example = true, files = {}, localhost = false } = blog;
+      const key = JSON.stringify([example, files, localhost]);
+      if (!sites.has(key)) {
+        const dir = builtSite(example, files);
+        const server = await serveStatic(join(dir, 'dist'), { localhost });
+        sites.set(key, { dir, origin: server.origin, close: server.close });
+      }
+      await use(sites.get(key));
+    },
+    { timeout: 180000 },
+  ],
   baseURL: async ({ site }, use) => use(site.origin),
   // Opens a context or a page with options of its own at the address of the blog, closed when the test ends
   newContext: async ({ browser, baseURL }, use) => {
@@ -82,11 +86,6 @@ export function luminance(color) {
   const values = color.match(/[\d.]+/g).map(Number);
   const [r, g, b] = color.startsWith('color(') ? values.slice(0, 3).map((value) => value * 255) : values;
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-}
-
-export function sharedShadowLayers(light, dark) {
-  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
-  return layers(light).filter((layer) => layers(dark).includes(layer));
 }
 
 export async function scrollInSteps(page, delta) {

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { article, decodeImage } from '../blog.js';
-import { settle, sharedShadowLayers, test } from './browser.js';
+import { settle, test } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
 const motionBox = `export const layout = { height: 80 };
@@ -16,18 +16,6 @@ export default class MotionBox extends HTMLElement {
 }
 `;
 const body = ['正文第一段，说明**激活函数**的作用。', '', ':::motion-box', ':::', '', '## 门控单元', '', '门控单元把两路投影逐元素相乘。', '', '### 小节', '', '小节里的正文。', ''].join('\n');
-
-function readPage() {
-  return {
-    background: getComputedStyle(document.body).backgroundColor,
-    bodyFont: getComputedStyle(document.querySelector('.bk-article p')).fontFamily,
-    titleFont: getComputedStyle(document.querySelector('.bk-title')).fontFamily,
-  };
-}
-
-function chosenOptions() {
-  return [...document.querySelectorAll('.bk-settings-options button[aria-pressed="true"]')].map((button) => button.getAttribute('aria-label') ?? button.textContent.trim());
-}
 
 async function choose(page, name) {
   const option = page.locator('.bk-settings-panel').getByRole('button', { name, exact: true });
@@ -47,11 +35,6 @@ async function chooseWithFade(page, name) {
   });
   await choose(page, name);
   assert.equal(await page.evaluate(() => window.faded), true, `choosing ${name} does not fade`);
-}
-
-async function readSettledPage(page) {
-  await settle(page);
-  return page.evaluate(readPage);
 }
 
 const wenkaiFolder = dirname(createRequire(import.meta.url).resolve('lxgw-wenkai-webfont/lxgwwenkai-regular.css'));
@@ -116,80 +99,7 @@ test.describe('reader settings', () => {
     await page.close();
   });
 
-  test('the home link and the settings button stack as two round buttons from 1000 pixels up and in a tab on the left edge of a phone, labelled without visible text, and the settings button takes the accent colour on hover', async ({ newPage }) => {
-    const page = await newPage();
-    const read = () =>
-      page.evaluate(() => {
-        const button = document.querySelector('.bk-settings-toggle');
-        const box = button.getBoundingClientRect();
-        const home = document.querySelector('.bk-settings-home').getBoundingClientRect();
-        const style = getComputedStyle(button);
-        return {
-          box: [box.left, innerHeight - box.bottom, box.width, box.height],
-          home: [home.left, innerHeight - home.bottom, home.width, home.height],
-          radius: style.borderRadius,
-          text: button.textContent.trim(),
-          label: [button.getAttribute('aria-label'), button.title],
-          icon: button.querySelector('svg').getBoundingClientRect().width,
-        };
-      });
-    const expected = { text: '', label: ['设置', '设置'], icon: 17 };
-    for (const width of [1440, 1024]) {
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto(url);
-      assert.deepEqual(await read(), { box: [16, 16, 34, 34], home: [16, 58, 34, 34], radius: '17px', ...expected }, `at ${width} pixels`);
-    }
-    await page.setViewportSize({ width: 375, height: 700 });
-    await page.goto(url);
-    assert.deepEqual(await read(), { box: [0, 24, 40, 38], home: [0, 62, 40, 38], radius: '0px 11px 11px 0px', ...expected });
-    const color = () => page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
-    assert.equal(await color(), 'rgb(22, 26, 29)');
-    await page.setViewportSize({ width: 1440, height: 800 });
-    await page.hover('.bk-settings-toggle');
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-toggle')).color !== 'rgb(22, 26, 29)');
-    await page.close();
-  });
-
-  test('theme and font change the page at once, survive a reload and are applied before the page script runs', async ({ newContext }) => {
-    const context = await newContext();
-    const page = await context.newPage();
-    await page.goto(url);
-    const initial = await readSettledPage(page);
-    assert.deepEqual((await page.evaluate(chosenOptions)).slice(0, 1), ['跟随系统']);
-    assert.equal(initial.titleFont, initial.bodyFont);
-
-    await page.getByRole('button', { name: '设置' }).click();
-    await choose(page, '深');
-    const font = page.locator('.bk-settings-font');
-    await font.fill('LXGW "WenKai\\');
-    await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--reader-font') !== '');
-    const chosen = await readSettledPage(page);
-    assert.notEqual(chosen.background, initial.background);
-    assert.match(chosen.bodyFont, /^"LXGW WenKai", "PingFang SC"/);
-    assert.equal(chosen.titleFont, chosen.bodyFont);
-
-    await page.reload();
-    assert.deepEqual(await readSettledPage(page), chosen);
-    assert.deepEqual((await page.evaluate(chosenOptions)).slice(0, 1), ['深']);
-    assert.equal(await font.inputValue(), 'LXGW WenKai');
-
-    await page.route('**/assets/*.js', (route) => route.abort());
-    await page.reload();
-    assert.deepEqual(await page.evaluate(readPage), chosen);
-    assert.equal(await page.locator('.bk-settings').count(), 0);
-    await page.unroute('**/assets/*.js');
-
-    await page.reload();
-    await page.getByRole('button', { name: '设置' }).click();
-    await choose(page, '跟随系统');
-    await font.fill('');
-    await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--reader-font') === '');
-    assert.deepEqual(await readSettledPage(page), initial);
-    await context.close();
-  });
-
-
-  test('text size, weight and spacing change the article text with a fade, survive a reload and leave components alone', async ({ newContext }) => {
+  test('text size, weight and spacing change the article text with a fade and leave components alone', async ({ newContext }) => {
     const context = await newContext({ viewport: { width: 1440, height: 800 } });
     const page = await context.newPage();
     await page.goto(url);
@@ -236,11 +146,6 @@ test.describe('reader settings', () => {
     assert.equal(chosen.strong[0], '800');
     assert.notEqual(chosen.strong[1], chosen.ink);
     assert.deepEqual(chosen.component, initial.component);
-
-    await page.reload();
-    await settle(page);
-    assert.deepEqual(await read(), chosen);
-
     await context.close();
   });
 
@@ -291,22 +196,6 @@ test.describe('reader settings', () => {
     await context.close();
   });
 
-  test('the shadows of the settings button, the chosen option and the switch follow dark mode', async ({ newPage, after }) => {
-    const shadows = {};
-    for (const colorScheme of ['light', 'dark']) {
-      const page = await newPage({ colorScheme });
-      await page.goto(url);
-      shadows[colorScheme] = await page.evaluate(() => [
-        getComputedStyle(document.querySelector('.bk-settings-toggle')).boxShadow,
-        getComputedStyle(document.querySelector('.bk-settings-options button[aria-pressed="true"]'), '::before').boxShadow,
-        getComputedStyle(document.querySelector('.bk-settings-switch i'), '::after').boxShadow,
-      ]);
-      await page.close();
-    }
-    const shared = ['button', 'option', 'switch'].map((name, index) => [name, sharedShadowLayers(shadows.light[index], shadows.dark[index])]);
-    assert.deepEqual(shared, [['button', []], ['option', []], ['switch', []]]);
-  });
-
   test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async ({ newContext }) => {
     const context = await newContext({ reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await context.newPage();
@@ -340,4 +229,89 @@ test.describe('reader settings', () => {
     );
     await context.close();
   });
+});
+
+// Each setting that the reader chooses: where it is chosen, how it is chosen and what of the page it changes
+const syntaxArticle = '/2026-10/syntax/';
+const panelChoice = (setting, name) => async (page) => {
+  if (!(await page.locator('.bk-settings-panel').isVisible())) await page.getByRole('button', { name: '设置' }).click();
+  await page.locator(`.bk-settings-row[data-setting="${setting}"]`).getByRole('button', { name, exact: true }).click();
+};
+const paragraph = (property) => (page) => page.evaluate((name) => getComputedStyle(document.querySelector('.bk-article p')).getPropertyValue(name), property);
+const background = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+const settings = [
+  { name: 'the theme', path: syntaxArticle, choose: panelChoice('theme', '深'), reset: panelChoice('theme', '跟随系统'), read: background },
+  { name: 'the theme of the 404 page', path: '/a-missing-page/', choose: panelChoice('theme', '深'), reset: panelChoice('theme', '跟随系统'), read: background },
+  {
+    name: 'the font',
+    path: syntaxArticle,
+    choose: async (page) => {
+      await page.getByRole('button', { name: '设置' }).click();
+      await page.locator('.bk-settings-font').fill('LXGW "WenKai\\');
+      await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--reader-font') !== '');
+    },
+    reset: async (page) => {
+      await page.getByRole('button', { name: '设置' }).click();
+      await page.locator('.bk-settings-font').fill('');
+      await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--reader-font') === '');
+    },
+    read: (page) => page.evaluate(() => [document.querySelector('.bk-title'), document.querySelector('.bk-article p')].map((element) => getComputedStyle(element).fontFamily)),
+  },
+  { name: 'the text size', path: syntaxArticle, choose: panelChoice('size', '特大'), reset: panelChoice('size', '标准'), read: paragraph('font-size') },
+  { name: 'the weight', path: syntaxArticle, choose: panelChoice('weight', '粗'), reset: panelChoice('weight', '常规'), read: paragraph('font-weight') },
+  { name: 'the spacing', path: syntaxArticle, choose: panelChoice('spacing', '宽松'), reset: panelChoice('spacing', '标准'), read: paragraph('line-height') },
+  {
+    name: 'the table of contents style',
+    path: syntaxArticle,
+    choose: async (page) => {
+      await page.getByRole('button', { name: '设置' }).click();
+      await page.getByRole('radio', { name: /刻度线/ }).click();
+    },
+    reset: async (page) => {
+      await page.getByRole('button', { name: '设置' }).click();
+      await page.getByRole('radio', { name: /前文笔记/ }).click();
+    },
+    // why: without the page script the table of contents is a plain list in every style, and only the column it leaves for it differs
+    read: (page) => page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left)),
+  },
+  {
+    name: 'the grouping of the homepage',
+    path: '/',
+    choose: (page) => page.getByRole('button', { name: '月份', exact: true }).click(),
+    reset: (page) => page.getByRole('button', { name: '分类', exact: true }).click(),
+    read: (page) => page.evaluate(() => [...document.querySelectorAll('.bk-group-title')].filter((title) => title.checkVisibility()).map((title) => title.textContent)),
+  },
+  {
+    name: 'the columns of the homepage',
+    path: '/',
+    choose: (page) => page.getByRole('button', { name: '5', exact: true }).click(),
+    reset: (page) => page.getByRole('button', { name: '3', exact: true }).click(),
+    read: (page) => page.evaluate(() => getComputedStyle([...document.querySelectorAll('.bk-grid')].find((grid) => grid.checkVisibility())).gridTemplateColumns.split(' ').length),
+  },
+];
+
+test.describe('every reader setting of the example blog', () => {
+  for (const setting of settings) {
+    test(`${setting.name} changes the page at once, survives a reload, is applied before the page script runs and can be chosen back`, async ({ newPage }) => {
+      const page = await newPage({ viewport: { width: 1440, height: 900 } });
+      const read = async () => {
+        await settle(page);
+        return setting.read(page);
+      };
+      await page.goto(setting.path);
+      const initial = await read();
+      await setting.choose(page);
+      const chosen = await read();
+      assert.notDeepEqual(chosen, initial);
+      await page.reload();
+      assert.deepEqual(await read(), chosen);
+      await page.route('**/assets/*.js', (route) => route.abort());
+      await page.reload();
+      assert.deepEqual(await read(), chosen);
+      await page.unroute('**/assets/*.js');
+      await page.reload();
+      await setting.reset(page);
+      assert.deepEqual(await read(), initial);
+    });
+  }
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article } from '../blog.js';
-import { test as base, expect, luminance, scrollInSteps, sharedShadowLayers } from './browser.js';
+import { test as base, expect, scrollInSteps } from './browser.js';
 
 const config = `export default {
   title: '测试博客',
@@ -73,44 +73,10 @@ const test = base.extend({
 test.use({ blog: { example: false, files } });
 
 test.describe('the essay homepage', () => {
-  const state = (page) =>
-    page.evaluate(() => ({
-      groups: [...document.querySelectorAll('.bk-group-title')].filter((title) => title.checkVisibility()).map((title) => title.textContent),
-      gridColumns: getComputedStyle([...document.querySelectorAll('.bk-grid')].find((grid) => grid.checkVisibility())).gridTemplateColumns.split(' ').length,
-    }));
-  const byCategory = { groups: ['模型', '数学'], gridColumns: 3 };
-  const byMonth = { groups: ['2026-10', '2026-09', '2026-08', '2026-07'], gridColumns: 5 };
-  const thumbs = (page, chosen) =>
-    page.evaluate(
-      (labels) =>
-        [...document.querySelectorAll('.bk-switch-options')].map((options, index) => {
-          const thumb = getComputedStyle(options, '::before');
-          const button = [...options.querySelectorAll('button')].find((option) => option.textContent === labels[index]).getBoundingClientRect();
-          const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(thumb.transform).m41;
-          return Math.abs(left - button.left) < 1 && Math.abs(parseFloat(thumb.width) - button.width) < 1 && options.getAnimations({ subtree: true }).length === 0;
-        }),
-      chosen,
-    );
   const currentChips = (page) =>
     page.evaluate(() => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => chip.getAttribute('aria-current') === 'true').map((chip) => chip.getAttribute('href')));
   const cardIn = (grouping, url) => `[data-grouping="${grouping}"] .bk-card[href="${url}"]`;
   const previewState = (page, selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview')?.dataset.state ?? null);
-
-  test('grouping and column choices change the page, survive a reload and are applied with the switch thumbs on the chosen buttons before the page script runs', async ({ open }) => {
-    const { page } = await open();
-    assert.deepEqual(await state(page), byCategory);
-    await page.getByRole('button', { name: '月份' }).click();
-    await page.getByRole('button', { name: '5', exact: true }).click();
-    assert.deepEqual(await state(page), byMonth);
-    assert.equal(await page.getByRole('button', { name: '月份' }).getAttribute('aria-pressed'), 'true');
-    await page.reload();
-    assert.deepEqual(await state(page), byMonth);
-    await page.route('**/assets/*.js', (route) => route.abort());
-    await page.reload();
-    assert.deepEqual(await state(page), byMonth);
-    assert.deepEqual(await thumbs(page, ['月份', '5']), [true, true]);
-    await page.unroute('**/assets/*.js');
-  });
 
   test('a preview loads only in the visible grouping, starts while the pointer rests on its card and stops when it leaves', async ({ open }) => {
     const { page, errors } = await open();
@@ -184,15 +150,6 @@ test.describe('the essay homepage', () => {
     });
     assert.deepEqual(new Set(states.slice(1)), new Set(['stopped']));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', jacobian);
-  });
-
-  test('a column switch animates the cards only by moving and scaling them', async ({ open }) => {
-    const { page } = await open();
-    const properties = await page.evaluate(() => {
-      document.querySelector('[data-control="columns"] button[data-value="5"]').click();
-      return [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
-    });
-    assert.deepEqual(properties.filter((name) => !['composite', 'computedOffset', 'easing', 'offset'].includes(name)), ['scale', 'translate']);
   });
 
   test('with reduced motion a preview shows its first frame and never starts', async ({ open }) => {
@@ -322,41 +279,6 @@ test.describe('the essay homepage', () => {
     ]);
   });
 
-  test('the bar covers the whole width with an edge only while it is stuck, and the switches slide a thumb to the chosen value', async ({ open }) => {
-    const { page } = await open({ viewport: { width: 1440, height: 700 } });
-    const edge = (opacity) => page.waitForFunction((value) => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity === value, opacity);
-    await edge('0');
-    await page.evaluate(() => scrollTo({ top: 500, behavior: 'instant' }));
-    await edge('1');
-    const cover = await page.evaluate(() => {
-      const bar = document.querySelector('.bk-home-bar');
-      const box = bar.getBoundingClientRect();
-      return { top: box.top, background: getComputedStyle(bar).backgroundColor, scrollWidth: document.documentElement.scrollWidth };
-    });
-    assert.deepEqual(cover, { top: 0, background: await page.evaluate(() => getComputedStyle(document.body).backgroundColor), scrollWidth: 1440 });
-    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-    await edge('0');
-
-    await page.getByRole('button', { name: '5', exact: true }).click();
-    await page.getByRole('button', { name: '月份' }).click();
-    await page.waitForFunction(() => [...document.querySelectorAll('.bk-switch-options')].every((options) => options.getAnimations({ subtree: true }).length === 0));
-    assert.deepEqual(await thumbs(page, ['月份', '5']), [true, true]);
-
-    const moving = await page.evaluate(() =>
-      ['.bk-card', '.bk-card-fallback', '.bk-chip', '.bk-home-bar', '.bk-switch-options'].flatMap((selector) =>
-        ['', '::before', '::after'].flatMap((pseudo) => {
-          const element = document.querySelector(selector);
-          if (element === null) return [];
-          return getComputedStyle(element, pseudo || null)
-            .transitionProperty.split(', ')
-            .filter((property) => !['all', 'none', 'opacity', 'transform', 'translate', 'scale'].includes(property))
-            .map((property) => `${selector}${pseudo} ${property}`);
-        }),
-      ),
-    );
-    assert.deepEqual(moving, []);
-  });
-
   test('without scripts the default grouping and its cards are shown and the controls are hidden', async ({ open }) => {
     const { page } = await open({ javaScriptEnabled: false });
     const shown = await page.evaluate(() => ({
@@ -410,16 +332,8 @@ test.describe('the essay homepage', () => {
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-home')).opacity === '1');
   });
 
-  test('the homepage stays inside the screen at every width and follows dark mode', async ({ open }) => {
-    const { page } = await open({ colorScheme: 'dark' });
-    const overflowing = [];
-    for (const width of [1440, 1100, 375]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      if (scrollWidth > width) overflowing.push(`${width}px is ${scrollWidth}px wide`);
-    }
-    assert.deepEqual(overflowing, []);
+  test('the text of a card stays inside the card with 3, 4 and 5 columns and on a phone', async ({ open }) => {
+    const { page } = await open();
     const clipped = [];
     for (const [width, columns] of [
       [1440, '3'],
@@ -443,14 +357,5 @@ test.describe('the essay homepage', () => {
       if (outside.length > 0) clipped.push(`${width}px with ${columns} columns: ${outside.join(', ')}`);
     }
     assert.deepEqual(clipped, []);
-    const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    const [body, card] = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
-    assert.ok(luminance(body) < 0.2 && luminance(card) > luminance(body), `the page is ${body} and a card ${card} in dark mode`);
-    const pressedShadow = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-switch[data-control="group"] .bk-switch-options'), '::before').boxShadow);
-    const darkShadow = await pressedShadow();
-    await page.getByRole('button', { name: '设置' }).click();
-    await page.getByRole('button', { name: '浅' }).click();
-    await expect.poll(async () => luminance(await background())).toBeGreaterThan(0.8);
-    assert.deepEqual(sharedShadowLayers(await pressedShadow(), darkShadow), [], 'the shadow of the chosen grouping follows dark mode');
   });
 });

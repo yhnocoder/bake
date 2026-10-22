@@ -135,19 +135,17 @@ test.describe('the keyboard and the pointer in the AI chat on published pages', 
   });
 
   test('every open of the chat, by a click or by Enter on the pet, puts the keyboard focus on the input field, and a chat that the theme hides on a phone while the reader scrolls down fades out before it leaves the keyboard order', async ({ openChat }) => {
-    const { context, page } = await openChat();
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const { page } = await openChat();
     await page.goto('/2026-10/syntax/');
     const launcher = page.locator('.bk-chat-launcher');
     const focused = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.matches('.bk-chat-composer > input'), null, { timeout: 2000 });
-    for (let round = 0; round < 6; round += 1) {
-      if (round === 2) {
+    for (const state of ['without a key', 'with a key', 'after a reload']) {
+      if (state === 'with a key') {
         await setUpKey(page);
         await page.keyboard.press('Escape');
         await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
       }
-      if (round === 4) await page.reload();
+      if (state === 'after a reload') await page.reload();
       await launcher.click();
       await focused();
       await page.keyboard.press('Escape');

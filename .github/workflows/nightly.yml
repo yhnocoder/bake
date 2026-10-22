@@ -62,6 +62,25 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  repeat:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # why: a test that depends on timing fails more often when every test runs three times on twice as many workers as processors
+      - name: Run the browser tests three times under load
+        run: npx playwright test --repeat-each=3 --workers=200%
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: repeat-browser-traces
+          path: test-out/playwright
+          retention-days: 7
+
   macos:
     runs-on: macos-latest
     timeout-minutes: 30
@@ -78,3 +97,36 @@ jobs:
           name: macos-browser-traces
           path: test-out/playwright
           retention-days: 7
+
+  # why: nobody watches a scheduled run, so each one comments its results on one issue, which is checked every day; the person who starts a run by hand watches it
+  report:
+    needs: [performance, dev, repeat, macos]
+    if: ${{ always() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Comment the results of the run on the issue of the nightly runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULTS: |
+            - performance: ${{ needs.performance.result }}
+            - dev: ${{ needs.dev.result }}
+            - repeat: ${{ needs.repeat.result }}
+            - macos: ${{ needs.macos.result }}
+          PASSED: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+        run: |
+          title='Nightly test runs'
+          read -r number state <<EOF
+          $(gh issue list --state all --search "\"$title\" in:title" --json number,title,state --jq "map(select(.title == \"$title\")) | .[0] // empty | \"\\(.number) \\(.state)\"")
+          EOF
+          if [ -z "$number" ]; then
+            number=$(gh issue create --title "$title" --body "Each scheduled run of the workflow \`nightly\` adds a comment with the result of its jobs. A failed job shows which budgets were exceeded or which tests failed, and the artifacts of the run hold the reports and the traces." | grep -o '[0-9]*$')
+          fi
+          if [ "$state" = CLOSED ]; then gh issue reopen "$number"; fi
+          if [ "$PASSED" = true ]; then verdict=passed; else verdict=failed; fi
+          gh issue comment "$number" --body "The nightly run $RUN $verdict.
+
+          $RESULTS"
