@@ -1,5 +1,5 @@
 {
-  "measured": "The byte and request limits: test/browser/pages.test.js on examples/blog at commit PLACEHOLDER, which gives the same values on every machine. The time limits: PLACEHOLDER",
+  "measured": "The byte and request limits: test/browser/pages.test.js on examples/blog at commit 3872dbe, which gives the same values on every machine. The time limits: one run of the nightly workflow at commit 847f315 on GitHub's ubuntu-latest runner in the Playwright container, on 2026-10-22.",
   "limits": {
     "htmlBytes": {
       "limit": 236700,
@@ -25,53 +25,53 @@
       "limit": 9200,
       "basis": "The largest value measured, 8281 bytes on /, plus 10 percent, rounded up to 100 bytes"
     },
-    "requests": {
-      "limit": 64,
-      "basis": "The largest number measured, 58 requests on /2026-09/matrix-calculus/, plus 10 percent, rounded up"
-    },
     "otherScriptBytes": {
       "limit": 0,
       "basis": "Every script of a page is a theme script, component code, the chat module or a preview, so another script means that the measurement cannot attribute it"
     },
+    "requests": {
+      "limit": 64,
+      "basis": "The largest number measured, 58 requests on /2026-09/matrix-calculus/, plus 10 percent, rounded up"
+    },
     "firstContentfulPaintMs": {
-      "limit": 400,
-      "basis": "The largest value measured, 156 ms on /2026-09/llm-act-fns/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
+      "limit": 700,
+      "basis": "The largest value measured, 344 ms on /2026-09/llm-act-fns/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs"
     },
     "largestContentfulPaintMs": {
-      "limit": 400,
-      "basis": "The largest value measured, 156 ms on /2026-09/llm-act-fns/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
+      "limit": 700,
+      "basis": "The largest value measured, 344 ms on /2026-09/llm-act-fns/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs"
     },
     "componentsReadyMs": {
-      "limit": 300,
-      "basis": "The largest value measured, 126 ms on /2026-10/activations/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
+      "limit": 600,
+      "basis": "The largest value measured, 251 ms on /2026-10/activations/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs"
     },
     "componentsBlankOnScroll": {
       "limit": 0,
       "basis": "The owner requires that no component is blank while the reader scrolls"
     },
-    "devStartupMs": {
-      "limit": 4300,
-      "basis": "The largest median measured, 2117 ms, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
-    },
-    "articleUpdateMs": {
-      "limit": 1500,
-      "basis": "The largest median measured, 710 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
-    },
-    "componentUpdateMs": {
-      "limit": 2000,
-      "basis": "The largest median measured, 992 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
-    },
-    "configUpdateMs": {
-      "limit": 1200,
-      "basis": "The largest median measured, 559 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
-    },
     "buildMs": {
-      "limit": 20000,
-      "basis": "placeholder"
+      "limit": 7000,
+      "basis": "The largest value measured, 3491 ms, the median of three builds of examples/blog, times 2, rounded up to 100 ms, because timings vary between runs"
     },
     "newMs": {
-      "limit": 1000,
-      "basis": "placeholder"
+      "limit": 200,
+      "basis": "The largest value measured, 55 ms, the median of five runs of bake new, times 2, rounded up to 100 ms, because timings vary between runs"
+    },
+    "devStartupMs": {
+      "limit": 6700,
+      "basis": "The largest value measured, 3313 ms, the median of five starts, times 2, rounded up to 100 ms, because timings vary between runs"
+    },
+    "articleUpdateMs": {
+      "limit": 2200,
+      "basis": "The largest value measured, 1059 ms, the median of five edits on /2026-09/matrix-calculus/, times 2, rounded up to 100 ms, because timings vary between runs"
+    },
+    "componentUpdateMs": {
+      "limit": 3000,
+      "basis": "The largest value measured, 1498 ms, the median of five edits on /2026-09/matrix-calculus/, times 2, rounded up to 100 ms, because timings vary between runs"
+    },
+    "configUpdateMs": {
+      "limit": 1400,
+      "basis": "The largest value measured, 694 ms, the median of five edits on /2026-09/matrix-calculus/, times 2, rounded up to 100 ms, because timings vary between runs"
     }
   }
 }
