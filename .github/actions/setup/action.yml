@@ -1,5 +1,5 @@
 name: Set up Bake
-description: Installs Node 24, the npm dependencies and Playwright's Chromium headless shell with its system libraries.
+description: Installs Node 24, the npm dependencies and, unless the job's container provides it, Playwright's Chromium headless shell with its system libraries.
 runs:
   using: composite
   steps:
@@ -9,12 +9,16 @@ runs:
         cache: npm
     - run: npm ci
       shell: bash
+    # why: a Linux job runs in the Playwright container, which holds Chromium and its system libraries, and sets PLAYWRIGHT_BROWSERS_PATH to them; an Ubuntu mirror sometimes takes minutes to download the libraries
     - id: playwright
+      if: ${{ env.PLAYWRIGHT_BROWSERS_PATH == '' }}
       run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       shell: bash
-    - uses: actions/cache@v4
+    - if: ${{ env.PLAYWRIGHT_BROWSERS_PATH == '' }}
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
         key: playwright-chromium-headless-shell-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-    - run: npx playwright install --with-deps --only-shell chromium
+    - if: ${{ env.PLAYWRIGHT_BROWSERS_PATH == '' }}
+      run: npx playwright install --with-deps --only-shell chromium
       shell: bash

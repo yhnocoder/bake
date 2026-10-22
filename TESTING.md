@@ -14,7 +14,7 @@
 | `make example` | Runs `bake preview` in `examples/blog/`, which builds it and serves `examples/blog/dist/` at the `localhost` address it prints |
 | `make dev` | Runs `bake dev` in `examples/blog/` |
 
-`bake build` draws share images with Chromium, so the unit tests need Playwright's Chromium too. On macOS, run `make browser` once to download it. In the cloud environment Chromium is preinstalled at `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`; do not run `playwright install` there. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, so update both together.
+`bake build` draws share images with Chromium, so the unit tests need Playwright's Chromium too. On macOS, run `make browser` once to download it. In the cloud environment Chromium is preinstalled at `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`; do not run `playwright install` there. The `playwright` version in `package.json` is pinned to the release that uses that Chromium build, and the jobs of the workflows run in the container `mcr.microsoft.com/playwright` of the same release, so update all three together.
 
 ## Tiers
 
@@ -24,7 +24,7 @@
 | Pull request CI | Every push to a pull request or to `main` | 5 minutes per job |
 | Nightly | Once a day | 30 minutes per job |
 
-`.github/workflows/test.yml` runs on every pull request, on every push to `main` and when started by hand; a new push cancels the run that is still going for the same pull request or branch. Its jobs `lint`, `unit` (two shards) and `browser` (three shards) run in parallel, and the job `test` passes when all of them passed, so `test` is the check to read. `node --test --test-shard` runs each unit test file whole on one shard, and `playwright test --shard` divides the browser tests one by one; when a shard comes close to its time limit, add a shard to the matrix and to the command. A failed `browser` job uploads the Playwright trace of each failed test as an artifact; `npx playwright show-trace <trace.zip>` replays it. The jobs that run tests set up Node, the dependencies and Chromium with `.github/actions/setup`.
+`.github/workflows/test.yml` runs on every pull request, on every push to `main` and when started by hand; a new push cancels the run that is still going for the same pull request or branch. Its jobs `lint`, `unit` (two shards) and `browser` (three shards) run in parallel, and the job `test` passes when all of them passed, so `test` is the check to read. `node --test --test-shard` runs each unit test file whole on one shard, and `playwright test --shard` divides the browser tests one by one; when a shard comes close to its time limit, add a shard to the matrix and to the command. A failed `browser` job uploads the Playwright trace of each failed test as an artifact; `npx playwright show-trace <trace.zip>` replays it. The jobs that run tests on Linux run in Playwright's container image, which holds Chromium and the system libraries it needs, and set `PLAYWRIGHT_BROWSERS_PATH` to its browsers; `.github/actions/setup` then installs Node and the dependencies, and on macOS it also installs Chromium.
 
 `.github/workflows/nightly.yml` runs once a day and when started by hand. Its job `performance` measures the pages of the example blog and checks the budgets, its job `dev` measures `bake dev` and checks the budgets, and its job `macos` runs the unit and the browser tests on macOS.
 

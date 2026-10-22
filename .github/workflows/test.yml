@@ -23,6 +23,9 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     timeout-minutes: 5
     strategy:
       fail-fast: false
@@ -35,6 +38,9 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     timeout-minutes: 5
     strategy:
       fail-fast: false
