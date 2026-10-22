@@ -96,6 +96,7 @@ describe('homepage', () => {
           { id: 'math', name: 'Math', color: '#985b57', desc: 'Derivations.' },
           { id: 'empty', name: 'Empty', color: '#000000', desc: '' },
           { id: 'ml', name: 'ML', color: '#2a78d6', desc: '' },
+          { id: 'default', name: 'Default', color: '#7d7f84', desc: '' },
         ],
       },
       articles: [

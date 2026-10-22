@@ -46,7 +46,7 @@ toc: notes
 | `slug` | 是 | 网址的最后一段，只能用小写字母、数字和 `-`。 |
 | `date` | 是 | 写作日期，格式 `YYYY-MM-DD`，年月进入网址。 |
 | `summary` | 否 | 一句摘要，用于页头导语、首页卡片、网页描述和 RSS。 |
-| `category` | 否 | 分类的 id，取自 `bake.config.js` 的 `categories`。站点配置了分类而文章不写时，文章归入第一个分类。 |
+| `category` | 否 | 分类的 id，取自 `bake.config.js` 的 `categories`。站点配置了分类而文章不写时，文章归入 id 为 `default` 的“默认”分类；在 `categories` 里写一个 id 为 `default` 的分类，可以改它的名字、颜色、说明和位置。 |
 | `tags` | 否 | 标签列表，用于首页筛选。 |
 | `preview` | 否 | 首页卡片的动画预览脚本，放在文章文件夹里。 |
 | `cover` | 否 | 分享图片，不写时由 Bake 生成。 |

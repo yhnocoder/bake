@@ -63,7 +63,7 @@ export function readFrontMatter(file, source, rules, errors) {
   for (const name of REQUIRED) {
     if (!document.contents?.has(name)) errors.push(errorAt(file, fileStart, `front matter is missing "${name}"`));
   }
-  if (rules.categories.length > 0 && !document.contents?.has('category')) fields.category = rules.categories[0];
+  if (rules.categories.length > 0 && !document.contents?.has('category')) fields.category = 'default';
   if ('page' in fields) {
     const body = lines.findIndex((line, index) => index > close && line.trim() !== '');
     if (body !== -1) {

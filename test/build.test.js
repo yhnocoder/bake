@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fromHtml } from 'hast-util-from-html';
@@ -268,11 +268,15 @@ describe('bake build', () => {
     );
   });
 
-  test('puts an article without a category into the first category of bake.config.js', (t) => {
-    const config = "export default {\n  title: 'T',\n  url: 'https://example.com',\n  language: 'en',\n  categories: [{ id: 'ml', name: 'Machine learning', color: '#336699' }, { id: 'math', name: 'Math', color: '#993366' }],\n};\n";
-    const dir = createBlog(t, { 'bake.config.js': config, 'content/posts/c/index.md': article({ slug: 'c' }) });
+  test('puts an article without a category into the category "default", which bake.config.js may define', (t) => {
+    const categories = "{ id: 'ml', name: 'Machine learning', color: '#336699' }";
+    const config = (list) => `export default {\n  title: 'T',\n  url: 'https://example.com',\n  language: 'en',\n  categories: [${list}],\n};\n`;
+    const dir = createBlog(t, { 'bake.config.js': config(categories), 'content/posts/c/index.md': article({ slug: 'c' }), 'content/posts/d/index.md': article({ slug: 'd', extra: 'category: default\n' }) });
     assert.equal(bake(dir, 'build').stderr, '');
-    assert.match(readFileSync(join(dir, 'dist/feed.xml'), 'utf8'), /<category>Machine learning<\/category>/);
+    assert.equal(readFileSync(join(dir, 'dist/feed.xml'), 'utf8').match(/<category>Default<\/category>/g).length, 2);
+    writeFileSync(join(dir, 'bake.config.js'), config(`${categories}, { id: 'default', name: 'Notes', color: '#993366' }`));
+    assert.equal(bake(dir, 'build').stderr, '');
+    assert.equal(readFileSync(join(dir, 'dist/feed.xml'), 'utf8').match(/<category>Notes<\/category>/g).length, 2);
   });
 
   test('rejects arguments', (t) => {

@@ -104,7 +104,7 @@ export default {
 | `themes` | no | The options of each theme, keyed by the theme name. The `essay` theme has one option: `toc`, the table of contents style, `notes`, `dots` or `ticks`, `notes` by default. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default. Both are written as `themes: { essay: { toc: 'dots' }, bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `chat` | no | `{ pet }`: the pet of the AI chat, described in "The pet" below. The default is `crt-monitor`. |
-| `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. An article that names no category belongs to the first one. |
+| `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. An article that names no category belongs to the category `default`, which Bake adds after the others with a grey colour and the name Default, or 默认 for a Chinese blog. To choose its name, colour, description or place, list a category with the id `default`. |
 
 Any other field is an error.
 
@@ -129,7 +129,7 @@ tags: [LLM]
 | `date` | yes | Date in the form `YYYY-MM-DD`. Its year and month are part of the URL. |
 | `summary` | no | One sentence for the page header, the homepage card, the page description and RSS. |
 | `tags` | no | List of tags for filtering on the homepage. |
-| `category` | no | The `id` of one of the categories in `bake.config.js`. Without it, the article belongs to the first category. |
+| `category` | no | The `id` of one of the categories in `bake.config.js`. Without it, the article belongs to the category `default`. |
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of a PNG, JPEG, GIF, WebP, AVIF or SVG image in the article folder that becomes the share image in place of the card Bake draws, see [Share images](#share-images). |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
