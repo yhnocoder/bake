@@ -80,8 +80,8 @@ export function startPreviewCard(article) {
     () => {
       if (!shown()) return;
       if (entry().link === document.activeElement) setPlaced(placed() + 1);
-      // why: when content above the screen changes height, as a component does when it starts, the browser scrolls to keep the link in place, and the card still sits next to it
-      else if (entry().link.getBoundingClientRect().top !== linkTop) close();
+      // why: when content above the screen changes height, as a component does when it starts, the browser scrolls to keep the link in place, and the card still sits next to it; the scroll position is a whole pixel, so the link can move by a fraction of one
+      else if (Math.abs(entry().link.getBoundingClientRect().top - linkTop) >= 1) close();
     },
     { passive: true },
   );
