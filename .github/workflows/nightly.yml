@@ -98,24 +98,35 @@ jobs:
           path: test-out/playwright
           retention-days: 7
 
-  # why: a failed scheduled run is otherwise seen by nobody, while the person who starts a run by hand watches it
+  # why: nobody watches a scheduled run, so each one comments its results on one issue, which is checked every day; the person who starts a run by hand watches it
   report:
     needs: [performance, dev, repeat, macos]
-    if: ${{ failure() && github.event_name == 'schedule' }}
+    if: ${{ always() && github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
-      - name: Open an issue, or comment on the open one, for the failed run
+      - name: Comment the results of the run on the issue of the nightly runs
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULTS: |
+            - performance: ${{ needs.performance.result }}
+            - dev: ${{ needs.dev.result }}
+            - repeat: ${{ needs.repeat.result }}
+            - macos: ${{ needs.macos.result }}
+          PASSED: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
         run: |
-          title='The nightly tests failed'
-          number=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --body "The nightly run $RUN failed."
-          else
-            gh issue create --title "$title" --body "The nightly run $RUN failed. Its jobs show which budgets were exceeded or which tests failed, and the artifacts hold the reports and the traces."
+          title='Nightly test runs'
+          read -r number state <<EOF
+          $(gh issue list --state all --search "\"$title\" in:title" --json number,title,state --jq "map(select(.title == \"$title\")) | .[0] // empty | \"\\(.number) \\(.state)\"")
+          EOF
+          if [ -z "$number" ]; then
+            number=$(gh issue create --title "$title" --body "Each scheduled run of the workflow \`nightly\` adds a comment with the result of its jobs. A failed job shows which budgets were exceeded or which tests failed, and the artifacts of the run hold the reports and the traces." | grep -o '[0-9]*$')
           fi
+          if [ "$state" = CLOSED ]; then gh issue reopen "$number"; fi
+          if [ "$PASSED" = true ]; then verdict=passed; else verdict=failed; fi
+          gh issue comment "$number" --body "The nightly run $RUN $verdict.
+
+          $RESULTS"
