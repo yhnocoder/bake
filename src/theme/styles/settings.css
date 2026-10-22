@@ -315,14 +315,8 @@
 
 @media (max-width: 999.98px) {
   .bk-toast {
-    top: 16px;
-    bottom: auto;
+    bottom: var(--ui-reserve);
     max-width: calc(100vw - 32px);
-    transform: translate(-50%, calc(-6px * var(--motion-distance)));
-  }
-
-  .bk-toast.is-on {
-    transform: translate(-50%, 0);
   }
 }
 

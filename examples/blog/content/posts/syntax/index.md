@@ -150,10 +150,10 @@ export default function preview(element) {
 
 ## 提示框与折叠块
 
-提示框只有一种样式，`title` 是第一行的小标题，可以不写：
+提示框只有一种样式，`title` 是第一行的小标题，可以不写。小标题里可以写行内公式：
 
 ::::example
-:::aside{title="阅读约定"}
+:::aside{title="阅读约定：$\sigma$ 与 $\Phi$"}
 本文的 $\sigma(x)$ 表示 logistic sigmoid，$\Phi(x)$ 表示标准正态分布的累积分布函数。
 :::
 ::::

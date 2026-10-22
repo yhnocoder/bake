@@ -150,7 +150,7 @@ describe('bake.config.js', () => {
     const broken = [
       'export const options = {};',
       "export const headings = { id: { type: 'text' }, 'two words': { type: 'text' }, tone: { type: 'color' }, size: { type: 'number', min: 3, max: 1, depth: 1 }, kind: { type: 'enum', options: [] }, mark: { type: 'text', label: 'Mark' } };",
-      "export const blocks = { aside: {}, 'my-card': {}, Card: {}, card: { tone: { type: 'text', depth: 2 } }, plain: 'x' };",
+      "export const blocks = { aside: {}, 'my-card': {}, Card: {}, card: { tone: { type: 'text', depth: 2 }, kind: { type: 'enum', options: ['a'], required: 'yes' } }, plain: 'x' };",
       '',
     ].join('\n');
     assert.deepEqual(await problems(t, { 'bake.config.js': `export default { ${base} };\n`, 'themes/mine/options.js': broken }), [
@@ -164,7 +164,8 @@ describe('bake.config.js', () => {
       'themes/mine/options.js:1:1 mine: block "aside" has the name of a block of Bake; a theme cannot declare aside, fold, recap, references, example, list-table or embed',
       'themes/mine/options.js:1:1 mine: block "my-card" must be named with lowercase letters and digits, starting with a letter; a name with "-" is a component',
       'themes/mine/options.js:1:1 mine: block "Card" must be named with lowercase letters and digits, starting with a letter; a name with "-" is a component',
-      'themes/mine/options.js:1:1 mine: attribute "tone" of block "card" has the unknown field "depth"; the fields of a text attribute are type',
+      'themes/mine/options.js:1:1 mine: attribute "tone" of block "card" has the unknown field "depth"; the fields of a text attribute are type and required',
+      'themes/mine/options.js:1:1 mine: attribute "kind" of block "card" has required "yes"; it must be true or false',
       "themes/mine/options.js:1:1 mine: block \"plain\" must be declared as an object that maps each of its attributes to its declaration, such as { cols: { type: 'number', min: 1, max: 6, step: 1 } }, got \"x\"",
     ]);
   });

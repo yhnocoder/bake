@@ -58,7 +58,9 @@ function showEdges() {
   setScrolledAway(false);
 }
 
+// why: every scroll event ends here, and a search of the whole page for the edge areas on each one made long articles stutter
 function setScrolledAway(away) {
+  if (away === scrolledAway) return;
   scrolledAway = away;
   syncEdges();
 }

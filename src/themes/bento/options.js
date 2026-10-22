@@ -11,6 +11,7 @@ export const headings = {
 
 export const blocks = {
   sticker: {
+    icon: { type: 'enum', options: ['book', 'bookmark', 'chart', 'check', 'code', 'flask', 'formula', 'heart', 'idea', 'pin', 'question', 'rocket', 'star', 'warning'], required: true },
     cols: { type: 'number', min: 1, max: 6, step: 1 },
     rows: { type: 'number', min: 1, max: 200, step: 1 },
   },
