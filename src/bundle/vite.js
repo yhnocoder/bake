@@ -72,7 +72,9 @@ export function compileProblem(root, error) {
   const message = String(cause.message ?? cause)
     .split('\n')[0]
     .replace(`${file}: `, '')
-    .replace(LOCATION_SUFFIX, '');
+    .replace(LOCATION_SUFFIX, '')
+    // why: Rolldown names the modules in a message relative to the working directory, which is the blog root only when bake runs there
+    .replaceAll(/"([^"]+)"/g, (quoted, path) => (isInBlog(root, resolve(path)) ? `"${blogPath(root, resolve(path))}"` : quoted));
   if (!isInBlog(root, file)) return { message, file: null, position: fileStart };
   const position = cause.loc?.line === undefined ? fileStart : { line: cause.loc.line, column: cause.loc.column + 1 };
   return { message, file: blogPath(root, file), position };

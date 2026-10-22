@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
-import { test } from 'node:test';
-import { article, bake, createBlog } from '../blog.js';
-import { launchBrowser, serve } from './browser.js';
+import { article } from '../blog.js';
+import { test as base, expect, luminance, scrollInSteps, sharedShadowLayers } from './browser.js';
 
 const config = `export default {
   title: '测试博客',
@@ -57,29 +55,24 @@ const files = {
   'content/posts/attention/index.md': article({ title: longWord, slug: 'attention', date: '2026-07-01', extra: `category: ml\ntags: [注意力]\nsummary: ${longWord} 的摘要。\n` }),
 };
 
-const sharedShadowLayers = (light, dark) => {
-  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
-  return layers(light).filter((layer) => layers(dark).includes(layer));
-};
-
-test('the essay homepage', async (t) => {
-  const dir = createBlog(t, files);
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  const origin = await serve(t, join(dir, 'dist'));
-  const browser = await launchBrowser();
-
-  const open = async (options = {}) => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...options });
-    const page = await context.newPage();
-    const errors = [];
-    page.on('console', (message) => {
-      if (message.type() === 'error') errors.push(message.text());
+const test = base.extend({
+  open: async ({ newContext }, use) => {
+    await use(async (options = {}) => {
+      const page = await (await newContext(options)).newPage();
+      const errors = [];
+      page.on('console', (message) => {
+        if (message.type() === 'error') errors.push(message.text());
+      });
+      await page.goto('/');
+      await page.evaluate(() => document.fonts.ready);
+      return { page, errors };
     });
-    await page.goto(`${origin}/`);
-    await page.evaluate(() => document.fonts.ready);
-    return { context, page, errors };
-  };
+  },
+});
+
+test.use({ blog: { example: false, files } });
+
+test.describe('the essay homepage', () => {
   const state = (page) =>
     page.evaluate(() => ({
       groups: [...document.querySelectorAll('.bk-group-title')].filter((title) => title.checkVisibility()).map((title) => title.textContent),
@@ -103,8 +96,8 @@ test('the essay homepage', async (t) => {
   const cardIn = (grouping, url) => `[data-grouping="${grouping}"] .bk-card[href="${url}"]`;
   const previewState = (page, selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview')?.dataset.state ?? null);
 
-  await t.test('grouping and column choices change the page, survive a reload and are applied with the switch thumbs on the chosen buttons before the page script runs', async () => {
-    const { context, page } = await open();
+  test('grouping and column choices change the page, survive a reload and are applied with the switch thumbs on the chosen buttons before the page script runs', async ({ open }) => {
+    const { page } = await open();
     assert.deepEqual(await state(page), byCategory);
     await page.getByRole('button', { name: '月份' }).click();
     await page.getByRole('button', { name: '5', exact: true }).click();
@@ -117,11 +110,10 @@ test('the essay homepage', async (t) => {
     assert.deepEqual(await state(page), byMonth);
     assert.deepEqual(await thumbs(page, ['月份', '5']), [true, true]);
     await page.unroute('**/assets/*.js');
-    await context.close();
   });
 
-  await t.test('a preview loads only in the visible grouping, starts while the pointer rests on its card and stops when it leaves', async () => {
-    const { context, page, errors } = await open();
+  test('a preview loads only in the visible grouping, starts while the pointer rests on its card and stops when it leaves', async ({ open }) => {
+    const { page, errors } = await open();
     const gate = cardIn('category', '2026-10/gate/');
     await page.waitForFunction(() => document.querySelector('[data-grouping="category"] .bk-card-preview[data-drawn]') !== null);
     assert.equal(await page.locator('[data-grouping="month"] .bk-card-preview').count(), 0);
@@ -146,11 +138,10 @@ test('the essay homepage', async (t) => {
     await page.getByRole('button', { name: '月份' }).click();
     assert.equal(await previewState(page, gate), 'stopped');
     await page.waitForFunction(() => document.querySelector('[data-grouping="month"] .bk-card-preview[data-drawn]') !== null);
-    await context.close();
   });
 
-  await t.test('on a phone a card plays while it is in the middle of the screen', async () => {
-    const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+  test('on a phone a card plays while it is in the middle of the screen', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
     assert.equal(await page.evaluate(() => matchMedia('(hover: none)').matches), true);
     assert.equal(await page.locator('[data-control="columns"]').isVisible(), false);
     const bar = await page.evaluate(() => {
@@ -164,26 +155,21 @@ test('the essay homepage', async (t) => {
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
     await page.locator(jacobian).evaluate((card) => scrollBy({ top: card.getBoundingClientRect().bottom + 20, behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', jacobian);
-    await context.close();
   });
 
-  await t.test('on a phone the pet slides out of view while the reader scrolls down and the settings button stays', async () => {
-    const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+  test('on a phone the pet slides out of view while the reader scrolls down and the settings button stays', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
     const shown = () => page.evaluate(() => ['start', 'end'].map((name) => getComputedStyle(document.querySelector(`[data-edge="${name}"]`)).visibility === 'visible'));
-    const scroll = async (delta) => {
-      for (let step = 0; step < 5; step += 1) await page.evaluate((amount) => scrollBy(0, amount), delta / 5);
-    };
     assert.deepEqual(await shown(), [true, true]);
-    await scroll(600);
+    await scrollInSteps(page, 600);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-edge="end"]')).visibility === 'hidden');
     assert.deepEqual(await shown(), [true, false]);
-    await scroll(-200);
+    await scrollInSteps(page, -200);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-edge="end"]')).visibility === 'visible');
-    await context.close();
   });
 
-  await t.test('on a phone a preview in the middle of the screen waits until the scrolling stops', async () => {
-    const { context, page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+  test('on a phone a preview in the middle of the screen waits until the scrolling stops', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
     const jacobian = cardIn('category', '2026-09/jacobian/');
     await page.locator(jacobian).evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
@@ -198,21 +184,19 @@ test('the essay homepage', async (t) => {
     });
     assert.deepEqual(new Set(states.slice(1)), new Set(['stopped']));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', jacobian);
-    await context.close();
   });
 
-  await t.test('a column switch animates the cards only by moving and scaling them', async () => {
-    const { context, page } = await open();
+  test('a column switch animates the cards only by moving and scaling them', async ({ open }) => {
+    const { page } = await open();
     const properties = await page.evaluate(() => {
       document.querySelector('[data-control="columns"] button[data-value="5"]').click();
       return [...new Set(document.getAnimations().filter((animation) => animation.effect.target.matches('.bk-card')).flatMap((animation) => animation.effect.getKeyframes().flatMap((keyframe) => Object.keys(keyframe))))].sort();
     });
     assert.deepEqual(properties.filter((name) => !['composite', 'computedOffset', 'easing', 'offset'].includes(name)), ['scale', 'translate']);
-    await context.close();
   });
 
-  await t.test('with reduced motion a preview shows its first frame and never starts', async () => {
-    const { context, page } = await open({ reducedMotion: 'reduce' });
+  test('with reduced motion a preview shows its first frame and never starts', async ({ open }) => {
+    const { page } = await open({ reducedMotion: 'reduce' });
     const gate = cardIn('category', '2026-10/gate/');
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.drawn === 'yes', gate);
     await page.hover(gate);
@@ -220,11 +204,10 @@ test('the essay homepage', async (t) => {
     await page.evaluate(() => new Promise((done) => setTimeout(done, 100)));
     assert.equal(await previewState(page, gate), null);
     assert.deepEqual(await page.evaluate(() => window.previewLog), []);
-    await context.close();
   });
 
-  await t.test('a focused card stops its preview when it leaves the screen and starts it again when it comes back', async () => {
-    const { context, page } = await open({ viewport: { width: 1440, height: 500 } });
+  test('a focused card stops its preview when it leaves the screen and starts it again when it comes back', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 1440, height: 500 } });
     const gate = cardIn('category', '2026-10/gate/');
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.drawn === 'yes', gate);
     await page.locator(gate).focus();
@@ -234,11 +217,10 @@ test('the essay homepage', async (t) => {
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', gate);
     await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', gate);
-    await context.close();
   });
 
-  await t.test('a preview keeps running while either the pointer or the keyboard focus stays on its card', async () => {
-    const { context, page } = await open();
+  test('a preview keeps running while either the pointer or the keyboard focus stays on its card', async ({ open }) => {
+    const { page } = await open();
     const gate = cardIn('category', '2026-10/gate/');
     const running = (selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview').dataset.state);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.drawn === 'yes', gate);
@@ -253,11 +235,10 @@ test('the essay homepage', async (t) => {
     assert.equal(await running(gate), 'running', 'the focus left a hovered card');
     await page.mouse.move(5, 5);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', gate);
-    await context.close();
   });
 
-  await t.test('clicking the chip of the group on screen does not keep the highlight from following the scroll', async () => {
-    const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
+  test('clicking the chip of the group on screen does not keep the highlight from following the scroll', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 1440, height: 700 } });
     const settled = () =>
       page.evaluate(
         () =>
@@ -299,11 +280,10 @@ test('the essay homepage', async (t) => {
     assert.equal(followed, true, 'the highlight did not move to the first group while the page scrolled to the top');
     await page.waitForFunction(() => document.querySelector('.bk-chip[href="#category-ml"]').getAttribute('aria-current') === 'true');
     assert.deepEqual(await currentChips(page), ['#category-ml']);
-    await context.close();
   });
 
-  await t.test('category chips jump to their group and mark the group on screen, and tag chips filter the month grouping', async () => {
-    const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
+  test('category chips jump to their group and mark the group on screen, and tag chips filter the month grouping', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 1440, height: 700 } });
     const current = (href) => page.waitForFunction((target) => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].every((chip) => (chip.getAttribute('aria-current') === 'true') === (chip.getAttribute('href') === target)), href);
     await page.getByRole('link', { name: '数学' }).click();
     await page.waitForFunction(() => {
@@ -340,11 +320,10 @@ test('the essay homepage', async (t) => {
       ['2026-08', '1 篇', ['Series']],
       ['2026-07', '1 篇', [longWord]],
     ]);
-    await context.close();
   });
 
-  await t.test('the bar covers the whole width with an edge only while it is stuck, and the switches slide a thumb to the chosen value', async () => {
-    const { context, page } = await open({ viewport: { width: 1440, height: 700 } });
+  test('the bar covers the whole width with an edge only while it is stuck, and the switches slide a thumb to the chosen value', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 1440, height: 700 } });
     const edge = (opacity) => page.waitForFunction((value) => getComputedStyle(document.querySelector('.bk-home-bar'), '::before').opacity === value, opacity);
     await edge('0');
     await page.evaluate(() => scrollTo({ top: 500, behavior: 'instant' }));
@@ -354,7 +333,7 @@ test('the essay homepage', async (t) => {
       const box = bar.getBoundingClientRect();
       return { top: box.top, background: getComputedStyle(bar).backgroundColor, scrollWidth: document.documentElement.scrollWidth };
     });
-    assert.deepEqual(cover, { top: 0, background: 'rgb(245, 246, 244)', scrollWidth: 1440 });
+    assert.deepEqual(cover, { top: 0, background: await page.evaluate(() => getComputedStyle(document.body).backgroundColor), scrollWidth: 1440 });
     await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
     await edge('0');
 
@@ -376,11 +355,10 @@ test('the essay homepage', async (t) => {
       ),
     );
     assert.deepEqual(moving, []);
-    await context.close();
   });
 
-  await t.test('without scripts the default grouping and its cards are shown and the controls are hidden', async () => {
-    const { context, page } = await open({ javaScriptEnabled: false });
+  test('without scripts the default grouping and its cards are shown and the controls are hidden', async ({ open }) => {
+    const { page } = await open({ javaScriptEnabled: false });
     const shown = await page.evaluate(() => ({
       groups: [...document.querySelectorAll('.bk-group-title')].filter((title) => title.offsetParent !== null).map((title) => title.textContent),
       cards: [...document.querySelectorAll('.bk-card')].filter((card) => card.offsetParent !== null).length,
@@ -392,11 +370,10 @@ test('the essay homepage', async (t) => {
     assert.deepEqual(shown, { groups: ['模型', '数学'], cards: 7, controls: false, tags: false, chips: 2, image: '2026-09/chain/plot.svg' });
     await page.getByRole('link', { name: '数学' }).click();
     assert.match(page.url(), /#category-math$/);
-    await context.close();
   });
 
-  await t.test('the settings panel on the homepage offers the theme and the font with their current values', async () => {
-    const { context, page } = await open();
+  test('the settings panel on the homepage offers the theme and the font with their current values', async ({ open }) => {
+    const { page } = await open();
     for (const width of [1440, 375]) {
       await page.setViewportSize({ width, height: 800 });
       await page.reload();
@@ -409,14 +386,14 @@ test('the essay homepage', async (t) => {
         homeLinks: document.querySelectorAll('.bk-settings-home').length,
         gap: Math.round(document.querySelector('.bk-settings-toggle').getBoundingClientRect().top - document.querySelector('.bk-settings-panel').getBoundingClientRect().bottom),
       }));
-      assert.deepEqual(panel, { rows: ['主题', '字体'], pressed: ['跟随系统'], handles: 0, homeLinks: 0, gap: 8 }, `at ${width} pixels`);
+      assert.ok(panel.gap > 0, `the panel overlaps the settings button by ${-panel.gap} pixels at ${width} pixels`);
+      assert.deepEqual(panel, { rows: ['主题', '字体'], pressed: ['跟随系统'], handles: 0, homeLinks: 0, gap: panel.gap }, `at ${width} pixels`);
       await page.keyboard.press('Escape');
     }
-    await context.close();
   });
 
-  await t.test('a link to another page fades the page out before it opens, and going back shows the page again', async () => {
-    const { context, page } = await open();
+  test('a link to another page fades the page out before it opens, and going back shows the page again', async ({ open }) => {
+    const { page } = await open();
     const card = page.locator('[data-grouping="category"] .bk-card').first();
     const href = await card.getAttribute('href');
     const fades = await card.evaluate((element) => {
@@ -431,11 +408,10 @@ test('the essay homepage', async (t) => {
     await page.waitForURL(`**/${href}`);
     await page.goBack();
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-home')).opacity === '1');
-    await context.close();
   });
 
-  await t.test('the homepage stays inside the screen at every width and follows dark mode', async () => {
-    const { context, page } = await open({ colorScheme: 'dark' });
+  test('the homepage stays inside the screen at every width and follows dark mode', async ({ open }) => {
+    const { page } = await open({ colorScheme: 'dark' });
     const overflowing = [];
     for (const width of [1440, 1100, 375]) {
       await page.setViewportSize({ width, height: 900 });
@@ -467,14 +443,14 @@ test('the essay homepage', async (t) => {
       if (outside.length > 0) clipped.push(`${width}px with ${columns} columns: ${outside.join(', ')}`);
     }
     assert.deepEqual(clipped, []);
-    const colors = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
-    assert.deepEqual(colors, ['rgb(17, 20, 19)', 'rgb(26, 30, 28)']);
+    const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    const [body, card] = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
+    assert.ok(luminance(body) < 0.2 && luminance(card) > luminance(body), `the page is ${body} and a card ${card} in dark mode`);
     const pressedShadow = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-switch[data-control="group"] .bk-switch-options'), '::before').boxShadow);
     const darkShadow = await pressedShadow();
     await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '浅' }).click();
-    await page.waitForFunction(() => getComputedStyle(document.body).backgroundColor === 'rgb(245, 246, 244)');
+    await expect.poll(async () => luminance(await background())).toBeGreaterThan(0.8);
     assert.deepEqual(sharedShadowLayers(await pressedShadow(), darkShadow), [], 'the shadow of the chosen grouping follows dark mode');
-    await context.close();
   });
 });

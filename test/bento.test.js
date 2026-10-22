@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { article, bake, createBlog } from './blog.js';
+import { article, build, createBlog } from './blog.js';
 import { withoutCopySource } from './article.js';
 
 const config = (extra) => `export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'bento'${extra} };\n`;
@@ -72,13 +72,12 @@ function cards(html) {
     }));
 }
 
-test('the bento theme renders each ## section as a card whose span follows its cols and rows or its width', (t) => {
+test('the bento theme renders each ## section as a card whose span follows its cols and rows or its width', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(", themes: { bento: { columns: 5 } }"),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body }),
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   assert.deepEqual(
     cards(html).map(({ title, span, columns, rows, notes }) => ({ title, span, columns, rows, notes })),
@@ -98,13 +97,12 @@ test('the bento theme renders each ## section as a card whose span follows its c
   assert.match(html, /<meta property="og:image" content="https:\/\/example.com\/og\/2026-10\/cards-\w+\.png">/);
 });
 
-test('the bento theme writes the homepage, the 404 page and the theme stylesheet when it is the site theme, loads the AI chat, is listed in the chat catalog and reads the column count and the row height from bake.config.js', (t) => {
+test('the bento theme writes the homepage, the 404 page and the theme stylesheet when it is the site theme, loads the AI chat, is listed in the chat catalog and reads the column count and the row height from bake.config.js', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(", themes: { bento: { columns: 4, rowHeight: 30 } }"),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: '## One\n\nText.\n' }),
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   assert.match(readFileSync(join(dir, 'dist/index.html'), 'utf8'), /<h3 class="bk-card-title">Cards<\/h3>/);
   assert.match(readFileSync(join(dir, 'dist/404.html'), 'utf8'), /<li data-url="2026-10\/cards\/" hidden>/);
   assert.match(readFileSync(join(dir, 'dist/feed.xml'), 'utf8'), /<link>https:\/\/example.com\/2026-10\/cards\/<\/link>/);
@@ -121,7 +119,7 @@ test('the bento theme writes the homepage, the 404 page and the theme stylesheet
   assert.match(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'), /<div class="bt-grid" data-columns="4" style="--bt-columns:4;--bt-row-height:30px">/);
 });
 
-test('the bento theme shows the recap of a section under the card title and the recap of a subsection under its heading', (t) => {
+test('the bento theme shows the recap of a section under the card title and the recap of a subsection under its heading', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({
@@ -130,14 +128,13 @@ test('the bento theme shows the recap of a section under the card title and the 
       body: '## One\n\n:::recap\nThe section in short.\n:::\n\nText.\n\n### Part\n\n:::recap\nThe part in short.\n:::\n\nMore text.\n',
     }),
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   assert.match(html, />One<\/span><\/h2><div class="[^"]*recap[^"]*"><p>The section in short.<\/p><\/div>(?:(?!<h3).)*<p>Text.<\/p>/s);
   assert.match(html, />Part<\/span><\/h3><div class="[^"]*recap[^"]*"><p>The part in short.<\/p><\/div>(?:(?!<\/section>).)*<p>More text.<\/p>/s);
 });
 
-test('the bento theme lists a sidenote that only a recap refers to at the bottom of the card of that recap', (t) => {
+test('the bento theme lists a sidenote that only a recap refers to at the bottom of the card of that recap', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({
@@ -146,8 +143,7 @@ test('the bento theme lists a sidenote that only a recap refers to at the bottom
       body: '## One\n\n:::recap\nThe section in short.[^section]\n:::\n\nText.\n\n### Part\n\n:::recap\nThe part in short.[^part]\n:::\n\nMore text.\n\n## Two\n\nOther text.\n\n[^section]: The section note.\n\n[^part]: The part note.\n',
     }),
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   const cards = html.split('<section class="bt-card"').slice(1);
   assert.equal(cards.length, 2);
@@ -155,7 +151,7 @@ test('the bento theme lists a sidenote that only a recap refers to at the bottom
   assert.doesNotMatch(cards[1], /<aside class="bk-sidenote"/);
 });
 
-test('the bento theme draws a sticker and a note as their own cards after the card of their section, and the note keeps its own sidenotes', (t) => {
+test('the bento theme draws a sticker and a note as their own cards after the card of their section, and the note keeps its own sidenotes', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({
@@ -164,8 +160,7 @@ test('the bento theme draws a sticker and a note as their own cards after the ca
       body: ':::sticker{icon=flask}\n:::\n\n## One\n\nText.[^one]\n\n:::note{cols=3 color=blue}\nA note with $x$.[^note]\n:::\n\n:::sticker{icon=chart cols=2 rows=4}\n**Short text**\n:::\n\nMore text.\n\n[^one]: The section note.\n\n[^note]: The note of the note.\n',
     }),
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
+  assert.deepEqual(await build(dir), []);
   const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   const grid = /<div class="bt-grid"[^>]*>(.*)<\/div><\/article>/s.exec(html)[1];
   const cards = [...grid.matchAll(/<(section|div) class="bt-card[^"]*"([^>]*)>/g)].map(([, tag, attributes]) => [tag, /data-theme-block="(\w+)"/.exec(attributes)?.[1], /style="([^"]*)"/.exec(attributes)[1], /data-color="(\w+)"/.exec(attributes)?.[1], /data-icon="(\w+)"/.exec(attributes)?.[1]]);
@@ -184,27 +179,27 @@ test('the bento theme draws a sticker and a note as their own cards after the ca
   assert.doesNotMatch(html, /class="bt-intro"/);
 });
 
-test('every built-in sticker of the bento theme has a drawing', (t) => {
+test('every built-in sticker of the bento theme has a drawing', async (t) => {
   const icons = ['book', 'bookmark', 'chart', 'check', 'code', 'flask', 'formula', 'heart', 'idea', 'pin', 'question', 'rocket', 'star', 'warning'];
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: `## One\n\nText.\n\n${icons.map((icon) => `:::sticker{icon=${icon}}\n:::\n`).join('\n')}` }),
   });
-  assert.equal(bake(dir, 'build').stderr, '');
+  assert.deepEqual(await build(dir), []);
   const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
   const drawn = [...html.matchAll(/data-icon="(\w+)"[^>]*><svg class="bt-sticker-icon"[^>]*>(.*?)<\/svg>/g)].filter(([, , inside]) => /<(path|circle) /.test(inside)).map(([, icon]) => icon);
   assert.deepEqual(drawn, icons);
 });
 
-test('the bento theme reports a note colour that is not one of its colours, a sticker without an icon and a block that it does not declare', (t) => {
+test('the bento theme reports a note colour that is not one of its colours, a sticker without an icon and a block that it does not declare', async (t) => {
   const dir = createBlog(t, {
     'bake.config.js': config(''),
     'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: '## One\n\n:::note{color=red}\nText.\n:::\n\n:::sticker\n🧪\n:::\n\n:::badge\nText.\n:::\n' }),
   });
-  const lines = bake(dir, 'build').stderr.trimEnd().split('\n');
+  const lines = await build(dir);
   const at = (text) => lines.find((line) => line.includes(text));
   assert.match(at('color'), /^content\/posts\/cards\/index\.md:\d+:9 color must be one of yellow, green, blue or pink, got "red"$/);
   assert.match(at('icon'), /^content\/posts\/cards\/index\.md:\d+:1 :::sticker is missing "icon"; icon is book, bookmark, chart, check, code, flask, formula, heart, idea, pin, question, rocket, star or warning$/);
   assert.match(at('badge'), /^content\/posts\/cards\/index\.md:\d+:1 unknown block ":::badge"; the blocks of the bento theme are sticker and note$/);
-  assert.equal(lines.at(-1), '3 errors, dist/ was not written');
+  assert.equal(lines.length, 3);
 });

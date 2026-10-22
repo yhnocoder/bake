@@ -6,7 +6,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { describe, test } from 'node:test';
 import sharp from 'sharp';
 import { folder, outline, parse, parsed } from './article.js';
-import { article, bake, createBlog, validConfig } from './blog.js';
+import { article, build, createBlog, validConfig } from './blog.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"/>';
 
@@ -127,7 +127,7 @@ describe('images', () => {
     const image = await png(40, 20);
     const body = Object.entries(references).map(([name, reference]) => `![](${name}.png)\n\n${reference}\n`).join('\n');
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article({ body }), ...Object.fromEntries(Object.keys(references).map((name) => [`content/posts/rope/${name}.png`, image])) });
-    assert.equal(bake(dir, 'build').stderr, '');
+    assert.deepEqual(await build(dir), []);
     const published = readdirSync(join(dir, 'dist/2026-10/rope')).filter((name) => name.endsWith('.png'));
     assert.deepEqual(published.sort(), ['a1.png', 'a2.png', 'a3.png', 'a4.png', 'a5.png', 'a6.png', 'a7.png']);
   });
@@ -147,7 +147,7 @@ describe('images', () => {
       'content/posts/note/note.png': photo,
       'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-10-01', body: 'No images.\n' }),
     });
-    assert.equal(bake(dir, 'build').stderr, '');
+    assert.deepEqual(await build(dir), []);
     const cards = readFileSync(join(dir, 'dist/index.html'), 'utf8').split('<a class="bk-card"').slice(1);
     assert.deepEqual(
       cards.map((card) => /<img src="([^"]*)"/.exec(card)?.[1] ?? null),
