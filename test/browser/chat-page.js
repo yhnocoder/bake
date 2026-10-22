@@ -1,4 +1,4 @@
-import { launchBrowser, nextFrame } from './browser.js';
+import { addPasskeyAuthenticator, test as base } from './browser.js';
 
 export const API_KEY = 'sk-test-0123456789abcdef';
 export const PETS = 'https://pets.example';
@@ -15,9 +15,8 @@ export function text(content, size = 6) {
   return events(chunks);
 }
 
-export async function openBrowser(t, base, { prf = true, contextOptions = {} } = {}) {
-  const browser = await launchBrowser();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], ...contextOptions });
+async function openChat(browser, origin, { prf = true, contextOptions = {} }) {
+  const context = await browser.newContext({ baseURL: origin, viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], ...contextOptions });
   const api = { requests: [], answers: [], models: { status: 200, body: '{"object":"list","data":[]}' }, pets: {}, petRequests: [] };
   await context.route(
     (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
@@ -64,14 +63,24 @@ export async function openBrowser(t, base, { prf = true, contextOptions = {} } =
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', (error) => problems.push(error.message));
-  const cdp = await context.newCDPSession(page);
-  await cdp.send('WebAuthn.enable');
-  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
-    options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: prf, automaticPresenceSimulation: true },
-  });
+  const { cdp, authenticatorId } = await addPasskeyAuthenticator(context, page, { prf });
   const passkeys = async () => (await cdp.send('WebAuthn.getCredentials', { authenticatorId })).credentials.map((credential) => credential.credentialId.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, ''));
   return { context, page, api, problems, passkeys };
 }
+
+// The AI chat appears only at localhost. openChat opens a page in a context that answers the requests to DeepSeek and to pet addresses from api, records the page errors in problems and has a virtual passkey authenticator.
+export const test = base.extend({
+  blog: [{ localhost: true }, { option: true }],
+  openChat: async ({ browser, site }, use) => {
+    const contexts = [];
+    await use(async (options = {}) => {
+      const opened = await openChat(browser, site.origin, options);
+      contexts.push(opened.context);
+      return opened;
+    });
+    for (const context of contexts) await context.close();
+  },
+});
 
 export async function storage(page) {
   return page.evaluate(() => ({
@@ -94,13 +103,6 @@ export async function setUpKey(page, key = API_KEY) {
 export async function ask(page, question) {
   await page.locator(QUESTION).fill(question);
   await page.locator(QUESTION).press('Enter');
-}
-
-export async function scrollPage(page, delta) {
-  for (let step = 0; step < 5; step += 1) {
-    await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-    await nextFrame(page);
-  }
 }
 
 const PET_ROWS = {

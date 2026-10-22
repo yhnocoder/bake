@@ -46,13 +46,13 @@ toc: notes
 | `slug` | 是 | 网址的最后一段，只能用小写字母、数字和 `-`。 |
 | `date` | 是 | 写作日期，格式 `YYYY-MM-DD`，年月进入网址。 |
 | `summary` | 否 | 一句摘要，用于页头导语、首页卡片、网页描述和 RSS。 |
-| `category` | 站点配置了分类时必填 | 分类的 id，取自 `bake.config.js` 的 `categories`。 |
+| `category` | 否 | 分类的 id，取自 `bake.config.js` 的 `categories`。站点配置了分类而文章不写时，文章归入 id 为 `default` 的“默认”分类；在 `categories` 里写一个 id 为 `default` 的分类，可以改它的名字、颜色、说明和位置。 |
 | `tags` | 否 | 标签列表，用于首页筛选。 |
 | `preview` | 否 | 首页卡片的动画预览脚本，放在文章文件夹里。 |
 | `cover` | 否 | 分享图片，不写时由 Bake 生成。 |
 | `theme` | 否 | 主题，`essay` 或 `bento`，不写时用站点默认值。 |
 | `toc` | 否 | essay 主题的选项，目录样式：`notes`、`dots`、`ticks`，分别是前文笔记、圆点胶囊、刻度线，不写时用 `bake.config.js` 里 `themes.essay.toc` 的值。front matter 可以写文章所用主题的任何选项，例如 bento 文章的 `columns`。 |
-| `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。 |
+| `draft` | 否 | 写 `true` 时不发布，只在 `bake dev` 里显示。`bake build` 不检查草稿，写到一半的草稿有错也不影响其他文章发布。 |
 | `page` | 否 | 纯 HTML 页面要原样发布的文件，写了它的 `index.md` 没有正文。 |
 
 `preview` 指向的脚本是一个 ES 模块。它的默认导出是一个函数：函数收到一个覆盖卡片预览区的空元素，在里面画出第一帧，然后返回带 `start` 和 `stop` 两个方法的对象。首页在卡片接近屏幕时加载这个脚本；指针停在卡片上时调用 `start`，指针离开时调用 `stop`；手机上卡片滚到屏幕中间时开始，离开中间时停止；读者要求减少动画时只显示第一帧。颜色用主题的 CSS 变量，深色模式下随之改变。
@@ -76,7 +76,7 @@ export default function preview(element) {
 }
 ```
 
-没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，显示分类颜色的色块和文章标题。这篇文章的 `preview` 让一道渐变的分界在卡片上来回扫过，分界上方是生成的页面，下方是 Markdown 原文。
+没有 `preview` 时，卡片显示文章的第一张图片；也没有图片时，在分类颜色的色块上列出各章的编号和标题，最多五章；文章没有 `##` 标题时，色块上显示文章标题。这篇文章的 `preview` 让一道渐变的分界在卡片上来回扫过，分界上方是生成的页面，下方是 Markdown 原文。
 
 ## 标题与锚点 {toc="标题"}
 
@@ -150,10 +150,10 @@ export default function preview(element) {
 
 ## 提示框与折叠块
 
-提示框只有一种样式，`title` 是第一行的小标题，可以不写：
+提示框只有一种样式，`title` 是第一行的小标题，可以不写。小标题里可以写行内公式：
 
 ::::example
-:::aside{title="阅读约定"}
+:::aside{title="阅读约定：$\sigma$ 与 $\Phi$"}
 本文的 $\sigma(x)$ 表示 logistic sigmoid，$\Phi(x)$ 表示标准正态分布的累积分布函数。
 :::
 ::::
@@ -522,7 +522,7 @@ def silu(x):
 | 标签写在公式环境外面 | `\end{align}` 后面写 `\label{eq:ffn}` | `\label{eq:ffn} is outside the environment of its equation; write it inside \begin{…} and \end{…}, on the line it labels` |
 | list-table 各行单元格数不同 | 第二行只有两个单元格 | `list-table row 2 has 2 cells, the header row has 3` |
 | 图片宽度写了宽度档 | `{width=wide}` 写在图片后面 | `image width must be a positive number of pixels or a percentage, got "wide"; use :::{width=wide} around the image` |
-| 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot` |
+| 组件参数名写错 | `:::act-fn-plot{bta=2}` | `unknown parameter "bta" for act-fn-plot; did you mean beta?` |
 | 组件参数超出范围 | `:::act-fn-plot{xmax=200}` | `parameter "xmax" of act-fn-plot must be between -100 and 100, got 200` |
 | 组件不存在 | `:::fn-plot`，`components/` 里没有这个文件 | `unknown component "fn-plot"; there is no fn-plot.js or fn-plot.jsx in components/ or in the components/ folder of this article` |
 | 组件宽度取值不对 | `:::glu-heatmap{width=full}` | `width of glu-heatmap must be body, wide, page, auto, a size in pixels such as 560px or a percentage such as 70%, got "full"` |

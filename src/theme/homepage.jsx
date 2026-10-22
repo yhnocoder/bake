@@ -168,12 +168,21 @@ function Card(props) {
     >
       <div class="bk-card-frame">
         <div class="bk-card-fallback">
-          {article.image === undefined ? (
+          {article.image !== undefined ? (
+            <img src={article.image} alt="" loading="lazy" decoding="async" />
+          ) : article.sections.length > 0 ? (
+            <ol class="bk-card-cover bk-card-outline" aria-hidden="true">
+              {article.sections.map((section) => (
+                <li>
+                  <span class="bk-card-outline-number">{section.number}</span>
+                  {section.title}
+                </li>
+              ))}
+            </ol>
+          ) : (
             <span class="bk-card-cover" aria-hidden="true">
               {article.title}
             </span>
-          ) : (
-            <img src={article.image} alt="" loading="lazy" decoding="async" />
           )}
         </div>
         {article.draft ? <span class="bk-card-draft">{labels.draft}</span> : null}

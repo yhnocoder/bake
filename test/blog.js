@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import sharp from 'sharp';
+import { formatError } from '../src/report.js';
 
 export const cli = join(import.meta.dirname, '../src/cli.js');
 export const exampleBlog = join(import.meta.dirname, '../examples/blog');
 
 const EXAMPLE_OUTPUTS = new Set(['dist', '.dist-staging', '.dist-previous', 'node_modules']);
-let builtExample = null;
+const BUILT_SITES = join(tmpdir(), 'bake-test-sites');
+const SITE_INPUTS = ['src', 'package-lock.json'].map((path) => join(import.meta.dirname, '..', path));
+const DAY = 24 * 60 * 60 * 1000;
 
 export const validConfig = "export default { title: 'Test Blog', url: 'https://example.com', language: 'en' };\n";
 
@@ -31,17 +35,51 @@ function copyExampleTo(dir) {
   cpSync(exampleBlog, dir, { recursive: true, filter: (source) => !EXAMPLE_OUTPUTS.has(relative(exampleBlog, source)) });
 }
 
-export function exampleBuild() {
-  if (builtExample === null) {
-    const dir = mkdtempSync(join(tmpdir(), 'bake-example-'));
-    process.once('exit', () => rmSync(dir, { recursive: true, force: true }));
-    copyExampleTo(dir);
-    const result = bake(dir, 'build');
-    assert.equal(result.stderr, '');
-    assert.equal(result.status, 0);
-    builtExample = dir;
+// why: a build takes seconds, and building the example blog about ten, so a build is kept in the temporary folder under the hash of everything it is built from and shared by every test file and every run until the code or the blog changes
+export function builtExample(files = {}) {
+  return cachedBuild(exampleBlog, files);
+}
+
+export function builtBlog(files) {
+  return cachedBuild(null, files);
+}
+
+async function cachedBuild(base, files) {
+  const hash = createHash('sha256');
+  for (const input of [...SITE_INPUTS, ...(base === null ? [] : [base])]) hashTree(hash, input);
+  hash.update(JSON.stringify(Object.entries(files).map(([path, content]) => [path, Buffer.isBuffer(content) ? content.toString('base64') : content])));
+  const dir = join(BUILT_SITES, hash.digest('hex').slice(0, 16));
+  if (existsSync(dir)) return dir;
+  mkdirSync(BUILT_SITES, { recursive: true });
+  for (const name of readdirSync(BUILT_SITES)) {
+    if (Date.now() - statSync(join(BUILT_SITES, name)).mtimeMs > DAY) rmSync(join(BUILT_SITES, name), { recursive: true, force: true });
   }
-  return builtExample;
+  const staging = realpathSync(mkdtempSync(join(BUILT_SITES, 'staging-')));
+  if (base !== null) copyExampleTo(staging);
+  writeFiles(staging, files);
+  assert.deepEqual(await build(staging), []);
+  try {
+    renameSync(staging, dir);
+  } catch {
+    // why: another test process built the same site first
+    rmSync(staging, { recursive: true, force: true });
+  }
+  return dir;
+}
+
+function hashTree(hash, path) {
+  if (statSync(path).isFile()) {
+    hash.update(path);
+    hash.update(readFileSync(path));
+    return;
+  }
+  for (const name of readdirSync(path).sort()) if (!EXAMPLE_OUTPUTS.has(name)) hashTree(hash, join(path, name));
+}
+
+export async function build(dir) {
+  // why: loading the build takes a second, which a test process that finds its blogs already built does not spend
+  const { build: buildBlog } = await import('../src/build/build.js');
+  return (await buildBlog(dir)).errors.map(formatError);
 }
 
 export function writeFiles(dir, files) {
@@ -62,6 +100,10 @@ export function bake(dir, ...args) {
 
 export function article({ title = 'Rope', slug = 'rope', date = '2026-10-19', extra = '', body = 'Text.\n' } = {}) {
   return `---\ntitle: ${title}\nslug: ${slug}\ndate: ${date}\n${extra}---\n\n${body}`;
+}
+
+export function filler(topic, count = 4) {
+  return Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 }
 
 export function readTree(dir) {

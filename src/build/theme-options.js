@@ -80,7 +80,7 @@ function attributeProblems(subject, name, declaration, heading) {
   if (heading && name === 'id') return [`${subject} is the anchor of a heading, which Bake reads itself`];
   if (!isPlainObject(declaration)) return [`${subject} must be declared as an object such as { type: 'number', min: 1, max: 6, step: 1 }, got ${describeValue(declaration)}`];
   if (!ATTRIBUTE_TYPES.includes(declaration.type)) return [`${subject} has the type ${describeValue(declaration.type)}; use ${listChoices(ATTRIBUTE_TYPES)}`];
-  const known = ['type', ...ATTRIBUTE_FIELDS[declaration.type], ...(heading ? ['depth'] : [])];
+  const known = ['type', ...ATTRIBUTE_FIELDS[declaration.type], ...(heading ? ['depth'] : ['required'])];
   const problems = Object.keys(declaration)
     .filter((field) => !known.includes(field))
     .map((field) => `${subject} has the unknown field "${field}"; the fields of a ${declaration.type} attribute are ${listAll(known)}`);
@@ -96,6 +96,7 @@ function attributeProblems(subject, name, declaration, heading) {
     problems.push(`${subject} is an enum without options; list them as strings, for example options: ['body', 'wide']`);
   }
   if (declaration.depth !== undefined && !DEPTHS.includes(declaration.depth)) problems.push(`${subject} has depth ${describeValue(declaration.depth)}; it must be the level of a heading from 2 to 6`);
+  if (declaration.required !== undefined && typeof declaration.required !== 'boolean') problems.push(`${subject} has required ${describeValue(declaration.required)}; it must be true or false`);
   return problems;
 }
 

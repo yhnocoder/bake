@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
-import { test } from 'node:test';
-import { article, bake, copyExample, writeFiles } from '../blog.js';
-import { launchBrowser, serve, settle } from './browser.js';
+import { article } from '../blog.js';
+import { settle, test } from './browser.js';
 
 const NOTE_GAP = 12;
 const LINE_TOLERANCE = 4;
@@ -116,25 +114,19 @@ function checkNotes({ blocks, notes }, label) {
   return reasons;
 }
 
-test('sidenotes', async (t) => {
-  const dir = copyExample(t);
-  writeFiles(dir, { 'content/posts/stress/index.md': stressArticle });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  const base = await serve(t, join(dir, 'dist'));
-  const browser = await launchBrowser();
-  const wide = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+test.describe('sidenotes', () => {
+  test.use({ blog: { files: { 'content/posts/stress/index.md': stressArticle } } });
 
-  await t.test('never overlap and align with the line of their number at 1440 px in the syntax article', async () => {
-    await wide.goto(`${base}/2026-10/syntax/`);
-    await settle(wide);
-    checkNotes(await wide.evaluate(measureNotes), 'syntax article');
+  test('never overlap and align with the line of their number at 1440 px in the syntax article', async ({ page }) => {
+    await page.goto('/2026-10/syntax/');
+    await settle(page);
+    checkNotes(await page.evaluate(measureNotes), 'syntax article');
   });
 
-  await t.test('move below earlier notes and wide blocks and hide while their number is in a closed fold', async () => {
-    await wide.goto(`${base}/2026-10/stress/`);
-    await settle(wide);
-    const closed = await wide.evaluate(measureNotes);
+  test('move below earlier notes and wide blocks and hide while their number is in a closed fold', async ({ page }) => {
+    await page.goto('/2026-10/stress/');
+    await settle(page);
+    const closed = await page.evaluate(measureNotes);
     const reasons = checkNotes(closed, 'stress article');
     assert.ok(reasons.includes('aligned'), `no sidenote is aligned with its number: ${reasons}`);
     assert.ok(reasons.includes('below note'), `no sidenote moved below an earlier one: ${reasons}`);
@@ -143,10 +135,10 @@ test('sidenotes', async (t) => {
       closed.notes.filter((note) => note.hidden).map((note) => note.number),
       ['6'],
     );
-    await wide.click('details.fold > summary');
-    await wide.waitForFunction(() => document.querySelector('details.fold').open);
-    await settle(wide);
-    const opened = await wide.evaluate(measureNotes);
+    await page.click('details.fold > summary');
+    await page.waitForFunction(() => document.querySelector('details.fold').open);
+    await settle(page);
+    const opened = await page.evaluate(measureNotes);
     checkNotes(opened, 'stress article with the fold open');
     assert.deepEqual(
       opened.notes.filter((note) => note.hidden).map((note) => note.number),
@@ -154,19 +146,20 @@ test('sidenotes', async (t) => {
     );
   });
 
-  await t.test('highlight the number and the note and tint the paragraph on hover', async () => {
-    await wide.hover('.sidenote-ref[data-sidenote="5"] a');
-    await settle(wide);
-    assert.deepEqual(await wide.evaluate(highlights), { number: '1', note: '1', paragraph: '1' });
-    await wide.mouse.move(5, 450);
-    await settle(wide);
-    assert.deepEqual(await wide.evaluate(highlights), { number: '0', note: '0', paragraph: '0' });
+  test('highlight the number and the note and tint the paragraph on hover', async ({ page }) => {
+    await page.goto('/2026-10/stress/');
+    await settle(page);
+    await page.hover('.sidenote-ref[data-sidenote="5"] a');
+    await settle(page);
+    assert.deepEqual(await page.evaluate(highlights), { number: '1', note: '1', paragraph: '1' });
+    await page.mouse.move(5, 450);
+    await settle(page);
+    assert.deepEqual(await page.evaluate(highlights), { number: '0', note: '0', paragraph: '0' });
   });
 
-  await t.test('show every note under its block when scripts are disabled', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, javaScriptEnabled: false });
-    const page = await context.newPage();
-    await page.goto(`${base}/2026-10/stress/`);
+  test('show every note under its block when scripts are disabled', async ({ browser, site }) => {
+    const page = await browser.newPage({ javaScriptEnabled: false });
+    await page.goto(`${site.origin}/2026-10/stress/`);
     const notes = await page.evaluate(() => {
       const sources = document.querySelectorAll('.bk-sidenote');
       return {
@@ -175,16 +168,16 @@ test('sidenotes', async (t) => {
         target: document.querySelector('#sidenote-1')?.checkVisibility() ?? false,
       };
     });
-    await context.close();
+    await page.close();
     assert.equal(notes.count, 6);
     assert.deepEqual(notes.visible, ['1 A short note.', '2 Another short note.', `3 ${longNote('c')}`, `4 ${longNote('d')}`, '5 A short note.', '6 The note of the fold.']);
     assert.equal(notes.target, true);
   });
 
-  await t.test('open under their block when the number is tapped at 375 px and close on a second tap', async () => {
-    const context = await browser.newContext({ viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
+  test('open under their block when the number is tapped at 375 px and close on a second tap', async ({ browser, site }) => {
+    const context = await browser.newContext({ baseURL: site.origin, viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
     const phone = await context.newPage();
-    await phone.goto(`${base}/2026-10/stress/`);
+    await phone.goto('/2026-10/stress/');
     const note = phone.locator('.bk-section .bk-sidenote[data-sidenote="2"]');
     assert.equal(await phone.locator('.bk-notes-layer').isVisible(), false);
     assert.equal(await note.isVisible(), false);

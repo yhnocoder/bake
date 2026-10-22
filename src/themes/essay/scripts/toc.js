@@ -1,6 +1,5 @@
-import { LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, leftColumnScreen, notesColumnScreen, oncePerFrame, requestLayout } from 'bake/theme/client';
+import { LAYOUT_EVENT, SETTING_EVENT, currentLayout, followLink, leftColumnScreen, notesColumnScreen, oncePerFrame, requestLayout, showEdgesDuring } from 'bake/theme/client';
 import { essayLabels } from '../labels.js';
-import { showButtonsDuring } from './buttons.js';
 import { drawerView } from './drawer.js';
 import { bottomReserve, createCardHost, readOutline } from './toc-card.js';
 import { DOTS_CARD, dotsView } from './toc-dots.js';
@@ -43,7 +42,7 @@ export function startToc(article) {
     jumping = true;
     view.jumped?.(hash);
     const jump = followLink(hash);
-    showButtonsDuring(jump);
+    showEdgesDuring(jump);
     jump.then(() =>
       requestAnimationFrame(() => {
         jumping = false;

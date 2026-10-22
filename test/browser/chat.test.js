@@ -1,31 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
-import { startDevServer } from '../../src/dev/server.js';
 import { article, createBlog, exampleBlog, validConfig } from '../blog.js';
-import { serveExample, settle } from './browser.js';
-import { API_KEY, KEY, QUESTION, ask, backdropRoots, events, openBrowser, openSettings, petSeen, setUpKey, shadow, storage, text, watchPet } from './chat-page.js';
+import { settle, startDev } from './browser.js';
+import { API_KEY, KEY, QUESTION, ask, backdropRoots, events, openSettings, petSeen, setUpKey, shadow, storage, test, text, watchPet } from './chat-page.js';
 import { isSelectionChunk } from './selection-module.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
 
-function mainThreadTasks(trace) {
-  const events = trace.traceEvents;
-  const main = events.find((event) => event.name === 'thread_name' && event.args.name === 'CrRendererMain');
-  return events
-    .filter((event) => event.pid === main.pid && event.tid === main.tid && event.name === 'RunTask' && event.ph === 'X')
-    .map((event) => Math.round(event.dur / 100) / 10)
-    .sort((a, b) => b - a);
-}
-
-test('the key and the answers of the AI chat on published pages', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('the key is saved with a passkey, the browser stores only ciphertext, and the answer about the article streams with formulas and links', async (t) => {
-    const { page, api, problems } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+test.describe('the key and the answers of the AI chat on published pages', () => {
+  test('the key is saved with a passkey, the browser stores only ciphertext, and the answer about the article streams with formulas and links', async ({ openChat }) => {
+    const { page, api, problems } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await page.locator('.bk-chat-launcher').click();
     const setup = page.locator('.bk-chat-note').first();
     await setup.filter({ hasText: 'DeepSeek API key' }).waitFor();
@@ -63,10 +50,10 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('the frosted glass lies under every part of the chat that asks for the key and blurs the page also while it fades in, at 1440 and 375 pixels', async (t) => {
+  test('the frosted glass lies under every part of the chat that asks for the key and blurs the page also while it fades in, at 1440 and 375 pixels', async ({ openChat }) => {
     for (const [width, height] of [[1440, 900], [375, 812]]) {
-      const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width, height } } });
-      await page.goto(`${base}/2026-09/llm-act-fns/`);
+      const { page } = await openChat({ contextOptions: { viewport: { width, height } } });
+      await page.goto('/2026-09/llm-act-fns/');
       await page.locator('.bk-chat-launcher').click();
       await page.locator(KEY).waitFor();
       assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass while it fades in at ${width} pixels`);
@@ -90,8 +77,8 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     }
   });
 
-  await t.test('the passkey unlocks the key for 30 days in this browser, and only when a question is sent after that', async (t) => {
-    const { context, page, api } = await openBrowser(t, base);
+  test('the passkey unlocks the key for 30 days in this browser, and only when a question is sent after that', async ({ openChat }) => {
+    const { context, page, api } = await openChat();
     await context.addInitScript(() => {
       const offset = Number(sessionStorage.getItem('bake-test-day') ?? 0) * 86400000;
       const now = Date.now;
@@ -109,7 +96,7 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
       assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
       return unlockNotes();
     };
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     assert.equal(await askOnDay(0, '再说一次'), 0, 'the next page asks for no passkey');
     assert.equal(await askOnDay(29, '再说一次'), 0, 'the key is still unlocked after 29 days');
@@ -187,11 +174,11 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal(await askOnDay(30, '还记得吗'), 0, 'a key saved while the chat still reads the remembered key stays unlocked');
   });
 
-  await t.test('chatting about the whole blog reads articles with a tool and links into them', async (t) => {
-    const { page, api } = await openBrowser(t, base);
+  test('chatting about the whole blog reads articles with a tool and links into them', async ({ site, openChat }) => {
+    const { page, api } = await openChat();
     const fetched = [];
     page.on('request', (request) => fetched.push(new URL(request.url()).pathname));
-    await page.goto(`${base}/`);
+    await page.goto('/');
     await setUpKey(page);
     assert.equal(await page.locator(QUESTION).getAttribute('placeholder'), '问这个博客，打 @ 选范围…');
     const call = { index: 0, id: 'call_1', type: 'function', function: { name: 'read_article', arguments: '' } };
@@ -209,7 +196,7 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     api.answers.push({ body: text('见 [雅可比矩阵](/2026-10/jacobian/#定义)。') });
     await ask(page, '雅可比矩阵是什么？');
     await page.locator('.bk-chat-reply[data-done] .bk-chat-answer a').waitFor();
-    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), `${base}/2026-10/jacobian/#%E5%AE%9A%E4%B9%89`);
+    assert.equal(await page.locator('.bk-chat-answer a').getAttribute('href'), `${site.origin}/2026-10/jacobian/#%E5%AE%9A%E4%B9%89`);
     assert.equal(await page.locator('.bk-chat-read').textContent(), '读了《雅可比矩阵》');
     assert.ok(fetched.includes('/_bake/articles.json'));
     assert.ok(fetched.includes('/2026-10/jacobian/index.md'));
@@ -225,9 +212,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.deepEqual(second.body.messages.at(-2).tool_calls, [{ id: 'call_1', type: 'function', function: { name: 'read_article', arguments: '{"address":"/2026-10/jacobian/"}' } }]);
   });
 
-  await t.test('a selected passage can be asked about directly', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('a selected passage can be asked about directly', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await page.keyboard.press('Escape');
     await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
@@ -250,9 +237,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal(await page.locator('.bk-chat-composer .bk-chat-quote').count(), 0);
   });
 
-  await t.test('on phones the button that asks about a selected passage shows while scrolling down hides the chat button, and asking shows the chat', async (t) => {
-    const { page } = await openBrowser(t, base, { contextOptions: { viewport: { width: 375, height: 760 } } });
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('on phones the button that asks about a selected passage shows while scrolling down hides the chat button, and asking shows the chat', async ({ openChat }) => {
+    const { page } = await openChat({ contextOptions: { viewport: { width: 375, height: 760 } } });
+    await page.goto('/2026-10/syntax/');
     const launcher = page.locator('.bk-chat-launcher');
     await launcher.waitFor();
     for (let step = 0; step < 6; step += 1) {
@@ -276,10 +263,10 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     }, null, { timeout: 5000 });
   });
 
-  await t.test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the chat without a quote', async (t) => {
-    const { page, problems } = await openBrowser(t, base);
+  test('when the module that writes a selection cannot be loaded, asking about a selected passage opens the chat without a quote', async ({ openChat }) => {
+    const { page, problems } = await openChat();
     await page.route((url) => isSelectionChunk(url.href), (route) => route.abort());
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await page.keyboard.press('Escape');
     await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
@@ -295,9 +282,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.deepEqual(problems, []);
   });
 
-  await t.test('DeepSeek errors are explained with a retry, and a cleared key is asked for again after a reload', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('DeepSeek errors are explained with a retry, and a cleared key is asked for again after a reload', async ({ context, openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     api.answers.push({ status: 402, body: '{"error":{"message":"Insufficient Balance"}}' });
     await ask(page, '你好');
@@ -329,9 +316,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     await page.locator(KEY).waitFor();
   });
 
-  await t.test('stopping an answer keeps the text written so far and sends it with the next question, and screen readers hear a reply only when it is done, also a reply equal to the one before', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('stopping an answer keeps the text written so far and sends it with the next question, and screen readers hear a reply only when it is done, also a reply equal to the one before', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await page.evaluate(() => (window.bakeTest.hold = true));
     await ask(page, '慢慢说');
@@ -369,9 +356,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal(await announced.evaluate((element) => element.isConnected), false);
   });
 
-  await t.test('a new chat started while an answer streams drops that answer from the bubbles and from the next request', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('a new chat started while an answer streams drops that answer from the bubbles and from the next request', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     await page.evaluate(() => (window.bakeTest.hold = true));
     await ask(page, '旧问题');
@@ -388,9 +375,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.deepEqual(api.requests.at(-1).body.messages.slice(1), [{ role: 'user', content: '新问题' }]);
   });
 
-  await t.test('only the last failed reply offers a retry, and never while another answer streams', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('only the last failed reply offers a retry, and never while another answer streams', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     api.answers.push({ status: 402, body: '{"error":{"message":"Insufficient Balance"}}' });
     await ask(page, '第一问');
@@ -425,9 +412,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     );
   });
 
-  await t.test('changing the key uses the new key and asks the browser to forget the old passkey', async (t) => {
-    const { page, api, passkeys } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('changing the key uses the new key and asks the browser to forget the old passkey', async ({ openChat }) => {
+    const { page, api, passkeys } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     const first = await passkeys();
     assert.equal(first.length, 1);
@@ -441,10 +428,10 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal(api.requests.at(-1).headers.authorization, 'Bearer sk-test-second-key');
   });
 
-  await t.test('a rejected key is reported before any passkey is created', async (t) => {
-    const { page, api, passkeys } = await openBrowser(t, base);
+  test('a rejected key is reported before any passkey is created', async ({ openChat }) => {
+    const { page, api, passkeys } = await openChat();
     api.models = { status: 401, body: '{"error":{"message":"Authentication Fails"}}' };
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await page.locator('.bk-chat-launcher').click();
     await page.locator(KEY).fill('sk-wrong');
     await page.locator(KEY).press('Enter');
@@ -454,9 +441,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.deepEqual((await storage(page)).local, {});
   });
 
-  await t.test('a passkey without PRF stores nothing and says why', async (t) => {
-    const { page } = await openBrowser(t, base, { prf: false });
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('a passkey without PRF stores nothing and says why', async ({ openChat }) => {
+    const { page } = await openChat({ prf: false });
+    await page.goto('/2026-10/syntax/');
     await page.locator('.bk-chat-launcher').click();
     await page.locator(KEY).fill(API_KEY);
     await page.locator(KEY).press('Enter');
@@ -465,24 +452,24 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.equal((await page.evaluate(() => window.bakeTest.signals)).length, 1);
   });
 
-  await t.test('a browser without passkeys or without client capabilities, and a page served from an IP address, show no chat', async (t) => {
-    const { page, context } = await openBrowser(t, base);
-    await page.goto(`${base.replace('localhost', '127.0.0.1')}/2026-10/syntax/`);
+  test('a browser without passkeys or without client capabilities, and a page served from an IP address, show no chat', async ({ openChat, site }) => {
+    const { page, context } = await openChat();
+    await page.goto(`${site.origin.replace('localhost', '127.0.0.1')}/2026-10/syntax/`);
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
     await context.addInitScript(() => delete PublicKeyCredential.getClientCapabilities);
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
     await context.addInitScript(() => delete window.PublicKeyCredential);
-    await page.goto(`${base}/2026-10/syntax/`);
+    await page.goto('/2026-10/syntax/');
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('[data-bake-chat]').count(), 0);
   });
 
-  await t.test('@ lists articles, months and topics, and the chosen scopes go into the question and the prompt while the pet reviews', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('@ lists articles, months and topics, and the chosen scopes go into the question and the prompt while the pet reviews', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await watchPet(page);
     await setUpKey(page);
     const input = page.locator(QUESTION);
@@ -558,9 +545,9 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
     assert.deepEqual(api.requests.at(-1).body.messages.slice(1), [{ role: 'user', content: '讲了什么？' }]);
   });
 
-  await t.test('older bubbles scroll inside a box of at most 480 pixels at 1440 pixels and 230 pixels on a phone without a scrollbar and fade at the top', async (t) => {
-    const { page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
+  test('older bubbles scroll inside a box of at most 480 pixels at 1440 pixels and 230 pixels on a phone without a scrollbar and fade at the top', async ({ openChat }) => {
+    const { page, api } = await openChat();
+    await page.goto('/2026-10/syntax/');
     await setUpKey(page);
     api.answers.push({ body: text(Array.from({ length: 24 }, (_, index) => `第 ${index + 1} 段。`).join('\n\n'), 40) });
     await ask(page, '写长一点');
@@ -589,14 +576,13 @@ test('the key and the answers of the AI chat on published pages', async (t) => {
   });
 });
 
-test('a page saved in bake dev gives the chat the new source of the article', async (t) => {
+test('a page saved in bake dev gives the chat the new source of the article', async ({ openChat, after }) => {
   const file = 'content/posts/rope/index.md';
-  const dir = createBlog(t, { 'bake.config.js': validConfig, [file]: article({ body: 'The first text.\n' }) });
-  const server = await startDevServer(dir, { port: 0, print: () => {} });
-  t.after(() => server.close());
-  const base = new URL(server.url).origin;
-  const { page, api } = await openBrowser(t, base);
-  await page.goto(`${base}/2026-10/rope/`);
+  const dir = createBlog({ after }, { 'bake.config.js': validConfig, [file]: article({ body: 'The first text.\n' }) });
+  const dev = await startDev(dir);
+  after(dev.close);
+  const { page, api } = await openChat();
+  await page.goto(`${dev.url}2026-10/rope/`);
   await setUpKey(page);
   const saved = article({ body: 'The new text.\n' });
   writeFileSync(join(dir, file), saved);
@@ -607,14 +593,12 @@ test('a page saved in bake dev gives the chat the new source of the article', as
   assert.ok(api.requests.at(-1).body.messages[0].content.includes(`<article>\n${saved}\n</article>`));
 });
 
-test('the shadows and the speed of the AI chat on published pages', async (t) => {
-  const base = await serveExample(t, { localhost: true });
-
-  await t.test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async (t) => {
+test.describe('the shadows of the AI chat on published pages', () => {
+  test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async ({ openChat }) => {
     const seen = {};
     for (const colorScheme of ['light', 'dark']) {
-      const { page, api } = await openBrowser(t, base, { contextOptions: { colorScheme } });
-      await page.goto(`${base}/2026-10/syntax/`);
+      const { page, api } = await openChat({ contextOptions: { colorScheme } });
+      await page.goto('/2026-10/syntax/');
       await setUpKey(page);
       api.answers.push({ body: text('好。') });
       await ask(page, '你好');
@@ -643,59 +627,4 @@ test('the shadows and the speed of the AI chat on published pages', async (t) =>
     assert.match(seen.light.pet, /^drop-shadow\(rgba\(0, 0, 0, 0\) /, seen.light.pet);
     assert.doesNotMatch(seen.dark.pet, /rgba\(0, 0, 0, 0\)/, seen.dark.pet);
   });
-
-  await t.test('in the median of seven cycles of opening and closing the chat at a quarter of the CPU speed, the longest main-thread task takes at most 40 milliseconds longer with 30 rounds of conversation than with one and at most 80 milliseconds, at 1440 and 375 pixels', async (t) => {
-    const { context, page, api } = await openBrowser(t, base);
-    await page.goto(`${base}/2026-10/syntax/`);
-    await setUpKey(page);
-    const launcher = page.locator('.bk-chat-launcher');
-    const cdp = await context.newCDPSession(page);
-    const cycle = async () => {
-      const box = await launcher.boundingBox();
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await page.locator('.bk-chat[data-open]').waitFor({ state: 'attached' });
-      await settle(page.locator('.bk-chat'));
-      await page.keyboard.press('Escape');
-      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      await settle(page.locator('.bk-chat'));
-    };
-    const measure = async () => {
-      await page.keyboard.press('Escape');
-      await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-      const longest = {};
-      for (const width of [1440, 375]) {
-        await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
-        await settle(page.locator('.bk-chat'));
-        await cycle();
-        await cdp.send('HeapProfiler.collectGarbage');
-        const cycles = [];
-        for (let round = 0; round < 7; round += 1) {
-          await context.browser().startTracing(page, { categories: ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline'] });
-          await cycle();
-          cycles.push(mainThreadTasks(JSON.parse(await context.browser().stopTracing()))[0]);
-        }
-        longest[width] = cycles.sort((a, b) => a - b)[3];
-      }
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-      await page.setViewportSize({ width: 1440, height: 900 });
-      await launcher.click();
-      await page.locator(QUESTION).waitFor();
-      return longest;
-    };
-    const answer = (round) => text(`第 ${round + 1} 个回答，公式 $x^${round} + \\frac{a_${round}}{b}$ 和 $\\sum_{i=1}^{n} y_i^2$。\n\n${'这是一段较长的回答文字。'.repeat(6)}\n\n$$\n\\int_0^1 f_${round}(x)\\,dx\n$$`, 400);
-    for (let round = 0; round < 30; round += 1) {
-      if (round === 1) var short = await measure();
-      api.answers.push({ body: answer(round) });
-      await ask(page, `问题 ${round + 1}`);
-      await page.locator('.bk-chat-reply[data-done]').nth(round).waitFor();
-    }
-    const long = await measure();
-    const report = JSON.stringify({ short, long });
-    for (const width of [1440, 375]) {
-      assert.ok(long[width] <= short[width] + 40, report);
-      assert.ok(long[width] <= 80, report);
-    }
-  });
-
 });

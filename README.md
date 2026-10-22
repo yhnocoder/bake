@@ -20,7 +20,7 @@ npx bake dev
 
 ## Example blog
 
-`examples/blog/` is a blog written with Bake. Its syntax article lists every syntax item with its source next to its result, and its other articles show components, embeds, plain HTML pages and both themes. `make example` builds it and serves it at http://localhost:8000/. The `demo` workflow in `.github/workflows/demo.yml` builds it with the address of this repository's GitHub Pages site and publishes it there when it is started by hand from the Actions tab; it is never started by a push.
+`examples/blog/` is a blog written with Bake. Its articles show every syntax item, components, embeds, plain HTML pages and both themes, see [Writing an article](#writing-an-article). `make example` builds it and serves it at http://localhost:8000/. The `demo` workflow in `.github/workflows/demo.yml` builds it with the address of this repository's GitHub Pages site and publishes it there when it is started by hand from the Actions tab; it is never started by a push.
 
 ## Commands
 
@@ -37,7 +37,7 @@ Run every command except `bake init` from the blog root, the folder that contain
 
 `bake new <path>` creates `content/posts/<path>/index.md` with front matter for a draft dated today. The last folder name of the path becomes the slug.
 
-`bake build` checks `bake.config.js` and the front matter and Markdown of every article, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts and styles of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. It also writes `dist/404.html`, the RSS feed `dist/feed.xml`, the sitemap `dist/sitemap.xml`, the theme stylesheet `dist/_bake/theme.css` and one share image per Markdown article to `dist/og/`, see [Share images](#share-images). Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
+`bake build` checks `bake.config.js` and the front matter and Markdown of every article that is not a draft, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts and styles of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. It also writes `dist/404.html`, the RSS feed `dist/feed.xml`, the sitemap `dist/sitemap.xml`, the theme stylesheet `dist/_bake/theme.css` and one share image per Markdown article to `dist/og/`, see [Share images](#share-images). Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
 
 ### bake dev
 
@@ -50,7 +50,7 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 - Changing any other file, such as a component, an image or a file in `public/`, reloads the page at the same scroll position.
 - The homepage at http://localhost:4321/ shows every article, drafts included, and reloads when the front matter of an article changes or an article is added or removed.
 
-Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry copies its position, `file:line:col`. The close button hides the list until the problems change. While the blog has errors, every page keeps showing the last version without errors, and the pages update again when the errors are fixed. When `bake dev` starts on a blog whose articles have errors, it shows the pages with those errors.
+Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry opens the file in Visual Studio Code at the position of the problem. The close button hides the list until the problems change. While the blog has errors, every page keeps showing the last version without errors, and the pages update again when the errors are fixed. When `bake dev` starts on a blog whose articles have errors, it shows the pages with those errors.
 
 Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts. In the preview of the [VS Code extension](#editing-in-visual-studio-code), it moves the editor to that line.
 
@@ -110,7 +110,7 @@ export default {
 | `themes` | no | The options of each theme, keyed by the theme name. The `essay` theme has one option: `toc`, the table of contents style, `notes`, `dots` or `ticks`, `notes` by default. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default. Both are written as `themes: { essay: { toc: 'dots' }, bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
 | `home` | no | `{ columns, groupBy }`: the homepage has 3, 4 or 5 columns, 3 by default, and groups articles by `category` or `month`. Articles are grouped by category when `categories` is set and by month otherwise. |
 | `chat` | no | `{ pet }`: the pet of the AI chat, described in "The pet" below. The default is `crt-monitor`. |
-| `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. When categories are set, every article names one of them. |
+| `categories` | no | List of `{ id, name, color, desc }`. The `id` uses lowercase letters, digits and `-` and is unique, `name` is the displayed name, `color` is a `#rrggbb` color and `desc` is an optional description. An article that names no category belongs to the category `default`, which Bake adds after the others with a grey colour and the name Default, or 默认 for a Chinese blog. To choose its name, colour, description or place, list a category with the id `default`. |
 
 Any other field is an error.
 
@@ -135,243 +135,38 @@ tags: [LLM]
 | `date` | yes | Date in the form `YYYY-MM-DD`. Its year and month are part of the URL. |
 | `summary` | no | One sentence for the page header, the homepage card, the page description and RSS. |
 | `tags` | no | List of tags for filtering on the homepage. |
-| `category` | when `categories` is set | The `id` of one of the categories in `bake.config.js`. |
+| `category` | no | The `id` of one of the categories in `bake.config.js`. Without it, the article belongs to the category `default`. |
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
 | `cover` | no | Path of a PNG, JPEG, GIF, WebP, AVIF or SVG image in the article folder that becomes the share image in place of the card Bake draws, see [Share images](#share-images). |
 | `theme` | no | Theme of this article. The default comes from `bake.config.js`. |
-| `draft` | no | `true` keeps the article out of `bake build`. `bake dev` shows it with a Draft label. |
+| `draft` | no | `true` keeps the article out of `bake build`, which does not check it either, so a half-written draft does not stop the other articles from being published. `bake dev` shows it with a Draft label and reports its problems. |
 | `page` | no | Path of an HTML file in the article folder. Bake publishes the folder unchanged and serves this file as the article's `index.html`. An `index.md` with `page` has no text after the front matter. |
 
 The front matter can also set the options of the article's theme by their names, such as `toc: dots` in an `essay` article or `columns: 4` in a `bento` article; a value written in the front matter replaces the one in `themes` of `bake.config.js` for this article. Any other field is an error, and two articles cannot have the same URL.
 
 ## Writing an article
 
-The text after the front matter is Markdown: CommonMark with GitHub tables, footnotes and strikethrough, math between `$` signs, and the additions below. The example blog's article `examples/blog/content/posts/syntax/index.md` shows every syntax item next to its result.
+The articles of the example blog are the guide to writing. Each one is written in Chinese and shows its source next to its result:
 
-### Sections and anchors
+- [Bake 写法一览](examples/blog/content/posts/syntax/index.md) lists every Markdown syntax item: headings and anchors, recaps, callouts and folds, sidenotes and references, math and `preamble.sty`, code, tables, images, widths, components, links between articles, `:::embed`, copying as Markdown and the build errors.
+- [写交互组件](examples/blog/content/posts/components/index.md) explains how to write an interactive component: the file, its `params` and `layout`, how a parameter works together with the state inside the component, and every part of `bake/kit` with its properties.
 
-`##` headings start the sections of an article and are numbered 01, 02 and so on. `###` headings divide a section and appear under it in the table of contents. A `#` heading is an error, because the title comes from the front matter.
+Read them as source in `examples/blog/`, or as pages: `make example` builds the example blog and serves it at http://localhost:8000/.
 
-Braces at the end of a heading set its attributes:
+A new article takes these steps:
 
-```markdown
-## Activation functions in transformers {#act-fns toc="Activation functions"}
+```bash
+bake new 2026-10/rope   # content/posts/2026-10/rope/index.md, a draft dated today
+bake dev                # shows the draft and updates the page on each save
 ```
 
-`#id` is the anchor of the heading in every theme. Without it, the anchor is made from the heading text as on GitHub: letters become lowercase, spaces become `-` and most punctuation is dropped, so `## 链式法则` has the anchor `#链式法则`, and a second heading with the same text gets `-1`. Write `#id` when the text of a heading will change while other pages link to it, when two headings have the same text, or when the text is too long for a readable address. The other attributes belong to the theme of the article, and an attribute that the theme does not declare is an error, so `cols` in an `essay` article and `toc` in a `bento` article are errors:
-
-| Theme | Attribute | Meaning |
-|---|---|---|
-| `essay` | `toc` | A shorter title for the table of contents. |
-| `bento` | `width` | Only for `##` headings: the card width of the section, `body`, `wide` or `page`. |
-| `bento` | `cols` | Only for `##` headings: the number of card columns of the section, a whole number from 1 to 6. It wins over `width`. |
-| `bento` | `rows` | Only for `##` headings: the height of the card of the section, as a number of rows, a whole number from 1 to 200. |
-
-A paragraph that ends with `^name` gets the anchor `name`; the marker is not shown. Two anchors with the same name in one article are an error.
-
-### Text
-
-`==text==` highlights text. `**bold**`, `*italic*`, `~~strikethrough~~`, inline code, links and `$math$` work as usual, and emphasis may end next to Chinese punctuation, as in `**“引号”**后面`. A single `~` stays a tilde.
-
-A quote whose last paragraph starts with `— ` shows that paragraph as its source:
-
-```markdown
-> We find that some of these variants yield quality improvements.
->
-> — Shazeer, *GLU Variants Improve Transformer*, 2020
-```
-
-### Blocks
-
-A block starts with a line of three or more colons and a name, and ends with a line of at least as many colons. A block inside another block uses fewer colons than the block around it. Lines inside a fenced code block never close a block. A block without a closing line and a colon line that closes no block are errors.
-
-| Block | Meaning |
-|---|---|
-| `:::aside{title="Notation"}` | A callout. The title is optional. |
-| `:::fold{title="Derivation"}` | A collapsed part that opens when the reader clicks its title. The title is required. |
-| `:::recap` | The summary of the current `##` or `###` section. In the `essay` theme it is not shown in the text. The `notes` table of contents shows it under the section once the reader has read it, and the cards of the other styles and the phone drawer show it under the section title. A section without a recap shows the first sentence of its first paragraph there instead. The `bento` theme has no table of contents and shows the recap under the title of the card or under the `###` heading. A section has at most one. |
-| `:::references` | The bibliography: a list whose items start with `[@key]`. An article has at most one. |
-| `:::list-table` | A table written as a nested list, see below. |
-| `:::example` | Shows the Markdown source of its content next to the result, see below. |
-| `:::embed` | Shows sections or paragraphs of other articles, see [Embedding other articles](#embedding-other-articles). |
-| `:::{width=wide}` | Sets the width of the one block inside it to `body`, `wide` or `page`. |
-
-A name with a `-` is an interactive component. Any other name is a block of the theme of the article, such as `:::sticker` and `:::note` of the `bento` theme, see [Themes](#themes); a name that the theme does not declare is an error, and so is an attribute the block does not know. A block of the theme holds ordinary Markdown, with math, links, footnotes and citations, and stands at the top level of the article, outside other blocks, lists and quotes.
-
-### Math
-
-Math between `$` signs is inline and math between `$$` lines is a display formula. Bake typesets every formula at build time with MathJax into SVG, so the published page loads no math script. A formula MathJax cannot typeset is an error that quotes MathJax's message.
-
-A display formula with `\label{name}` is numbered, and `\eqref{name}` in the text or in another formula links to it and shows its number. Numbered environments such as `align` number each line that is not marked `\notag`. A numbered equation without a label gets the anchor `eq-` followed by its number, such as `eq-2`. A reference to an unknown label, two equations with the same label or anchor, a `\label` in inline math, an empty `\label{}` and a `\label` on a line that is not numbered are errors.
-
-`preamble.sty` in the blog root holds math macros shared by every article. It may only contain `\newcommand`, `\renewcommand`, `\DeclareMathOperator`, `\def`, `\let`, `\newenvironment`, `\renewenvironment`, `\ProvidesPackage` and `\RequirePackage`, so the same file also works in LaTeX, and `\RequirePackage` only accepts the packages Bake always loads: amsmath, amssymb, amsfonts, mathtools, braket, cancel, cases, color, xcolor, gensymb and upgreek. Anything else in the file is an error. Macros defined inside one article apply only to that article.
-
-### Code
-
-A fenced code block names its language after the opening fence. Bake highlights it at build time with Shiki. The colors are CSS variables named `--code-…`, so the theme sets them and switches them in dark mode. An unknown language name is an error; a block without a language is shown as plain text.
-
-### Tables
-
-GitHub tables work as usual, and a `|` inside `$…$` in a table cell belongs to the formula and does not split the cell. A table wider than the column scrolls horizontally.
-
-`:::list-table` writes a table as a nested list. Each item of the outer list is a row, and each item of its inner list is a cell, so a cell can hold several paragraphs, lists or code. The first row is the header. Every row must have as many cells as the header row.
-
-```markdown
-:::list-table
-- - Function
-  - Formula
-- - ReLU
-  - $\max(0, x)$
-:::
-```
-
-### Images
-
-`![alt](relu.svg "Caption")` shows an image from the article folder. When the image stands alone on the first line of a paragraph, it is shown as a figure, its quoted title becomes the caption, and the lines after it form a new paragraph. An image inside a line of text stays inline. Braces after the image set its size and position:
-
-```markdown
-![ReLU](relu.png "The ReLU function"){width=280px float=right}
-```
-
-| Attribute | Meaning |
-|---|---|
-| `width`, `height` | Display size greater than zero, in pixels such as `560px` or as a percentage of the text column such as `70%`. When both are set they use the same unit. A figure with a size shrinks to that width and is centred in the column, and it is never wider than the screen. A figure without a size is never wider than the text column; a figure with a pixel width wider than the text column extends to `wide`. |
-| `float` | `left` or `right`: the text flows around the figure. Only for a figure. |
-
-Bake reads every image at build time and writes its width and height into the page, so the page does not shift while images load, and images load lazily. PNG, JPEG, GIF and WebP images are published as WebP next to the original name, PNG and GIF without loss. The original file is published as well only when a link or raw HTML in the article refers to it. An image wider than twice its largest display width, or twice the page width of 1340 pixels when no width is set, is scaled down. SVG and AVIF images are published unchanged. An image that is not a file in the article folder, an image in another format, an image that cannot be read, for example because it has more pixels than the image library accepts, and two images published under the same name are errors. To make an image wider than the text, wrap it in `:::{width=wide}` or `:::{width=page}`.
-
-### Widths
-
-`:::{width=body}`, `:::{width=wide}` and `:::{width=page}` set the width of the one block inside them, such as a formula, a code block, a table, an image or a component. `body` is the width of the text, `wide` extends into the margin and `page` uses the whole page. The theme decides how each width is laid out. A block without a width is placed automatically: it has the width of the text when it fits, extends to `wide` when it does not, and scrolls horizontally when it is wider still. For formulas, code blocks, and figures and components with a pixel width, Bake records the natural width at build time, and the stylesheet sizes these blocks, also without scripts and at every text size the reader chooses; for tables and components without a pixel width the page measures it. A figure without a size stays at the width of the text.
-
-### Examples
-
-`:::example` shows the Markdown source of its content next to the rendered result; on a narrow screen the source is above the result. Headings inside an example do not enter the table of contents or the section numbering. Sidenotes, citations and equation numbers inside an example are numbered together with the rest of the article.
-
-### Components
-
-A component is an interactive figure that the blog writes in JavaScript. It is a file `components/<name>.js` or `components/<name>.jsx` in the blog root, and an article shows it with a block of that name:
-
-```markdown
-:::act-fn-plot{fn=silu range=6}
-The curve of SiLU. Drag the slider to change β.
-:::
-```
-
-The text between the two lines is the caption under the component, written in Markdown; a component without a caption has nothing between them. A component is always a block of its own and cannot appear inside a paragraph.
-
-A component that only one article uses can live in a `components/` folder inside the folder of that article, such as `content/posts/2026-10/llm-act-fns/components/glu-heatmap.jsx`. Only that article can show it; a block of it in another article is an error at the block. The files of this folder, with the modules and styles that its components import, are not published with the article. `bake dev` rebuilds the components when a file in it changes, as it does for `components/`.
-
-The file name is both the custom element name and the block name, so it uses lowercase letters and digits with at least one `-`, such as `act-fn-plot`. A name that HTML reserves, such as `font-face`, the name of a built-in block, such as `aside`, and two files with the same name in the whole blog, in `components/` or in the `components/` folder of any article and with the same or a different extension, are errors, reported at each of the files.
-
-```jsx
-import './act-fn-plot.css';
-
-export const params = {
-  fn: { label: 'Function', type: 'enum', options: ['relu', 'gelu', 'silu'], default: 'gelu' },
-  range: { label: 'Range', type: 'number', min: 1, max: 10, step: 1, default: 4 },
-};
-
-export const layout = { width: 'body' };
-
-export default function ActFnPlot(props) {
-  return <p>{props.fn} from -{props.range} to {props.range}</p>;
-}
-```
-
-The default export is the component. A class that extends `HTMLElement` is defined as the custom element of that name. Any other default export is a [SolidJS](https://www.solidjs.com/) component, which Bake wraps in a custom element. A file without a default export is an error.
-
-- A SolidJS component receives the parameter values as its props. When the values change, as they do while you move a control of the parameter bar in `bake dev`, the props change and the component updates.
-- A custom element finds the parameter values in `this.params` when it is connected. When the values change, Bake sets `this.params` again and calls the element's `update()` method if it has one.
-
-The file may import npm packages that the blog installs, other files of the blog, and CSS files, which the page loads together with the component. Bake bundles each component into its own script, which a page downloads only when its article uses the component.
-
-`params` and `layout` are optional. Bake reads both at build time without running the file, so each is written as `export const` with a literal value: strings, numbers, `true`, `false`, `null`, lists, objects, template strings without `${…}`, and names of `const` declarations of the same file with such a value. Anything else, such as a function call, an arithmetic expression or an imported name, is an error at its position. The rest of the file runs only in the browser, so it may use browser APIs at its top level; an error there shows the component as failed on the page.
-
-`params` maps the name of each parameter to its declaration. An article sets a parameter with the attribute of the same name, and a parameter that the article does not set has its default. Every declaration has `label`, the text next to its control in the parameter bar, `type` and `default`:
-
-| Type | Written in the article | Other fields |
-|---|---|---|
-| `number` | A number, such as `range=6` | `min`, `max` and `step`, all optional |
-| `text` | Any text, in quotes when it has spaces, such as `title="Two words"` | |
-| `boolean` | `name` or `name=true` for true, `name=false` for false | |
-| `enum` | One of the options, such as `fn=silu` | `options`, the list of allowed strings |
-| `file` | The path of a file in the article folder, such as `data=ffn-share.json`; the component receives the address of the published file | |
-
-The names `width`, `height`, `id` and `class` cannot be parameters. An unknown field of a declaration, a default that does not fit its declaration, an attribute that is not a parameter of the component, a value that does not fit its parameter and a file that is not in the article folder are errors at their positions.
-
-`layout` describes the box of the component on the page:
-
-| Field | Meaning |
-|---|---|
-| `width` | `body`, `wide` or `page`, see [Widths](#widths), a size in pixels such as `560px`, or a percentage of the text column up to `100%`. The default is `body`. |
-| `height` | A number of pixels, or `{ ratio }`, the width divided by the height, such as `{ ratio: 1.5 }`, for a component that fills a box of that size. |
-| `placeholder` | For a component without `height`: `{ narrow, wide }`, the height in pixels of its box before it starts, on screens narrower than 600 pixels and from 600 pixels up, such as `{ narrow: 600, wide: 340 }`. |
-| `frame` | `false` shows the component without the frame, the border and background, that the theme draws around it. The default is `true`. |
-
-The `width` and `height` attributes of the block replace the declared values for one use: `width` takes the same values as `layout.width` and `auto` for the declared width, and `height` takes a number of pixels, such as `:::bar-chart{height=320}`.
-
-A component without `layout.height` shows a placeholder until it starts and then takes the height of its content, so it lays out its content for every width itself. The placeholder has the height of `layout.placeholder`, or the theme's height `--component-placeholder-height` when the component declares none; a placeholder close to the height of the content keeps the page from moving when the component starts, and the content may still be taller or shorter, for example with another font size. A component that fills a box of a given size, such as a heatmap drawn to the size of its box, declares `layout.height`; its box has that height at every screen width, before and after the component starts. A component starts when it comes within one and a half screen heights of the visible part of the page, so its height changes before the reader reaches it; when a component above the visible part changes its height, the browser keeps the visible text in place, which Safari does from version 27 on.
-
-Two modules of Bake are available to components:
-
-- `bake/kit` holds SolidJS parts for figures, styled with the colours and fonts of the theme, so they follow the dark mode: the controls `Controls`, `Slider`, `Segmented`, `Toggle` and `Button`; the plot parts `Plot`, `Axes`, `Curve`, `Crosshair` and `usePlot`; `Legend` and `Swatch`; `Tex` and `SvgTex`, which typeset a TeX formula with the macros of `preamble.sty` in HTML or inside an SVG drawing, and `MathText` and `SvgMathText`, which show a line of text with formulas between `$` signs, or `$$` for a formula on its own line, in HTML or inside an SVG drawing, where `within={[left, right]}` moves a label sideways to keep it between two x positions; `divergingColors`, which maps a value from −1 to 1 to the theme's diverging colours `--diverge-low`, `--diverge-mid` and `--diverge-high`; the number helpers `linearScale`, `niceTicks`, `samplePath`, `formatNumber` and `stepDigits`; `createElementSize`, the size of an element as a signal; and `createTween` and `prefersReducedMotion` for animations that stop when the reader prefers reduced motion. Using the kit is optional, and a custom element can import its number helpers too.
-- `bake/math` exports `texToSvg(formula, { display })`, which typesets a TeX formula with the macros of `preamble.sty` and resolves to an SVG element.
-
-In `bake dev`, every component shows a parameter bar with one control per parameter, see [bake dev](#bake-dev). The bar shows a number field for a number, with a slider next to it when the declaration has `min` and `max`, a list for an enum, a switch for a boolean, and a text field for text and a file.
-
-### Sidenotes and citations
-
-Footnotes become numbered sidenotes, numbered in the order in which the text first refers to them:
-
-```markdown
-The activation can run in the GEMM epilogue[^gemm].
-
-[^gemm]: The epilogue is the stage of a matrix multiplication kernel that processes each result element.
-```
-
-`[@key]` cites an entry of `:::references`. Citations are numbered by their first appearance, and entries that are never cited are listed after the numbered ones without a number. The `essay` and `bento` themes show the list under the label References, or 参考文献 on a Chinese site, unless the block directly follows a heading:
-
-```markdown
-Gated variants lower the loss [@shazeer2020].
-
-:::references
-- [@shazeer2020] Shazeer. *GLU Variants Improve Transformer*. 2020.
-:::
-```
-
-A footnote reference without a definition, a definition that is never used and a citation that is not in `:::references` are errors.
-
-### Links between articles
-
-A link whose address is the address of an article on the site, `/YYYY-MM/slug/`, optionally followed by `#anchor`, is an internal link. The anchor names a heading, the `^name` of a paragraph, a sidenote such as `sidenote-2`, a reference entry such as `reference-shazeer2020`, or an equation by its label or its `eq-` anchor:
-
-```markdown
-The backward pass follows the [chain rule](/2026-07/matrix-calculus/#chain-rule).
-```
-
-Bake checks every internal link after it has read all articles. A link to an article or an anchor that does not exist is an error. When an article with the same slug exists under another month, the error gives its current address, because such a link usually broke when the date of the article changed; the address of a draft is never given. An address written without the trailing slash or with `index.html`, such as `/2026-07/matrix-calculus` or `/2026-07/matrix-calculus/index.html#chain-rule`, is an error that gives the address to write. A query string is kept in the link and does not change the check. A link from a published article to a draft is an error. A link to an anchor on the same page, such as `[see above](#act-fns)`, may name the same kinds of anchors and must exist in the article. Addresses with a scheme, such as `https://…`, are not checked. Bake writes internal links relative to the page, so the site also works when it is published under a sub-path.
-
-In the `essay` and `bento` themes, when the reader rests the pointer on an internal link or moves the keyboard focus to it, a card shows the title of the target article, the number and title of the section, and the content at the target with its formulas: the first paragraphs of a section, the paragraph, the formula of an equation or the text of a sidenote. A link to a reference entry shows the entry, as a citation does. A click on the card opens the target. On a touch screen there is no card, and a tap on the link opens the target.
-
-### Embedding other articles
-
-`:::embed` lists internal addresses, one per line, and shows their content in this article in the order of the lines:
-
-```markdown
-:::embed
-/2026-07/matrix-calculus/#chain-rule
-/2026-09/autodiff/#vjp
-:::
-```
-
-The address of a heading embeds its section up to the next heading of the same or a higher level, and the address of a paragraph anchor embeds that paragraph. All parts of one `:::embed` form one block, and each part ends with a line that names its article and section and links to them. Embedded content keeps its layout, its equation numbers and its components. Its headings do not enter the table of contents or the section numbering of this article, its sidenotes are not shown, and an `:::embed` inside it is shown as a link. Bake reads the embedded content on every build, so a change in the source article reaches every article that embeds it. Embedding the article itself, an address without an anchor, a target that does not exist or is not a heading or a paragraph, the same address twice and an address whose section contains another address of the same block are errors.
+Write the title, the summary and the text, remove `draft: true` from the front matter when the article is ready, and run `bake build`.
 
 ## The homepage
 
 `dist/index.html` lists every published article as a card: a 16:9 preview, the title, the summary, the date and the tags. Plain HTML pages get the same card as Markdown articles. A bar at the top of the screen switches between two groupings. Grouped by category, the articles are listed under each category in the order of `categories`, with its colour, description and number of articles, and the bar holds a chip for every category that jumps to its group and is highlighted while that group is on screen; categories without published articles are left out. Grouped by month, the newest month comes first, and the bar holds a chip for every tag that shows only the articles with that tag. Without `categories` the homepage is grouped by month only. On screens of 1000 pixels and up the reader can choose 3, 4 or 5 columns; narrower screens fit as many columns as the width allows. `home.groupBy` and `home.columns` set the defaults, and the browser remembers the reader's choice. Without scripts the default grouping is shown and the category chips still jump to their groups. A blog without published articles gets a homepage with one line that says there are no posts yet.
 
-The card shows the article's first image when the article has no `preview` script, and a block in the category colour with the title when it has no image either. A `preview` script is an ES module in the article folder whose default export receives an empty element that covers the card's frame, draws the first frame into it and returns an object with `start` and `stop`:
+The card shows the article's first image when the article has no `preview` script. When it has no image either, a block in the category colour lists the numbers and titles of its first five `##` sections, or shows the title of an article without sections. A `preview` script is an ES module in the article folder whose default export receives an empty element that covers the card's frame, draws the first frame into it and returns an object with `start` and `stop`:
 
 ```js
 export default function preview(element) {
@@ -477,8 +272,7 @@ The `bento` theme lays the same Markdown out as a grid of cards, one card per `#
 The `bento` theme has two blocks of its own, each drawn as a card of its own after the card of the section it is written in:
 
 ```markdown
-:::sticker
-🧪
+:::sticker{icon=flask}
 :::
 
 :::note{cols=2 color=blue}
@@ -486,7 +280,7 @@ PyTorch's `F.gelu(x, approximate="tanh")` is the approximation above.
 :::
 ```
 
-`:::sticker` holds a short text, an emoji or a small image and is drawn as a tilted sticker; an emoji alone is drawn large. `:::note` holds any Markdown, with math, links and footnotes, on a tinted card; `color` is `yellow`, `green`, `blue` or `pink`, `yellow` by default. Both take `cols`, the card columns, 1 for a sticker and a third of the columns for a note by default, and `rows`, which works as on a heading. From 1000 pixels up the section cards are placed first, and then each sticker and note, in the order of the article, goes to the highest place where it fits next to the cards placed before it, which fills the gaps the section cards leave, and to the leftmost of equally high places. Below 1000 pixels and without scripts they follow the order of the article.
+`:::sticker` draws one of the built-in stickers as a square card in the accent colour: `icon` names it and is `book`, `bookmark`, `chart`, `check`, `code`, `flask`, `formula`, `heart`, `idea`, `pin`, `question`, `rocket`, `star` or `warning`; a short text inside the block is written under the drawing. `:::note` holds any Markdown, with math, links and footnotes, on a tinted card; `color` is `yellow`, `green`, `blue` or `pink`, `yellow` by default. Both take `cols`, the card columns, 1 for a sticker and a third of the columns for a note by default, and `rows`, which works as on a heading. From 1000 pixels up the section cards are placed first, and then each sticker and note, in the order of the article, goes to the highest place where it fits next to the cards placed before it, which fills the gaps the section cards leave, and to the leftmost of equally high places. Below 1000 pixels and without scripts they follow the order of the article.
 
 A round settings button with a gear icon at the bottom left of every page, the homepage included, lets the reader choose a light or dark theme or follow the system, and type the name of a font installed on the reader's device, which then sets the title, the headings and the text; an empty field keeps the system's sans-serif font. Bake publishes no font files. On an article page the settings also let the reader choose the table of contents style from a list that shows a drawing of each style; the choice then replaces the style of every article. Below 1000 pixels the settings button is a tab on the left edge, under the table of contents handle on an article page, and on an article page both slide out of view while the reader scrolls down and return when the reader scrolls up; a switch in the settings keeps them in view. The `bento` theme has no table of contents, so its settings offer only the theme and the font, and its settings button stays in view. The browser remembers these choices, and the page applies them before it is first shown.
 
@@ -528,7 +322,7 @@ A theme builds these pages from the parts that `bake/theme` exports. `ArticleDoc
 
 The stylesheets of a theme import the shared styles from `bake/theme/styles/`, such as `tokens.css`, `page.css` and `blocks.css`, and the styles of a built-in theme from `bake/themes/<name>/styles/`. An `@import` resolves relative to its file or through these two prefixes. The article styles of `blocks.css` and `page.css` stop at the box of a component, so they do not reach the content of a component, and `--component-placeholder-height` in `tokens.css` sets the height of a component that declares no `layout.placeholder` before it starts.
 
-`options.js` has no imports. It exports `options`, the theme's options, declared like the parameters of a component and set in `themes` of `bake.config.js` and in the front matter; an option cannot have the name of a field of the front matter. It may export `settings`, the reader settings the theme adds to the color scheme, font, size, weight and spacing. A setting is named with lowercase letters and digits and declared as `{ values, default, control }`: `values` lists its values, `default` is one of them or `{ option: 'name' }` for the value of an enum option, and `control` is `segmented`, `switch` (two values, the first when it is on) or `list`. `ArticleDocument` takes the settings and the page's options and writes the starting value of each setting as a `data-` attribute of the `<html>` element, and `startSettings(settings, { labels, drawings })` from `bake/theme/client` shows them in the settings panel. `options.js` may also export `headings` and `blocks`, the Markdown that the theme reads beyond what every article has. `headings` maps the name of each heading attribute other than `#id` to its declaration, and `blocks` maps the name of each block of the theme, written with lowercase letters and digits, to the declarations of its attributes; a block cannot take the name of a block of Bake. An attribute is declared as `{ type }`, where the type is `number` with the optional fields `min`, `max` and `step`, `text`, `enum` with `options`, a list of strings, or `boolean`, and a heading attribute may add `depth`, the one heading level it applies to, such as 2 for `##`. The Markdown of each article is checked against the declarations of its theme. The prop `article.content` gives each section, each heading in a section and each entry of `toc` its `attributes`, with numbers and booleans as values of their type, and gives each block of the theme as a block `{ type: 'themeBlock', name, attributes, html }`, where `html` is the Markdown inside it rendered to HTML, which `page.jsx` places at build time.
+`options.js` has no imports. It exports `options`, the theme's options, declared like the parameters of a component and set in `themes` of `bake.config.js` and in the front matter; an option cannot have the name of a field of the front matter. It may export `settings`, the reader settings the theme adds to the color scheme, font, size, weight and spacing. A setting is named with lowercase letters and digits and declared as `{ values, default, control }`: `values` lists its values, `default` is one of them or `{ option: 'name' }` for the value of an enum option, and `control` is `segmented`, `switch` (two values, the first when it is on) or `list`. `ArticleDocument` takes the settings and the page's options and writes the starting value of each setting as a `data-` attribute of the `<html>` element, and `startSettings(settings, { labels, drawings })` from `bake/theme/client` shows them in the settings panel. `options.js` may also export `headings` and `blocks`, the Markdown that the theme reads beyond what every article has. `headings` maps the name of each heading attribute other than `#id` to its declaration, and `blocks` maps the name of each block of the theme, written with lowercase letters and digits, to the declarations of its attributes; a block cannot take the name of a block of Bake. An attribute is declared as `{ type }`, where the type is `number` with the optional fields `min`, `max` and `step`, `text`, `enum` with `options`, a list of strings, or `boolean`; a heading attribute may add `depth`, the one heading level it applies to, such as 2 for `##`, and a block attribute may add `required: true`, which makes a block without it an error. The Markdown of each article is checked against the declarations of its theme. The prop `article.content` gives each section, each heading in a section and each entry of `toc` its `attributes`, with numbers and booleans as values of their type, and gives each block of the theme as a block `{ type: 'themeBlock', name, attributes, html }`, where `html` is the Markdown inside it rendered to HTML, which `page.jsx` places at build time.
 
 The built-in themes are modules that the files of a theme import: `bake/themes/essay` exports `Page`, `Article`, `Toc` and `essayLabels`, `bake/themes/bento` exports `Page` and `Article`, and each has `/client`, `/options` and `/styles/*.css`; the parts they share are `bake/theme`, `bake/theme/client` and `bake/theme/styles/*.css`. A blog changes a built-in theme with a theme folder of another name whose files import the parts they keep and replace the others. For example, `themes/mine/page.jsx` can render its own header next to the essay `Toc` and `Article`, with `export { default } from 'bake/themes/essay/client';` as `themes/mine/client.jsx` and the essay option `toc` and heading attribute `toc` copied into `themes/mine/options.js`; an article with `theme: mine` then has the essay page with that header.
 

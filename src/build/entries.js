@@ -16,6 +16,7 @@ export function articleEntry(article, config) {
     link: absoluteLink(config, path),
     preview: fields.preview === undefined ? undefined : `${path}${encodePath(fields.preview)}`,
     image: content?.image === undefined ? undefined : `${path}${encodePath(content.image)}`,
+    sections: content?.toc.map(({ number, title }) => ({ number, title })) ?? [],
   };
 }
 

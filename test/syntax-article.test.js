@@ -3,7 +3,7 @@ import { cpSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { bake, copyExample, writeFiles } from './blog.js';
+import { build, copyExample, writeFiles } from './blog.js';
 
 const articlePath = new URL('../examples/blog/content/posts/syntax/index.md', import.meta.url);
 const fixturesDir = new URL('./fixtures/syntax-errors/', import.meta.url);
@@ -48,19 +48,19 @@ function appendixMessages(text) {
     .map((line) => line.split(' | ').at(-1).replace(/ \|$/, '').replace(/^`|`$/g, ''));
 }
 
-test('the front matter shown in the syntax article is its own front matter', () => {
+test('the front matter shown in the syntax article is its own front matter', async () => {
   const frontMatter = /^---\n[\s\S]*?\n---$/m.exec(article)[0];
   const shown = fencedBlocks(article).blocks.find((b) => b.lang === 'markdown' && b.body.startsWith('---'));
   assert.equal(shown.body, frontMatter);
 });
 
-test('every example block in the syntax article is closed by the same number of colons', () => {
+test('every example block in the syntax article is closed by the same number of colons', async () => {
   const blocks = exampleBlocks(article);
   assert.ok(blocks.length >= 30);
   assert.deepEqual(blocks.filter((b) => b.close === -1).map((b) => `line ${b.start + 1}`), []);
 });
 
-test('syntax error appendix matches the error fixtures', () => {
+test('syntax error appendix matches the error fixtures', async () => {
   const expected = JSON.parse(readFileSync(new URL('expected.json', fixturesDir), 'utf8'));
   const fixtureFiles = readdirSync(fixturesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() || entry.name.endsWith('.md'))
@@ -71,7 +71,7 @@ test('syntax error appendix matches the error fixtures', () => {
   assert.deepEqual(appendixMessages(article).sort(), fixtureMessages);
 });
 
-test('bake build reports every syntax error fixture at the position in expected.json', (t) => {
+test('bake build reports every syntax error fixture at the position in expected.json', async (t) => {
   const expected = JSON.parse(readFileSync(new URL('expected.json', fixturesDir), 'utf8'));
   const fixtures = fileURLToPath(fixturesDir);
   const dir = copyExample(t);
@@ -82,8 +82,6 @@ test('bake build reports every syntax error fixture at the position in expected.
     cpSync(join(fixtures, 'relu.svg'), join(dir, folder, 'relu.svg'));
   }
   for (const name of Object.keys(expected).filter((name) => !name.endsWith('.md'))) cpSync(join(fixtures, name), dir, { recursive: true });
-  const result = bake(dir, 'build');
-  const lines = result.stderr.trimEnd().split('\n');
-  assert.equal(lines.pop(), `${Object.keys(expected).length} errors, dist/ was not written`);
+  const lines = await build(dir);
   assert.deepEqual(lines.map((line) => line.replace(/^content\/posts\/fixtures\/([\w-]+)\/index\.md/, '$1.md')).sort(), Object.values(expected).sort());
 });

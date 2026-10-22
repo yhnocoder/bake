@@ -21,7 +21,7 @@ const PORT_ATTEMPTS = 20;
 const DEV_PREFIX = '/__bake/';
 const MAX_REQUEST_BYTES = 1024 * 1024;
 const CLIENT_DIR = join(import.meta.dirname, 'client');
-const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, join(CLIENT_DIR, file)]), ['controls.css', join(import.meta.dirname, '../kit/controls.css')]]);
+const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, join(CLIENT_DIR, file)]), ['controls.css', join(import.meta.dirname, '../kit/controls.css')], ['numbers.js', join(import.meta.dirname, '../components/numbers.js')]]);
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
@@ -94,7 +94,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
   function openEvents(request, response) {
     response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     send(response, 'hello', { id: serverId });
-    send(response, 'problems', problemsData(preview.problems()));
+    send(response, 'problems', problemsData(root, preview.problems()));
     clients.add(response);
     request.on('close', () => clients.delete(response));
   }
@@ -145,7 +145,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
       try {
         const result = await preview.update(batch);
         report(result);
-        broadcast('problems', problemsData(result.problems));
+        broadcast('problems', problemsData(root, result.problems));
         if (result.applied) broadcast('update', { reload: result.reload, refresh: result.refresh });
       } catch (error) {
         print(`bake dev could not update the preview: ${error instanceof Error ? error.message : String(error)}`);
@@ -363,12 +363,13 @@ function sendHtml(response, status, html) {
   response.end(html);
 }
 
-function problemsData(problems) {
+function problemsData(root, problems) {
   return problems.map((problem) => ({
     file: problem.file,
     location: `${problem.line}:${problem.column}`,
     message: problem.message,
     position: `${problem.file}:${problem.line}:${problem.column}`,
+    editor: `vscode://file${pathToFileURL(join(root, problem.file)).pathname}:${problem.line}:${problem.column}`,
     text: formatError(problem),
   }));
 }

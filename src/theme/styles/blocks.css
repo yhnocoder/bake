@@ -496,16 +496,17 @@
 
   :scope .references > li {
     margin: 4px 0;
-    padding-left: calc(2.4em + 8px);
+    padding-left: calc(3em + 8px);
     border-radius: 4px;
   }
 
   :scope ol.references > li::before {
     content: '[' attr(value) ']';
     display: inline-block;
-    width: 2.4em;
-    margin-left: calc(-2.4em - 8px);
+    width: 3em;
+    margin-left: calc(-3em - 8px);
     margin-right: 8px;
+    white-space: nowrap;
     font-family: var(--font-mono);
     font-size: calc(13px * var(--reader-scale));
     color: var(--ink-3);

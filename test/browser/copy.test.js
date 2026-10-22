@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
 import sharp from 'sharp';
 import { parse } from '../article.js';
-import { article, bake, createBlog, exampleBlog, validConfig } from '../blog.js';
+import { article, exampleBlog, validConfig } from '../blog.js';
+import { luminance, test } from './browser.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
-import { launchBrowser, serve, serveExample } from './browser.js';
 
 const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const lines = source.split('\n');
@@ -69,47 +68,47 @@ async function copied(page) {
   });
 }
 
-test('copying from an article gives the Markdown source of the selection', async (t) => {
-  const base = await serveExample(t);
-  const browser = await launchBrowser();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
-  const page = await context.newPage();
-  await openWithSelectionModule(page, `${base}/2026-10/syntax/`);
-  await page.waitForFunction(() => document.querySelector('.bk-notes-layer') !== null);
+test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
+
+test.describe('copying from an article gives the Markdown source of the selection', () => {
+  test.beforeEach(async ({ page }) => {
+    await openWithSelectionModule(page, '/2026-10/syntax/');
+    await page.waitForFunction(() => document.querySelector('.bk-notes-layer') !== null);
+  });
   const copyChapter = '#复制为-markdown ~ .bk-block';
 
-  await t.test('part of a paragraph keeps highlights, math and the footnote, and the definition is appended', async () => {
+  test('part of a paragraph keeps highlights, math and the footnote, and the definition is appended', async ({ page }) => {
     await select(page, { selector: copyChapter, text: '只选中一部分的块' }, { selector: copyChapter, contains: '附在末尾', text: '。', after: true, last: true });
     const paragraph = sourceLine('完整选中的块');
     const expected = `${paragraph.slice(paragraph.indexOf('只选中一部分的块'))}\n\n${sourceLine('[^copy-notes]:')}`;
     assert.equal((await copied(page)).text, expected);
   });
 
-  await t.test('a sidenote number inside an example becomes the reference with its label and its definition', async () => {
+  test('a sidenote number inside an example becomes the reference with its label and its definition', async ({ page }) => {
     await select(page, { selector: '#旁注 ~ .bk-block .example-result', text: '推理时' }, { selector: '#旁注 ~ .bk-block .example-result', text: '不额外占带宽', after: true });
     assert.equal((await copied(page)).text, `推理时这个逐元素操作要能融合进 GEMM 的 epilogue[^gemm]，不额外占带宽\n\n${sourceLine('[^gemm]:')}`);
   });
 
-  await t.test('whole blocks are copied as their source lines, and a component counts as whole when part of it is selected', async () => {
+  test('whole blocks are copied as their source lines, and a component counts as whole when part of it is selected', async ({ page }) => {
     await select(page, { selector: copyChapter, text: '章节编号' }, { selector: `${copyChapter} figcaption`, text: '选中', after: true });
     assert.equal((await copied(page)).text, sourceLines('- 章节编号', ':::'));
   });
 
-  await t.test('a selection inside the caption of a component gives its block and keeps the figure in the HTML', async () => {
+  test('a selection inside the caption of a component gives its block and keeps the figure in the HTML', async ({ page }) => {
     await select(page, { selector: `${copyChapter} figcaption`, text: '任何部分' }, { selector: `${copyChapter} figcaption`, text: '整个', after: true });
     const caption = await copied(page);
     assert.equal(caption.text, sourceLines(':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}', ':::'));
     assert.match(caption.html, /^<figure><figcaption>任何部分，复制的都是它的整个<\/figcaption><\/figure>$/);
   });
 
-  await t.test('a selection inside a list item gives its inline Markdown, and one across items gives list items', async () => {
+  test('a selection inside a list item gives its inline Markdown, and one across items gives list items', async ({ page }) => {
     await select(page, { selector: `${copyChapter} li`, text: '标题旁的' }, { selector: `${copyChapter} li code`, text: '#', after: true });
     assert.equal((await copied(page)).text, '标题旁的 `#`');
     await select(page, { selector: `${copyChapter} li`, text: '页边的旁注编号' }, { selector: `${copyChapter} li`, text: '选区从文章外面开始时', after: true });
     assert.equal((await copied(page)).text, '- 页边的旁注编号可以选中，复制的内容里没有它们。\n- 选区从文章外面开始时');
   });
 
-  await t.test('a selection across the rows of a pipe table gives whole rows under the header and delimiter rows', async () => {
+  test('a selection across the rows of a pipe table gives whole rows under the header and delimiter rows', async ({ page }) => {
     const table = '#文章开头的-front-matter ~ .bk-block table';
     const header = [sourceLine('| 字段 |'), sourceLine('|---|')];
     await select(page, { selector: `${table} td`, text: '网址的最后一段' }, { selector: `${table} td`, text: '一句摘要', after: true });
@@ -118,17 +117,17 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal((await copied(page)).text, [...header, sourceLine('| `draft` |'), sourceLine('| `page` |')].join('\n'));
   });
 
-  await t.test('a partly selected example converts its result, with the math and images of list-table cells', async () => {
+  test('a partly selected example converts its result, with the math and images of list-table cells', async ({ page }) => {
     await select(page, { selector: '#表格与-list-table ~ .bk-block .example-result .list-table', text: '激活函数' }, { selector: '#表格与-list-table ~ .bk-block .example-result .list-table', text: '负半轴梯度为 0', after: true });
     assert.equal((await copied(page)).text, [':::list-table', '* - 激活函数', '  - 公式', '  - 特点', '  - 曲线', '* - ReLU', '  - $\\max(0, x)$', '  - - 计算只需要一次比较', '    - 负半轴梯度为 0', '  - ![](relu.svg){width=64px}', ':::'].join('\n'));
   });
 
-  await t.test('a selection that starts outside the article copies the article part', async () => {
+  test('a selection that starts outside the article copies the article part', async ({ page }) => {
     await select(page, { selector: '.bk-title', text: 'Bake' }, { selector: '.bk-article > .bk-block', text: '先改这篇文章。', after: true });
     assert.equal((await copied(page)).text, sourceLine('这篇文章列出 Bake 的全部写法'));
   });
 
-  await t.test('section numbers and heading links are left out of the Markdown and the HTML, and math is TeX in the HTML', async () => {
+  test('section numbers and heading links are left out of the Markdown and the HTML, and math is TeX in the HTML', async ({ page }) => {
     await select(page, { selector: '#复制为-markdown .bk-heading-text', text: 'Markdown' }, { selector: copyChapter, text: '只选中一部分的块也复制选中部分的原文，', after: true });
     const partial = await copied(page);
     assert.equal(partial.text, `${sourceLine('## 复制为 Markdown')}\n\n${sourceLine('在页面上选中内容复制')}\n\n完整选中的块按 \`index.md\` 里的原文复制。只选中一部分的块也复制选中部分的原文，`);
@@ -144,7 +143,7 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.match(whole.html, /<hr><ol><li value="3" id="footnote-3"><p>每个脚注的定义只附一次，按 <code>index.md<\/code> 里的原文复制。<\/p><\/li><\/ol>$/);
   });
 
-  await t.test('the HTML has absolute addresses for links and images', async () => {
+  test('the HTML has absolute addresses for links and images', async ({ page, baseURL: base }) => {
     await select(page, { selector: '#站内链接与嵌入 ~ .bk-block .example-result', text: 'SwiGLU' }, { selector: '#站内链接与嵌入 ~ .bk-block .example-result', text: '被引用的文章', after: true });
     const links = await copied(page);
     assert.match(links.html, new RegExp(`<a href="${base}/2026-10/syntax-linked/#${encodeURIComponent('链式法则')}">链式法则</a>`));
@@ -153,14 +152,14 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.match((await copied(page)).html, new RegExp(`<img src="${base}/2026-10/syntax/ffn-shapes.svg"`));
   });
 
-  await t.test('a selection from the source of an example into its result gives the source of the result once, with the attributes of a heading and a component', async () => {
+  test('a selection from the source of an example into its result gives the source of the result once, with the attributes of a heading and a component', async ({ page }) => {
     await select(page, { selector: '#标题与锚点 ~ .bk-block .example-source', text: '三级标题' }, { selector: '#标题与锚点 ~ .bk-block .example-result h3', text: '三级标题', after: true });
     assert.equal((await copied(page)).text, '### 三级标题 {#third-level toc="短标题"}');
     await select(page, { selector: '#交互组件 ~ .bk-block .example-source', text: 'width=body}' }, { selector: '#交互组件 ~ .bk-block .example-result figure[data-attributes*="body"]', after: true });
     assert.equal((await copied(page)).text, ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}\n:::');
   });
 
-  await t.test('a selection of only the title of a fold gives the title', async () => {
+  test('a selection of only the title of a fold gives the title', async ({ page }) => {
     await page.evaluate(() => {
       const fold = [...document.querySelectorAll('.example-result details.fold')].find((details) => details.textContent.includes('GELU 的导数'));
       const range = document.createRange();
@@ -172,12 +171,12 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal((await copied(page)).text, '推导：GELU 的导数');
   });
 
-  await t.test('a whole sidenote in the margin is copied as its text without its number', async () => {
+  test('a whole sidenote in the margin is copied as its text without its number', async ({ page }) => {
     await select(page, { selector: '.bk-notes-layer .bk-sidenote-body', text: '每个脚注' }, { selector: '.bk-notes-layer .bk-sidenote-body', text: '原文复制。', after: true });
     assert.equal((await copied(page)).text, sourceLine('[^copy-notes]:').replace('[^copy-notes]: ', ''));
   });
 
-  await t.test('headings and a component in embedded content are copied as the lines of the embedded article', async () => {
+  test('headings and a component in embedded content are copied as the lines of the embedded article', async ({ page }) => {
     const embed = '.embed-part';
     await select(page, { selector: `${embed} h2`, contains: '向量与雅可比矩阵的乘积' }, { selector: `${embed} figcaption`, contains: 'SiLU', after: true });
     const start = linkedLines.findIndex((line) => line.startsWith('## 向量与雅可比矩阵的乘积'));
@@ -185,7 +184,7 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal((await copied(page)).text, linkedLines.slice(start, end + 1).join('\n'));
   });
 
-  await t.test('copying shows one toast with the Markdown message', async () => {
+  test('copying shows one toast with the Markdown message', async ({ page }) => {
     await toastHidden(page);
     await select(page, { selector: copyChapter, text: '只选中' }, { selector: copyChapter, text: '只选中', after: true });
     await copied(page);
@@ -193,7 +192,7 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.bk-toast')].filter((toast) => getComputedStyle(toast).opacity !== '0').map((toast) => toast.textContent)), ['已复制为 Markdown']);
   });
 
-  await t.test('the copy button copies the whole index.md, uses the pointer cursor and shows the toast', async () => {
+  test('the copy button copies the whole index.md, uses the pointer cursor and shows the toast', async ({ page }) => {
     await page.evaluate(() => getSelection().removeAllRanges());
     await toastHidden(page);
     const button = page.locator('.bk-header .bk-copy-source');
@@ -205,12 +204,7 @@ test('copying from an article gives the Markdown source of the selection', async
     assert.equal(await page.locator('.bk-toast').textContent(), '已复制为 Markdown');
   });
 
-  await t.test('the toast takes the colours of the light and the dark scheme and does not cover the settings button', async () => {
-    const luminance = (color) => {
-      const values = color.match(/[\d.]+/g).map(Number);
-      const [r, g, b] = color.startsWith('color(') ? values.slice(0, 3).map((value) => value * 255) : values;
-      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    };
+  test('the toast takes the colours of the light and the dark scheme and does not cover the settings button', async ({ page }) => {
     for (const width of [1440, 375]) {
       for (const colorScheme of ['light', 'dark']) {
         await page.setViewportSize({ width, height: 800 });
@@ -230,29 +224,23 @@ test('copying from an article gives the Markdown source of the selection', async
         assert.ok(own.left >= 0 && own.right <= width, `${at}: the toast ${JSON.stringify(own)} leaves the screen`);
       }
     }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.emulateMedia({ colorScheme: 'light' });
   });
 
-  await t.test('starting the copy module on a page without the source script is an error', async () => {
-    const stripped = await context.newPage();
+  test('starting the copy module on a page without the source script is an error', async ({ newPage }) => {
+    const stripped = await newPage();
     const errors = [];
     stripped.on('pageerror', (error) => errors.push(error.message));
-    await stripped.route(`${base}/2026-10/syntax/`, async (route) => {
+    await stripped.route('**/2026-10/syntax/', async (route) => {
       const response = await route.fetch();
       const html = await response.text();
       const withoutSource = html.replace(/<script type="application\/json" class="bk-source"[^>]*>[\s\S]*?<\/script>/, '');
       assert.notEqual(withoutSource, html);
       await route.fulfill({ response, body: withoutSource });
     });
-    await stripped.goto(`${base}/2026-10/syntax/`, { waitUntil: 'load' });
+    await stripped.goto('/2026-10/syntax/', { waitUntil: 'load' });
     assert.deepEqual(errors, ['bake/copy needs the source of the article in script.bk-source']);
-    await stripped.close();
   });
-
-  await context.close();
 });
-
 
 const escapedParagraphs = [
   ['Start: a \\*literal\\* star, snake_case\\_name, a \\_literal\\_ underscore, \\`ticks\\` and C:\\\\path.', 'a *literal*', 'path'],
@@ -275,55 +263,53 @@ const escapedParagraphs = [
 
 const LAZY_SOURCE = article({ title: 'Lazy', slug: 'lazy', body: 'Some **bold** text and ==marked== words.\n' });
 
-async function copyCases(t) {
-  const dir = createBlog(t, {
-    'bake.config.js': validConfig,
-    'content/posts/keys/index.md': article({ title: 'Keys', slug: 'keys', body: '## Keys {#a%zz}\n\nGates help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/keys/#a%25zz) too.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n' }),
-    'content/posts/dots/index.md': article({ title: 'Dots', slug: 'dots', body: '## Dots\n\n:::aside\nDots ![dot](dot.png){width=40px height=10px} and ![dot](dot.png){height=12px} inline.\n\n![Figure](dot.png){width=200px float=left}\n\nAfter the figure.\n:::\n' }),
-    'content/posts/dots/dot.png': await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer(),
-    'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: ':::embed\n/2026-10/keys/#a%25zz\n/2026-10/dots/#dots\n:::\n' }),
-    'content/posts/ends/index.md': article({ title: 'Ends', slug: 'ends', body: '## Ends\n\nThe note ends with \\^b\n\n<p>Press <button>OK</button> now.</p>\n' }),
-    'content/posts/raw/index.md': article({
-      title: 'Raw',
-      slug: 'raw',
-      body: '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n\n<p>Raw shows <img src="q.png" alt="q" data-attributes="oops"> and <img src="r.png" alt="r" data-attributes="{&quot;x} y&quot;:&quot;1&quot;,&quot;width&quot;:{&quot;a&quot;:1},&quot;height&quot;:&quot;12px&quot;}"> here.</p>\n',
-    }),
-    'content/posts/escapes/index.md': article({ title: 'Escapes', slug: 'escapes', body: `${escapedParagraphs.map(([text]) => text).join('\n\n')}\n` }),
-    'content/posts/lazy/index.md': LAZY_SOURCE,
+const dot = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#985b57' } }).png().toBuffer();
+
+
+test.describe('copying from articles written for the cases of the conversion', () => {
+  test.use({
+    blog: {
+      example: false,
+      files: {
+        'bake.config.js': validConfig,
+        'content/posts/keys/index.md': article({ title: 'Keys', slug: 'keys', body: '## Keys {#a%zz}\n\nGates help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/keys/#a%25zz) too.\n\n:::references\n- [@a%zz] First.\n- [@b%20c] Second.\n:::\n' }),
+        'content/posts/dots/index.md': article({ title: 'Dots', slug: 'dots', body: '## Dots\n\n:::aside\nDots ![dot](dot.png){width=40px height=10px} and ![dot](dot.png){height=12px} inline.\n\n![Figure](dot.png){width=200px float=left}\n\nAfter the figure.\n:::\n' }),
+        'content/posts/dots/dot.png': dot,
+        'content/posts/host/index.md': article({ title: 'Host', slug: 'host', body: ':::embed\n/2026-10/keys/#a%25zz\n/2026-10/dots/#dots\n:::\n' }),
+        'content/posts/ends/index.md': article({ title: 'Ends', slug: 'ends', body: '## Ends\n\nThe note ends with \\^b\n\n<p>Press <button>OK</button> now.</p>\n' }),
+        'content/posts/raw/index.md': article({
+          title: 'Raw',
+          slug: 'raw',
+          body: '## Keys\n\n<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>\n\n<ol class="references"><li>First plain entry.</li><li>Second plain entry.</li></ol>\n\n<p>Raw shows <img src="q.png" alt="q" data-attributes="oops"> and <img src="r.png" alt="r" data-attributes="{&quot;x} y&quot;:&quot;1&quot;,&quot;width&quot;:{&quot;a&quot;:1},&quot;height&quot;:&quot;12px&quot;}"> here.</p>\n',
+        }),
+        'content/posts/escapes/index.md': article({ title: 'Escapes', slug: 'escapes', body: `${escapedParagraphs.map(([text]) => text).join('\n\n')}\n` }),
+        'content/posts/lazy/index.md': LAZY_SOURCE,
+      },
+    },
   });
-  const result = bake(dir, 'build');
-  assert.equal(result.stderr, '');
-  return serve(t, join(dir, 'dist'));
-}
 
-test('copying from articles written for the cases of the conversion', async (t) => {
-  const base = await copyCases(t);
-  const browser = await launchBrowser();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
-  const page = await context.newPage();
-
-  await t.test('a converted citation, reference entry and internal link keep a key or an anchor with a percent sign as written', async () => {
-    await openWithSelectionModule(page, `${base}/2026-10/keys/`);
+  test('a converted citation, reference entry and internal link keep a key or an anchor with a percent sign as written', async ({ page }) => {
+    await openWithSelectionModule(page, '/2026-10/keys/');
     const paragraph = '.bk-article p';
     await select(page, { selector: paragraph, contains: 'Gates', text: 'help' }, { selector: paragraph, contains: 'Gates', text: ' too', after: true });
     assert.equal((await copied(page)).text, 'help [@a%zz] and [@b%20c] here, see [the keys](/2026-10/keys/#a%25zz) too');
-    await openWithSelectionModule(page, `${base}/2026-10/host/`);
+    await openWithSelectionModule(page, '/2026-10/host/');
     await select(page, { selector: '.embed li', contains: 'First', text: 'irst' }, { selector: '.embed li', contains: 'Second', text: 'Sec', after: true });
     assert.equal((await copied(page)).text, ':::references\n- [@a%zz] irst.\n- [@b%20c] Sec\n:::');
   });
 
-  await t.test('a converted image keeps the address and the attributes written in the source, and an embedded image links to its published file', async () => {
+  test('a converted image keeps the address and the attributes written in the source, and an embedded image links to its published file', async ({ page, baseURL }) => {
     const images = (address) => `ots ![dot](${address}){width=40px height=10px} and ![dot](${address}){height=12px} inline.\n\n![Figure](${address}){width=200px float=left}\n\nAft`;
-    await openWithSelectionModule(page, `${base}/2026-10/dots/`);
+    await openWithSelectionModule(page, '/2026-10/dots/');
     await select(page, { selector: '.aside p', contains: 'Dots', text: 'ots' }, { selector: '.aside p', contains: 'After', text: 'Aft', after: true });
     assert.equal((await copied(page)).text, `:::aside\n${images('dot.png')}\n:::`);
-    await openWithSelectionModule(page, `${base}/2026-10/host/`);
+    await openWithSelectionModule(page, '/2026-10/host/');
     await select(page, { selector: '.embed .aside p', contains: 'Dots', text: 'ots' }, { selector: '.embed .aside p', contains: 'After', text: 'Aft', after: true });
-    assert.equal((await copied(page)).text, `:::aside\n${images(`${base}/2026-10/dots/dot.webp`)}\n:::`);
+    assert.equal((await copied(page)).text, `:::aside\n${images(`${baseURL}/2026-10/dots/dot.webp`)}\n:::`);
   });
 
-  await t.test('a paragraph keeps the escape of an ending that reads as a paragraph anchor, raw HTML is copied as its source, and the text of a button in raw HTML is left out of the HTML', async () => {
-    await openWithSelectionModule(page, `${base}/2026-10/ends/`);
+  test('a paragraph keeps the escape of an ending that reads as a paragraph anchor, raw HTML is copied as its source, and the text of a button in raw HTML is left out of the HTML', async ({ page }) => {
+    await openWithSelectionModule(page, '/2026-10/ends/');
     const paragraph = '.bk-article p';
     await select(page, { selector: paragraph, contains: 'note', text: 'note' }, { selector: paragraph, contains: 'Press', text: 'now', after: true });
     const { text, html } = await copied(page);
@@ -331,8 +317,8 @@ test('copying from articles written for the cases of the conversion', async (t) 
     assert.doesNotMatch(html, /OK/);
   });
 
-  await t.test('a selection inside raw HTML copies the raw HTML block as written, because each boundary moves to the nearer edge of the block', async () => {
-    await openWithSelectionModule(page, `${base}/2026-10/raw/`);
+  test('a selection inside raw HTML copies the raw HTML block as written, because each boundary moves to the nearer edge of the block', async ({ page }) => {
+    await openWithSelectionModule(page, '/2026-10/raw/');
     await select(page, { selector: '.bk-article p', contains: 'Raw', text: 'cites' }, { selector: '.bk-article p', contains: 'Raw', text: ' before', after: true });
     assert.equal((await copied(page)).text, '<p>Raw text cites <a class="citation" href="#keys">[1]</a> before the end.</p>');
     await select(page, { selector: '.bk-article li', contains: 'First', text: 'irst' }, { selector: '.bk-article li', contains: 'Second', text: 'Sec', after: true });
@@ -341,8 +327,8 @@ test('copying from articles written for the cases of the conversion', async (t) 
     assert.match((await copied(page)).text, /^<p>Raw shows <img src="q.png" [^\n]* here\.<\/p>$/);
   });
 
-  await t.test('a part of a paragraph keeps the escapes written in the source and every other character, including U+FDD0, so the copy renders the same text', async () => {
-    await openWithSelectionModule(page, `${base}/2026-10/escapes/`);
+  test('a part of a paragraph keeps the escapes written in the source and every other character, including U+FDD0, so the copy renders the same text', async ({ page }) => {
+    await openWithSelectionModule(page, '/2026-10/escapes/');
     for (const [, from, to] of escapedParagraphs) {
       const point = { selector: '.bk-article p', contains: from };
       await select(page, { ...point, text: from }, { ...point, text: to, after: true });
@@ -357,7 +343,7 @@ test('copying from articles written for the cases of the conversion', async (t) 
     assert.equal((await copied(page)).text, '标点：“引号”（括号）！还有 snake_case 和 a * b。');
   });
 
-  const lazy = `${base}/2026-10/lazy/`;
+  const lazy = '/2026-10/lazy/';
   const paragraph = '.bk-article p';
   const selectWords = (target) => select(target, { selector: paragraph, text: 'bold' }, { selector: paragraph, text: 'marked', after: true });
   const dragAcross = async (target) => {
@@ -368,8 +354,8 @@ test('copying from articles written for the cases of the conversion', async (t) 
     await target.mouse.up();
   };
 
-  await t.test('a copy before the module that writes a selection as Markdown arrives is the browser copy, and a copy after it arrives is Markdown with the toast', async () => {
-    const early = await context.newPage();
+  test('a copy before the module that writes a selection as Markdown arrives is the browser copy, and a copy after it arrives is Markdown with the toast', async ({ newPage }) => {
+    const early = await newPage();
     const errors = [];
     early.on('pageerror', (error) => errors.push(error.message));
     let release;
@@ -393,11 +379,10 @@ test('copying from articles written for the cases of the conversion', async (t) 
     assert.equal((await copied(early)).text, '**bold** text and ==marked==');
     await toastShown(early);
     assert.deepEqual(errors, []);
-    await early.close();
   });
 
-  await t.test('when the module cannot be loaded, every copy is the browser copy without a toast, the masthead button still copies the source and the page reports no error', async () => {
-    const failing = await context.newPage();
+  test('when the module cannot be loaded, every copy is the browser copy without a toast, the masthead button still copies the source and the page reports no error', async ({ newPage }) => {
+    const failing = await newPage();
     const errors = [];
     failing.on('pageerror', (error) => errors.push(error.message));
     const requested = [];
@@ -422,30 +407,26 @@ test('copying from articles written for the cases of the conversion', async (t) 
     await failing.locator('.bk-copy-source').click();
     assert.equal(await failing.evaluate(() => navigator.clipboard.readText()), LAZY_SOURCE);
     assert.deepEqual(errors, []);
-    await failing.close();
   });
 
-  await t.test('a page where nobody selects requests no module, and a selection, a context menu or a shortcut key loads it', async () => {
+  test('a page where nobody selects requests no module, and a selection, a context menu or a shortcut key loads it', async ({ newPage }) => {
     const triggers = {
       selection: dragAcross,
       'context menu': (target) => target.locator(paragraph).click({ button: 'right' }),
       'shortcut key': (target) => target.keyboard.press('Control'),
     };
     for (const [name, trigger] of Object.entries(triggers)) {
-      const reader = await context.newPage();
+      const reader = await newPage();
       const requested = [];
       reader.on('request', (request) => isSelectionChunk(request.url()) && requested.push(request.url()));
       await reader.goto(lazy);
-        await reader.waitForLoadState('networkidle');
+      await reader.waitForLoadState('networkidle');
       assert.deepEqual(requested, [], `the module loads before the ${name}`);
       const loading = reader.waitForRequest((request) => isSelectionChunk(request.url()), { timeout: 10000 });
       await trigger(reader);
       await selectionModuleReady(reader, (await loading).url());
       await selectWords(reader);
       assert.equal((await copied(reader)).text, '**bold** text and ==marked==', name);
-      await reader.close();
     }
   });
-
-  await context.close();
 });

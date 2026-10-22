@@ -10,7 +10,7 @@ import { percentDecode, referenceId, sidenoteId } from '../fragments.js';
 import { isKnownLanguage, loadLanguages } from '../render/code.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, typesetMath } from '../render/math.js';
-import { listAll } from '../report.js';
+import { listAll, listChoices } from '../report.js';
 import { encodePath } from '../urls.js';
 import { HEADING_ATTRIBUTE_SUFFIX, PARAGRAPH_ANCHOR_SUFFIX, parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
@@ -121,6 +121,7 @@ function readBlock(article, node, parent) {
     const written = node.attributes;
     node.attributes = checkAttributes(article, written, BUILT_IN_BLOCKS[node.name], label, start);
     if (node.name === 'fold' && written.title === undefined) article.report(start, ':::fold is missing "title"');
+    if (node.attributes.title !== undefined) node.children.unshift({ type: 'blockTitle', children: inlineNodes(node.attributes.title, node.position), position: node.position });
   } else if (!node.name.includes('-')) {
     const attributeStart = start.offset + node.colons + node.name.length;
     readThemeBlock(article, node, parent, (attribute) => article.positionAt(attributeStart + offsets[attribute]));
@@ -158,7 +159,13 @@ function readThemeBlock(article, node, parent, attributePosition) {
   const declarations = blocks[node.name];
   const names = Object.keys(declarations);
   const takes = names.length === 0 ? 'takes no attributes' : `takes ${listAll(names)}`;
-  node.attributes = themeAttributes(article, node.attributes, declarations, attributePosition, (attribute) => `unknown attribute "${attribute}" on :::${node.name}; :::${node.name} of the ${name} theme ${takes}`);
+  const written = node.attributes;
+  node.attributes = themeAttributes(article, written, declarations, attributePosition, (attribute) => `unknown attribute "${attribute}" on :::${node.name}; :::${node.name} of the ${name} theme ${takes}`);
+  for (const attribute of names) {
+    if (!declarations[attribute].required || written[attribute] !== undefined) continue;
+    const choices = declarations[attribute].type === 'enum' ? `; ${attribute} is ${listChoices(declarations[attribute].options)}` : '';
+    article.report(start, `:::${node.name} is missing "${attribute}"${choices}`);
+  }
   node.themeBlock = true;
 }
 
@@ -493,11 +500,15 @@ function splitFigure(article, paragraph, parent) {
 
 function caption(image) {
   if (!image.title) return [];
-  const children = processor.parse(image.title).children.flatMap((node) => (node.type === 'paragraph' ? node.children : [node]));
+  return [{ type: 'figcaption', children: inlineNodes(image.title, image.position), position: image.position }];
+}
+
+function inlineNodes(markdown, position) {
+  const children = processor.parse(markdown).children.flatMap((node) => (node.type === 'paragraph' ? node.children : [node]));
   walk({ children }, (node) => {
-    node.position = image.position;
+    node.position = position;
   });
-  return [{ type: 'figcaption', children, position: image.position }];
+  return children;
 }
 
 function readFootnotes(article, tree) {

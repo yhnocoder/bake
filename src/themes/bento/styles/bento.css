@@ -152,33 +152,32 @@
 .bt-sticker {
   display: grid;
   align-content: center;
-  padding: 6px;
-  border: 0;
-  background: none;
-  box-shadow: none;
-  font-family: var(--font-heading);
-  font-size: calc(19px * var(--reader-scale));
+  justify-items: center;
+  gap: 8px;
+  aspect-ratio: 1;
+  padding: 16px;
+  --scroll-cover: var(--accent-soft);
+  background: var(--accent-soft);
+  font-family: var(--font-ui);
+  font-size: calc(13px * var(--reader-scale));
   line-height: 1.4;
   text-align: center;
   color: var(--accent);
   text-wrap: balance;
 }
 
-.bt-sticker[data-emoji] {
-  font-size: calc(46px * var(--reader-scale));
-  line-height: 1.15;
+.bt-sticker-icon {
+  width: 56px;
+  height: 56px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.bt-sticker > .bt-block-body {
-  padding: 16px 18px;
-  border-radius: 20px;
-  --scroll-cover: var(--accent-soft);
-  background: var(--accent-soft);
-  box-shadow:
-    0 0 0 4px var(--surface),
-    0 0 0 5px var(--line),
-    0 10px 18px -10px var(--scroll-shadow);
-  rotate: var(--bt-tilt);
+.bt-sticker > .bt-block-body:empty {
+  display: none;
 }
 
 .bt-note {
@@ -256,17 +255,6 @@
 
   .bt-block-body > :first-child {
     margin-top: 0;
-  }
-
-  .bt-sticker img {
-    max-width: 100%;
-    max-height: 160px;
-    width: auto;
-    height: auto;
-  }
-
-  .bt-sticker .figure {
-    margin: 0;
   }
 
   .bt-card .embed h2 {
@@ -424,7 +412,7 @@
   }
 
   .bt-note,
-  .bt-sticker > .bt-block-body {
+  .bt-sticker {
     padding: 8px 12px;
     border: 1px solid var(--line-2);
     box-shadow: none;
@@ -433,11 +421,8 @@
 
   .bt-sticker {
     display: inline-grid;
+    aspect-ratio: auto;
     margin-right: 12px;
-  }
-
-  .bt-sticker > .bt-block-body {
-    rotate: none;
   }
 }
 
