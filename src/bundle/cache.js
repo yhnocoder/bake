@@ -5,19 +5,11 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
-const TOOLCHAIN = [
-  ['vite'],
-  ['rolldown', 'vite'],
-  ['lightningcss', 'vite'],
-  ['vite-plugin-solid'],
-  ['@babel/core', 'vite-plugin-solid'],
-  ['babel-preset-solid', 'vite-plugin-solid'],
-  ['babel-plugin-jsx-dom-expressions', 'babel-preset-solid'],
-  ['solid-js'],
-];
+const TOOLCHAIN = ['vite', 'vite-plugin-solid', 'solid-js'];
 const QUERY = /\?.*$/;
 const RENAME_TARGET_EXISTS = ['EEXIST', 'ENOTEMPTY'];
 const MTIME_RESOLUTION = 2000;
+let toolchain = null;
 
 export function filesIn(paths) {
   return paths
@@ -85,10 +77,34 @@ export function buildCache(name, slot, base) {
   return { read, write };
 }
 
+// The toolchain is the packages that compile the bundles and every package they depend on, as a sorted list of name@version, because a name can be installed in two versions.
+// why: the process keeps running the toolchain that it loaded, so its versions are read once
 function toolchainVersions() {
+  toolchain ??= dependencyClosure(TOOLCHAIN, import.meta.url);
+  return toolchain;
+}
+
+function dependencyClosure(names, base) {
   const packages = new Map();
-  for (const [name, dependent] of TOOLCHAIN) packages.set(name, findPackageJSON(name, dependent === undefined ? import.meta.url : packages.get(dependent)));
-  return Object.fromEntries([...packages].map(([name, file]) => [name, JSON.parse(readFileSync(file, 'utf8')).version]));
+  const queue = names.map((name) => [name, base]);
+  while (queue.length > 0) {
+    const [name, parent] = queue.pop();
+    const file = packageFile(name, parent);
+    if (file === undefined || packages.has(file)) continue;
+    const { version, dependencies = {} } = JSON.parse(readFileSync(file, 'utf8'));
+    packages.set(file, `${name}@${version}`);
+    queue.push(...Object.keys(dependencies).map((dependency) => [dependency, file]));
+  }
+  return [...new Set(packages.values())].sort();
+}
+
+// why: a dependency that is not installed, such as the build of a package for another platform, is not part of the toolchain that runs
+function packageFile(name, parent) {
+  try {
+    return findPackageJSON(name, parent);
+  } catch {
+    return undefined;
+  }
 }
 
 function readIndex(file) {
