@@ -1,10 +1,8 @@
-import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { build } from 'vite';
 import solid from 'vite-plugin-solid';
 import { buildCache, filesIn } from '../bundle/cache.js';
 import { publicModules, virtualModules } from '../bundle/modules.js';
-import { BAKE_ROOT, blogPath, browserBuild, compileProblem, outputOf, viteConfig } from '../bundle/vite.js';
+import { BAKE_ROOT, blogPath, browserBuild, compileProblem, viteBuild, viteConfig } from '../bundle/vite.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
 import { errorAt, fileStart } from '../report.js';
 
@@ -22,8 +20,8 @@ const RENDER_ENTRY = 'bake:render';
 const CLIENT_ENTRY = 'bake:client';
 const MISSING_BINDING = /"([^"]+)" is not exported/;
 
-export function builtInThemeFolders(root) {
-  return BUILT_IN_THEMES.filter((name) => existsSync(join(root, THEMES_DIR, name))).map((name) =>
+export function builtInThemeFolders(files) {
+  return BUILT_IN_THEMES.filter((name) => files.stat(join(files.root, THEMES_DIR, name)) !== undefined).map((name) =>
     errorAt(`${THEMES_DIR}/${name}`, fileStart, `a theme folder of the blog cannot have the name of the built-in theme "${name}"; to change ${name}, name the folder differently and import the parts it keeps from bake/themes/${name}`),
   );
 }
@@ -36,46 +34,55 @@ export function themeLocation(root, name) {
   return blogPath(root, themeFolder(root, name));
 }
 
-export async function compileTheme(root, name, { siteTheme }, errors) {
+export async function compileTheme(files, name, { siteTheme }, errors) {
+  const { root } = files;
   const folder = themeFolder(root, name);
-  const locate = (file) => (existsSync(join(folder, file)) ? join(folder, file) : null);
+  const locate = (file) => (files.stat(join(folder, file)) === undefined ? null : join(folder, file));
   const count = errors.length;
   for (const file of [PAGE_FILE, CLIENT_FILE, ...(siteTheme ? [HOME_FILE, NOT_FOUND_FILE, THEME_STYLES_FILE] : [])]) {
     if (locate(file) === null) errors.push(errorAt(themeLocation(root, name), fileStart, `theme "${name}" has no ${file}`));
   }
   if (errors.length > count) return null;
+  const started = Date.now();
   const cache = buildCache('theme', `${BAKE_ROOT}\0${name}\0${siteTheme}`, resolve(root));
   const required = filesIn([folder, ...BUILD_FILES].map((path) => resolve(path)));
+  // why: a stylesheet that another stylesheet imports is not a module of the build, so every file of a theme folder of the blog is an input
+  files.modules(required, started);
   const cached = cache.read(required);
-  if (cached !== null) return loadTheme(cached.data, cached.files, new Set(cached.inputs));
-  const started = Date.now();
+  if (cached !== null) {
+    files.modules(cached.inputs, started);
+    return loadTheme(cached.data, cached.files);
+  }
   const alias = publicModules('themes');
   let data;
+  let modules;
   let theme;
   try {
     const [server, client, styles] = await Promise.all([
-      build(serverConfig(alias, locate, siteTheme)),
+      viteBuild(serverConfig(alias, locate, siteTheme)),
       browserBuild({ input: { [name]: CLIENT_ENTRY }, plugins: [clientEntry(locate(CLIENT_FILE)), solid()], alias }),
       siteTheme ? browserBuild({ input: locate(THEME_STYLES_FILE), alias, stylesheet: THEME_STYLES_PATH }) : null,
     ]);
     data = {
-      server: outputOf(server)[0].code,
+      server: server.outputs[0].code,
       styles: client.stylesheets,
       script: client.entry,
     };
-    const files = [client, styles].flatMap((output) => output?.files ?? []);
-    theme = await loadTheme(data, files, new Set([...[client, styles].flatMap((output) => output?.modules ?? []), ...outputOf(server).flatMap((output) => output.moduleIds ?? [])]));
+    modules = [server, client, styles].flatMap((output) => output?.modules ?? []);
+    theme = await loadTheme(data, [client, styles].flatMap((output) => output?.files ?? []));
   } catch (error) {
+    files.everything();
     errors.push(compileError(root, name, locate(CLIENT_FILE), error));
     return null;
   }
-  cache.write(data, theme.files, [...required, ...theme.sources], started);
+  files.modules(modules, started);
+  cache.write(data, theme.files, [...required, ...modules], started);
   return theme;
 }
 
-async function loadTheme({ server, ...data }, files, sources) {
+async function loadTheme({ server, ...data }, files) {
   const module = await import(`data:text/javascript;base64,${Buffer.from(server).toString('base64')}`);
-  return { render: module.render, renderHome: module.renderHome, renderNotFound: module.renderNotFound, files, ...data, sources };
+  return { render: module.render, renderHome: module.renderHome, renderNotFound: module.renderNotFound, files, ...data };
 }
 
 function clientEntry(file) {

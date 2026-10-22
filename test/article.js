@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { indexPages } from '../src/build/links.js';
 import { readArticle } from '../src/markdown/article.js';
 import { formatError, sortErrors } from '../src/report.js';
@@ -67,5 +68,5 @@ export function components(declarations) {
 }
 
 export function folder(path) {
-  return { path, files: readdirSync(path) };
+  return { files: readdirSync(path), read: (file) => readFileSync(join(path, file)) };
 }

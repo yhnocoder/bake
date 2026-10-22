@@ -27,13 +27,14 @@ export function hasConfig(root) {
   return statSync(join(root, CONFIG_FILE), { throwIfNoEntry: false })?.isFile() ?? false;
 }
 
-export async function loadBakeConfig(root, themes, optionProblem, errors) {
-  if (!hasConfig(root)) {
+export async function loadBakeConfig(files, themes, optionProblem, errors) {
+  const { root } = files;
+  const path = join(root, CONFIG_FILE);
+  const source = files.read(path, 'utf8');
+  if (source === null) {
     errors.push(configNotFoundError());
     return null;
   }
-  const path = join(root, CONFIG_FILE);
-  const source = readFileSync(path, 'utf8');
   let program;
   try {
     program = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
@@ -41,8 +42,8 @@ export async function loadBakeConfig(root, themes, optionProblem, errors) {
     errors.push(errorAt(CONFIG_FILE, { line: error.loc.line, column: error.loc.column + 1 }, error.message.replace(/ \(\d+:\d+\)$/, '')));
     return null;
   }
-  const packageFile = nearestPackageFile(root);
-  const type = packageFile === null ? 'module' : packageType(packageFile);
+  const packageFile = nearestPackageFile(files, root);
+  const type = packageFile === null ? 'module' : packageType(files, packageFile);
   if (type !== 'module') {
     const reason = type === undefined ? 'has no "type" field, so Node prints a warning while it detects that the file is an ES module' : `sets "type": ${JSON.stringify(type)}, so Node reads it as CommonJS`;
     errors.push(errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} is an ES module, but ${relative(root, packageFile)} ${reason}; set "type": "module" there`));
@@ -61,16 +62,16 @@ export async function loadBakeConfig(root, themes, optionProblem, errors) {
   return errors.length === count ? deepFreeze(config) : null;
 }
 
-function nearestPackageFile(folder) {
+function nearestPackageFile(files, folder) {
   const file = join(folder, 'package.json');
-  if (statSync(file, { throwIfNoEntry: false })?.isFile()) return file;
+  if (files.stat(file)?.isFile()) return file;
   const parent = dirname(folder);
-  return parent === folder ? null : nearestPackageFile(parent);
+  return parent === folder ? null : nearestPackageFile(files, parent);
 }
 
-function packageType(file) {
+function packageType(files, file) {
   try {
-    return JSON.parse(readFileSync(file, 'utf8')).type;
+    return JSON.parse(files.read(file, 'utf8')).type;
   } catch {
     return undefined;
   }

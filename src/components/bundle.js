@@ -5,16 +5,19 @@ import { errorAt, fileStart } from '../report.js';
 import { COMPONENTS_DIR } from './read.js';
 import { RUNTIME_FILE, browserModules } from './modules.js';
 
-export async function bundleComponents(root, components, preamble, errors, { prefetch }) {
+export async function bundleComponents(files, components, preamble, errors, { prefetch }) {
+  const started = Date.now();
   try {
-    const { entry, files, modules } = await browserBuild({
+    const bundle = await browserBuild({
       input: { components: RUNTIME_FILE },
       plugins: [...browserModules({ preamble, components, prefetch }), solid()],
       alias: publicModules('components'),
     });
-    return { runtime: entry, files, modules };
+    files.modules(bundle.modules, started);
+    return { runtime: bundle.entry, files: bundle.files };
   } catch (error) {
-    const { message, file, position } = compileProblem(root, error);
+    files.everything();
+    const { message, file, position } = compileProblem(files.root, error);
     errors.push(file === null ? errorAt(COMPONENTS_DIR, fileStart, `the components cannot be built: ${message}`) : errorAt(file, position, message));
     return null;
   }

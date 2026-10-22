@@ -1,15 +1,14 @@
-import { readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, posix, relative, sep } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import { CHAT_PREAMBLE_PATH, chatBundle } from '../chat/bundle.js';
 import { readPet } from '../chat/pet-files.js';
-import { petFolder } from '../config/pet.js';
 import { bundleComponents } from '../components/bundle.js';
 import { optionProblem } from '../components/declarations.js';
-import { COMPONENTS_DIR, readComponents } from '../components/read.js';
+import { readComponents } from '../components/read.js';
 import { CONFIG_FILE, configPosition, loadBakeConfig } from '../config/bake-config.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
-import { BUILT_IN_THEMES, availableThemes } from '../config/rules.js';
+import { availableThemes } from '../config/rules.js';
 import { readArticle } from '../markdown/article.js';
 import { BUILT_IN_BLOCK_NAMES } from '../markdown/parse.js';
 import { IMAGE_FORMATS, convertImage, readImage } from '../render/images.js';
@@ -21,24 +20,25 @@ import { listFiles } from './files.js';
 import { checkDuplicateUrls, indexPages } from './links.js';
 import { CHAT_CATALOG_PATH, FEED_PATH, NOT_FOUND_PATH, SITEMAP_PATH, chatCatalogJson, feedXml, sitemapXml } from './site-files.js';
 import { SHARE_IMAGE_DIR, shareImageOf } from './share-images.js';
-import { THEMES_DIR, THEME_STYLES_PATH, builtInThemeFolders, compileTheme, themeLocation } from './theme.js';
-import { THEME_OPTIONS_FILE, readThemeDeclarations } from './theme-options.js';
+import { createMemo } from './memo.js';
+import { THEME_STYLES_PATH, builtInThemeFolders, compileTheme, themeLocation } from './theme.js';
+import { readThemeDeclarations } from './theme-options.js';
 import { absoluteLink, articleUrl, encodePath, pageRoot, siteLink, sitePath } from '../urls.js';
 
 const PUBLIC_DIR = 'public';
 
-const convertedImages = new WeakMap();
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
-const QUERY = /\?.*$/;
 
 export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
   // why: Vite reports module paths with symbolic links resolved, and they are compared with paths under the root
-  return { root: realpathSync(root), drafts, base, shareImages, prefetch, settings: null, results: new Map(), articles: new Map(), themes: new Map() };
+  const real = realpathSync(root);
+  return { root: real, drafts, base, shareImages, prefetch, settings: null, memo: createMemo(real) };
 }
 
+// changedPaths names the files and folders of the blog that changed since the last update, relative to the root; null rereads every input.
 export async function updateSite(site, changedPaths = null) {
-  const { root } = site;
-  for (const cache of [site.results, site.articles, site.themes]) forgetChanged(cache, changedPaths);
+  const { root, memo } = site;
+  memo.startUpdate(changedPaths);
   const found = findArticles(root);
   site.settings = await siteSettings(site, found);
   const { settings } = site;
@@ -46,7 +46,6 @@ export async function updateSite(site, changedPaths = null) {
   const { config } = settings;
   // why: a failure is reported when compileThemes asks for the theme again after the article loop
   themeOf(site, config.theme, true).catch(() => {});
-  for (const file of site.articles.keys()) if (!found.some((article) => article.file === file)) site.articles.delete(file);
   const articles = [];
   for (const article of found) articles.push(await articleOf(site, article));
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
@@ -55,7 +54,7 @@ export async function updateSite(site, changedPaths = null) {
   // why: bake build publishes no draft, so a draft that is half written does not keep the other articles from being published
   if (!site.drafts) dropDraftErrors(articles, errors);
   const published = articles.filter((article) => article.url !== null && (site.drafts || !article.draft));
-  const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), chatBundle()]);
+  const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, config, errors), compileComponents(site, published, errors), memo.get('chat', null, () => chatBundle())]);
   const assetFiles = assetOutputs(themes, bundle, chat);
   const assetSources = new Map(site.shareImages ? assetFiles.map((file) => [file.path, file.render()]) : []);
   const current = published.map((article) => ({ article, entry: articleEntry(article, config) }));
@@ -78,6 +77,7 @@ export async function updateSite(site, changedPaths = null) {
   const publicFiles = publicOutputs(root, generated, errors);
   const failed = new Set(errors.map((error) => error.file));
   const drawable = [...shareImages.values()].filter((image) => !failed.has(image.owner));
+  memo.sweep();
   return { errors: sortErrors(errors), articles, pages, home, siteFiles, assetFiles, assetSources, shareImages: drawable, publicFiles };
 }
 
@@ -87,73 +87,36 @@ function dropDraftErrors(articles, errors) {
   errors.splice(0, errors.length, ...kept);
 }
 
-// Each cached result keeps the paths of the blog files it read and is dropped when one of them, or a folder that holds one, changes.
-function forgetChanged(cache, changedPaths) {
-  for (const [name, { inputs }] of cache) {
-    if (changedPaths === null || inputs.some((input) => changedPaths.some((path) => input === path || input.startsWith(`${path}/`) || path.startsWith(`${input}/`)))) cache.delete(name);
-  }
-}
-
-// The entry holds the promise, so that the theme started before the article loop is not compiled a second time after it.
-function cached(cache, name, key, compute) {
-  const entry = cache.get(name);
-  if (entry?.key === key) return entry.value;
-  const next = { key, inputs: [] };
-  next.value = compute().then(
-    ({ value, inputs }) => {
-      next.inputs = inputs;
-      return value;
-    },
-    (error) => {
-      cache.delete(name);
-      throw error;
-    },
-  );
-  cache.set(name, next);
-  return next.value;
-}
-
 async function siteSettings(site, found) {
-  const { root } = site;
-  const themeNames = availableThemes(root);
-  const settings = await cached(site.results, 'settings', themeNames.join('\n'), async () => {
-    const value = await readSettings(root, themeNames);
-    const pet = value.config === undefined ? null : petFolder(value.config.chat.pet);
-    const options = themeNames.filter((name) => !BUILT_IN_THEMES.includes(name)).map((name) => posix.join(THEMES_DIR, name, THEME_OPTIONS_FILE));
-    return { value, inputs: [CONFIG_FILE, PREAMBLE_FILE, ...BUILT_IN_THEMES.map((name) => posix.join(THEMES_DIR, name)), ...options, ...(pet === null ? [] : [pet])] };
-  });
+  const { memo } = site;
+  const settings = await memo.get('settings', null, readSettings);
   if (settings.errors.length > 0) return settings;
-  const articleDirs = found.map((article) => article.dir);
-  const components = await cached(site.results, 'components', articleDirs.join('\n'), async () => {
+  const components = await memo.get('components', { articleDirs: found.map((article) => article.dir) }, (files) => {
     const errors = [];
-    const value = { components: readComponents(root, { builtInBlocks: BUILT_IN_BLOCK_NAMES, articleDirs }, errors), errors };
-    return { value, inputs: [COMPONENTS_DIR, ...articleDirs.map((dir) => posix.join(dir, COMPONENTS_DIR))] };
+    return { components: readComponents(files, { builtInBlocks: BUILT_IN_BLOCK_NAMES, articleDirs: files.value((context) => context.articleDirs) }, errors), errors };
   });
   return { ...settings, components: components.components, componentErrors: components.errors };
 }
 
-async function readSettings(root, themeNames) {
-  const errors = builtInThemeFolders(root);
-  const { options: themeOptions, markdown } = await readThemeDeclarations(root, themeNames, errors);
-  const config = await loadBakeConfig(root, themeOptions, optionProblem, errors);
+async function readSettings(files) {
+  const themeNames = availableThemes(files);
+  const errors = builtInThemeFolders(files);
+  const { options: themeOptions, markdown } = await readThemeDeclarations(files, themeNames, errors);
+  const config = await loadBakeConfig(files, themeOptions, optionProblem, errors);
   if (config === null || errors.length > 0) return { errors };
-  const preamble = await readMathPreamble(root, errors);
-  const pet = await readPet(root, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
+  const preamble = await readMathPreamble(files, errors);
+  const pet = await readPet(files, config.chat.pet, (file, message) => errors.push(file === null ? errorAt(CONFIG_FILE, configPosition(files.root, ['chat', 'pet']), `chat.pet: ${message}`) : errorAt(file, fileStart, message)));
   const rules = { themes: themeNames, categories: config.categories.map((category) => category.id), theme: config.theme, options: themeOptions, optionProblem };
   return { errors, config, preamble, pet, rules, markdown };
 }
 
+// The entry holds the promise, so that the theme started before the article loop is not compiled a second time after it.
 function themeOf(site, name, siteTheme) {
-  return cached(site.themes, name, siteTheme, async () => {
+  return site.memo.get(`theme ${name}`, { siteTheme }, async (files) => {
     const errors = [];
-    const theme = await compileTheme(site.root, name, { siteTheme }, errors);
-    const folder = BUILT_IN_THEMES.includes(name) ? [] : [posix.join(THEMES_DIR, name)];
-    return { value: { theme, errors }, inputs: theme === null ? [THEMES_DIR] : [...folder, ...blogPaths(site.root, theme.sources)] };
+    const theme = await compileTheme(files, name, { siteTheme: files.value((context) => context.siteTheme) }, errors);
+    return { theme, errors };
   });
-}
-
-function blogPaths(root, files) {
-  return [...files].map((file) => relative(root, file.replace(QUERY, ''))).filter((path) => path !== '' && !path.startsWith('..') && !isAbsolute(path)).map((path) => path.split(sep).join('/'));
 }
 
 async function compileThemes(site, published, config, errors) {
@@ -228,14 +191,11 @@ function articleTheme(article, config) {
 async function compileComponents(site, published, errors) {
   const names = [...new Set(published.flatMap((article) => article.content?.components ?? []))].sort();
   if (names.length === 0) return null;
-  const { root, settings } = site;
-  const result = await cached(site.results, 'bundle', JSON.stringify([names, settings.preamble]), async () => {
-    const bundleErrors = [];
-    const components = names.map((name) => settings.components.get(name));
-    const bundle = await bundleComponents(root, components, settings.preamble, bundleErrors, { prefetch: site.prefetch });
-    // why: a bundle that failed has no modules, so it depends on every folder that a component of it can import from
-    const folders = [COMPONENTS_DIR, ...components.flatMap((component) => (component.article === null ? [] : [posix.join(component.article, COMPONENTS_DIR)]))];
-    return { value: { bundle, errors: bundleErrors }, inputs: bundle === null ? folders : blogPaths(root, bundle.modules) };
+  const { settings } = site;
+  const result = await site.memo.get('components bundle', { components: names.map((name) => settings.components.get(name)), preamble: settings.preamble }, async (files) => {
+    const errors = [];
+    const bundle = await bundleComponents(files, files.value((context) => context.components), files.value((context) => context.preamble), errors, { prefetch: site.prefetch });
+    return { bundle, errors };
   });
   errors.push(...result.errors);
   return result.bundle;
@@ -254,8 +214,8 @@ function assetOutputs(themes, bundle, chat) {
   return [...outputs.values()];
 }
 
-async function readMathPreamble(root, errors) {
-  const definitions = readPreamble(root, errors);
+async function readMathPreamble(files, errors) {
+  const definitions = readPreamble(files, errors);
   if (definitions.length === 0) return definitions;
   const { definitionErrors } = await typesetMath(definitions, []);
   definitionErrors.forEach((error, index) => {
@@ -274,41 +234,39 @@ function linkTarget({ url, fields, draft, document }) {
   return { url, title: fields?.title ?? '', draft, article: document };
 }
 
-// An article also depends on the values of the settings it read, so a change of bake.config.js or of a component that leaves them as they were keeps it.
-async function articleOf(site, found) {
-  const { root, settings } = site;
-  const key = (lookups) => JSON.stringify([found.files, settings.rules, [...settings.rules.options], [...settings.markdown], settings.preamble, lookups.map((name) => settings.components.get(name) ?? null)]);
-  const entry = site.articles.get(found.file);
-  if (entry !== undefined && entry.key === key(entry.lookups)) return entry.article;
-  const lookups = new Set();
-  const components = {
-    get: (name) => {
-      lookups.add(name);
-      return settings.components.get(name);
-    },
-  };
-  const article = await loadArticle(root, found, { ...settings, components });
-  site.articles.set(found.file, { article, lookups: [...lookups], key: key([...lookups]), inputs: [found.file, ...found.files.map((file) => posix.join(found.dir, file))] });
-  return article;
+// An article depends on the values of the settings it reads, so a change of bake.config.js or of a component that leaves them as they were keeps it.
+function articleOf(site, found) {
+  return site.memo.get(`article ${found.file}`, { found, settings: site.settings }, async (files) => {
+    const article = files.value((context) => context.found);
+    const rules = files.value((context) => context.settings.rules);
+    const errors = [];
+    const source = files.read(join(files.root, article.file), 'utf8');
+    const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
+    const fields = frontMatter?.fields ?? null;
+    const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
+    const folder = { files: article.files, read: (file) => files.read(join(files.root, article.dir, file)) };
+    const themeName = fields?.theme ?? rules.theme;
+    const settings = {
+      folder,
+      url,
+      get theme() {
+        return files.value((context) => context.settings.markdown.get(themeName));
+      },
+      get preamble() {
+        return files.value((context) => context.settings.preamble);
+      },
+      components: { get: (name) => files.value((context) => context.settings.components.get(name)) },
+    };
+    const document = fields?.page === undefined ? await readArticle(article.file, source, errors, settings) : null;
+    const positions = frontMatter?.positions ?? {};
+    const options = frontMatter?.options ?? {};
+    const cover = fields?.cover === undefined ? undefined : await readCover(folder.read(fields.cover), fields.cover, article.file, positions.cover, errors);
+    return { ...article, source, fields, options, positions, url, draft: fields?.draft === true, document, content: null, cover, errors, conversions: new Map() };
+  });
 }
 
-async function loadArticle(root, article, { rules, preamble, components, markdown }) {
-  const errors = [];
-  const source = readFileSync(join(root, article.file), 'utf8');
-  const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
-  const fields = frontMatter?.fields ?? null;
-  const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;
-  const folder = { path: join(root, article.dir), files: article.files };
-  const theme = markdown.get(fields?.theme ?? rules.theme);
-  const document = fields?.page === undefined ? await readArticle(article.file, source, errors, { folder, preamble, url, components, theme }) : null;
-  const positions = frontMatter?.positions ?? {};
-  const options = frontMatter?.options ?? {};
-  const cover = fields?.cover === undefined ? undefined : await readCover(join(folder.path, fields.cover), fields.cover, article.file, positions.cover, errors);
-  return { ...article, source, fields, options, positions, url, draft: fields?.draft === true, document, content: null, cover, errors };
-}
-
-async function readCover(path, cover, file, position, errors) {
-  const image = await readImage(path);
+async function readCover(content, cover, file, position, errors) {
+  const image = await readImage(content);
   if (image.width !== undefined) return { format: image.format, width: image.width, height: image.height };
   const problem = image.error === undefined ? `must be a ${IMAGE_FORMATS} image` : `cannot be read: ${image.error}`;
   errors.push(errorAt(file, position, `cover ${JSON.stringify(cover)} ${problem}`));
@@ -326,7 +284,7 @@ function articleOutputs(root, article, entry, pageSettings, errors) {
     const source = { path: `${entry.path}index.md`, render: () => article.content.source, owner: article.file };
     const images = article.content.images.map((image) => ({
       path: `${entry.path}${image.path}`,
-      render: () => convertedImage(join(root, article.dir, image.source), image),
+      render: () => convertedImage(article, join(root, article.dir, image.source), image),
       owner: article.file,
     }));
     const converted = new Set(article.content.images.flatMap((image) => (image.keepSource ? [image.path] : [image.path, image.source])));
@@ -339,9 +297,9 @@ function articleOutputs(root, article, entry, pageSettings, errors) {
   return article.files.map((file) => copy(file, file === page ? 'index.html' : file));
 }
 
-function convertedImage(file, image) {
-  if (!convertedImages.has(image)) convertedImages.set(image, convertImage(file, image));
-  return convertedImages.get(image);
+function convertedImage(article, file, image) {
+  if (!article.conversions.has(image)) article.conversions.set(image, convertImage(file, image));
+  return article.conversions.get(image);
 }
 
 function renderArticle(article, entry, { config, themes, bundle, chat, shareImages, mathStyles }, errors) {

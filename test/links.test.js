@@ -281,7 +281,7 @@ describe(':::embed', () => {
   });
 
   test('points a file parameter whose name holds #, ? or % into the source article with a URL-encoded path', async () => {
-    const source = { url: '/2026-10/data/', title: 'Data', body: '## Data {#data}\n\n:::data-view{source=data#1.json}\n:::\n\n:::data-view{source="a?b.json"}\n:::\n\n:::data-view{source=100%.json}\n:::\n', folder: { path: '/blog/data', files: ['data#1.json', 'a?b.json', '100%.json'] } };
+    const source = { url: '/2026-10/data/', title: 'Data', body: '## Data {#data}\n\n:::data-view{source=data#1.json}\n:::\n\n:::data-view{source="a?b.json"}\n:::\n\n:::data-view{source=100%.json}\n:::\n', folder: { files: ['data#1.json', 'a?b.json', '100%.json'] } };
     const { articles, errors } = await site('Text.\n\n:::embed\n/2026-10/data/#data\n:::\n', [source]);
     assert.deepEqual(errors, []);
     const sources = articles['/2026-10/host/'].intro[1].html

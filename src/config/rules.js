@@ -1,4 +1,3 @@
-import { readdirSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { describeValue, listChoices } from '../report.js';
 
@@ -47,16 +46,8 @@ export function folderFile(path, files) {
   return normal !== null && files.includes(normal) ? normal : null;
 }
 
-export function availableThemes(root) {
-  const themesDir = join(root, 'themes');
-  const custom = isDirectory(themesDir)
-    ? readdirSync(themesDir)
-        .filter((name) => isDirectory(join(themesDir, name)) && !BUILT_IN_THEMES.includes(name))
-        .sort()
-    : [];
+export function availableThemes(files) {
+  const themesDir = join(files.root, 'themes');
+  const custom = files.list(themesDir).filter((name) => files.stat(join(themesDir, name))?.isDirectory() && !BUILT_IN_THEMES.includes(name));
   return Object.freeze([...BUILT_IN_THEMES, ...custom]);
-}
-
-function isDirectory(path) {
-  return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 }

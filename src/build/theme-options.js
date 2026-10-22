@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { optionProblem, paramProblems } from '../components/declarations.js';
@@ -22,21 +21,21 @@ const ATTRIBUTE_FIELDS = { number: ['min', 'max', 'step'], text: [], enum: ['opt
 const DEPTHS = [2, 3, 4, 5, 6];
 const NOTHING_DECLARED = { options: {}, headings: {}, blocks: {} };
 
-export async function readThemeDeclarations(root, names, errors) {
+export async function readThemeDeclarations(files, names, errors) {
   const options = new Map();
   const markdown = new Map();
   for (const name of names) {
-    const path = join(themeFolder(root, name), THEME_OPTIONS_FILE);
-    const declared = existsSync(path) ? await readDeclarations(root, name, path, errors) : NOTHING_DECLARED;
+    const path = join(themeFolder(files.root, name), THEME_OPTIONS_FILE);
+    const source = files.read(path, 'utf8');
+    const declared = source === null ? NOTHING_DECLARED : await readDeclarations(files.root, name, path, source, errors);
     options.set(name, declared?.options ?? null);
     markdown.set(name, declared === null ? null : { name, headings: declared.headings, blocks: declared.blocks });
   }
   return { options, markdown };
 }
 
-async function readDeclarations(root, name, path, errors) {
+async function readDeclarations(root, name, path, source, errors) {
   const file = path.startsWith(root) ? relative(root, path) : `${name} theme ${THEME_OPTIONS_FILE}`;
-  const source = readFileSync(path, 'utf8');
   let options;
   let settings;
   let headings;

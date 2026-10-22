@@ -10,10 +10,11 @@ const UNSUPPORTED = /unsupported image format/;
 
 export const IMAGE_FORMATS = 'PNG, JPEG, GIF, WebP, AVIF or SVG';
 
-export async function readImage(path) {
+export async function readImage(content) {
+  if (content === null) return { error: 'the file is missing' };
   let metadata;
   try {
-    metadata = await sharp(path, { animated: true }).metadata();
+    metadata = await sharp(content, { animated: true }).metadata();
   } catch (error) {
     if (UNSUPPORTED.test(error.message)) return { format: null };
     return { error: error.message.replace(/[:\s]+$/, '') };

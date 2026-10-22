@@ -1,4 +1,4 @@
-import { join, posix } from 'node:path';
+import { posix } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -372,7 +372,7 @@ async function readImages(article, tree) {
       article.report(node.position.start, `image ${node.url} is not a file in the article folder`);
       continue;
     }
-    if (!sources.has(source)) sources.set(source, { image: await readImage(join(article.folder.path, source)), nodes: [] });
+    if (!sources.has(source)) sources.set(source, { image: await readImage(article.folder.read(source)), nodes: [] });
     const entry = sources.get(source);
     if (entry.image.error !== undefined) article.report(node.position.start, `image ${source} cannot be read: ${entry.image.error}`);
     else if (entry.image.format === null) article.report(node.position.start, `image ${source} is not a ${IMAGE_FORMATS} file`);

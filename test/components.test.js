@@ -127,7 +127,7 @@ describe('component blocks', () => {
 
   test('checks that a file parameter names a file in the article folder', async () => {
     const withDefault = declare({ 'act-fn-plot': { params: { data: { label: 'Data', type: 'file', default: 'data.csv' } } } });
-    const options = { components: withDefault, folder: { path: '/blog/post', files: ['grid.json', 'data/angles.csv'] } };
+    const options = { components: withDefault, folder: { files: ['grid.json', 'data/angles.csv'] } };
     const [block] = (await parsed(':::act-fn-plot{data=./data/angles.csv}\n:::\n', options)).intro;
     assert.equal(block.params.data, './data/angles.csv');
     assert.deepEqual((await parse(':::act-fn-plot{data=missing.csv}\n:::\n\n:::act-fn-plot\n:::\n\n:::act-fn-plot{data=../grid.json}\n:::\n', options)).errors, [

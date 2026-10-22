@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { join, posix, sep } from 'node:path';
 import sharp from 'sharp';
 import { BUILT_IN_PETS, isUrl, petFolder } from '../config/pet.js';
@@ -12,11 +12,11 @@ const DOWNLOAD_TIMEOUT = 30_000;
 const LICENSE = 'LICENSE.txt';
 const WEBP = { quality: 90, alphaQuality: 100 };
 
-export async function readPet(root, pet, report) {
+export async function readPet(files, pet, report) {
   let read;
-  if (Object.hasOwn(BUILT_IN_PETS, pet)) read = await readFolder(join(BUILT_IN_DIR, pet), null, report);
+  if (Object.hasOwn(BUILT_IN_PETS, pet)) read = await readFolder(files, join(BUILT_IN_DIR, pet), null, report);
   else if (isUrl(pet)) read = await downloadPet(pet, (message) => report(null, message));
-  else read = await readFolder(join(root, pet), petFolder(pet), report);
+  else read = await readFolder(files, join(files.root, pet), petFolder(pet), report);
   if (read === null) return null;
   const { name, sheet, image, reportSheet } = read;
   const published = image.format === 'webp' && image.height === PET_ROW_COUNT * PET_FRAME.height ? sheet : await croppedSheet(sheet);
@@ -25,7 +25,7 @@ export async function readPet(root, pet, report) {
     return null;
   }
   const credit = Object.hasOwn(BUILT_IN_PETS, pet) ? BUILT_IN_PETS[pet] : null;
-  const files = [
+  const outputs = [
     { path: `${PET_DIR}/pet.json`, source: `${JSON.stringify({ displayName: name, spritesheetPath: 'spritesheet.webp', ...(credit ? { credit: { ...credit, href: LICENSE } } : {}) })}\n` },
     { path: `${PET_DIR}/spritesheet.webp`, source: published },
     {
@@ -37,50 +37,50 @@ export async function readPet(root, pet, report) {
     },
     ...(credit ? [{ path: `${PET_DIR}/${LICENSE}`, source: readFileSync(join(BUILT_IN_DIR, pet, 'LICENSE')) }] : []),
   ];
-  return { name, files };
+  return { name, files: outputs };
 }
 
-async function readFolder(dir, folder, report) {
+async function readFolder(files, dir, folder, report) {
   const label = (name) => (folder === null ? name : posix.join(folder, name));
-  if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
+  if (!files.stat(dir)?.isDirectory()) {
     report(null, `the folder ${folder} does not exist`);
     return null;
   }
-  if (!existsSync(join(dir, 'pet.json'))) {
+  if (files.stat(join(dir, 'pet.json')) === undefined) {
     report(null, `${label('pet.json')} does not exist`);
     return null;
   }
-  const jsonPath = fileInside(dir, 'pet.json');
+  const jsonPath = fileInside(files, dir, 'pet.json');
   if (jsonPath === null) {
     report(label('pet.json'), 'pet.json must be a file inside the pet folder');
     return null;
   }
-  if (statSync(jsonPath).size > PET_JSON_MAX_BYTES) {
+  if (files.stat(jsonPath).size > PET_JSON_MAX_BYTES) {
     report(label('pet.json'), `pet.json is larger than ${byteLimit(PET_JSON_MAX_BYTES)}`);
     return null;
   }
-  const json = petJson(readFileSync(jsonPath, 'utf8'), (message) => report(label('pet.json'), message));
+  const json = petJson(files.read(jsonPath, 'utf8'), (message) => report(label('pet.json'), message));
   if (json === null) return null;
   const sheetName = posix.normalize(json.spritesheetPath);
-  const sheetPath = posix.isAbsolute(sheetName) ? null : fileInside(dir, sheetName);
+  const sheetPath = posix.isAbsolute(sheetName) ? null : fileInside(files, dir, sheetName);
   if (sheetPath === null) {
     report(label('pet.json'), `spritesheetPath ${JSON.stringify(json.spritesheetPath)} does not name a file in the pet folder`);
     return null;
   }
   const reportSheet = (message) => report(label(sheetName), message);
-  const size = statSync(sheetPath).size;
+  const size = files.stat(sheetPath).size;
   if (size > PET_MAX_BYTES) {
     reportSheet(`the spritesheet has ${megabytes(size)}, a pet spritesheet must be at most ${byteLimit(PET_MAX_BYTES)}`);
     return null;
   }
-  const sheet = readFileSync(sheetPath);
+  const sheet = files.read(sheetPath);
   const image = await sheetImage(sheet, reportSheet);
   return image === null ? null : { name: json.displayName, sheet, image, reportSheet };
 }
 
-function fileInside(dir, name) {
+function fileInside(files, dir, name) {
   const path = join(dir, name);
-  if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return null;
+  if (!files.stat(path)?.isFile()) return null;
   const folder = realpathSync(dir);
   return realpathSync(path).startsWith(folder + sep) ? path : null;
 }

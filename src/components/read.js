@@ -1,4 +1,3 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { parseSync } from 'vite';
 import { describeValue, errorAt, fileStart, listAll } from '../report.js';
@@ -22,12 +21,12 @@ class NotLiteral extends Error {
 }
 
 // A component in components/ serves every article; one in the components/ folder of an article serves only that article.
-export function readComponents(root, { builtInBlocks, articleDirs }, errors) {
+export function readComponents(files, { builtInBlocks, articleDirs }, errors) {
   const components = new Map();
   const folders = [null, ...articleDirs].map((article) => ({ article, dir: article === null ? COMPONENTS_DIR : posix.join(article, COMPONENTS_DIR) }));
-  for (const { name, file, article, duplicate } of componentFiles(root, folders, builtInBlocks, errors)) {
-    const path = join(root, file);
-    const source = readFileSync(path, 'utf8');
+  for (const { name, file, article, duplicate } of componentFiles(files, folders, builtInBlocks, errors)) {
+    const path = join(files.root, file);
+    const source = files.read(path, 'utf8');
     const count = errors.length;
     const report = (node, message) => errors.push(errorAt(file, node === null ? fileStart : positionAt(source, node.start), `${name}: ${message}`));
     const { params, layout, solid } = readDeclarations(file, source, report);
@@ -36,13 +35,12 @@ export function readComponents(root, { builtInBlocks, articleDirs }, errors) {
   return components;
 }
 
-function componentFiles(root, folders, builtInBlocks, errors) {
+function componentFiles(files, folders, builtInBlocks, errors) {
   const found = new Map();
   for (const { article, dir } of folders) {
-    const entries = statSync(join(root, dir), { throwIfNoEntry: false })?.isDirectory() ? readdirSync(join(root, dir)).sort() : [];
-    for (const entry of entries) {
+    for (const entry of files.list(join(files.root, dir))) {
       const extension = COMPONENT_EXTENSIONS.find((candidate) => entry.endsWith(candidate));
-      if (extension === undefined || !statSync(join(root, dir, entry)).isFile()) continue;
+      if (extension === undefined || !files.stat(join(files.root, dir, entry))?.isFile()) continue;
       const file = posix.join(dir, entry);
       const name = entry.slice(0, -extension.length);
       if (!COMPONENT_NAME.test(name)) {
@@ -56,19 +54,19 @@ function componentFiles(root, folders, builtInBlocks, errors) {
       }
     }
   }
-  const files = [];
+  const unique = [];
   for (const [name, defined] of found) {
     if (defined.length === 1) {
-      files.push(defined[0]);
+      unique.push(defined[0]);
       continue;
     }
     // why: the name is the custom element name of the whole blog, so two files cannot share it even in different articles
     const message = `${name}: ${listAll(defined.map(({ file }) => file))} ${defined.length === 2 ? 'both' : 'all'} define the component; a component name is unique in the blog, so rename or remove all but one of them`;
     for (const { file } of defined) errors.push(errorAt(file, fileStart, message));
     // why: the first file stays as an invalid component, so that an article that uses the name reports nothing more
-    files.push({ ...defined[0], duplicate: true });
+    unique.push({ ...defined[0], duplicate: true });
   }
-  return files;
+  return unique;
 }
 
 function readDeclarations(file, source, report) {
