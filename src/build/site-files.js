@@ -1,12 +1,18 @@
 import { escapeMarkup } from '../escape.js';
 import { absoluteLink, siteLink } from '../urls.js';
 
-export const FEED_PATH = 'feed.xml';
-export const SITEMAP_PATH = 'sitemap.xml';
-export const NOT_FOUND_PATH = '404.html';
-export const CHAT_CATALOG_PATH = '_bake/articles.json';
+const FEED_PATH = 'feed.xml';
+const SITEMAP_PATH = 'sitemap.xml';
 
-export function feedXml(config, entries) {
+export function feedFiles({ config, listed }) {
+  return [{ path: FEED_PATH, render: () => feedXml(config, listed.map(({ entry }) => entry)), owner: 'the RSS feed' }];
+}
+
+export function sitemapFiles({ config, listed }) {
+  return [{ path: SITEMAP_PATH, render: () => sitemapXml(config, listed.map(({ entry }) => entry)), owner: 'the sitemap' }];
+}
+
+function feedXml(config, entries) {
   const link = siteLink(config.url);
   const items = entries.map((entry) =>
     [
@@ -36,7 +42,7 @@ export function feedXml(config, entries) {
   ].join('\n');
 }
 
-export function sitemapXml(config, entries) {
+function sitemapXml(config, entries) {
   const addresses = [siteLink(config.url), ...entries.map((entry) => entry.link)];
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -45,25 +51,6 @@ export function sitemapXml(config, entries) {
     '</urlset>',
     '',
   ].join('\n');
-}
-
-export function chatCatalogJson(config, pages) {
-  const articles = pages.map(({ article, entry }) => ({
-    url: entry.path,
-    title: entry.title,
-    date: entry.date,
-    summary: entry.summary,
-    tags: entry.tags,
-    category: entry.category?.name,
-    source: article.fields.page === undefined ? `${entry.path}index.md` : undefined,
-    sections: (article.content?.toc ?? []).map((section) => ({
-      id: section.id,
-      number: section.number,
-      title: section.title,
-      subsections: section.children.map((child) => ({ id: child.id, title: child.title })),
-    })),
-  }));
-  return `${JSON.stringify({ title: config.title, description: config.description, language: config.language, articles })}\n`;
 }
 
 function element(name, text) {

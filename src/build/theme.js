@@ -6,7 +6,7 @@ import { BAKE_ROOT, blogPath, browserBuild, compileProblem, viteBuild, viteConfi
 import { BUILT_IN_THEMES } from '../config/rules.js';
 import { errorAt, fileStart } from '../report.js';
 
-export const THEMES_DIR = 'themes';
+const THEMES_DIR = 'themes';
 const PAGE_FILE = 'page.jsx';
 const CLIENT_FILE = 'client.jsx';
 const HOME_FILE = 'home.jsx';
@@ -26,6 +26,32 @@ export function builtInThemeFolders(files) {
   );
 }
 
+// why: the site theme compiles while the articles are read; a failure is reported when compileThemes asks for it again
+export function startSiteTheme(site) {
+  themeOf(site, site.settings.config.theme, true).catch(() => {});
+}
+
+export async function compileThemes(site, published, errors) {
+  const { config } = site.settings;
+  const names = [...new Set([config.theme, ...published.filter((article) => article.content !== null).map((article) => articleTheme(article, config))])].sort();
+  const compiled = await Promise.all(names.map((name) => themeOf(site, name, name === config.theme)));
+  errors.push(...compiled.flatMap((result) => result.errors));
+  return new Map(names.map((name, index) => [name, compiled[index].theme]));
+}
+
+export function articleTheme(article, config) {
+  return article.fields.theme ?? config.theme;
+}
+
+// The entry holds the promise, so that the site theme started before the articles are read is not compiled a second time.
+function themeOf(site, name, siteTheme) {
+  return site.memo.get(`theme ${name}`, { siteTheme }, async (files) => {
+    const errors = [];
+    const theme = await compileTheme(files, name, { siteTheme: files.value((context) => context.siteTheme) }, errors);
+    return { theme, errors };
+  });
+}
+
 export function themeFolder(root, name) {
   return BUILT_IN_THEMES.includes(name) ? join(BUILT_IN_DIR, name) : join(root, THEMES_DIR, name);
 }
@@ -34,7 +60,7 @@ export function themeLocation(root, name) {
   return blogPath(root, themeFolder(root, name));
 }
 
-export async function compileTheme(files, name, { siteTheme }, errors) {
+async function compileTheme(files, name, { siteTheme }, errors) {
   const { root } = files;
   const folder = themeFolder(root, name);
   const locate = (file) => (files.stat(join(folder, file)) === undefined ? null : join(folder, file));

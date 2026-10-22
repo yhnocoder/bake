@@ -8,7 +8,7 @@ import { describeValue, errorAt, fileStart, listAll, listChoices } from '../repo
 import { READING_SETTINGS } from '../theme/settings.js';
 import { themeFolder } from './theme.js';
 
-export const THEME_OPTIONS_FILE = 'options.js';
+const THEME_OPTIONS_FILE = 'options.js';
 const OPTION = { noun: 'option', reserved: [], written: 'as a key of bake.config.js', setter: 'bake.config.js' };
 const SETTING_NAME = /^[a-z][a-z0-9]*$/;
 const SETTING_FIELDS = ['values', 'default', 'control'];

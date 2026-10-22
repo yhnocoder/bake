@@ -1,6 +1,40 @@
 import { errorAt } from '../report.js';
 import { meantName } from '../suggest.js';
 
+// An article is linked again when it or a page at an address it looked up changed, and its structure is computed again when its links or the links of an article whose parts it shows changed.
+export async function linkArticles(site, articles, errors) {
+  checkDuplicateUrls(articles, errors);
+  const index = indexPages(articles.map((article) => article.page));
+  const links = new Map();
+  for (const article of articles.filter((candidate) => candidate.document !== null)) {
+    const linked = await site.memo.get(`links ${article.file}`, { article, index }, (files) => {
+      const { document } = files.same((context) => context.article);
+      const linkErrors = [];
+      for (const path of document.link(index, linkErrors)) {
+        if (files.same((context) => context.index.page(path)) === undefined) files.value((context) => context.index.moved(path));
+      }
+      return { errors: linkErrors };
+    });
+    links.set(article.document, linked);
+  }
+  for (const article of articles) {
+    if (article.document === null) {
+      article.content = null;
+      continue;
+    }
+    const structure = await site.memo.get(`structure ${article.file}`, { article, links }, (files) => {
+      const { document } = files.same((context) => context.article);
+      files.same((context) => context.links.get(document));
+      const structureErrors = [];
+      const content = document.structure(structureErrors);
+      for (const source of document.borrowed) files.same((context) => context.links.get(source));
+      return { content, errors: structureErrors };
+    });
+    article.content = structure.content;
+    errors.push(...links.get(article.document).errors, ...structure.errors);
+  }
+}
+
 export function indexPages(pages) {
   const byUrl = new Map();
   for (const page of pages) {
@@ -38,7 +72,7 @@ function movedHint(address, moved) {
   return `; the articles with slug "${slug}" are at ${moved.slice(0, -1).join(', ')} and ${moved.at(-1)}`;
 }
 
-export function checkDuplicateUrls(articles, errors) {
+function checkDuplicateUrls(articles, errors) {
   const owners = new Map();
   for (const article of articles) {
     if (article.url === null) continue;
