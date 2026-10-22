@@ -4,6 +4,11 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- `bake new` and `bake init` load only the modules that read the configuration and write files, which shortens them from about 0.9 to 0.1 seconds.
+- The `bake` command turns on Node's compile cache, which shortens each command after the first.
+
 ## [0.2.0]
 
 ### Added
