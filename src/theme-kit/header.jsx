@@ -12,6 +12,11 @@ export function Header(props) {
       <div class="bk-meta">
         <div class="bk-meta-items">
           <time datetime={article.date}>{article.date}</time>
+          {article.updated === undefined ? null : (
+            <span class="bk-updated">
+              {labels.updated} <time datetime={article.updated}>{article.updated}</time>
+            </span>
+          )}
           <span class="bk-words" data-region={REGIONS.words}>{labels.words(article.words)}</span>
           {article.draft ? <span class="bk-draft">{labels.draft}</span> : null}
           {article.tags.length === 0 ? null : (

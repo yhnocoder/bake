@@ -45,6 +45,7 @@ toc: notes
 | `title` | 是 | 文章标题。 |
 | `slug` | 是 | 网址的最后一段，只能用小写字母、数字和 `-`。 |
 | `date` | 是 | 写作日期，格式 `YYYY-MM-DD`，年月进入网址。 |
+| `updated` | 否 | 最后修改的日期，格式 `YYYY-MM-DD`，不能早于 `date`。页头在日期后面显示“更新于”，sitemap 用它作为页面的修改时间；网址仍然取 `date` 的年月。 |
 | `summary` | 否 | 一句摘要，用于页头导语、首页卡片、网页描述和 RSS。 |
 | `category` | 否 | 分类的 id，取自 `bake.config.js` 的 `categories`。站点配置了分类而文章不写时，文章归入 id 为 `default` 的“默认”分类；在 `categories` 里写一个 id 为 `default` 的分类，可以改它的名字、颜色、说明和位置。 |
 | `tags` | 否 | 标签列表，用于首页筛选。 |
@@ -324,7 +325,7 @@ def swiglu(x, w_gate, w_up, w_down):
 
 ## 图片与浮动
 
-图片放在和交互组件相同的图框里，引号里的文字是图注。图片文件放在文章文件夹里。
+图片放在和交互组件相同的图框里，引号里的文字是图注。图片文件放在文章文件夹里，地址写相对文章文件夹的路径。几篇文章共用的图片放在博客的 `public/` 里，地址以 `/` 开头，例如 `/images/logo.png`，按原样发布；`http` 或 `https` 开头的远程图片按原样引用，Bake 不检查也不下载。
 
 :::example
 ![FFN 的形状](ffn-shapes.svg "FFN 中间层的形状：先升维到 $d_{ff}$，再降回 $d$。")
@@ -460,6 +461,8 @@ def swiglu(x, w_gate, w_up, w_down):
 SwiGLU 的反向传播同样遵循[链式法则](/2026-10/syntax-linked/#链式法则)，门控的梯度按[这一段](/2026-10/syntax-linked/#local-grad)的方法计算，可以参考[交互式组件](/2026-10/syntax-linked/#门控函数的导数)。整篇文章见[被引用的文章](/2026-10/syntax-linked/)。
 :::
 
+指向站内其他文件的链接，例如 `/feed.xml`、`public/` 里的 `/files/cv.pdf`、文章文件夹里的 `data.csv`，Bake 同样检查目标是否存在，以 `/` 开头的地址在发布时改写成相对当前页面的地址，所以博客发布在子路径下也不会断。
+
 `:::embed` 把其他文章的内容嵌入这里，每行写一个地址。地址指向标题时嵌入整节，到下一个同级标题为止；指向段落锚点时只嵌入这一段。
 
 ::::example
@@ -535,6 +538,9 @@ def silu(x):
 | 组件写了锚点或类名 | `:::act-fn-plot{#plot}` | `components take no id or class; remove the id from :::act-fn-plot` |
 | 组件声明不是字面量 | `components/range-plot.js` 写 `params = { n: range('N') }` | `range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |
+| 链接指向站内不存在的路径 | `[关于](/about/)` | `link target /about/ is not a page or a file of the site` |
+| 块名和冒号之间有空格 | `::: aside` | `the name of a block follows the colons without a space; write :::aside` |
+| 代码块的语言名写错 | ` ```pyhton ` | `unknown code language "pyhton"; did you mean "python"?` |
 | 嵌入本文自己 | `:::embed` 里写本文的地址 | `:::embed cannot embed the article itself` |
 | 同一个地址写两次 | `:::embed` 里两行相同 | `:::embed lists /2026-10/syntax-linked/#向量与雅可比矩阵的乘积 twice` |
 | 一个地址包含另一个 | 同时写 `#chain-rule` 和它里面的 `#local-grad` | `:::embed address /2026-10/syntax-linked/#链式法则 contains /2026-10/syntax-linked/#local-grad` |

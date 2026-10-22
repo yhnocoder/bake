@@ -9,6 +9,7 @@ import { walk, walkWithSidenotes } from './tree.js';
 const PREVIEW_BLOCKS = 3;
 const EMBEDDABLE = new Set(['heading', 'paragraph']);
 const EMBED_EXAMPLE = 'such as /2026-10/slug/#anchor';
+const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 
 export function indexTargets(article) {
   const { tree } = article;
@@ -51,6 +52,7 @@ export function indexTargets(article) {
 // Returns the paths of the site that the article looked up, the pages its links and embeds depend on.
 export function linkArticle(article, site, errors) {
   article.errors = errors;
+  article.siteLinks = [];
   const paths = new Set();
   const recorded = {
     find(address, source) {
@@ -92,7 +94,10 @@ function checkLink(article, node, site, ids) {
     return;
   }
   const address = parseAddress(node.url);
-  if (address === null) return;
+  if (address === null) {
+    if (!URL_SCHEME.test(node.url) && !node.url.startsWith('//')) article.siteLinks.push({ url: node.url, position: node.position.start });
+    return;
+  }
   if (address.problem !== undefined) {
     article.report(node.position.start, `link target ${address.written} ${address.problem}`);
     return;

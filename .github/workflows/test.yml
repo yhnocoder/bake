@@ -23,18 +23,20 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: node --test --test-shard=${{ matrix.shard }}/2 "test/*.test.js"
+      - run: npm test
 
   browser:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     timeout-minutes: 5
     strategy:
       fail-fast: false

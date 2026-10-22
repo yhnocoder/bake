@@ -25,7 +25,7 @@ const CLIENT_FILES = new Map([...readdirSync(CLIENT_DIR).map((file) => [file, jo
 
 export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEFAULT_HOST, print = console.log } = {}) {
   const root = resolve(blogRoot);
-  const preview = createPreview(root);
+  const preview = createPreview(root, `http://${addressHost(host)}:${port}/`);
   const serverId = randomUUID();
   const token = randomBytes(32).toString('base64url');
   const clients = new Set();

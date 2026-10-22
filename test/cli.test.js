@@ -15,12 +15,13 @@ function bakeIn(dir, ...args) {
 }
 
 describe('bake cli', () => {
-  test('--help lists the commands and the options of dev, says why bake dev is opened at localhost and exits 0', () => {
+  test('--help lists the commands and their options, says why bake dev is opened at localhost and exits 0', () => {
     const result = bake('--help');
     assert.equal(result.status, 0);
     assert.match(result.stdout, /^Usage: bake <command>/);
-    for (const command of ['init \\[folder\\]', 'new <path>', 'dev', 'build']) assert.match(result.stdout, new RegExp(`^  ${command} `, 'm'));
-    assert.match(result.stdout, /^  --no-open {10}Do not open the browser when bake dev starts$/m);
+    for (const command of ['init \\[folder\\]', 'new <title\\|path>', 'dev', 'build', 'preview']) assert.match(result.stdout, new RegExp(`^  ${command} `, 'm'));
+    for (const option of ['--language <code>', '--no-install', '--slug <slug>', '--url <address>', '--port <number>']) assert.match(result.stdout, new RegExp(`^  ${option} `, 'm'));
+    assert.match(result.stdout, /^  --no-open {10}Do not open the browser when bake dev or bake preview starts$/m);
     assert.match(result.stdout, /^  --host <address> {3}Address that bake dev listens on, 127\.0\.0\.1 by default/m);
     assert.match(result.stdout, /^Open bake dev at localhost rather than 127\.0\.0\.1: the AI chat stores its key with a passkey,\nand browsers do not create passkeys for an IP address\.$/m);
   });
@@ -117,11 +118,51 @@ describe('bake cli', () => {
     assert.equal(existsSync(join(dir, 'dist')), false);
   });
 
-  test('build rejects arguments', (t) => {
+  test('build rejects arguments other than --url and an address that is not absolute', (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
-    const result = bakeIn(dir, 'build', 'now');
-    assert.equal(result.stderr, 'bake build: unexpected argument "now"\n');
-    assert.equal(result.status, 1);
+    for (const args of [['now'], ['--url'], ['--port', '1']]) {
+      const result = bakeIn(dir, 'build', ...args);
+      assert.equal(result.stderr, 'Usage: bake build [--url <address>]\n', args.join(' '));
+      assert.equal(result.status, 1);
+    }
+    const relative = bakeIn(dir, 'build', '--url', 'blog/');
+    assert.equal(relative.stderr, 'bake build: --url must be an absolute http or https URL, got "blog/"\n');
+    assert.equal(existsSync(join(dir, 'dist')), false);
+  });
+
+  test('preview builds a blog without url for the address it serves at and answers like GitHub Pages', { timeout: 60000 }, async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': "export default { title: 'Notes', language: 'en' };\n", 'content/posts/rope/index.md': article() });
+    const child = spawn(process.execPath, [cli, 'preview', '--port', '0', '--no-open'], { cwd: dir });
+    t.after(() => child.kill());
+    let output = '';
+    child.stderr.on('data', (chunk) => {
+      output += chunk;
+    });
+    const origin = await new Promise((done) => {
+      child.stdout.on('data', (chunk) => {
+        output += chunk;
+        const match = /Serving dist\/ at (http:\/\/localhost:\d+)\/\n/.exec(output);
+        if (match) done(match[1]);
+      });
+      child.on('exit', () => done(null));
+    });
+    assert.notEqual(origin, null, output);
+    const page = await fetch(`${origin}/2026-10/rope/`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), new RegExp(`<link rel="canonical" href="${origin}/2026-10/rope/">`));
+    assert.equal((await fetch(`${origin}/missing/`)).status, 404);
+  });
+
+  test('a bake installed elsewhere hands a command in a blog to the Bake that the blog installs', (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'node_modules/@yhnocoder/bake/package.json': JSON.stringify({ name: '@yhnocoder/bake', type: 'module', bin: { bake: 'cli.js' } }),
+      'node_modules/@yhnocoder/bake/cli.js': "console.log(`local bake ${process.argv.slice(2).join(' ')}`);\nprocess.exitCode = 3;\n",
+    });
+    const result = bakeIn(dir, 'build', '--url', 'https://example.com');
+    assert.equal(result.stdout, 'local bake build --url https://example.com\n');
+    assert.equal(result.status, 3);
+    assert.equal(existsSync(join(dir, 'dist')), false);
   });
 
   test('unknown command is named in the error', () => {

@@ -112,7 +112,7 @@ test.describe('copying from an article gives the Markdown source of the selectio
     const table = '#文章开头的-front-matter ~ .bk-block table';
     const header = [sourceLine('| 字段 |'), sourceLine('|---|')];
     await select(page, { selector: `${table} td`, text: '网址的最后一段' }, { selector: `${table} td`, text: '一句摘要', after: true });
-    assert.equal((await copied(page)).text, [...header, sourceLine('| `slug` |'), sourceLine('| `date` |'), sourceLine('| `summary` |')].join('\n'));
+    assert.equal((await copied(page)).text, [...header, sourceLine('| `slug` |'), sourceLine('| `date` |'), sourceLine('| `updated` |'), sourceLine('| `summary` |')].join('\n'));
     await select(page, { selector: `${table} td`, text: '时不发布' }, { selector: '#文章开头的-front-matter ~ .bk-block p', contains: '指向的脚本' });
     assert.equal((await copied(page)).text, [...header, sourceLine('| `draft` |'), sourceLine('| `page` |')].join('\n'));
   });

@@ -4,8 +4,8 @@ import { createSite, updateSite } from '../build/site.js';
 import { BUILT_IN_BLOCKS, IMAGE_ATTRIBUTES } from '../markdown/parse.js';
 import { sourceVersion } from './params.js';
 
-export function createPreview(root) {
-  const site = createSite(root, { drafts: true, base: '/', prefetch: false });
+export function createPreview(root, localUrl) {
+  const site = createSite(root, { drafts: true, base: '/', localUrl, prefetch: false });
   let pages = new Map();
   let home = null;
   let siteFiles = new Map();

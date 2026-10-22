@@ -29,7 +29,7 @@ export default function Page(props) {
 }
 `;
 
-const siteFiles = ['404.html', '_bake/articles.json', '_bake/pet/LICENSE.txt', '_bake/pet/frame.webp', '_bake/pet/pet.json', '_bake/pet/spritesheet.webp', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml'];
+const siteFiles = ['404.html', '_bake/articles.json', '_bake/pet/LICENSE.txt', '_bake/pet/frame.webp', '_bake/pet/pet.json', '_bake/pet/spritesheet.webp', '_bake/preamble.json', '_bake/theme.css', 'feed.xml', 'sitemap.xml', 'robots.txt'];
 
 function articleFiles(tree) {
   return Object.keys(tree).filter((path) => !path.startsWith('assets/') && !path.startsWith('og/') && !siteFiles.includes(path));

@@ -206,6 +206,14 @@ describe('aside and fold', () => {
     ]);
   });
 
+  test('reports a space between the colons and the name of a block at the opening line and not again at its closing line', async () => {
+    assert.deepEqual((await parse('::: aside\nhi\n:::\n\n:::: fold {title=x}\n\nyo\n\n::::\n\n:::\n')).errors, [
+      'index.md:7:1 the name of a block follows the colons without a space; write :::aside',
+      'index.md:11:1 the name of a block follows the colons without a space; write ::::fold',
+      'index.md:17:1 this ::: line closes no block; a block inside another block needs fewer colons than the outer block',
+    ]);
+  });
+
   test('keeps ::: lines inside a fenced code block from closing the block around it', async () => {
     const article = await parsed(':::aside\n```markdown\n:::\n```\n~~~~\n:::\n~~~\n:::\n~~~~\n:::\n\n## After\n');
     assert.equal(outline(article.intro[0].html), '<aside class="aside">\n```markdown\n:::\n```\n```\n:::\n~~~\n:::\n```\n</aside>');

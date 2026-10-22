@@ -13,6 +13,10 @@ export function isKnownLanguage(language) {
   return isPlainLang(language) || Object.hasOwn(bundledLanguages, language);
 }
 
+export function knownLanguages() {
+  return Object.keys(bundledLanguages);
+}
+
 export async function loadLanguages(languages) {
   const instance = await highlighter();
   const missing = [...new Set(languages)].filter((language) => !isPlainLang(language) && !instance.getLoadedLanguages().includes(language));

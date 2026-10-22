@@ -81,3 +81,28 @@ function checkDuplicateUrls(articles, errors) {
     else owners.set(article.url, article.file);
   }
 }
+
+// A link to a path of the site that is not an article, such as /about/ or a file in public/, is checked against the files that the build writes, which are known only at its end.
+export function checkSiteLinks(articles, outputs, errors) {
+  const paths = new Set(outputs.map((output) => output.path));
+  for (const article of articles) {
+    for (const { url, position } of article.document?.siteLinks ?? []) {
+      const path = linkedPath(url, article.url);
+      if (path !== null && !servedPaths(path).some((served) => paths.has(served))) errors.push(errorAt(article.file, position, `link target ${url} is not a page or a file of the site`));
+    }
+  }
+}
+
+function linkedPath(url, from) {
+  try {
+    return decodeURIComponent(new URL(url, `http://site${from}`).pathname).slice(1);
+  } catch {
+    return null;
+  }
+}
+
+// GitHub Pages serves a folder from its index.html, and a path without an extension also from the HTML file of that name.
+function servedPaths(path) {
+  if (path === '' || path.endsWith('/')) return [`${path}index.html`];
+  return [path, `${path}/index.html`, `${path}.html`];
+}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { serveStatic } from '../../scripts/static-server.js';
+import { serveStatic } from '../../src/dev/static-server.js';
 import { article, filler, validConfig } from '../blog.js';
 import { test as base } from './browser.js';
 

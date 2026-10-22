@@ -18,9 +18,23 @@ describe('bake new', () => {
     const content = readFileSync(join(dir, 'content/posts/2026-10/rope/index.md'), 'utf8');
     const date = /^date: (.+)$/m.exec(content)[1];
     assert.ok([before, after].includes(date), date);
-    assert.equal(content, `---\ntitle: rope\nslug: rope\ndate: ${date}\ndraft: true\n---\n\n`);
+    assert.equal(content, `---\ntitle: rope\nslug: rope\ndate: ${date}\ndraft: true\n# summary: One sentence for the homepage card, the share image and the RSS feed\n# tags: []\n---\n\n`);
     assert.equal(result.stdout, `Created content/posts/2026-10/rope/index.md (URL: /${date.slice(0, 7)}/rope/)\n`);
     assert.equal(result.status, 0);
+  });
+
+  test('creates a draft from a title, with the slug from its letters a to z and digits or from --slug', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig });
+    const fromTitle = bake(dir, 'new', 'Why Transformers Need LayerNorm');
+    assert.equal(fromTitle.status, 0, fromTitle.stderr);
+    assert.match(readFileSync(join(dir, 'content/posts/why-transformers-need-layernorm/index.md'), 'utf8'), /^---\ntitle: Why Transformers Need LayerNorm\nslug: why-transformers-need-layernorm\n/);
+    const withSlug = bake(dir, 'new', 'Rope 数据结构', '--slug', 'rope');
+    assert.equal(withSlug.status, 0, withSlug.stderr);
+    assert.match(readFileSync(join(dir, 'content/posts/rope/index.md'), 'utf8'), /^---\ntitle: Rope 数据结构\nslug: rope\n/);
+    const withoutLetters = bake(dir, 'new', '数据结构');
+    assert.equal(withoutLetters.stderr, 'bake new: the title "数据结构" has no letters a to z or digits to make a slug of; give one with --slug <slug>\n');
+    assert.equal(withoutLetters.status, 1);
+    assert.deepEqual(await build(dir), []);
   });
 
   test('creates an article that bake build accepts as a draft', async (t) => {
@@ -55,7 +69,7 @@ describe('bake new', () => {
   test('prints its usage without a path', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig });
     const result = bake(dir, 'new');
-    assert.equal(result.stderr, 'Usage: bake new <path>\n');
+    assert.equal(result.stderr, 'Usage: bake new <title|path> [--slug <slug>]\n');
     assert.equal(result.status, 1);
   });
 

@@ -8,10 +8,11 @@ import { unified } from 'unified';
 import { convertAttribute, optionProblem, resolveComponent } from '../components/declarations.js';
 import { WIDTHS, choiceProblem, folderFile, parseSize, sizeProblem } from '../config/rules.js';
 import { percentDecode, referenceId, sidenoteId } from '../shared/fragments.js';
-import { isKnownLanguage, loadLanguages } from '../render/code.js';
+import { isKnownLanguage, knownLanguages, loadLanguages } from '../render/code.js';
 import { IMAGE_FORMATS, publishedImage, readImage } from '../render/images.js';
 import { EQUATION_ID_PREFIX, typesetMath } from '../render/math.js';
 import { listAll, listChoices } from '../shared/report.js';
+import { meantName } from '../shared/suggest.js';
 import { encodePath } from '../shared/urls.js';
 import { HEADING_ATTRIBUTE_SUFFIX, PARAGRAPH_ANCHOR_SUFFIX, parseAttributes } from './attributes.js';
 import { bakeBlocks } from './block-syntax.js';
@@ -55,6 +56,7 @@ export const IMAGE_ATTRIBUTES = {
 };
 const BLOCK_LINE = /^([A-Za-z][\w-]*)?(\{.*\})?$/;
 const STRAY_CLOSING_LINE = /^([\s>]*):{3,}\s*$/;
+const SPACED_OPENING_LINE = /^([\s>]*)(:{3,})[ \t]+([A-Za-z][\w-]*)/;
 const IMAGE_ATTRIBUTE_TEXT = /^\{[^{}\n]*\}/;
 const URL_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const WHITESPACE = /\s/;
@@ -110,11 +112,12 @@ export function generatedIds(article) {
 }
 
 function readBlocksAndAnchors(article, tree) {
+  const spacedOpenings = { open: 0 };
   walk(tree, (node, parent) => {
     if (node.type === 'bakeBlock') readBlock(article, node, parent);
     if (node.type === 'heading') readHeading(article, node);
     if (node.type === 'paragraph') {
-      readStrayClosingLines(article, node);
+      readStrayClosingLines(article, node, spacedOpenings);
       readParagraphAnchor(article, node);
     }
   });
@@ -244,12 +247,21 @@ function readHeading(article, node) {
   }
 }
 
-function readStrayClosingLines(article, node) {
+// A block opened with a space after the colons, as other Markdown tools write it, stays text; its closing line is the next stray one, which is then not reported again.
+function readStrayClosingLines(article, node, spacedOpenings) {
   const raw = article.source.slice(node.position.start.offset, node.position.end.offset);
   let offset = node.position.start.offset;
   for (const line of raw.split('\n')) {
+    const spaced = SPACED_OPENING_LINE.exec(line);
     const colons = STRAY_CLOSING_LINE.exec(line);
-    if (colons) article.report(article.positionAt(offset + colons[1].length), 'this ::: line closes no block; a block inside another block needs fewer colons than the outer block');
+    if (spaced) {
+      article.report(article.positionAt(offset + spaced[1].length), `the name of a block follows the colons without a space; write ${spaced[2]}${spaced[3]}`);
+      spacedOpenings.open += 1;
+    } else if (colons && spacedOpenings.open > 0) {
+      spacedOpenings.open -= 1;
+    } else if (colons) {
+      article.report(article.positionAt(offset + colons[1].length), 'this ::: line closes no block; a block inside another block needs fewer colons than the outer block');
+    }
     offset += line.length + 1;
   }
 }
@@ -384,7 +396,8 @@ async function loadCodeLanguages(article, tree) {
     if (node.type === 'bakeBlock' && node.name === 'example') languages.add('markdown');
     if (node.type !== 'code') return;
     if (node.lang && !isKnownLanguage(node.lang)) {
-      article.report(node.position.start, `unknown code language "${node.lang}"`);
+      const meant = meantName(node.lang, knownLanguages());
+      article.report(node.position.start, `unknown code language "${node.lang}"${meant === undefined ? '' : `; did you mean "${meant}"?`}`);
       node.lang = null;
     }
     languages.add(node.lang ?? 'text');
@@ -401,6 +414,11 @@ async function readImages(article, tree) {
   for (const node of nodes) {
     node.published = { src: node.url };
     if (node.attributes.float !== undefined && !node.inFigure) article.report(node.attributesPosition, 'float only applies to an image that starts a paragraph');
+    if (URL_SCHEME.test(node.url) || node.url.startsWith('//')) continue;
+    if (node.url.startsWith('/')) {
+      await readPublicImage(article, node);
+      continue;
+    }
     const source = addressFile(article, node.url);
     if (source === null) {
       article.report(node.position.start, `image ${node.url} is not a file in the article folder`);
@@ -432,6 +450,21 @@ async function readImages(article, tree) {
     }
   }
   article.image = publishedPaths.get(nodes.find((node) => publishedPaths.has(node)));
+}
+
+// An image in public/ is published there as it is, so the page only learns its size.
+async function readPublicImage(article, node) {
+  const path = percentDecode(node.url.split(/[?#]/)[0].slice(1));
+  const inside = path !== null && path !== '' && !posix.normalize(path).startsWith('../');
+  const content = inside ? (article.publicFiles?.read(posix.normalize(path)) ?? null) : null;
+  if (content === null) {
+    article.report(node.position.start, `image ${node.url} is not a file in public/`);
+    return;
+  }
+  const image = await readImage(content);
+  if (image.error !== undefined) article.report(node.position.start, `image ${node.url} cannot be read: ${image.error}`);
+  else if (image.format === null) article.report(node.position.start, `image ${node.url} is not a ${IMAGE_FORMATS} file`);
+  else node.published = imageProperties(node.attributes, { path: `${article.context.root}${posix.normalize(path)}`, width: image.width, height: image.height });
 }
 
 function linkedFiles(article, tree) {

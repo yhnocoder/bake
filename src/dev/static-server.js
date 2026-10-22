@@ -2,9 +2,12 @@ import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import { createGzip } from 'node:zlib';
-import { contentType } from '../src/shared/content-types.js';
+import { contentType } from '../shared/content-types.js';
 
-export async function serveStatic(dir, { gzip = false, localhost = false } = {}) {
+const PORT_ATTEMPTS = 20;
+
+// Serves a built site as GitHub Pages does: 404.html for a missing file, and a cache time for the hashed files in assets/.
+export async function serveStatic(dir, { gzip = false, localhost = false, port = 0 } = {}) {
   const root = resolve(dir);
   const assets = join(root, 'assets');
   const server = createServer((request, response) => {
@@ -33,7 +36,7 @@ export async function serveStatic(dir, { gzip = false, localhost = false } = {})
     response.writeHead(status, { 'content-type': type, ...cache });
     createReadStream(path).pipe(response);
   };
-  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  await listen(server, port);
   return {
     // why: the AI chat appears only at localhost
     origin: `http://${localhost ? 'localhost' : '127.0.0.1'}:${server.address().port}`,
@@ -43,6 +46,24 @@ export async function serveStatic(dir, { gzip = false, localhost = false } = {})
         server.closeAllConnections();
       }),
   };
+}
+
+// A port in use moves to the next one, as in bake dev; port 0 takes any free port.
+async function listen(server, port) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await new Promise((done, failed) => {
+        server.once('error', failed);
+        server.listen(port === 0 ? 0 : port + attempt, '127.0.0.1', () => {
+          server.off('error', failed);
+          done();
+        });
+      });
+      return;
+    } catch (error) {
+      if (error.code !== 'EADDRINUSE' || port === 0 || attempt === PORT_ATTEMPTS - 1) throw error;
+    }
+  }
 }
 
 function compressible(type) {

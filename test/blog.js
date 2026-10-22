@@ -76,10 +76,10 @@ function hashTree(hash, path) {
   for (const name of readdirSync(path).sort()) if (!EXAMPLE_OUTPUTS.has(name)) hashTree(hash, join(path, name));
 }
 
-export async function build(dir) {
+export async function build(dir, options) {
   // why: loading the build takes a second, which a test process that finds its blogs already built does not spend
   const { build: buildBlog } = await import('../src/build/build.js');
-  return (await buildBlog(dir)).errors.map(formatError);
+  return (await buildBlog(dir, options)).errors.map(formatError);
 }
 
 export function writeFiles(dir, files) {

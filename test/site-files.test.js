@@ -20,7 +20,7 @@ const pageHtml = '<!doctype html>\n<link rel="stylesheet" href="../../_bake/them
 
 const blogFiles = {
   'bake.config.js': subPathConfig,
-  'content/posts/rope/index.md': article({ title: "Rope & <'angles'>", slug: 'rope', date: '2026-10-14', extra: 'category: ml\nsummary: Rotary <positions> & more.\n', body: 'Secret body text.\n' }),
+  'content/posts/rope/index.md': article({ title: "Rope & <'angles'>", slug: 'rope', date: '2026-10-14', extra: 'updated: 2026-10-21\ncategory: ml\nsummary: Rotary <positions> & more.\n', body: 'Body text.\n' }),
   'content/posts/alpha/index.md': article({ title: 'Alpha', slug: 'alpha', date: '2026-10-14', extra: 'category: notes\n' }),
   'content/posts/demo/index.md': '---\ntitle: Demo\nslug: demo\ndate: 2026-09-05\ncategory: notes\nsummary: A page.\npage: demo.html\n---\n',
   'content/posts/demo/demo.html': pageHtml,
@@ -58,13 +58,13 @@ function probed(html) {
 }
 
 describe('site files', () => {
-  test('feed.xml lists the published articles and plain HTML pages newest first with absolute links and summaries only', async (t) => {
+  test('feed.xml lists the published articles and plain HTML pages newest first with absolute links and summaries', async (t) => {
     const { read } = await built(t, blogFiles);
     assert.equal(
-      read('feed.xml'),
+      read('feed.xml').replace(/<content:encoded>[\s\S]*?<\/content:encoded>\n/g, ''),
       [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">',
         '<channel>',
         '<title>Notes &amp; &lt;Models&gt;</title>',
         '<link>https://x.github.io/bake/</link>',
@@ -101,6 +101,23 @@ describe('site files', () => {
     );
   });
 
+  test('feed.xml carries the whole text of each Markdown article with its sidenotes and absolute addresses', async (t) => {
+    const body = 'See [alpha](/2026-10/alpha/), [the notes](#notes) and [a file](data.txt)[^1].\n\n[^1]: A sidenote.\n\n## Notes\n\nLast words.\n';
+    const { read } = await built(t, { ...blogFiles, 'content/posts/rope/index.md': article({ slug: 'rope', date: '2026-10-14', extra: 'category: ml\n', body }), 'content/posts/rope/data.txt': 'x\n' });
+    const items = [...read('feed.xml').matchAll(/<item>[\s\S]*?<\/item>/g)].map(([item]) => item);
+    const content = /<content:encoded>([\s\S]*?)<\/content:encoded>/.exec(items.find((item) => item.includes('/2026-10/rope/')))[1].replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&');
+    assert.match(content, /<p>See <a class="internal-link" href="https:\/\/x\.github\.io\/bake\/2026-10\/alpha\/">alpha<\/a>, <a href="https:\/\/x\.github\.io\/bake\/2026-10\/rope\/#notes">the notes<\/a> and <a href="https:\/\/x\.github\.io\/bake\/2026-10\/rope\/data\.txt">a file<\/a>/);
+    assert.match(content, /<h2>Notes<\/h2>\n<p>Last words\.<\/p>\n<ol><li id="sidenote-1"><p>A sidenote\.<\/p><\/li><\/ol>$/);
+    assert.doesNotMatch(items.find((item) => item.includes('/2026-09/demo/')), /content:encoded/);
+  });
+
+  test('robots.txt allows every page and names the sitemap, unless public/ holds a robots.txt', async (t) => {
+    const { read } = await built(t, blogFiles);
+    assert.equal(read('robots.txt'), 'User-agent: *\nAllow: /\n\nSitemap: https://x.github.io/bake/sitemap.xml\n');
+    const own = await built(t, { ...blogFiles, 'public/robots.txt': 'User-agent: *\nDisallow: /drafts/\n' });
+    assert.equal(own.read('robots.txt'), 'User-agent: *\nDisallow: /drafts/\n');
+  });
+
   test('feed.xml uses the site title as the channel description when the site has none', async (t) => {
     const { read } = await built(t, { 'bake.config.js': validConfig.replace("url: 'https://example.com'", "url: 'https://example.com/'") });
     const feed = read('feed.xml');
@@ -117,9 +134,9 @@ describe('site files', () => {
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         '<url><loc>https://x.github.io/bake/</loc></url>',
-        '<url><loc>https://x.github.io/bake/2026-10/alpha/</loc></url>',
-        '<url><loc>https://x.github.io/bake/2026-10/rope/</loc></url>',
-        '<url><loc>https://x.github.io/bake/2026-09/demo/</loc></url>',
+        '<url><loc>https://x.github.io/bake/2026-10/alpha/</loc><lastmod>2026-10-14</lastmod></url>',
+        '<url><loc>https://x.github.io/bake/2026-10/rope/</loc><lastmod>2026-10-21</lastmod></url>',
+        '<url><loc>https://x.github.io/bake/2026-09/demo/</loc><lastmod>2026-09-05</lastmod></url>',
         '</urlset>',
         '',
       ].join('\n'),

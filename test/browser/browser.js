@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { join } from 'node:path';
 import { serialize } from 'node:v8';
 import { test as base } from '@playwright/test';
-import { serveStatic } from '../../scripts/static-server.js';
+import { serveStatic } from '../../src/dev/static-server.js';
 
 export { expect } from '@playwright/test';
 
