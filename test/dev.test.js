@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -113,13 +113,12 @@ describe('bake dev', () => {
     assert.equal(allowedHost(hostName('studio.lan.evil.example'), 'studio.lan'), false);
   });
 
-  test('sends HTML pages with headers that refuse framing by other sites', async (t) => {
+  test('sends HTML pages with headers that allow framing only by bake dev itself and by VS Code', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': article() });
     const { get } = await start(t, dir);
     for (const path of ['/', '/2026-10/rope/', '/missing/']) {
       const response = await get(path);
-      assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN', path);
-      assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'self'", path);
+      assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'self' vscode-webview: vscode-file:", path);
     }
   });
 
@@ -408,6 +407,54 @@ describe('updates while bake dev runs', () => {
     await save(dir, { 'components/demo-chart.js': chart("size: { label: 'Size', type: 'number', default: 1 }") }, () => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
     await save(dir, { 'components/demo-chart.js': chart("scale: { label: 'Scale', type: 'number', default: 1 }") }, () => lines.at(-1) === '1 error', `bake dev printed ${JSON.stringify(lines)}`);
     assert.match(lines.at(-2), /^content\/posts\/rope\/index\.md:7:\d+ .*size/);
+  });
+
+  test('shows the unsaved text that an editor sends, and the file again when the text is withdrawn or the file is saved', async (t) => {
+    const file = 'content/posts/rope/index.md';
+    const { dir, lines, text, server } = await serve(t, { [file]: article({ body: 'Saved text.\n' }) });
+    const token = /data-token="([^"]+)"/.exec(await text('/2026-10/rope/'))[1];
+    const send = (body, headers = { 'x-bake-token': token }) => fetch(new URL('/__bake/source', server.url), { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    assert.equal((await send({ file, text: article({ body: 'Unsaved text.\n' }) })).status, 200);
+    await eventually(async () => (await text('/2026-10/rope/')).includes('Unsaved text.'), 'the unsaved text was not served');
+    assert.equal(readFileSync(join(dir, file), 'utf8'), article({ body: 'Saved text.\n' }));
+    await send({ file, text: article({ body: '\nUnsaved text[^missing].\n' }) });
+    await eventually(() => lines.includes(`${file}:8:13 footnote "missing" has no definition`), `bake dev printed ${JSON.stringify(lines)}`);
+    await send({ file, text: null });
+    await eventually(async () => lines.at(-1) !== '1 error' && (await text('/2026-10/rope/')).includes('Saved text.'), 'the saved file was not served again');
+    await send({ file, text: article({ body: 'Unsaved again.\n' }) });
+    await eventually(async () => (await text('/2026-10/rope/')).includes('Unsaved again.'), 'the second unsaved text was not served');
+    await save(dir, { [file]: article({ body: 'Saved on disk.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Saved on disk.'), 'the saved file did not replace the unsaved text');
+    assert.equal((await send({ file, text: 'x' }, {})).status, 403);
+    assert.equal((await send({ file: 'content/posts/other/index.md', text: 'x' })).status, 404);
+  });
+
+  test('lists the articles with their addresses, and the blocks that an article can use and the attributes of its images and headings', async (t) => {
+    const { get } = await serve(t, {
+      'content/posts/rope/index.md': article({ extra: 'theme: bento\n' }),
+      'content/posts/gelu/index.md': article({ slug: 'gelu' }),
+      'content/posts/gelu/components/gelu-plot.js': 'export default class GeluPlot extends HTMLElement {}\n',
+      'components/demo-chart.js': "export const params = { fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'gelu' } };\n\nexport default class DemoChart extends HTMLElement {}\n",
+    });
+    const { articles } = await (await get('/__bake/articles')).json();
+    assert.deepEqual(articles.map(({ file, url }) => ({ file, url })), [
+      { file: 'content/posts/gelu/index.md', url: '/2026-10/gelu/' },
+      { file: 'content/posts/rope/index.md', url: '/2026-10/rope/' },
+    ]);
+    const { blocks, image, headings } = await (await get('/__bake/syntax?file=content/posts/rope/index.md')).json();
+    assert.deepEqual(image.float, { type: 'enum', options: ['left', 'right'] });
+    assert.deepEqual(Object.keys(image), ['width', 'height', 'float']);
+    assert.ok(Object.hasOwn(headings, 'cols'), JSON.stringify(headings));
+    const byName = new Map(blocks.map((block) => [block.name, block]));
+    assert.deepEqual(byName.get('fold'), { name: 'fold', kind: 'built-in', attributes: { title: { type: 'text', label: 'text in quotes, for example title="Notes"' } } });
+    assert.deepEqual(byName.get('note').attributes.color, { type: 'enum', options: ['yellow', 'green', 'blue', 'pink'] });
+    assert.equal(byName.get('note').kind, 'theme');
+    assert.deepEqual(byName.get('demo-chart'), { name: 'demo-chart', kind: 'component', attributes: { fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'gelu' } } });
+    assert.equal(byName.has('gelu-plot'), false);
+    const gelu = await (await get('/__bake/syntax?file=content/posts/gelu/index.md')).json();
+    assert.deepEqual(gelu.headings, { toc: { type: 'text' } });
+    assert.equal(gelu.blocks.some((block) => block.name === 'gelu-plot'), true);
+    assert.equal(gelu.blocks.some((block) => block.name === 'note'), false);
+    assert.equal((await get('/__bake/syntax?file=content/posts/none/index.md')).status, 404);
   });
 
   test('keeps every page while bake.config.js has problems and uses the fixed configuration', async (t) => {

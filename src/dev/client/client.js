@@ -6,6 +6,13 @@ const { source, missing, file, token } = script.dataset;
 const scrollKey = `bake-dev-scroll:${location.pathname}`;
 const pagePath = location.pathname.replace(/index\.html$/, '');
 const BARS_KEY = 'bake-dev-param-bars';
+// why: the preview of the Bake extension for VS Code shows this page in a frame and talks to it with messages
+const editor = window.parent === window ? null : window.parent;
+// why: only a scroll that the reader starts moves the editor; the page also scrolls itself to keep the text in place after an update
+const READER_SCROLL_TIME = 500;
+let readerScrolled = -Infinity;
+let pointerDown = false;
+let scrollQueued = false;
 
 let pristine = null;
 let outline = JSON.parse(script.dataset.outline ?? '[]');
@@ -30,6 +37,14 @@ const loaded =
 const connected = connect();
 Promise.all([loaded, connected]).then(overlay.ready);
 document.addEventListener('dblclick', openInEditor);
+if (editor !== null) {
+  addEventListener('message', answerEditor);
+  for (const type of ['wheel', 'touchmove', 'keydown']) addEventListener(type, () => (readerScrolled = performance.now()), { passive: true });
+  addEventListener('pointerdown', () => (pointerDown = true));
+  for (const type of ['pointerup', 'pointercancel']) addEventListener(type, () => (pointerDown = false));
+  addEventListener('scroll', followReader, { passive: true });
+  editor.postMessage({ bake: 'ready', file: file ?? null }, '*');
+}
 
 function connect() {
   const events = new EventSource('/__bake/events');
@@ -281,5 +296,59 @@ function openInEditor(event) {
   if (event.composedPath().some((target) => target instanceof Element && target.matches('bake-param-bar'))) return;
   const block = event.target.closest(BLOCKS);
   if (block === null) return;
-  window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
+  if (editor === null) window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
+  else editor.postMessage({ bake: 'open', file, line: Number(block.dataset.line) }, '*');
+}
+
+function answerEditor(event) {
+  if (event.source !== editor) return;
+  const { bake, line, text } = event.data ?? {};
+  if (bake === 'reveal' && Number.isInteger(line) && !readerScrolling()) reveal(line);
+  if (bake === 'source' && token !== undefined && (typeof text === 'string' || text === null)) {
+    fetch('/__bake/source', { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token }, body: JSON.stringify({ file: event.data.file, text }) });
+  }
+}
+
+function readerScrolling() {
+  return pointerDown || performance.now() - readerScrolled < READER_SCROLL_TIME;
+}
+
+function followReader() {
+  if (scrollQueued || !readerScrolling()) return;
+  scrollQueued = true;
+  requestAnimationFrame(() => {
+    scrollQueued = false;
+    const positions = linePositions();
+    const top = scrollY + scrollPadding();
+    const index = positions.findLastIndex((position) => position.top <= top);
+    if (index === -1) return editor.postMessage({ bake: 'scroll', file, line: positions[0]?.line ?? 1 }, '*');
+    const [current, next] = [positions[index], positions[index + 1]];
+    const line = next === undefined ? current.line : current.line + ((top - current.top) / (next.top - current.top)) * (next.line - current.line);
+    editor.postMessage({ bake: 'scroll', file, line: Math.floor(line) }, '*');
+  });
+}
+
+function reveal(line) {
+  const positions = linePositions();
+  const index = positions.findLastIndex((position) => position.line <= line);
+  if (index === -1) return scrollTo({ top: 0, behavior: 'instant' });
+  const [current, next] = [positions[index], positions[index + 1]];
+  const top = next === undefined ? current.top : current.top + ((line - current.line) / (next.line - current.line)) * (next.top - current.top);
+  scrollTo({ top: top - scrollPadding(), behavior: 'instant' });
+}
+
+// why: the editor scrolls by lines and the page by pixels, so a line between the starts of two blocks is placed at the same fraction of the distance between their tops; blocks that the theme places out of order, such as sidenotes in the margin, are left out
+function linePositions() {
+  const positions = [];
+  for (const block of document.querySelectorAll(BLOCKS)) {
+    if (block.parentElement.closest(BLOCKS) !== null || !isShown(block)) continue;
+    const position = { line: Number(block.dataset.line), top: block.getBoundingClientRect().top + scrollY };
+    const last = positions.at(-1);
+    if (last === undefined || (position.line > last.line && position.top > last.top)) positions.push(position);
+  }
+  return positions;
+}
+
+function scrollPadding() {
+  return parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
 }

@@ -25,8 +25,7 @@ $$
 ReLU 和它的导数。拖动滑块改变横轴的范围和中心。
 :::
 
-:::sticker
-📈
+:::sticker{icon=chart}
 :::
 
 ## GELU {cols=2 rows=14}
@@ -59,8 +58,7 @@ $$
 
 它和 GELU 的形状很接近，计算更便宜。SwiGLU 用 SiLU 作为门控的激活函数。
 
-:::sticker
-$x\,\sigma(x)$
+:::sticker{icon=formula}
 :::
 
 ## 导数 {cols=2 rows=18}
@@ -99,8 +97,7 @@ $$
 沿用模型原来的激活函数。换成另一个函数后，学习率和初始化通常也要重新调。
 :::
 
-:::sticker
-🧪
+:::sticker{icon=flask}
 :::
 
 :::note{color=green}

@@ -1,0 +1,53 @@
+{
+  "scopeName": "markdown.bake.injection",
+  "injectionSelector": "L:text.html.markdown -markup.fenced_code -markup.inline.raw -markup.raw",
+  "patterns": [{ "include": "#block" }, { "include": "#heading" }, { "include": "#paragraph-anchor" }, { "include": "#citation" }, { "include": "#eqref" }],
+  "repository": {
+    "block": {
+      "match": "^((?:[ \\t]*>)*[ \\t]*)(:{3,})([A-Za-z][\\w-]*)?(\\{.*\\})?[ \\t]*$",
+      "captures": {
+        "2": { "name": "punctuation.definition.block.bake" },
+        "3": { "name": "entity.name.tag.block.bake" },
+        "4": { "patterns": [{ "include": "#attributes" }] }
+      }
+    },
+    "heading": {
+      "match": "^[ ]{0,3}(#{1,6})([ \\t]+)(.*?)[ \\t]*(\\{[^{}]*\\})[ \\t]*$",
+      "name": "markup.heading.markdown",
+      "captures": {
+        "1": { "name": "punctuation.definition.heading.markdown" },
+        "3": { "name": "entity.name.section.markdown", "patterns": [{ "include": "text.html.markdown#inline" }] },
+        "4": { "patterns": [{ "include": "#attributes" }] }
+      }
+    },
+    "attributes": {
+      "patterns": [
+        { "match": "[{}]", "name": "punctuation.definition.attributes.bake" },
+        { "match": "[#.][^\\s\"'={}]+", "name": "entity.other.attribute-name.id.bake" },
+        {
+          "match": "([A-Za-z_][\\w-]*)(?:(=)(\"[^\"]*\"|'[^']*'|[^\\s\"'={}]+))?",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.bake" },
+            "2": { "name": "punctuation.separator.key-value.bake" },
+            "3": { "name": "string.unquoted.bake" }
+          }
+        }
+      ]
+    },
+    "paragraph-anchor": {
+      "match": "(?<![\\p{L}\\p{N}_])\\^[A-Za-z0-9][\\w-]*(?=[ \\t]*$)",
+      "name": "entity.other.attribute-name.id.bake"
+    },
+    "citation": {
+      "match": "\\[@[^\\]\\s]+\\]",
+      "name": "markup.underline.link.citation.bake"
+    },
+    "eqref": {
+      "match": "(\\\\eqref)(\\{)([^}]*)(\\})",
+      "captures": {
+        "1": { "name": "support.function.eqref.bake" },
+        "3": { "name": "markup.underline.link.equation.bake" }
+      }
+    }
+  }
+}

@@ -64,6 +64,9 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname === `${DEV_PREFIX}events`) return openEvents(request, response);
     if (pathname === `${DEV_PREFIX}params`) return answerParams(request, response);
+    if (pathname === `${DEV_PREFIX}source`) return answerSource(request, response);
+    if (pathname === `${DEV_PREFIX}articles`) return sendJson(response, 200, { articles: preview.listing() });
+    if (pathname === `${DEV_PREFIX}syntax`) return answerSyntax(request, response);
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
     if (clientFile !== null && CLIENT_FILES.has(clientFile)) {
       response.writeHead(200, { 'content-type': contentType(clientFile), 'cache-control': 'no-store' });
@@ -97,18 +100,40 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
   }
 
   async function answerParams(request, response) {
-    if (request.method !== 'POST') return sendJson(response, 405, { error: 'send the parameters with POST' });
+    const body = await pageRequest(request, response, 'parameters');
+    if (body === undefined) return;
+    const [status, data] = changeParams(root, preview, body);
+    sendJson(response, status, data);
+  }
+
+  async function answerSource(request, response) {
+    const body = await pageRequest(request, response, 'text');
+    if (body === undefined) return;
+    const { file, text } = isPlainObject(body) ? body : {};
+    if (typeof text !== 'string' && text !== null) return sendJson(response, 400, { error: 'text must be the unsaved text of the article, or null for the saved file' });
+    const changedText = typeof file === 'string' ? preview.setUnsaved(file, text) : null;
+    if (changedText === null) return sendJson(response, 404, { error: `${describeValue(file)} is not an article of the blog` });
+    if (changedText) changed([file]);
+    sendJson(response, 200, {});
+  }
+
+  function answerSyntax(request, response) {
+    const file = new URL(request.url, 'http://localhost').searchParams.get('file');
+    const syntax = preview.syntax(file);
+    if (syntax === null) return sendJson(response, 404, { error: `${describeValue(file)} is not an article that bake dev has read` });
+    sendJson(response, 200, syntax);
+  }
+
+  async function pageRequest(request, response, what) {
+    if (request.method !== 'POST') return sendJson(response, 405, { error: `send the ${what} with POST` });
     if (!sameToken(request.headers[TOKEN_HEADER], token)) return sendJson(response, 403, { error: 'the request does not carry the token of this bake dev run; reload the page' });
-    if (!sameOrigin(request)) return sendJson(response, 403, { error: 'parameters can only be sent from a page that bake dev serves' });
-    if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) return sendJson(response, 415, { error: 'send the parameters as application/json' });
-    let body;
+    if (!sameOrigin(request)) return sendJson(response, 403, { error: `${what} can only be sent from a page that bake dev serves` });
+    if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) return sendJson(response, 415, { error: `send the ${what} as application/json` });
     try {
-      body = JSON.parse(await readBody(request));
+      return JSON.parse(await readBody(request));
     } catch (error) {
       return sendJson(response, 400, { error: `cannot read the request: ${error.message}` });
     }
-    const [status, data] = changeParams(root, preview, body);
-    sendJson(response, status, data);
   }
 
   let waiting = [];
@@ -132,6 +157,11 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     waiting.push(...paths);
     updating ??= applyChanges();
   };
+  // why: a file written on disk replaces the unsaved text that the editor sent for it
+  const saved = (paths) => {
+    preview.dropUnsaved(paths);
+    changed(paths);
+  };
 
   let stop;
   const stopped = new Promise((done) => {
@@ -145,7 +175,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     return new Promise((done) => server.close(() => done()));
   };
   // why: macOS reports changes only from a moment after fs.watch returns, so watching starts before the first build, which also catches a file saved during that build
-  const stopWatching = watchBlog(root, changed, (error) => {
+  const stopWatching = watchBlog(root, saved, (error) => {
     close().then(() => stop(`bake dev: cannot watch ${root}: ${error.message}`));
   });
   let listenedPort;
@@ -327,8 +357,8 @@ function sendHtml(response, status, html) {
   response.writeHead(status, {
     'content-type': contentType('index.html'),
     'cache-control': 'no-store',
-    'x-frame-options': 'SAMEORIGIN',
-    'content-security-policy': "frame-ancestors 'self'",
+    // why: the preview of the Bake extension shows the page in a VS Code webview, whose frames have these schemes
+    'content-security-policy': "frame-ancestors 'self' vscode-webview: vscode-file:",
   });
   response.end(html);
 }

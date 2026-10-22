@@ -44,11 +44,11 @@ export function publishedArticles(site, articles, errors) {
 
 // An article depends on the values of the settings it reads, so a change of bake.config.js or of a component that leaves them as they were keeps it.
 function articleOf(site, found) {
-  return site.memo.get(`article ${found.file}`, { found, settings: site.settings }, async (files) => {
+  return site.memo.get(`article ${found.file}`, { found, settings: site.settings, unsaved: site.unsaved.get(found.file) ?? null }, async (files) => {
     const article = files.value((context) => context.found);
     const rules = files.value((context) => context.settings.rules);
     const errors = [];
-    const source = files.read(join(files.root, article.file), 'utf8');
+    const source = files.value((context) => context.unsaved) ?? files.read(join(files.root, article.file), 'utf8');
     const frontMatter = readFrontMatter(article.file, source, { ...rules, files: article.files }, errors);
     const fields = frontMatter?.fields ?? null;
     const url = fields?.slug !== undefined && fields?.date !== undefined ? articleUrl(fields.date, fields.slug) : null;

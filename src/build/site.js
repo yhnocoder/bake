@@ -21,7 +21,7 @@ const SITE_FILES = [feedFiles, sitemapFiles, notFoundFiles, chatFiles, shareImag
 export function createSite(root, { drafts = false, base, shareImages = false, prefetch = true } = {}) {
   // why: Vite reports module paths with symbolic links resolved, and they are compared with paths under the root
   const real = realpathSync(root);
-  return { root: real, drafts, base, shareImages, prefetch, settings: null, memo: createMemo(real) };
+  return { root: real, drafts, base, shareImages, prefetch, settings: null, unsaved: new Map(), memo: createMemo(real) };
 }
 
 // changedPaths names the files and folders of the blog that changed since the last update, relative to the root; null rereads every input.

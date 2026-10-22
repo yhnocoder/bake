@@ -1,6 +1,7 @@
 import { posix } from 'node:path';
-import { POSTS_DIR } from '../build/articles.js';
+import { POSTS_DIR, findArticles } from '../build/articles.js';
 import { createSite, updateSite } from '../build/site.js';
+import { BUILT_IN_BLOCKS, IMAGE_ATTRIBUTES } from '../markdown/parse.js';
 import { sourceVersion } from './params.js';
 
 export function createPreview(root) {
@@ -11,6 +12,7 @@ export function createPreview(root) {
   let publicFiles = new Map();
   const assetFiles = new Map();
   let articles = [];
+  let read = new Map();
   let problems = [];
   let changedPaths = [];
 
@@ -26,6 +28,7 @@ export function createPreview(root) {
     if (home?.html !== nextHome.html) changes.reload = changes.reload === 'all' ? 'all' : ['/', ...changes.reload];
     pages = next;
     home = nextHome;
+    read = new Map(result.articles.map((article) => [article.file, article]));
     articles = result.articles.map((article) => ({ file: article.file, title: article.fields?.title, date: article.fields?.date, draft: article.draft }));
     siteFiles = new Map(result.siteFiles.map((output) => [output.path, output]));
     publicFiles = new Map(result.publicFiles.map((output) => [output.path, output]));
@@ -53,7 +56,44 @@ export function createPreview(root) {
     return found?.valid ? found : null;
   }
 
-  return { update, find, listing, problems: () => problems, page: (file) => pages.get(file) ?? null, component };
+  function setUnsaved(file, text) {
+    if (!findArticles(site.root).some((article) => article.file === file)) return null;
+    const changed = (site.unsaved.get(file) ?? null) !== text;
+    if (text === null) site.unsaved.delete(file);
+    else site.unsaved.set(file, text);
+    return changed;
+  }
+
+  function dropUnsaved(paths) {
+    for (const path of paths) site.unsaved.delete(path);
+  }
+
+  function syntax(file) {
+    const { settings } = site;
+    const article = read.get(file);
+    if (settings?.markdown === undefined || article === undefined) return null;
+    const theme = settings.markdown.get(article.fields?.theme ?? settings.rules.theme);
+    const dir = posix.dirname(file);
+    const components = [...settings.components.values()].filter((found) => found.valid && (found.article === null || found.article === dir));
+    const blocks = [
+      ...Object.entries(BUILT_IN_BLOCKS).map(([name, attributes]) => ({ name, kind: 'built-in', attributes: builtInAttributes(attributes) })),
+      ...Object.entries(theme?.blocks ?? {}).map(([name, attributes]) => ({ name, kind: 'theme', attributes })),
+      ...components.map((found) => ({ name: found.name, kind: 'component', attributes: found.params })),
+    ];
+    return { blocks, image: builtInAttributes(IMAGE_ATTRIBUTES), headings: theme?.headings ?? {} };
+  }
+
+  return { update, find, listing, problems: () => problems, page: (file) => pages.get(file) ?? null, component, setUnsaved, dropUnsaved, syntax };
+}
+
+function builtInAttributes(attributes) {
+  return Object.fromEntries(Object.entries(attributes).map(([name, { text, choices, size }]) => [name, attributeDeclaration(text, choices, size)]));
+}
+
+function attributeDeclaration(text, choices, size) {
+  if (choices !== undefined) return { type: 'enum', options: choices };
+  if (size !== undefined) return { type: 'text', label: `${size} in pixels such as 560px or as a percentage of the text column such as 70%` };
+  return { type: 'text', label: text };
 }
 
 function isArticleSource(path) {

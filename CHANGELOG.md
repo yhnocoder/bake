@@ -9,6 +9,8 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 - The `demo` workflow, which publishes the example blog to the GitHub Pages site of the repository when it is started by hand.
 - Installation steps in the README.
 - A check of the edge areas and the regions on each page that loads the scripts of Bake, reported at the theme file that renders the page.
+- The extension for Visual Studio Code in `editors/vscode/`, with its own changelog.
+- `bake dev` builds an article from the unsaved text that its page sends, lists the articles, the blocks that an article can use and the attributes of its images and headings, and lets VS Code show its pages in a frame.
 
 ### Changed
 

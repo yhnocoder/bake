@@ -89,14 +89,24 @@ function pageFades() {
 
 let fade = null;
 
+// why: the new values land in one frame; without this every element of the page would animate its colors under the snapshot of the old page
 function fadePage(apply) {
-  if (!pageFades()) {
+  const root = document.documentElement;
+  const change = () => {
+    root.dataset.switching = '';
     apply();
+  };
+  const settle = () => delete root.dataset.switching;
+  if (!pageFades()) {
+    change();
+    getComputedStyle(root).color;
+    requestAnimationFrame(() => requestAnimationFrame(settle));
     return;
   }
-  const transition = document.startViewTransition(apply);
+  const transition = document.startViewTransition(change);
   fade = transition;
   transition.finished.finally(() => {
+    settle();
     if (fade === transition) fade = null;
   });
 }

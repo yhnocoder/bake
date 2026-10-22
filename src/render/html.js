@@ -143,14 +143,15 @@ function at(state, node, result) {
 }
 
 function blockElement(state, node, context) {
-  const children = () => state.wrap(state.all(node), true);
+  const [title, body] = node.children[0]?.type === 'blockTitle' ? [node.children[0], node.children.slice(1)] : [undefined, node.children];
+  const children = () => state.wrap(state.all({ ...node, children: body }), true);
   switch (node.name) {
     case 'aside': {
-      const title = node.attributes.title === undefined ? [] : [element('p', { className: ['aside-title'] }, [text(node.attributes.title)])];
-      return element('aside', { className: ['aside'] }, [...title, ...children()]);
+      const heading = title === undefined ? [] : [element('p', { className: ['aside-title'] }, state.all(title))];
+      return element('aside', { className: ['aside'] }, [...heading, ...children()]);
     }
     case 'fold':
-      return element('details', { className: ['fold'] }, [element('summary', {}, [text(node.attributes.title ?? '')]), ...children()]);
+      return element('details', { className: ['fold'] }, [element('summary', {}, title === undefined ? [] : state.all(title)), ...children()]);
     case 'recap':
       return element('div', { className: ['recap'] }, children());
     case 'references': {

@@ -26,6 +26,7 @@ function startChat(root) {
   launcher.className = 'bk-chat-launcher';
   launcher.setAttribute('aria-label', labels.open);
   launcher.setAttribute('aria-haspopup', 'dialog');
+  launcher.dataset.hint = labels.hint[document.querySelector(regionSelector(REGIONS.article)) === null ? 'blog' : 'article'];
   launcher.append(pet.element);
   shadow.append(style, launcher);
   const edge = document.querySelector('[data-edge="end"]');

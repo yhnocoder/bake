@@ -68,8 +68,7 @@ const gapsArticle = article({
 
 Text.
 
-:::sticker{rows=3}
-🧪
+:::sticker{icon=flask rows=3}
 :::
 
 ## Short {cols=3 rows=4}
@@ -586,7 +585,6 @@ function largestDifference(first, second) {
 
 function overlappingCards() {
   const gap = parseFloat(getComputedStyle(document.querySelector('.bt-grid')).columnGap);
-  // why: the bounding box of a tilted sticker is larger than the box the packing gives it
   const layoutBox = (card) => {
     const style = getComputedStyle(card);
     const left = parseFloat(style.getPropertyValue('--bt-x'));

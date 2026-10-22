@@ -1,5 +1,6 @@
 const CHINESE = {
   open: 'AI 对话',
+  hint: { article: '问这篇文章', blog: '问这个博客' },
   ask: '问 AI',
   title: 'AI 对话',
   greeting: { article: '可以问这篇文章，也可以问整个博客。', blog: '可以问这个博客的任何文章。' },
@@ -132,6 +133,7 @@ const CHINESE = {
 
 const ENGLISH = {
   open: 'AI chat',
+  hint: { article: 'Ask about this article', blog: 'Ask about this blog' },
   ask: 'Ask AI',
   title: 'AI chat',
   greeting: { article: 'Ask about this article or about the whole blog.', blog: 'Ask about any article of this blog.' },

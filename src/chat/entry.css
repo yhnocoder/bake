@@ -30,6 +30,7 @@ button:focus-visible {
 }
 
 .bk-chat-launcher {
+  position: relative;
   display: grid;
   place-items: center;
   width: 76px;
@@ -51,6 +52,35 @@ button:focus-visible {
 .bk-chat-launcher:active {
   scale: 0.96;
   transition-duration: 0s;
+}
+
+.bk-chat-launcher::after {
+  content: attr(data-hint);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% - 4px);
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ink) 92%, transparent);
+  color: var(--bg);
+  font-size: 12.5px;
+  line-height: 28px;
+  white-space: nowrap;
+  box-shadow: var(--button-shadow);
+  opacity: 0;
+  translate: 0 calc(4px * var(--motion-distance));
+  pointer-events: none;
+  transition:
+    opacity var(--fade),
+    translate var(--motion) var(--ease);
+}
+
+@media (hover: hover) {
+  .bk-chat-launcher[aria-expanded='false']:is(:hover, :focus-visible)::after {
+    opacity: 1;
+    translate: 0 0;
+  }
 }
 
 .bk-chat-ask {
