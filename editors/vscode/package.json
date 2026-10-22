@@ -5,6 +5,9 @@
   "version": "0.1.0",
   "publisher": "yhnocoder",
   "license": "MIT",
+  "icon": "icon.png",
+  "homepage": "https://github.com/yhnocoder/bake/tree/main/editors/vscode#readme",
+  "bugs": "https://github.com/yhnocoder/bake/issues",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yhnocoder/bake.git",
@@ -16,11 +19,22 @@
   "categories": [
     "Programming Languages"
   ],
+  "keywords": [
+    "bake",
+    "blog",
+    "markdown",
+    "preview",
+    "static site generator"
+  ],
   "main": "./extension.js",
   "files": [
     "extension.js",
     "completions.js",
-    "syntaxes"
+    "syntaxes",
+    "icon.png",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "activationEvents": [
     "onLanguage:markdown"

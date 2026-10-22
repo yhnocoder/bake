@@ -396,7 +396,7 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
   const frame = page.frameLocator('iframe');
   const send = (message) => page.evaluate((data) => document.querySelector('iframe').contentWindow.postMessage(data, '*'), message);
 
-  await send({ bake: 'reveal', line: lineOf(source, 'Paragraph 2 about the distance') + 1 });
+  await send({ bake: 'reveal', line: lineOf(source, 'Paragraph 2 about the distance') });
   const far = frame.locator('.bk-block', { hasText: 'Paragraph 2 about the distance' });
   const top = () => far.evaluate((element) => element.getBoundingClientRect().top);
   await until(async () => (await top()) >= 0 && (await top()) < 50, 'the paragraph at the named line is not at the top of the frame');
@@ -406,9 +406,16 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
   await page.mouse.move(600, 400);
   await page.mouse.wheel(0, 600);
   await until(() => page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), 'scrolling the page sent nothing to the editor');
-  const scrolledTo = await frame.locator('[data-region] [data-line]').evaluateAll((blocks) => blocks.find((block) => block.checkVisibility() && block.getBoundingClientRect().bottom > 0).dataset.line);
-  await until(async () => (await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll').line)) === Number(scrolledTo), 'the editor was not sent the line of the block at the top of the page');
-  assert.equal(await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll').file), ARTICLE);
+  await page.waitForTimeout(600);
+  const scrolled = await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll'));
+  assert.equal(scrolled.file, ARTICLE);
+  const scrollY = () => frame.locator('html').evaluate(() => window.scrollY);
+  const before = await scrollY();
+  await send({ bake: 'reveal', line: scrolled.line });
+  await until(async () => (await scrollY()) !== before, 'revealing the line that the page sent does not scroll');
+  assert.ok((await scrollY()) <= before, `the line that the page sent starts below the top of the page at ${before} pixels`);
+  await send({ bake: 'reveal', line: scrolled.line + 1 });
+  await until(async () => (await scrollY()) > before, 'the line after the one that the page sent does not start below the top of the page');
 
   await frame.locator('.bk-block', { hasText: 'The edited paragraph' }).dblclick();
   await until(() => page.evaluate(() => window.messages.some((message) => message.bake === 'open')), 'the double-click sent nothing to the editor');

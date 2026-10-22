@@ -318,17 +318,37 @@ function followReader() {
   scrollQueued = true;
   requestAnimationFrame(() => {
     scrollQueued = false;
-    const top = [...document.querySelectorAll(BLOCKS)].find((block) => isShown(block) && block.getBoundingClientRect().bottom > 0);
-    if (top !== undefined) editor.postMessage({ bake: 'scroll', file, line: Number(top.dataset.line) }, '*');
+    const positions = linePositions();
+    const top = scrollY + scrollPadding();
+    const index = positions.findLastIndex((position) => position.top <= top);
+    if (index === -1) return editor.postMessage({ bake: 'scroll', file, line: positions[0]?.line ?? 1 }, '*');
+    const [current, next] = [positions[index], positions[index + 1]];
+    const line = next === undefined ? current.line : current.line + ((top - current.top) / (next.top - current.top)) * (next.line - current.line);
+    editor.postMessage({ bake: 'scroll', file, line: Math.floor(line) }, '*');
   });
 }
 
 function reveal(line) {
-  let target = null;
+  const positions = linePositions();
+  const index = positions.findLastIndex((position) => position.line <= line);
+  if (index === -1) return scrollTo({ top: 0, behavior: 'instant' });
+  const [current, next] = [positions[index], positions[index + 1]];
+  const top = next === undefined ? current.top : current.top + ((line - current.line) / (next.line - current.line)) * (next.top - current.top);
+  scrollTo({ top: top - scrollPadding(), behavior: 'instant' });
+}
+
+// why: the editor scrolls by lines and the page by pixels, so a line between the starts of two blocks is placed at the same fraction of the distance between their tops; blocks that the theme places out of order, such as sidenotes in the margin, are left out
+function linePositions() {
+  const positions = [];
   for (const block of document.querySelectorAll(BLOCKS)) {
-    const start = Number(block.dataset.line);
-    if (start <= line && (target === null || start > Number(target.dataset.line)) && isShown(block)) target = block;
+    if (block.parentElement.closest(BLOCKS) !== null || !isShown(block)) continue;
+    const position = { line: Number(block.dataset.line), top: block.getBoundingClientRect().top + scrollY };
+    const last = positions.at(-1);
+    if (last === undefined || (position.line > last.line && position.top > last.top)) positions.push(position);
   }
-  if (target === null) scrollTo({ top: 0, behavior: 'instant' });
-  else target.scrollIntoView({ block: 'start', behavior: 'instant' });
+  return positions;
+}
+
+function scrollPadding() {
+  return parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
 }

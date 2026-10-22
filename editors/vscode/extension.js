@@ -130,7 +130,19 @@ function startBlog(root) {
   return blog;
 }
 
+// why: fetch ends a response that sends nothing for five minutes, and the event stream of bake dev is quiet while nothing changes
 async function followProblems(blog, url) {
+  while (blogs.get(blog.root) === blog) {
+    try {
+      await readProblems(blog, url);
+    } catch (error) {
+      if (blogs.get(blog.root) === blog) output.appendLine(`The connection to bake dev ended (${error.message}); connecting again`);
+    }
+    await new Promise((done) => setTimeout(done, 1000));
+  }
+}
+
+async function readProblems(blog, url) {
   const response = await fetch(new URL('__bake/events', url));
   const decoder = new TextDecoder();
   let buffer = '';
