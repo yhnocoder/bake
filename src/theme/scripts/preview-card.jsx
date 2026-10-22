@@ -21,10 +21,12 @@ export function startPreviewCard(article) {
   let showTimer;
   let hideTimer;
   let warmUntil = 0;
+  let linkTop = 0;
   const show = (link, kind) => {
     clearTimeout(hideTimer);
     const read = kind.read(link);
     if (read === null) return;
+    linkTop = link.getBoundingClientRect().top;
     setEntry({ link, opens: kind.kind === 'link', ...read });
     setShown(true);
   };
@@ -76,8 +78,10 @@ export function startPreviewCard(article) {
     window,
     'scroll',
     () => {
-      if (shown() && entry()?.link === document.activeElement) setPlaced(placed() + 1);
-      else close();
+      if (!shown()) return;
+      if (entry().link === document.activeElement) setPlaced(placed() + 1);
+      // why: when content above the screen changes height, as a component does when it starts, the browser scrolls to keep the link in place, and the card still sits next to it
+      else if (entry().link.getBoundingClientRect().top !== linkTop) close();
     },
     { passive: true },
   );

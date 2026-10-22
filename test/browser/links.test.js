@@ -147,6 +147,19 @@ test.describe('internal links, preview cards and embeds', () => {
     assert.ok(hidden >= 190, `the card hid ${hidden} ms after the pointer left it`);
   });
 
+  test('the card stays when content above the screen changes height and hides when the reader scrolls', async ({ page }) => {
+    await desktop(page);
+    await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
+    await page.waitForFunction(isOn);
+    await page.evaluate(async () => {
+      document.querySelector('.bk-article').prepend(Object.assign(document.createElement('div'), { style: 'height: 300px' }));
+      for (let frame = 0; frame < 2; frame += 1) await new Promise((done) => requestAnimationFrame(done));
+    });
+    assert.equal(await page.evaluate(isOn), true);
+    await page.mouse.wheel(0, 200);
+    await page.waitForFunction(() => !document.querySelector('.bk-preview').checkVisibility({ visibilityProperty: true }));
+  });
+
   test('the card stays while the pointer is in it, and an external link shows no card', async ({ page }) => {
     await desktop(page, { clock: true });
     await page.getByRole('link', { name: 'chain rule', exact: true }).hover();
