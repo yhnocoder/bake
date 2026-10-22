@@ -9,10 +9,9 @@ import 'bake/theme/styles/settings.css';
 import 'bake/theme/styles/home.css';
 import 'bake/theme/styles/not-found.css';
 import 'bake/theme/styles/print.css';
-import { resolveWidths, startArticle, startHome, startLayout, startLeaveFade, startNotFound, startSettings } from 'bake/theme/client';
+import { resolveWidths, startArticle, startEdges, startHome, startLayout, startLeaveFade, startNotFound, startSettings } from 'bake/theme/client';
 import { essayLabels } from './labels.js';
 import { settings } from './options.js';
-import { startButtons } from './scripts/buttons.js';
 import { SETTING_DRAWINGS } from './scripts/drawings.js';
 import { startNotes, tintParagraph } from './scripts/notes.js';
 import { startToc } from './scripts/toc.js';
@@ -27,6 +26,6 @@ if (notFound !== null) startNotFound(notFound);
 export default function start(document) {
   const article = document.querySelector('.bk-article');
   if (article === null) return () => {};
-  const stops = [startLayout(article, [resolveWidths]), startArticle(article, { onSidenote: (number, on) => tintParagraph(article, number, on) }), startNotes(article), startToc(article), startButtons()];
+  const stops = [startLayout(article, [resolveWidths]), startArticle(article, { onSidenote: (number, on) => tintParagraph(article, number, on) }), startNotes(article), startToc(article), startEdges({ enabled: () => document.documentElement.dataset.buttons === 'autohide' })];
   return () => stops.forEach((stop) => stop());
 }

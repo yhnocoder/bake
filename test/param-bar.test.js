@@ -15,6 +15,7 @@ const plot = {
   grid: { label: 'Grid', type: 'boolean', default: true },
   caption: { label: 'Caption', type: 'text', default: 'none' },
   points: { label: 'Points', type: 'file', default: '' },
+  logits: { label: 'Logits', type: 'numbers', default: [1, 0] },
 };
 const files = ['index.md', 'points.json'];
 
@@ -61,6 +62,12 @@ describe('rewriting a component line', () => {
     assert.deepEqual(rewrite(':::act-fn-plot', { caption: 'say "hi"' }), { line: ":::act-fn-plot{caption='say \"hi\"'}" });
     assert.deepEqual(rewrite(':::act-fn-plot{caption="x y"}', { caption: '' }), { line: ':::act-fn-plot{caption=""}' });
     assert.deepEqual(rewrite(':::act-fn-plot', { points: 'points.json' }), { line: ':::act-fn-plot{points=points.json}' });
+  });
+
+  test('writes a list of numbers as one quoted attribute and removes it when it is the default again', () => {
+    assert.deepEqual(rewrite(':::act-fn-plot', { logits: [2, 1, 0.5] }), { line: ':::act-fn-plot{logits="2, 1, 0.5"}' });
+    assert.deepEqual(rewrite(':::act-fn-plot{logits="2,1"}', { logits: [2, 1] }), { line: ':::act-fn-plot{logits="2,1"}' });
+    assert.deepEqual(rewrite(':::act-fn-plot{logits="2, 1"}', { logits: [1, 0] }), { line: ':::act-fn-plot' });
   });
 
   test('finds the directive after blockquote markers and indentation', () => {

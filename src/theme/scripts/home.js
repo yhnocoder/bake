@@ -1,6 +1,7 @@
 import { labelsFor } from '../labels.js';
 import { storageKey } from '../settings.js';
 import { markCurrent } from './current.js';
+import { startEdges } from './edges.js';
 import { EASING, oncePerFrame, reducedMotion } from './motion.js';
 import { withoutHover } from './screens.js';
 
@@ -10,6 +11,7 @@ const CURRENT_LINE = 0.15;
 const SCROLL_REST = 150;
 
 export function startHome(home) {
+  startEdges({ names: ['end'] });
   const root = document.documentElement;
   const labels = labelsFor(root.lang);
   const cards = [...home.querySelectorAll('.bk-card')];

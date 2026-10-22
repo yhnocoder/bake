@@ -1,4 +1,5 @@
 import { errorAt } from '../report.js';
+import { meantName } from '../suggest.js';
 
 export function indexPages(pages) {
   const byUrl = new Map();
@@ -13,10 +14,15 @@ export function indexPages(pages) {
       if (page.draft && bySource.get(source)?.draft !== true) return { problem: 'is a draft, which is not published' };
       const anchored = address.anchor === undefined || (page.article !== null && page.article.hasTarget(address.anchor));
       if (!address.canonical) return { problem: `does not exist; the address of the article is ${anchored ? address.text : address.path}` };
-      if (!anchored) return { problem: 'does not exist' };
+      if (!anchored) return { problem: `does not exist${anchorHint(address, page)}` };
       return { page };
     },
   };
+}
+
+function anchorHint(address, page) {
+  const meant = page.article === null ? undefined : meantName(address.anchor, page.article.targets.keys());
+  return meant === undefined ? '' : `; did you mean ${address.path}#${meant}?`;
 }
 
 function movedHint(address, byUrl) {

@@ -16,6 +16,7 @@ const plot = {
   toggle: { label: 'Toggle', type: 'boolean', default: false },
   title: { label: 'Title', type: 'text', default: '' },
   data: { label: 'Data', type: 'file', default: '' },
+  logits: { label: 'Logits', type: 'numbers', min: -10, max: 10, default: [1, 0] },
 };
 const components = declare({ 'act-fn-plot': { params: plot }, 'glu-heatmap': {} });
 
@@ -67,7 +68,7 @@ describe('component files', () => {
       'components/bad-layout.js:1:101 bad-layout: layout.autoHeight no longer exists: a component without layout.height takes the height of its content; delete autoHeight and height',
       'components/bad-layout.js:1:119 bad-layout: layout has the unknown field "heigth"; the fields of layout are width, height, placeholder and frame',
       'components/bad-layout.js:1:130 bad-layout: layout.placeholder must be { narrow, wide }, the heights in pixels on screens narrower than 600 pixels and from 600 pixels up, such as { narrow: 600, wide: 340 }, got an object',
-      'components/bad-type.js:1:25 bad-type: parameter "n" has the type "integer"; use number, text, boolean, enum or file',
+      'components/bad-type.js:1:25 bad-type: parameter "n" has the type "integer"; use number, numbers, text, boolean, enum or file',
       `components/call-plot.js:2:28 call-plot: the build reads params without running the file, so write it with ${literals}; got a call`,
       `components/call-plot.js:2:52 call-plot: the build reads params without running the file, so write it with ${literals}; got a template string with \${…}`,
       "components/empty-enum.js:1:25 empty-enum: parameter \"fn\" is an enum without options; list them as strings, for example options: ['gelu', 'silu']",
@@ -92,14 +93,14 @@ describe('component files', () => {
 
 describe('component blocks', () => {
   test('converts attributes to the declared types and fills in the defaults', async () => {
-    const [block] = (await parsed(':::act-fn-plot{fn=silu range=2.5 toggle title="Two words"}\n:::\n', { components })).intro;
-    assert.deepEqual(block.params, { fn: 'silu', range: 2.5, beta: 1, gamma: 1, toggle: true, title: 'Two words', data: '' });
+    const [block] = (await parsed(':::act-fn-plot{fn=silu range=2.5 toggle title="Two words" logits="2, 1,0.5 , -1e-1"}\n:::\n', { components })).intro;
+    assert.deepEqual(block.params, { fn: 'silu', range: 2.5, beta: 1, gamma: 1, toggle: true, title: 'Two words', data: '', logits: [2, 1, 0.5, -0.1] });
     const [off] = (await parsed(':::act-fn-plot{toggle=false beta=1e-1 gamma=-.5}\n:::\n', { components })).intro;
     assert.deepEqual([off.params.toggle, off.params.beta, off.params.gamma], [false, 0.1, -0.5]);
   });
 
   test('reports each parameter error at the column of its attribute', async () => {
-    const { errors } = await parse(':::act-fn-plot{fn=tanh range=20 beta=-1 gamma=5 toggle=yes title bta=2 float=left}\n:::\n\n:::act-fn-plot{range=abc beta}\n:::\n', { components });
+    const { errors } = await parse(':::act-fn-plot{fn=tanh range=20 beta=-1 gamma=5 toggle=yes title bta=2 float=left}\n:::\n\n:::act-fn-plot{range=abc beta logits="1, two" }\n:::\n\n:::act-fn-plot{logits="1, 20"}\n:::\n', { components });
     assert.deepEqual(errors, [
       'index.md:7:16 parameter "fn" of act-fn-plot must be one of relu, gelu or silu, got "tanh"',
       'index.md:7:24 parameter "range" of act-fn-plot must be between 1 and 10, got 20',
@@ -107,10 +108,12 @@ describe('component blocks', () => {
       'index.md:7:41 parameter "gamma" of act-fn-plot must be at most 4, got 5',
       'index.md:7:49 parameter "toggle" of act-fn-plot must be true or false, got "yes"',
       'index.md:7:60 parameter "title" of act-fn-plot needs a value, got no value',
-      'index.md:7:66 unknown parameter "bta" for act-fn-plot',
+      'index.md:7:66 unknown parameter "bta" for act-fn-plot; did you mean beta?',
       'index.md:7:72 float does not apply to components; act-fn-plot is centred in its column',
       'index.md:10:16 parameter "range" of act-fn-plot must be a number, got "abc"',
       'index.md:10:26 parameter "beta" of act-fn-plot must be a number, got no value',
+      'index.md:10:31 parameter "logits" of act-fn-plot must be numbers separated by commas, such as "2, 1, 0.5", got "1, two"',
+      'index.md:13:16 parameter "logits" of act-fn-plot must hold numbers between -10 and 10, got 20',
     ]);
   });
 

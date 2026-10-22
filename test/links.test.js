@@ -93,6 +93,18 @@ describe('internal links', () => {
     ]);
   });
 
+  test('suggests the anchor that a mistyped link most likely meant', async () => {
+    const { errors } = await parseSite([
+      { url: '/2026-10/host/', body: '[a](/2026-10/zh/#链式法则LLM) [b](#chian-rule) [c](/2026-10/zh/#where)\n\n## Chain rule\n\nText.\n' },
+      { url: '/2026-10/zh/', body: '## 链式法则 LLM\n\nText.\n' },
+    ]);
+    assert.deepEqual(errors, [
+      'host.md:7:1 link target /2026-10/zh/#链式法则LLM does not exist; did you mean /2026-10/zh/#链式法则-llm?',
+      'host.md:7:27 link target #chian-rule does not exist; did you mean #chain-rule?',
+      'host.md:7:44 link target /2026-10/zh/#where does not exist',
+    ]);
+  });
+
   test('reports a link or an embed address whose anchor has an invalid percent-encoding at the link', async () => {
     const { errors } = await site('[x](/2026-10/nothere/#%ZZ) and [y](#%ZZ)\n\n:::embed\n/2026-10/target/#%E9\n:::\n');
     assert.deepEqual(errors, [
