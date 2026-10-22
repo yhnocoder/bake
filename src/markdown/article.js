@@ -1,5 +1,5 @@
-import { errorAt } from '../report.js';
-import { pageRoot } from '../urls.js';
+import { errorAt } from '../shared/report.js';
+import { pageRoot } from '../shared/urls.js';
 import { embedParts, indexTargets, linkArticle } from './link.js';
 import { parseArticle } from './parse.js';
 import { articleStructure } from './structure.js';

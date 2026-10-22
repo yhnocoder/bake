@@ -1,5 +1,5 @@
 import { For, Show, createSignal, onMount } from 'solid-js';
-import { composing } from '../keys.js';
+import { composing } from '../shared/keys.js';
 import { MAX_INSTRUCTIONS, MAX_RULES } from './instructions.js';
 
 const PROMPT_TABS = ['instructions', 'chat', 'note'];

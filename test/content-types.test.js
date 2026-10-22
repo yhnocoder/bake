@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { contentType } from '../src/content-types.js';
+import { contentType } from '../src/shared/content-types.js';
 
 test('gives each published file its registered media type, with the UTF-8 charset for text', () => {
   assert.deepEqual(

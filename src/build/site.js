@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { chatFiles } from '../chat/site-files.js';
-import { sortErrors } from '../report.js';
-import { sitePath } from '../urls.js';
+import { sortErrors } from '../shared/report.js';
+import { sitePath } from '../shared/urls.js';
 import { findArticles, publishedArticles, readArticles } from './articles.js';
 import { assetOutputs, compileChat } from './assets.js';
 import { compileComponents } from './components.js';

@@ -1,6 +1,6 @@
 import { join, posix } from 'node:path';
-import { FUNCTIONS, moduleBindings, objectFields, parseModule, positionAt, readLiteral } from '../literals.js';
-import { errorAt, fileStart, listAll } from '../report.js';
+import { FUNCTIONS, moduleBindings, objectFields, parseModule, positionAt, readLiteral } from '../shared/literals.js';
+import { errorAt, fileStart, listAll } from '../shared/report.js';
 import { HEIGHT_FUNCTION, REMOVED_LAYOUT_FIELDS, layoutProblems, paramProblems } from './declarations.js';
 
 export const COMPONENTS_DIR = 'components';

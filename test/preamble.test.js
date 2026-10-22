@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePreamble } from '../src/config/preamble.js';
-import { formatError } from '../src/report.js';
+import { formatError } from '../src/shared/report.js';
 
 function read(source) {
   const errors = [];

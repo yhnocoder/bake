@@ -1,5 +1,5 @@
 import { Show, createSignal } from 'solid-js';
-import { composing } from '../keys.js';
+import { composing } from '../shared/keys.js';
 import { PetError, chooseReaderPet, forgetReaderPet, storedReaderPet } from './reader-pet.js';
 import { storedKey } from './vault.js';
 

@@ -1,5 +1,5 @@
-import { escapeMarkup } from '../escape.js';
-import { absoluteLink, siteLink } from '../urls.js';
+import { escapeMarkup } from '../shared/escape.js';
+import { absoluteLink, siteLink } from '../shared/urls.js';
 
 const FEED_PATH = 'feed.xml';
 const SITEMAP_PATH = 'sitemap.xml';

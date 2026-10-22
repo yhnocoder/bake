@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import sharp from 'sharp';
-import { formatError } from '../src/report.js';
+import { formatError } from '../src/shared/report.js';
 
 export const cli = join(import.meta.dirname, '../src/cli.js');
 export const exampleBlog = join(import.meta.dirname, '../examples/blog');

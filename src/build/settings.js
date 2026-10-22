@@ -6,7 +6,7 @@ import { PREAMBLE_FILE, readPreamble } from '../config/preamble.js';
 import { availableThemes } from '../config/rules.js';
 import { BUILT_IN_BLOCK_NAMES } from '../markdown/parse.js';
 import { typesetMath } from '../render/math.js';
-import { errorAt, fileStart } from '../report.js';
+import { errorAt, fileStart } from '../shared/report.js';
 import { builtInThemeFolders } from './theme.js';
 import { readThemeDeclarations } from './theme-options.js';
 

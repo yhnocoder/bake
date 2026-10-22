@@ -2,7 +2,7 @@ import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import { createGzip } from 'node:zlib';
-import { contentType } from '../src/content-types.js';
+import { contentType } from '../src/shared/content-types.js';
 
 export async function serveStatic(dir, { gzip = false, localhost = false } = {}) {
   const root = resolve(dir);

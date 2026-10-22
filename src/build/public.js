@@ -1,5 +1,5 @@
 import { join, posix } from 'node:path';
-import { errorAt, fileStart } from '../report.js';
+import { errorAt, fileStart } from '../shared/report.js';
 import { listFiles } from './files.js';
 import { SHARE_IMAGE_DIR } from './share-images.js';
 import { THEME_STYLES_PATH } from './theme.js';

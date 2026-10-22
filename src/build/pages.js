@@ -1,9 +1,9 @@
 import { join } from 'node:path';
 import { convertImage } from '../render/images.js';
 import { mathStyles } from '../render/math.js';
-import { REGIONS } from '../regions.js';
-import { errorAt, fileStart, formatError } from '../report.js';
-import { absoluteLink, encodePath, pageRoot, siteLink } from '../urls.js';
+import { REGIONS } from '../shared/regions.js';
+import { errorAt, fileStart, formatError } from '../shared/report.js';
+import { absoluteLink, encodePath, pageRoot, siteLink } from '../shared/urls.js';
 import { articleTheme, themeLocation } from './theme.js';
 
 const NOT_FOUND_PATH = '404.html';

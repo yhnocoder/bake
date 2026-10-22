@@ -1,5 +1,5 @@
-import { escapeMarkup } from '../escape.js';
-import { compareText } from '../report.js';
+import { escapeMarkup } from '../shared/escape.js';
+import { compareText } from '../shared/report.js';
 
 const STYLE = `
 :root { color-scheme: light dark; }

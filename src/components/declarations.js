@@ -1,6 +1,6 @@
 import { WIDTHS, folderFile, parseSize } from '../config/rules.js';
-import { describeValue, listAll, listChoices } from '../report.js';
-import { meantName } from '../suggest.js';
+import { describeValue, listAll, listChoices } from '../shared/report.js';
+import { meantName } from '../shared/suggest.js';
 import { readNumbers } from './numbers.js';
 
 export const PARAM_TYPES = Object.freeze(['number', 'numbers', 'text', 'boolean', 'enum', 'file']);

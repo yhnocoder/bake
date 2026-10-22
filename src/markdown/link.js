@@ -1,8 +1,8 @@
 import { toString } from 'mdast-util-to-string';
-import { idOfFragment, referenceId, sidenoteId } from '../fragments.js';
+import { idOfFragment, referenceId, sidenoteId } from '../shared/fragments.js';
 import { renderChildrenHtml, renderHast, renderInlineHtml } from '../render/html.js';
-import { meantName } from '../suggest.js';
-import { INVALID_PERCENT_ENCODING, addressHref, parseAddress } from '../urls.js';
+import { meantName } from '../shared/suggest.js';
+import { INVALID_PERCENT_ENCODING, addressHref, parseAddress } from '../shared/urls.js';
 import { generatedIds } from './parse.js';
 import { walk, walkWithSidenotes } from './tree.js';
 

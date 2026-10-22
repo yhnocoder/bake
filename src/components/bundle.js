@@ -1,7 +1,7 @@
 import solid from 'vite-plugin-solid';
 import { publicModules } from '../bundle/modules.js';
 import { browserBuild, compileProblem } from '../bundle/vite.js';
-import { errorAt, fileStart } from '../report.js';
+import { errorAt, fileStart } from '../shared/report.js';
 import { COMPONENTS_DIR } from './read.js';
 import { RUNTIME_FILE, browserModules } from './modules.js';
 

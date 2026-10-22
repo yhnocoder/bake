@@ -1,5 +1,5 @@
-import { errorAt } from '../report.js';
-import { meantName } from '../suggest.js';
+import { errorAt } from '../shared/report.js';
+import { meantName } from '../shared/suggest.js';
 
 // An article is linked again when it or a page at an address it looked up changed, and its structure is computed again when its links or the links of an article whose parts it shows changed.
 export async function linkArticles(site, articles, errors) {

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { errorAt } from '../report.js';
+import { errorAt } from '../shared/report.js';
 
 export const PREAMBLE_FILE = 'preamble.sty';
 

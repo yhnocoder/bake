@@ -11,14 +11,14 @@ const FONT_DIR = join(dirname(fileURLToPath(import.meta.resolve('@mathjax/mathja
 
 export const PUBLIC_MODULES = Object.freeze([
   { name: 'bake/copy', file: join(SRC_DIR, 'copy/copy.js'), importers: ['themes'] },
-  { name: 'bake/fragments', file: join(SRC_DIR, 'fragments.js'), importers: ['themes'] },
-  { name: 'bake/keys', file: join(SRC_DIR, 'keys.js'), importers: ['themes'] },
-  { name: 'bake/live', file: join(SRC_DIR, 'live.js'), importers: ['themes'] },
-  { name: 'bake/regions', file: join(SRC_DIR, 'regions.js'), importers: ['themes'] },
+  { name: 'bake/fragments', file: join(SRC_DIR, 'shared/fragments.js'), importers: ['themes'] },
+  { name: 'bake/keys', file: join(SRC_DIR, 'shared/keys.js'), importers: ['themes'] },
+  { name: 'bake/live', file: join(SRC_DIR, 'shared/live.js'), importers: ['themes'] },
+  { name: 'bake/regions', file: join(SRC_DIR, 'shared/regions.js'), importers: ['themes'] },
   { name: 'bake/math', file: join(SRC_DIR, 'components/math.js'), importers: ['components', 'chat'] },
   { name: 'bake/kit', file: join(SRC_DIR, 'kit/index.js'), importers: ['components'] },
-  { name: 'bake/theme', file: join(SRC_DIR, 'theme/index.jsx'), importers: ['themes'] },
-  { name: 'bake/theme/client', file: join(SRC_DIR, 'theme/client.js'), importers: ['themes'] },
+  { name: 'bake/theme', file: join(SRC_DIR, 'theme-kit/index.jsx'), importers: ['themes'] },
+  { name: 'bake/theme/client', file: join(SRC_DIR, 'theme-kit/client.js'), importers: ['themes'] },
   ...BUILT_IN_THEMES.flatMap((theme) => [
     { name: `bake/themes/${theme}`, file: join(SRC_DIR, `themes/${theme}/index.jsx`), importers: ['themes'] },
     { name: `bake/themes/${theme}/client`, file: join(SRC_DIR, `themes/${theme}/client.jsx`), importers: ['themes'] },
@@ -26,7 +26,7 @@ export const PUBLIC_MODULES = Object.freeze([
   ]),
 ]);
 
-const PUBLIC_STYLES = Object.freeze([{ name: 'bake/theme/styles/', folder: join(SRC_DIR, 'theme/styles/') }, ...BUILT_IN_THEMES.map((theme) => ({ name: `bake/themes/${theme}/styles/`, folder: join(SRC_DIR, `themes/${theme}/styles/`) }))]);
+const PUBLIC_STYLES = Object.freeze([{ name: 'bake/theme/styles/', folder: join(SRC_DIR, 'theme-kit/styles/') }, ...BUILT_IN_THEMES.map((theme) => ({ name: `bake/themes/${theme}/styles/`, folder: join(SRC_DIR, `themes/${theme}/styles/`) }))]);
 
 export function publicModules(importer) {
   const modules = PUBLIC_MODULES.filter((module) => module.importers.includes(importer)).map(({ name, file }) => ({ find: new RegExp(`^${name}$`), replacement: file }));

@@ -1,5 +1,5 @@
 import { join, posix } from 'node:path';
-import { describeValue, listChoices } from '../report.js';
+import { describeValue, listChoices } from '../shared/report.js';
 
 export const BUILT_IN_THEMES = Object.freeze(['essay', 'bento']);
 export const WIDTHS = Object.freeze(['body', 'wide', 'page']);

@@ -1,4 +1,4 @@
-import { UI } from '../regions.js';
+import { UI } from '../shared/regions.js';
 
 export const NOTE = '[data-sidenote][data-line]';
 export const NOT_CONTENT = `${UI}, ${NOTE}, .component-box, .embed-source, script, template, button, input, svg`;

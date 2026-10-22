@@ -1,5 +1,5 @@
 import { posix } from 'node:path';
-import { describeValue } from '../report.js';
+import { describeValue } from '../shared/report.js';
 
 export const DEFAULT_PET = 'crt-monitor';
 export const BUILT_IN_PETS = {

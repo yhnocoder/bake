@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
-import { composing } from '../keys.js';
+import { composing } from '../shared/keys.js';
 import { loadCatalog, matchingScopes, scopeOptions } from './context.js';
 
 const SCOPE_QUERY = /@([^\s@]*)$/;

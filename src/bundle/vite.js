@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { build } from 'vite';
-import { fileStart } from '../report.js';
+import { fileStart } from '../shared/report.js';
 import { MATHJAX_CHUNK, isMathJaxModule } from './modules.js';
 
 export const BAKE_ROOT = join(import.meta.dirname, '../..');

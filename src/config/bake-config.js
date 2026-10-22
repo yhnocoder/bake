@@ -4,9 +4,9 @@ import { dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
 import { DEFAULT_PET, petSourceProblem } from './pet.js';
-import { describeValue, errorAt, fileStart } from '../report.js';
-import { HOME_COLUMNS } from '../choices.js';
-import { labelsFor } from '../theme/labels.js';
+import { describeValue, errorAt, fileStart } from '../shared/report.js';
+import { HOME_COLUMNS } from '../shared/choices.js';
+import { labelsFor } from '../theme-kit/labels.js';
 import { characterProblem, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';

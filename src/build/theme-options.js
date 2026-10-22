@@ -1,10 +1,10 @@
 import { join, relative } from 'node:path';
 import { optionProblem, paramProblems } from '../components/declarations.js';
 import { FRONT_MATTER_FIELDS } from '../config/front-matter.js';
-import { moduleBindings, parseModule, positionAt, readLiteral } from '../literals.js';
+import { moduleBindings, parseModule, positionAt, readLiteral } from '../shared/literals.js';
 import { BUILT_IN_BLOCK_NAMES } from '../markdown/parse.js';
-import { describeValue, errorAt, fileStart, listAll, listChoices } from '../report.js';
-import { READING_SETTINGS } from '../theme/settings.js';
+import { describeValue, errorAt, fileStart, listAll, listChoices } from '../shared/report.js';
+import { READING_SETTINGS } from '../theme-kit/settings.js';
 import { themeFolder } from './theme.js';
 
 const THEME_OPTIONS_FILE = 'options.js';

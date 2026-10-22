@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { indexPages } from '../src/build/links.js';
 import { readArticle } from '../src/markdown/article.js';
-import { formatError, sortErrors } from '../src/report.js';
+import { formatError, sortErrors } from '../src/shared/report.js';
 import * as bento from '../src/themes/bento/options.js';
 import * as essay from '../src/themes/essay/options.js';
 

@@ -1,7 +1,7 @@
 import { fragmentOf } from 'bake/fragments';
 import { labelsFor } from './labels.js';
 import { PageMeta } from './meta.jsx';
-import { HOME_COLUMNS } from '../choices.js';
+import { HOME_COLUMNS } from '../shared/choices.js';
 import { SITE_SETTINGS, homePrepaintSteps, prepaintScript, settingAttributes, settingDefaults } from './settings.js';
 
 export default function Home(props) {

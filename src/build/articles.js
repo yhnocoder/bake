@@ -3,8 +3,8 @@ import { COMPONENTS_DIR } from '../components/read.js';
 import { readFrontMatter } from '../config/front-matter.js';
 import { readArticle } from '../markdown/article.js';
 import { IMAGE_FORMATS, readImage } from '../render/images.js';
-import { errorAt } from '../report.js';
-import { articleUrl } from '../urls.js';
+import { errorAt } from '../shared/report.js';
+import { articleUrl } from '../shared/urls.js';
 import { listFiles } from './files.js';
 
 export const POSTS_DIR = 'content/posts';

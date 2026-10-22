@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { convertAttribute, fileProblem, valueProblem } from '../components/declarations.js';
 import { sameValue, writeNumbers } from '../components/numbers.js';
 import { attributeTokens, writeAttribute } from '../markdown/attributes.js';
-import { describeValue } from '../report.js';
+import { describeValue } from '../shared/report.js';
 
 const DIRECTIVE = /^((?:[ \t]*>)*[ \t]*)(:{3,})([A-Za-z][\w-]*)/;
 const DIRECTIVE_REST = /^(\{.*\})?([ \t]*)$/;

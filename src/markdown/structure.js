@@ -1,6 +1,6 @@
 import { eastAsianWidth } from 'get-east-asian-width';
 import { toString } from 'mdast-util-to-string';
-import { referenceId, sidenoteId } from '../fragments.js';
+import { referenceId, sidenoteId } from '../shared/fragments.js';
 import { renderChildrenHtml, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
 import { addGlyphs } from '../render/math.js';
 import { embedNodes, preview } from './link.js';

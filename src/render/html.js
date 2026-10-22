@@ -1,7 +1,7 @@
 import { toHtml } from 'hast-util-to-html';
 import { defaultHandlers, toHast } from 'mdast-util-to-hast';
-import { addressHref, encodePath } from '../urls.js';
-import { fragmentOf, idOfFragment, referenceId, sidenoteId } from '../fragments.js';
+import { addressHref, encodePath } from '../shared/urls.js';
+import { fragmentOf, idOfFragment, referenceId, sidenoteId } from '../shared/fragments.js';
 import { highlightCode } from './code.js';
 import { relocateMath } from './math.js';
 

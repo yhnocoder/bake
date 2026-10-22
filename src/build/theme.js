@@ -6,7 +6,7 @@ import { buildCache, filesIn } from '../bundle/cache.js';
 import { publicModules, virtualModules } from '../bundle/modules.js';
 import { BAKE_ROOT, blogPath, browserBuild, compileProblem, viteBuild, viteConfig } from '../bundle/vite.js';
 import { BUILT_IN_THEMES } from '../config/rules.js';
-import { errorAt, fileStart } from '../report.js';
+import { errorAt, fileStart } from '../shared/report.js';
 
 const THEMES_DIR = 'themes';
 const PAGE_FILE = 'page.jsx';
@@ -17,7 +17,7 @@ const THEME_STYLES_FILE = 'theme.css';
 export const THEME_STYLES_PATH = '_bake/theme.css';
 
 const BUILT_IN_DIR = join(import.meta.dirname, '../themes');
-const KIT_DIR = join(import.meta.dirname, '../theme');
+const KIT_DIR = join(import.meta.dirname, '../theme-kit');
 const KIT_HOME = join(KIT_DIR, 'homepage.jsx');
 const KIT_NOT_FOUND = join(KIT_DIR, 'not-found-page.jsx');
 const BUILD_FILES = [KIT_DIR, BUILT_IN_DIR, join(import.meta.dirname, '../kit/controls.css'), join(import.meta.dirname, '../bundle'), import.meta.filename, join(import.meta.dirname, '../config/rules.js')];
