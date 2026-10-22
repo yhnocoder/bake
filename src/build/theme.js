@@ -1,4 +1,6 @@
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
+import { compileFunction } from 'node:vm';
 import solid from 'vite-plugin-solid';
 import { buildCache, filesIn } from '../bundle/cache.js';
 import { publicModules, virtualModules } from '../bundle/modules.js';
@@ -100,7 +102,7 @@ async function compileTheme(files, name, { siteTheme }, errors) {
       script: client.entry,
     };
     modules = [server, client, styles].flatMap((output) => output?.modules ?? []);
-    theme = await loadTheme(data, [client, styles].flatMap((output) => output?.files ?? []), pageFiles);
+    theme = loadTheme(data, [client, styles].flatMap((output) => output?.files ?? []), pageFiles);
   } catch (error) {
     files.everything();
     errors.push(compileError(root, name, locate(CLIENT_FILE), error));
@@ -112,8 +114,10 @@ async function compileTheme(files, name, { siteTheme }, errors) {
 }
 
 // pages names the file of the blog that renders each page, where the problems of the page are reported.
-async function loadTheme({ server, ...data }, files, pages) {
-  const module = await import(`data:text/javascript;base64,${Buffer.from(server).toString('base64')}`);
+function loadTheme({ server, ...data }, files, pages) {
+  const module = {};
+  // why: the bundle keeps the Node built-in modules that a page.jsx imports as calls of require
+  compileFunction(server, ['exports', 'require'], { filename: RENDER_ENTRY })(module, createRequire(import.meta.url));
   return { render: module.render, renderHome: module.renderHome, renderNotFound: module.renderNotFound, files, ...data, pages };
 }
 
@@ -140,7 +144,7 @@ function serverConfig(alias, pages) {
   return {
     ...viteConfig({ plugins: [renderEntry(pages), solid({ ssr: true, solid: { hydratable: false } })], alias }),
     ssr: { noExternal: true },
-    build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { codeSplitting: false } } },
+    build: { ssr: true, write: false, rolldownOptions: { input: RENDER_ENTRY, output: { format: 'cjs', codeSplitting: false } } },
   };
 }
 

@@ -14,6 +14,7 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 - `home.jsx` and `not-found.jsx` are optional in a site theme, which then uses `Home` and `NotFound` of `bake/theme`.
 - The npm package exports none of its files; themes and components import the `bake/` modules, which Bake resolves when it builds them.
+- Bake reads `options.js` of a theme without running it, so its values are literals and constants of the same file, and it reports a value that is not one at its position.
 
 ## [0.1.0]
 

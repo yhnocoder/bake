@@ -24,7 +24,7 @@ export async function readSiteSettings(site, found) {
 async function readSettings(files) {
   const themeNames = availableThemes(files);
   const errors = builtInThemeFolders(files);
-  const { options: themeOptions, markdown } = await readThemeDeclarations(files, themeNames, errors);
+  const { options: themeOptions, markdown } = readThemeDeclarations(files, themeNames, errors);
   const config = await loadBakeConfig(files, themeOptions, optionProblem, errors);
   if (config === null || errors.length > 0) return { errors };
   const preamble = await readMathPreamble(files, errors);

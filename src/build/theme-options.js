@@ -1,14 +1,14 @@
-import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { optionProblem, paramProblems } from '../components/declarations.js';
 import { FRONT_MATTER_FIELDS } from '../config/front-matter.js';
+import { moduleBindings, parseModule, positionAt, readLiteral } from '../literals.js';
 import { BUILT_IN_BLOCK_NAMES } from '../markdown/parse.js';
 import { describeValue, errorAt, fileStart, listAll, listChoices } from '../report.js';
 import { READING_SETTINGS } from '../theme/settings.js';
 import { themeFolder } from './theme.js';
 
 const THEME_OPTIONS_FILE = 'options.js';
+const DECLARATIONS = ['options', 'settings', 'headings', 'blocks'];
 const OPTION = { noun: 'option', reserved: [], written: 'as a key of bake.config.js', setter: 'bake.config.js' };
 const SETTING_NAME = /^[a-z][a-z0-9]*$/;
 const SETTING_FIELDS = ['values', 'default', 'control'];
@@ -21,36 +21,33 @@ const ATTRIBUTE_FIELDS = { number: ['min', 'max', 'step'], text: [], enum: ['opt
 const DEPTHS = [2, 3, 4, 5, 6];
 const NOTHING_DECLARED = { options: {}, headings: {}, blocks: {} };
 
-export async function readThemeDeclarations(files, names, errors) {
+export function readThemeDeclarations(files, names, errors) {
   const options = new Map();
   const markdown = new Map();
   for (const name of names) {
     const path = join(themeFolder(files.root, name), THEME_OPTIONS_FILE);
     const source = files.read(path, 'utf8');
-    const declared = source === null ? NOTHING_DECLARED : await readDeclarations(files.root, name, path, source, errors);
+    const declared = source === null ? NOTHING_DECLARED : readDeclarations(files.root, name, path, source, errors);
     options.set(name, declared?.options ?? null);
     markdown.set(name, declared === null ? null : { name, headings: declared.headings, blocks: declared.blocks });
   }
   return { options, markdown };
 }
 
-async function readDeclarations(root, name, path, source, errors) {
+function readDeclarations(root, name, path, source, errors) {
   const file = path.startsWith(root) ? relative(root, path) : `${name} theme ${THEME_OPTIONS_FILE}`;
-  let options;
-  let settings;
-  let headings;
-  let blocks;
-  try {
-    ({ options, settings = {}, headings = {}, blocks = {} } = await import(`${pathToFileURL(path).href}?version=${createHash('sha256').update(source).digest('hex')}`));
-  } catch (error) {
-    errors.push(errorAt(file, fileStart, `${name}: ${THEME_OPTIONS_FILE} cannot be read: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`));
-    return null;
-  }
+  const count = errors.length;
+  const position = (node) => (node === null ? fileStart : positionAt(source, node.start));
+  const program = parseModule(file, source, (node, message) => errors.push(errorAt(file, position(node), `${name}: ${THEME_OPTIONS_FILE} cannot be read: ${message}`)));
+  if (program === null) return null;
+  const reportAt = (node, message) => errors.push(errorAt(file, position(node), `${name}: ${message}`));
+  const { constants, exported } = moduleBindings(program, DECLARATIONS, reportAt);
+  const [options, settings = {}, headings = {}, blocks = {}] = DECLARATIONS.map((declaration) => (exported.has(declaration) ? readLiteral(exported.get(declaration), declaration, constants, reportAt) : undefined));
+  if (errors.length > count) return null;
   if (!isPlainObject(options)) {
     errors.push(errorAt(file, fileStart, `${name}: ${THEME_OPTIONS_FILE} must export options, an object that maps each option name to its declaration, got ${describeValue(options)}`));
     return null;
   }
-  const count = errors.length;
   const report = (problem) => errors.push(errorAt(file, fileStart, `${name}: ${problem}`));
   for (const [option, declaration] of Object.entries(options)) {
     const problems = optionDeclarationProblems(option, declaration);
