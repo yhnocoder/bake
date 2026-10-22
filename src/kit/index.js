@@ -6,3 +6,4 @@ export { formatNumber, linearScale, niceTicks, samplePath, stepDigits } from './
 export { Axes, Crosshair, Curve, Plot, usePlot } from './plot.jsx';
 export { createElementSize } from './size.js';
 export { MathText, SvgMathText, SvgTex, Tex } from './tex.jsx';
+export { typeset } from './typeset.js';

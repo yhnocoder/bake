@@ -1,20 +1,9 @@
 import { For, createMemo, createResource, createSignal, onMount } from 'solid-js';
-import './tex.css';
+import { loadMath, segments } from './typeset.js';
 
 const ANCHORS = { start: 0, middle: 0.5, end: 1 };
 const BASELINES = { top: 0, middle: 0.5, bottom: 1 };
 const TEXT_ANCHORS = { start: 'start', middle: 'middle', end: 'end' };
-
-let math;
-const afterFrame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done)));
-
-// why: evaluating MathJax takes 20 to 30 ms, typesetting the first labels about 10 ms and the first render of a component at its size up to 25 ms, so MathJax is imported after the frame that draws the component that asks for it and the formulas are typeset a frame later, and no frame holds two of them
-function loadMath() {
-  math ??= afterFrame()
-    .then(() => import('bake/math'))
-    .then((module) => afterFrame().then(() => module));
-  return math;
-}
 
 function createFormula(tex, display, host) {
   const [formula] = createResource(
@@ -65,14 +54,6 @@ export function SvgTex(props) {
       {placed() === null ? <text text-anchor={TEXT_ANCHORS[props.anchor ?? 'start']}>{props.tex}</text> : placed()}
     </g>
   );
-}
-
-// $$…$$ is a display formula, $…$ an inline formula, the rest is text.
-function segments(text) {
-  return text
-    .split('$$')
-    .flatMap((block, index) => (index % 2 === 1 ? [{ tex: block.trim(), display: true }] : block.split('$').map((part, inner) => (inner % 2 === 1 ? { tex: part } : { text: part }))))
-    .filter((part) => part.text !== '');
 }
 
 export function MathText(props) {

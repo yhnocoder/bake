@@ -8,26 +8,46 @@ import { articleUrl } from '../shared/urls.js';
 
 const EXAMPLE_SLUG = 'hello';
 const PACKAGE_FILE = 'package.json';
+const GITIGNORE = '.gitignore';
+const FIRST_POST_FILE = `${POSTS_DIR}/${EXAMPLE_SLUG}/index.md`;
 const BAKE = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
+// A folder that already holds files, such as a repository with a .gitignore, keeps them: bake init writes only the files that are missing, adds its lines to .gitignore and its fields to package.json.
 export function newBlog(folder, { date, language }) {
   const root = resolve(folder);
   const files = blogFiles(basename(root) || 'Blog', date, language);
-  const blocking = blockingPaths(root, Object.keys(files));
-  if (blocking.length > 0) return { error: `bake init: ${blocking.map((path) => join(folder, path)).join(', ')} already ${blocking.length === 1 ? 'exists' : 'exist'}; run bake init in a new or empty folder` };
+  const problem = blockingPath(root, Object.keys(files));
+  if (problem !== null) return { error: `bake init: ${join(folder, problem.path)} ${problem.reason}` };
   const packageFile = join(root, PACKAGE_FILE);
   const existing = statSync(packageFile, { throwIfNoEntry: false }) === undefined ? {} : readPackage(packageFile);
   if (existing === null) return { error: `bake init: ${join(folder, PACKAGE_FILE)} is not valid JSON` };
+  const written = [];
+  const kept = [];
   try {
     for (const [path, content] of Object.entries(files)) {
-      mkdirSync(dirname(join(root, path)), { recursive: true });
-      writeFileSync(join(root, path), content, { flag: 'wx' });
+      const file = join(root, path);
+      const text = statSync(file, { throwIfNoEntry: false }) === undefined ? content : path === GITIGNORE ? missingLines(readFileSync(file, 'utf8'), content) : '';
+      if (text === '') {
+        kept.push(path);
+        continue;
+      }
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, text, { flag: 'a' });
+      written.push(path);
     }
     writeFileSync(packageFile, `${JSON.stringify(blogPackage(existing), null, 2)}\n`);
   } catch (error) {
     return { error: `bake init: cannot write ${join(folder, relative(root, error.path ?? root))}: ${error.code ?? error.message}` };
   }
-  return { root, files: [...Object.keys(files), PACKAGE_FILE], url: articleUrl(date, EXAMPLE_SLUG) };
+  return { root, written: [...written, PACKAGE_FILE], kept, url: kept.includes(FIRST_POST_FILE) ? null : articleUrl(date, EXAMPLE_SLUG) };
+}
+
+// The lines of the .gitignore that bake init writes that an existing .gitignore lacks, written as they are or as a path from the root.
+function missingLines(existing, content) {
+  const lines = new Set(existing.split(/\r?\n/).map((line) => line.trim().replace(/^\//, '').replace(/\/$/, '')));
+  const missing = content.split('\n').filter((line) => line !== '' && !lines.has(line.replace(/\/$/, '')));
+  if (missing.length === 0) return '';
+  return `${existing === '' || existing.endsWith('\n') ? '' : '\n'}${missing.join('\n')}\n`;
 }
 
 function readPackage(file) {
@@ -60,20 +80,20 @@ export function installDependencies(root) {
   return null;
 }
 
-function blockingPaths(root, files) {
-  const blocking = new Set();
-  const check = (path, folder) => {
-    const stat = statSync(join(root, path), { throwIfNoEntry: false });
-    if (stat !== undefined && (!folder || !stat.isDirectory())) blocking.add(path);
-  };
+function blockingPath(root, files) {
   const existing = nearestExisting(root);
-  if (!statSync(existing).isDirectory()) return [relative(root, existing) || '.'];
+  if (!statSync(existing).isDirectory()) return { path: relative(root, existing) || '.', reason: 'is a file, and bake init needs a folder there' };
   for (const file of files) {
     const parts = file.split('/');
-    for (let depth = 1; depth < parts.length; depth += 1) check(parts.slice(0, depth).join('/'), true);
-    check(file, false);
+    for (let depth = 1; depth <= parts.length; depth += 1) {
+      const path = parts.slice(0, depth).join('/');
+      const stat = statSync(join(root, path), { throwIfNoEntry: false });
+      if (stat === undefined) break;
+      if (depth < parts.length && !stat.isDirectory()) return { path, reason: 'is a file, and bake init needs a folder there' };
+      if (depth === parts.length && !stat.isFile()) return { path, reason: 'is a folder, and bake init needs a file there' };
+    }
   }
-  return [...blocking];
+  return null;
 }
 
 function nearestExisting(path) {
@@ -91,9 +111,9 @@ function blogFiles(name, date, language) {
   const text = language.startsWith('zh') ? FIRST_POST.zh : FIRST_POST.en;
   return {
     [CONFIG_FILE]: ['export default {', `  title: ${JSON.stringify(name)},`, `  language: ${JSON.stringify(language)},`, '};', ''].join('\n'),
-    [`${POSTS_DIR}/${EXAMPLE_SLUG}/index.md`]: ['---', `title: ${text.title}`, `slug: ${EXAMPLE_SLUG}`, `date: ${date}`, `summary: ${text.summary}`, '---', '', ...text.body, ''].join('\n'),
+    [FIRST_POST_FILE]: ['---', `title: ${text.title}`, `slug: ${EXAMPLE_SLUG}`, `date: ${date}`, `summary: ${text.summary}`, '---', '', ...text.body, ''].join('\n'),
     'public/favicon.svg': favicon(name),
-    '.gitignore': [...['node_modules', ...BUILD_DIRS].map((dir) => `${dir}/`), ''].join('\n'),
+    [GITIGNORE]: [...['node_modules', ...BUILD_DIRS].map((dir) => `${dir}/`), ''].join('\n'),
     '.github/workflows/deploy.yml': DEPLOY_WORKFLOW,
   };
 }
@@ -139,6 +159,7 @@ const FIRST_POST = {
 };
 
 // GitHub Pages names the address of the site, a custom domain included, so the build takes it from there instead of bake.config.js.
+// why: the Playwright container holds Chromium, its system libraries and the CJK fonts of the share images, which playwright install --with-deps would download on every run; its tag must be the Playwright version that the installed Bake pins
 const DEPLOY_WORKFLOW = `name: Deploy
 
 on:
@@ -156,11 +177,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  playwright:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+    outputs:
+      version: \${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: package-lock.json
+          sparse-checkout-cone-mode: false
+      - id: version
+        run: echo "version=$(jq -r '.packages["node_modules/${BAKE.name}"].dependencies.playwright' package-lock.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: playwright
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v\${{ needs.playwright.outputs.version }}-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -168,17 +202,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-\${{ hashFiles('package-lock.json') }}
-      - run: npx playwright install --with-deps --only-shell chromium
       - id: pages
         uses: actions/configure-pages@v5
       - run: npx bake build --url "\${{ steps.pages.outputs.base_url }}"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
 `;

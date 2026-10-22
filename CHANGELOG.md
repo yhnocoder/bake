@@ -4,10 +4,20 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- `typeset(element)` in `bake/kit`, which typesets the `$…$` and `$$…$$` formulas in the text of an element, so that a component without SolidJS shows formulas the way `MathText` does.
+
 ### Changed
 
 - `bake new` and `bake init` load only the modules that read the configuration and write files, which shortens them from about 0.9 to 0.1 seconds.
 - The `bake` command turns on Node's compile cache, which shortens each command after the first.
+- `bake init` works in a folder that already holds files, such as a Git repository: it keeps the existing files, writes the missing ones and adds the missing lines to `.gitignore`.
+- The workflow `.github/workflows/deploy.yml` that `bake init` writes builds the blog in the Playwright container of the Playwright version that Bake uses, instead of installing Chromium and its system libraries on every run. A blog that copied the earlier workflow can copy the new one from the README.
+
+### Fixed
+
+- A stylesheet without script that several components import, such as `components/lib/figure.css`, no longer makes the page request a script that the build does not write.
 
 ## [0.2.0]
 

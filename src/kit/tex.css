@@ -22,7 +22,8 @@
   white-space: pre;
 }
 
-.bk-kit-math-text .bk-kit-tex:not(.bk-kit-tex-display) {
+.bk-kit-math-text .bk-kit-tex:not(.bk-kit-tex-display),
+.bk-kit-tex-inline {
   display: inline;
   min-height: 0;
 }

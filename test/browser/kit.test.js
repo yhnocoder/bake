@@ -121,6 +121,19 @@ export default function MathLabels() {
   );
 }
 `,
+  'components/typeset-view.js': `import { typeset } from 'bake/kit';
+
+export const layout = { height: 200 };
+
+export default class TypesetView extends HTMLElement {
+  async connectedCallback() {
+    this.innerHTML = '<p class="typeset-text">Area $\\\\R^{2}$ and $$x^{2}$$ for $5</p><svg><text>$a$</text></svg>';
+    await typeset(this);
+    this.dataset.typeset = '';
+  }
+}
+`,
+  'content/posts/typeset/index.md': article({ slug: 'typeset', body: ':::typeset-view\n:::\n' }),
   'content/posts/math-labels/index.md': article({ slug: 'math-labels', body: ':::math-labels\n:::\n' }),
   'content/posts/sized-plots/index.md': article({ slug: 'sized-plots', body: ':::sized-plots\n:::\n' }),
   'content/posts/step-sliders/index.md': article({ slug: 'step-sliders', body: ':::step-sliders\n:::\n' }),
@@ -469,6 +482,28 @@ test.describe('the kit works for any component that imports it', () => {
     assert.ok(Math.abs(layout.centre - 150) < 1, `the label is centred at ${layout.centre}`);
     assert.equal(layout.label, 'side $a^{2}$ long');
     assert.ok(layout.edge <= 300.5 && layout.edge > 290, `the label that starts at 290 ends at ${layout.edge}`);
+  });
+
+  test('typeset() in a component without SolidJS lays out the formulas in its text as MathText does and leaves a single $ and SVG text alone', async ({ newPage }) => {
+    const page = await newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto('/2026-10/typeset/');
+    await waitForComponents(page);
+    await page.waitForFunction(() => document.querySelector('typeset-view').dataset.typeset !== undefined);
+    const result = await page.evaluate(() => {
+      const [inline, display] = document.querySelectorAll('.typeset-text .bk-kit-tex');
+      return {
+        formulas: [inline, display].map((formula) => [formula.getAttribute('aria-label'), formula.querySelectorAll('svg').length]),
+        styles: [inline, display].map((formula) => getComputedStyle(formula).display),
+        doubleStruck: inline.querySelector('[data-c="211D"]') !== null,
+        text: document.querySelector('.typeset-text').textContent,
+        svg: document.querySelector('typeset-view svg:not(.bk-kit-tex svg) text').textContent,
+      };
+    });
+    assert.deepEqual(result.formulas, [['\\R^{2}', 1], ['x^{2}', 1]]);
+    assert.deepEqual(result.styles, ['inline', 'flex']);
+    assert.ok(result.doubleStruck, 'the formula uses the \\R macro of preamble.sty');
+    assert.match(result.text, / for \$5$/);
+    assert.equal(result.svg, '$a$');
   });
 
   test('a component that only uses the plain helpers or does not import the kit loads no kit code and no MathJax, also when another component of the blog uses the kit', async ({ newPage, site }) => {
