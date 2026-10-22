@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { article, copyExample, createBlog, filler, validConfig } from '../blog.js';
+import { article, createBlog, exampleBlog, filler, validConfig } from '../blog.js';
 import { addPasskeyAuthenticator, expect, settle, startDev, test } from './browser.js';
 
 
@@ -395,9 +395,55 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
 
 const PLOT = ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}';
 
-// Opens the syntax article of a copy of the example blog in bake dev, at the component that PLOT writes, with the parts of its parameter bar
+const paramBarArticle = `---
+title: 写法
+slug: syntax
+date: 2026-10-19
+---
+
+这篇文章列出 Bake 的全部写法。
+
+::::example
+:::act-fn-plot{fns=gelu dashed="gelu-tanh,gelu-quick" zoom}
+实线是精确 GELU，虚线是两种近似。
+:::
+::::
+
+::::example
+${PLOT}
+:::
+::::
+
+::::example
+:::act-fn-plot{fns=relu width=70%}
+:::
+::::
+
+像素宽度超过正文栏时，组件框放进宽栏。
+
+:::embed
+/2026-10/linked/#plot
+:::
+
+复制时附上脚注的定义[^copy-notes]。
+
+:::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}
+选中交互组件的任何部分，复制的都是它的整个 \`:::\` 块。
+:::
+
+[^copy-notes]: 每个脚注的定义只附一次。
+`;
+
+const fromExample = (paths) => Object.fromEntries(paths.map((path) => [path, readFileSync(join(exampleBlog, path), 'utf8')]));
+
+// Opens an article of the components of the example blog in bake dev, at the component that PLOT writes, with the parts of its parameter bar
 async function paramBarPage({ browser, after }) {
-  const dir = copyExample({ after });
+  const dir = createBlog({ after }, {
+    'bake.config.js': "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n",
+    ...fromExample(['preamble.sty', 'components/act-fn-plot.jsx', 'components/lib/act-fn-plot.css', 'components/lib/activations.js', 'components/lib/guides.js']),
+    [SYNTAX]: paramBarArticle,
+    'content/posts/linked/index.md': article({ title: '链接', slug: 'linked', date: '2026-10-01', body: '## Plot {#plot}\n\n:::act-fn-plot{fns=relu}\n:::\n' }),
+  });
   const file = join(dir, SYNTAX);
   const original = readFileSync(file, 'utf8');
   const line = lineOf(original, PLOT);

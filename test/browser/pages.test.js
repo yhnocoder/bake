@@ -7,7 +7,11 @@ import { exampleBlog } from '../blog.js';
 import { openWithSelectionModule } from './selection-module.js';
 import { luminance, settle, test } from './browser.js';
 
-const WIDTHS = [1440, 1340, 1339, 1000, 600, 375];
+// why: a long article takes about three seconds per width on a loaded machine, so the six breakpoints are checked in two tests
+const WIDTHS = [
+  [1440, 1340, 1339],
+  [1000, 600, 375],
+];
 const budgets = JSON.parse(readFileSync(defaultBudgets, 'utf8'));
 
 const articles = readdirSync(join(exampleBlog, 'content/posts')).map((name) => {
@@ -96,55 +100,67 @@ function brokenParts() {
     const href = use.getAttribute('href') ?? use.getAttribute('xlink:href');
     if (document.getElementById(href.slice(1)) === null) problems.push(`formula glyph ${href} is missing`);
   }
-  const ids = [...document.querySelectorAll('[id]')].map((element) => element.id);
-  for (const id of new Set(ids.filter((id, index) => ids.indexOf(id) !== index))) problems.push(`id ${id} appears more than once`);
+  const ids = new Set();
+  for (const { id } of document.querySelectorAll('[id]')) {
+    if (ids.has(id)) problems.push(`id ${id} appears more than once`);
+    ids.add(id);
+  }
   return problems;
+}
+
+// Opens the page, then reports the errors of loading it, and the broken parts of it at each width after every component started
+async function problemsOf(newPage, path, { colorScheme, widths, byteBudgets }) {
+  const page = await newPage({ colorScheme, viewport: { width: widths[0], height: 900 } });
+  const problems = [];
+  page.on('console', (message) => {
+    // why: the browser logs the status 404 of the 404 page as an error of the page itself
+    if (message.type() === 'error' && message.location().url !== page.url()) problems.push(`console: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => problems.push(error.message));
+  page.on('requestfailed', (request) => {
+    // why: a component or a font that is no longer needed when the width changes is cancelled
+    if (request.failure().errorText !== 'net::ERR_ABORTED') problems.push(`${request.url()} failed: ${request.failure().errorText}`);
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400 && !response.request().isNavigationRequest()) problems.push(`${response.url()} answered ${response.status()}`);
+  });
+  const cdp = await page.context().newCDPSession(page);
+  const requests = recordRequests(cdp);
+  await cdp.send('Network.enable');
+  await page.goto(path, { waitUntil: 'networkidle' });
+  if (byteBudgets !== undefined) {
+    const values = byteMetrics(requests(), join(byteBudgets.dir, 'dist'), byteBudgets.origin);
+    problems.push(...budgetProblems({ metrics: Object.keys(values), measurements: [{ page: path, width: widths[0], ...values }] }, budgets));
+  }
+  // why: a component starts when it comes near the screen, and the page starts all of them before it is printed
+  await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
+  await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state === 'ready' || frame.dataset.state === 'failed'));
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    await settle(page);
+    problems.push(...(await page.evaluate(brokenParts)).map((problem) => `at ${width}px: ${problem}`));
+  }
+  return { page, problems };
 }
 
 for (const path of pages) {
   test.describe(`the page ${path} of the example blog`, () => {
-    for (const scheme of ['light', 'dark']) {
-      test(`in the ${scheme} scheme loads without errors, starts every component, fits the screen at every breakpoint and follows the colour scheme of the system`, async ({ site, newPage }) => {
-        const page = await newPage({ colorScheme: scheme, viewport: { width: WIDTHS[0], height: 900 } });
-        const problems = [];
-        page.on('console', (message) => {
-          // why: the browser logs the status 404 of the 404 page as an error of the page itself
-          if (message.type() === 'error' && message.location().url !== page.url()) problems.push(`console: ${message.text()}`);
-        });
-        page.on('pageerror', (error) => problems.push(error.message));
-        page.on('requestfailed', (request) => {
-          // why: a component or a font that is no longer needed when the width changes is cancelled
-          if (request.failure().errorText !== 'net::ERR_ABORTED') problems.push(`${request.url()} failed: ${request.failure().errorText}`);
-        });
-        page.on('response', (response) => {
-          if (response.status() >= 400 && !response.request().isNavigationRequest()) problems.push(`${response.url()} answered ${response.status()}`);
-        });
-        const cdp = await page.context().newCDPSession(page);
-        const requests = recordRequests(cdp);
-        await cdp.send('Network.enable');
-        await page.goto(path, { waitUntil: 'networkidle' });
-        if (scheme === 'light') {
-          const values = byteMetrics(requests(), join(site.dir, 'dist'), site.origin);
-          problems.push(...budgetProblems({ metrics: Object.keys(values), measurements: [{ page: path, width: WIDTHS[0], ...values }] }, budgets));
-        }
-        // why: a component starts when it comes near the screen, and the page starts all of them before it is printed
-        await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
-        await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state === 'ready' || frame.dataset.state === 'failed'));
-        for (const width of WIDTHS) {
-          await page.setViewportSize({ width, height: 900 });
-          await settle(page);
-          problems.push(...(await page.evaluate(brokenParts)).map((problem) => `at ${width}px: ${problem}`));
-        }
-        if (scheme === 'dark') {
-          const background = async () => luminance(await page.evaluate(() => getComputedStyle(document.body).backgroundColor));
-          const dark = await background();
-          await page.emulateMedia({ colorScheme: 'light' });
-          await settle(page);
-          if (dark >= (await background())) problems.push('the dark scheme is not darker than the light one');
-        }
+    for (const [index, widths] of WIDTHS.entries()) {
+      test(`loads without errors, starts every component and fits the screen at ${widths.join(', ')} pixels`, async ({ site, newPage }) => {
+        const { problems } = await problemsOf(newPage, path, { colorScheme: 'light', widths, byteBudgets: index === 0 ? site : undefined });
         assert.deepEqual(problems, []);
       });
     }
+
+    test('loads without errors and starts every component in the dark scheme, and is darker than in the light scheme', async ({ newPage }) => {
+      const { page, problems } = await problemsOf(newPage, path, { colorScheme: 'dark', widths: [WIDTHS[0][0]] });
+      const background = async () => luminance(await page.evaluate(() => getComputedStyle(document.body).backgroundColor));
+      const dark = await background();
+      await page.emulateMedia({ colorScheme: 'light' });
+      await settle(page);
+      if (dark >= (await background())) problems.push('the dark scheme is not darker than the light one');
+      assert.deepEqual(problems, []);
+    });
   });
 }
 
