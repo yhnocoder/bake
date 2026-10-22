@@ -381,7 +381,7 @@ test('bake dev updates a page with a save that it made while the event stream wa
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
-test('bake dev in a frame of an editor scrolls to the line the editor names, sends a double-clicked block to the editor and shows the unsaved text', async (t) => {
+test('bake dev in a frame of an editor scrolls to the line the editor names, sends the line that the reader scrolls to and a double-clicked block to the editor, and shows the unsaved text', async (t) => {
   const source = article({ title: 'Live', slug: 'live', body });
   const editor = '<!doctype html><title>Editor</title><iframe src="/2026-10/live/" style="width: 1200px; height: 800px"></iframe><script>window.messages = []; addEventListener("message", (event) => window.messages.push(event.data));</script>\n';
   const dir = createBlog(t, { 'bake.config.js': validConfig, [ARTICLE]: source, 'public/editor.html': editor });
@@ -400,6 +400,15 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
   const far = frame.locator('.bk-block', { hasText: 'Paragraph 2 about the distance' });
   const top = () => far.evaluate((element) => element.getBoundingClientRect().top);
   await until(async () => (await top()) >= 0 && (await top()) < 50, 'the paragraph at the named line is not at the top of the frame');
+
+  await page.waitForTimeout(600);
+  assert.equal(await page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), false, 'the page sent its own scroll to the editor');
+  await page.mouse.move(600, 400);
+  await page.mouse.wheel(0, 600);
+  await until(() => page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), 'scrolling the page sent nothing to the editor');
+  const scrolledTo = await frame.locator('[data-region] [data-line]').evaluateAll((blocks) => blocks.find((block) => block.checkVisibility() && block.getBoundingClientRect().bottom > 0).dataset.line);
+  await until(async () => (await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll').line)) === Number(scrolledTo), 'the editor was not sent the line of the block at the top of the page');
+  assert.equal(await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll').file), ARTICLE);
 
   await frame.locator('.bk-block', { hasText: 'The edited paragraph' }).dblclick();
   await until(() => page.evaluate(() => window.messages.some((message) => message.bake === 'open')), 'the double-click sent nothing to the editor');

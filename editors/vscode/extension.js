@@ -10,6 +10,8 @@ const POSTS_DIR = 'content/posts';
 const BAKE_PACKAGE = '@yhnocoder/bake';
 const SERVING = /^Serving the blog at (\S+)$/m;
 const SOURCE_DELAY = 300;
+// why: revealing a line scrolls the editor in several steps, and each step would scroll the preview back to the start of a block
+const FOLLOW_QUIET_TIME = 300;
 const COMPLETION_KINDS = {
   block: vscode.CompletionItemKind.Class,
   attribute: vscode.CompletionItemKind.Property,
@@ -33,14 +35,14 @@ function activate(context) {
     diagnostics,
     vscode.commands.registerCommand('bake.openPreview', openPreview),
     vscode.workspace.onDidOpenTextDocument((document) => {
-      const article = articleOf(document);
+      const article = articleOf(document.uri);
       if (article !== null) startBlog(article.root);
     }),
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (preview !== null && editor !== undefined && articleOf(editor.document) !== null) showArticle(editor);
-    }),
+    vscode.window.tabGroups.onDidChangeTabs(followActiveTab),
+    vscode.window.tabGroups.onDidChangeTabGroups(followActiveTab),
     vscode.window.onDidChangeTextEditorVisibleRanges(({ textEditor, visibleRanges }) => {
-      if (preview?.shown === textEditor.document.uri.fsPath && visibleRanges.length > 0) post({ bake: 'reveal', line: visibleRanges[0].start.line + 1 });
+      if (preview?.shown !== textEditor.document.uri.fsPath || visibleRanges.length === 0 || Date.now() < preview.quietUntil) return;
+      post({ bake: 'reveal', line: visibleRanges[0].start.line + 1 });
     }),
     vscode.workspace.onDidChangeTextDocument(({ document }) => sendSourceLater(document)),
     vscode.workspace.onDidCloseTextDocument((document) => sendSource(document, null)),
@@ -48,16 +50,16 @@ function activate(context) {
     { dispose: () => blogs.forEach((blog) => blog.process?.kill()) },
   );
   for (const document of vscode.workspace.textDocuments) {
-    const article = articleOf(document);
+    const article = articleOf(document.uri);
     if (article !== null) startBlog(article.root);
   }
 }
 
-function articleOf(document) {
-  if (document.uri.scheme !== 'file' || path.basename(document.uri.fsPath) !== 'index.md') return null;
-  for (let dir = path.dirname(document.uri.fsPath); dir !== path.dirname(dir); dir = path.dirname(dir)) {
+function articleOf(uri) {
+  if (uri?.scheme !== 'file' || path.basename(uri.fsPath) !== 'index.md') return null;
+  for (let dir = path.dirname(uri.fsPath); dir !== path.dirname(dir); dir = path.dirname(dir)) {
     if (!existsSync(path.join(dir, CONFIG_FILE))) continue;
-    const file = path.relative(dir, document.uri.fsPath).split(path.sep).join('/');
+    const file = path.relative(dir, uri.fsPath).split(path.sep).join('/');
     return file.startsWith(`${POSTS_DIR}/`) ? { root: dir, file } : null;
   }
   return null;
@@ -166,15 +168,15 @@ function clearDiagnostics(root) {
   for (const uri of uris) if (uri.fsPath.startsWith(`${root}${path.sep}`)) diagnostics.delete(uri);
 }
 
-function openPreview() {
-  const editor = vscode.window.activeTextEditor;
-  if (editor === undefined || articleOf(editor.document) === null) {
+// The button at the top of an editor passes the file of the editor, also for an editor that is not a text editor, such as a Markdown editor of another extension.
+function openPreview(uri = activeTab()?.input?.uri) {
+  if (articleOf(uri) === null) {
     vscode.window.showInformationMessage(`Open the index.md of an article under ${POSTS_DIR}/ in a Bake blog to preview it.`);
     return;
   }
   if (preview === null) {
     const panel = vscode.window.createWebviewPanel('bake.preview', 'Bake preview', { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }, { enableScripts: true, retainContextWhenHidden: true });
-    preview = { panel, shown: null, root: null, column: editor.viewColumn };
+    preview = { panel, shown: null, root: null, column: null, quietUntil: 0 };
     panel.onDidDispose(() => {
       preview = null;
     });
@@ -182,15 +184,24 @@ function openPreview() {
   } else {
     preview.panel.reveal(vscode.ViewColumn.Beside, true);
   }
-  showArticle(editor);
+  showArticle(uri, vscode.window.tabGroups.activeTabGroup.viewColumn);
 }
 
-async function showArticle(editor) {
-  const article = articleOf(editor.document);
-  if (preview.shown === editor.document.uri.fsPath) return;
-  preview.shown = editor.document.uri.fsPath;
+function activeTab() {
+  return vscode.window.tabGroups.activeTabGroup.activeTab;
+}
+
+function followActiveTab() {
+  const uri = activeTab()?.input?.uri;
+  if (preview !== null && articleOf(uri) !== null) showArticle(uri, vscode.window.tabGroups.activeTabGroup.viewColumn);
+}
+
+async function showArticle(uri, column) {
+  const article = articleOf(uri);
+  preview.column = column;
+  if (preview.shown === uri.fsPath) return;
+  preview.shown = uri.fsPath;
   preview.root = article.root;
-  preview.column = editor.viewColumn;
   const { panel } = preview;
   let html;
   try {
@@ -207,15 +218,20 @@ async function showArticle(editor) {
   } catch (error) {
     html = messagePage(error.message);
   }
-  if (preview?.panel === panel && preview.shown === editor.document.uri.fsPath) panel.webview.html = html;
+  if (preview?.panel === panel && preview.shown === uri.fsPath) panel.webview.html = html;
 }
 
 function answerPage(message) {
   if (preview === null) return;
+  const editor = vscode.window.visibleTextEditors.find((candidate) => candidate.document.uri.fsPath === preview.shown);
   if (message.bake === 'ready') {
-    const editor = vscode.window.visibleTextEditors.find((candidate) => candidate.document.uri.fsPath === preview.shown);
     if (editor !== undefined && editor.visibleRanges.length > 0) post({ bake: 'reveal', line: editor.visibleRanges[0].start.line + 1 });
     for (const document of vscode.workspace.textDocuments) if (document.isDirty) sendSource(document, document.getText());
+  }
+  if (message.bake === 'scroll' && editor !== undefined && Number.isInteger(message.line)) {
+    preview.quietUntil = Date.now() + FOLLOW_QUIET_TIME;
+    const position = new vscode.Position(message.line - 1, 0);
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.AtTop);
   }
   if (message.bake === 'open' && typeof message.file === 'string' && Number.isInteger(message.line)) {
     const position = new vscode.Position(message.line - 1, 0);
@@ -228,7 +244,7 @@ function post(message) {
 }
 
 function sendSourceLater(document) {
-  if (preview === null || articleOf(document)?.root !== preview.root) return;
+  if (preview === null || articleOf(document.uri)?.root !== preview.root) return;
   const key = document.uri.toString();
   clearTimeout(sourceTimers.get(key));
   sourceTimers.set(
@@ -241,13 +257,13 @@ function sendSourceLater(document) {
 }
 
 function sendSource(document, text) {
-  const article = articleOf(document);
+  const article = articleOf(document.uri);
   if (preview === null || article?.root !== preview.root) return;
   post({ bake: 'source', file: article.file, text });
 }
 
 async function provideCompletionItems(document, position) {
-  const article = articleOf(document);
+  const article = articleOf(document.uri);
   if (article === null) return [];
   const blocks = await blocksOf(article).catch(() => []);
   return completionsAt(document.getText(), position.line, position.character, blocks).map((completion) => {

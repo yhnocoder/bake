@@ -31,7 +31,7 @@
         "command": "bake.openPreview",
         "title": "Open Preview to the Side",
         "category": "Bake",
-        "icon": "$(open-preview)"
+        "icon": "$(globe)"
       }
     ],
     "menus": {

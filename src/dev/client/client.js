@@ -8,6 +8,11 @@ const pagePath = location.pathname.replace(/index\.html$/, '');
 const BARS_KEY = 'bake-dev-param-bars';
 // why: the preview of the Bake extension for VS Code shows this page in a frame and talks to it with messages
 const editor = window.parent === window ? null : window.parent;
+// why: only a scroll that the reader starts moves the editor; the page also scrolls itself to keep the text in place after an update
+const READER_SCROLL_TIME = 500;
+let readerScrolled = -Infinity;
+let pointerDown = false;
+let scrollQueued = false;
 
 let pristine = null;
 let outline = JSON.parse(script.dataset.outline ?? '[]');
@@ -34,6 +39,10 @@ Promise.all([loaded, connected]).then(overlay.ready);
 document.addEventListener('dblclick', openInEditor);
 if (editor !== null) {
   addEventListener('message', answerEditor);
+  for (const type of ['wheel', 'touchmove', 'keydown']) addEventListener(type, () => (readerScrolled = performance.now()), { passive: true });
+  addEventListener('pointerdown', () => (pointerDown = true));
+  for (const type of ['pointerup', 'pointercancel']) addEventListener(type, () => (pointerDown = false));
+  addEventListener('scroll', followReader, { passive: true });
   editor.postMessage({ bake: 'ready', file: file ?? null }, '*');
 }
 
@@ -294,10 +303,24 @@ function openInEditor(event) {
 function answerEditor(event) {
   if (event.source !== editor) return;
   const { bake, line, text } = event.data ?? {};
-  if (bake === 'reveal' && Number.isInteger(line)) reveal(line);
+  if (bake === 'reveal' && Number.isInteger(line) && !readerScrolling()) reveal(line);
   if (bake === 'source' && token !== undefined && (typeof text === 'string' || text === null)) {
     fetch('/__bake/source', { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token }, body: JSON.stringify({ file: event.data.file, text }) });
   }
+}
+
+function readerScrolling() {
+  return pointerDown || performance.now() - readerScrolled < READER_SCROLL_TIME;
+}
+
+function followReader() {
+  if (scrollQueued || !readerScrolling()) return;
+  scrollQueued = true;
+  requestAnimationFrame(() => {
+    scrollQueued = false;
+    const top = [...document.querySelectorAll(BLOCKS)].find((block) => isShown(block) && block.getBoundingClientRect().bottom > 0);
+    if (top !== undefined) editor.postMessage({ bake: 'scroll', file, line: Number(top.dataset.line) }, '*');
+  });
 }
 
 function reveal(line) {
