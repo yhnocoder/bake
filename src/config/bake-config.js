@@ -10,6 +10,7 @@ import { labelsFor } from '../theme-kit/labels.js';
 import { characterProblem, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
+export const POSTS_DIR = 'content/posts';
 
 const FIELDS = ['title', 'description', 'url', 'language', 'theme', 'themes', 'home', 'categories', 'chat'];
 const CHAT_FIELDS = ['pet'];

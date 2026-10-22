@@ -113,3 +113,22 @@ describe('layers of src/', () => {
     assert.deepEqual(offending, []);
   });
 });
+
+describe('modules that a command loads', () => {
+  test('bake new and bake init load only the packages that read the configuration and write files', () => {
+    const reached = new Set();
+    const packages = new Set();
+    const queue = [join(SRC, 'build/new-article.js'), join(SRC, 'build/new-blog.js')];
+    while (queue.length > 0) {
+      const file = queue.pop();
+      if (reached.has(file)) continue;
+      reached.add(file);
+      for (const { specifier, target } of imports.get(file)) {
+        if (target !== null) queue.push(target);
+        else if (!isBuiltin(specifier)) packages.add(specifier);
+      }
+    }
+    // why: the Markdown, math, image and bundling packages take most of a second to load, which bake new and bake init do not need
+    assert.deepEqual([...packages].sort(), ['acorn', 'stringify-entities', 'yaml']);
+  });
+});
