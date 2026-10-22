@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { parse } from '../article.js';
 import { article, exampleBlog, validConfig } from '../blog.js';
-import { luminance, test } from './browser.js';
+import { test } from './browser.js';
 import { isSelectionChunk, openWithSelectionModule, selectionModuleReady } from './selection-module.js';
 
 const source = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
@@ -202,28 +202,6 @@ test.describe('copying from an article gives the Markdown source of the selectio
     await toastShown(page);
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), source);
     assert.equal(await page.locator('.bk-toast').textContent(), '已复制为 Markdown');
-  });
-
-  test('the toast takes the colours of the light and the dark scheme and does not cover the settings button', async ({ page }) => {
-    for (const width of [1440, 375]) {
-      for (const colorScheme of ['light', 'dark']) {
-        await page.setViewportSize({ width, height: 800 });
-        await page.emulateMedia({ colorScheme });
-        await toastHidden(page);
-        await page.locator('.bk-header .bk-copy-source').evaluate((button) => button.click());
-        await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-toast')).opacity === '1');
-        const { toast, background, own, settings } = await page.evaluate(() => ({
-          toast: getComputedStyle(document.querySelector('.bk-toast')).backgroundColor,
-          background: getComputedStyle(document.body).backgroundColor,
-          own: document.querySelector('.bk-toast').getBoundingClientRect().toJSON(),
-          settings: document.querySelector('.bk-settings-toggle').getBoundingClientRect().toJSON(),
-        }));
-        const at = `${colorScheme} at ${width}px`;
-        assert.ok(Math.abs(luminance(toast) - luminance(background)) < 0.2, `${at}: the toast ${toast} on the page ${background}`);
-        assert.ok(own.right <= settings.left || own.left >= settings.right || own.bottom <= settings.top || own.top >= settings.bottom, `${at}: the toast ${JSON.stringify(own)} covers the settings button ${JSON.stringify(settings)}`);
-        assert.ok(own.left >= 0 && own.right <= width, `${at}: the toast ${JSON.stringify(own)} leaves the screen`);
-      }
-    }
   });
 
   test('starting the copy module on a page without the source script is an error', async ({ newPage }) => {

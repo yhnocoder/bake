@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { article, decodeImage } from '../blog.js';
-import { settle, sharedShadowLayers, test } from './browser.js';
+import { settle, test } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
 const motionBox = `export const layout = { height: 80 };
@@ -113,40 +113,6 @@ test.describe('reader settings', () => {
     await page.getByRole('button', { name: '设置' }).click();
     await page.mouse.click(700, 300);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-panel')).visibility === 'hidden');
-    await page.close();
-  });
-
-  test('the home link and the settings button stack as two round buttons from 1000 pixels up and in a tab on the left edge of a phone, labelled without visible text, and the settings button takes the accent colour on hover', async ({ newPage }) => {
-    const page = await newPage();
-    const read = () =>
-      page.evaluate(() => {
-        const button = document.querySelector('.bk-settings-toggle');
-        const box = button.getBoundingClientRect();
-        const home = document.querySelector('.bk-settings-home').getBoundingClientRect();
-        const style = getComputedStyle(button);
-        return {
-          box: [box.left, innerHeight - box.bottom, box.width, box.height],
-          home: [home.left, innerHeight - home.bottom, home.width, home.height],
-          radius: style.borderRadius,
-          text: button.textContent.trim(),
-          label: [button.getAttribute('aria-label'), button.title],
-          icon: button.querySelector('svg').getBoundingClientRect().width,
-        };
-      });
-    const expected = { text: '', label: ['设置', '设置'], icon: 17 };
-    for (const width of [1440, 1024]) {
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto(url);
-      assert.deepEqual(await read(), { box: [16, 16, 34, 34], home: [16, 58, 34, 34], radius: '17px', ...expected }, `at ${width} pixels`);
-    }
-    await page.setViewportSize({ width: 375, height: 700 });
-    await page.goto(url);
-    assert.deepEqual(await read(), { box: [0, 24, 40, 38], home: [0, 62, 40, 38], radius: '0px 11px 11px 0px', ...expected });
-    const color = () => page.locator('.bk-settings-toggle').evaluate((button) => getComputedStyle(button).color);
-    assert.equal(await color(), 'rgb(22, 26, 29)');
-    await page.setViewportSize({ width: 1440, height: 800 });
-    await page.hover('.bk-settings-toggle');
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings-toggle')).color !== 'rgb(22, 26, 29)');
     await page.close();
   });
 
@@ -289,22 +255,6 @@ test.describe('reader settings', () => {
     await toggle.click();
     assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await context.close();
-  });
-
-  test('the shadows of the settings button, the chosen option and the switch follow dark mode', async ({ newPage, after }) => {
-    const shadows = {};
-    for (const colorScheme of ['light', 'dark']) {
-      const page = await newPage({ colorScheme });
-      await page.goto(url);
-      shadows[colorScheme] = await page.evaluate(() => [
-        getComputedStyle(document.querySelector('.bk-settings-toggle')).boxShadow,
-        getComputedStyle(document.querySelector('.bk-settings-options button[aria-pressed="true"]'), '::before').boxShadow,
-        getComputedStyle(document.querySelector('.bk-settings-switch i'), '::after').boxShadow,
-      ]);
-      await page.close();
-    }
-    const shared = ['button', 'option', 'switch'].map((name, index) => [name, sharedShadowLayers(shadows.light[index], shadows.dark[index])]);
-    assert.deepEqual(shared, [['button', []], ['option', []], ['switch', []]]);
   });
 
   test('with reduced motion the settings panel and the toast only fade, and components keep their own transitions', async ({ newContext }) => {

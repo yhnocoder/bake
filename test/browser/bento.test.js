@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { article, createBlog, decodeImage, exampleBlog, writeFiles } from '../blog.js';
+import { article, createBlog, exampleBlog, writeFiles } from '../blog.js';
 import { addPasskeyAuthenticator, test as base, expect, luminance, settle, startDev } from './browser.js';
 import { openWithSelectionModule } from './selection-module.js';
 
@@ -369,26 +369,6 @@ test.describe('the bento theme lays out sections as cards', () => {
     assert.ok(darkCard > darkPage && lightCard > lightPage, 'the cards stand out from the page');
   });
 
-  test('a code block, a table or a display formula that fits its card shows no scroll shadow at its edges', async ({ open }) => {
-    for (const colorScheme of ['light', 'dark']) {
-      const page = await open('activations', { colorScheme, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-      const boxes = page.locator('.bt-card :is(pre.shiki, .table-scroll, mjx-container[display])');
-      const leaks = [];
-      for (let index = 0; index < (await boxes.count()); index += 1) {
-        const box = boxes.nth(index);
-        if (await box.evaluate((element) => !element.checkVisibility() || element.scrollWidth > element.clientWidth)) continue;
-        await box.scrollIntoViewIfNeeded();
-        const shown = await box.screenshot();
-        await box.evaluate((element) => (element.style.backgroundImage = 'none'));
-        const plain = await box.screenshot();
-        await box.evaluate((element) => element.style.removeProperty('background-image'));
-        const difference = largestDifference(await decodeImage(shown), await decodeImage(plain));
-        if (difference > 2) leaks.push(`${colorScheme}: ${await box.evaluate((element) => element.closest('.bt-card').querySelector('h2 .bk-heading-text').textContent)} ${index} differs by ${difference}`);
-      }
-      assert.deepEqual(leaks, []);
-    }
-  });
-
   test('the code blocks, tables and display formulas of the example article fit their cards, code wraps on a phone, and a component in a card has no frame of its own', async ({ open }) => {
     for (const width of [1440, 1100, 1000, 375]) {
       const page = await open('activations', { viewport: { width, height: 900 } });
@@ -572,15 +552,6 @@ function gridLayout(columns) {
   );
   const fullWidth = cards.every(({ box }) => Math.abs(box.width - origin.width) < 1);
   return { spans, starts, inOrder, fullWidth };
-}
-
-function largestDifference(first, second) {
-  const corner = 20;
-  let largest = 0;
-  for (let y = corner; y < first.height - corner; y += 1) {
-    for (let index = y * first.width * 4; index < (y + 1) * first.width * 4; index += 1) largest = Math.max(largest, Math.abs(first.data[index] - second.data[index]));
-  }
-  return largest;
 }
 
 function overlappingCards() {

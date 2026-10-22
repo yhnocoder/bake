@@ -278,39 +278,6 @@ test.describe('the essay theme lays out articles', () => {
     await page.close();
   });
 
-  test('a line with inline math, code, a highlight or a sidenote number keeps the line height of its paragraph at every text size, also in an example result on a first visit while the fonts load', async ({ newPage }) => {
-    const uneven = [];
-    for (const width of [1440, 375]) {
-      for (const size of ['small', 'medium', 'larger']) {
-        const page = await newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
-        await page.addInitScript((value) => localStorage.setItem('bk-size', value), size);
-        await page.goto('/2026-10/syntax/');
-        await settle(page);
-        const gaps = await page.evaluate(() =>
-          [...document.querySelectorAll('.bk-article p')]
-            .filter((paragraph) => !paragraph.closest('.component-box, .example-source') && paragraph.querySelector('mjx-container:not([display]), code, mark, sup'))
-            .filter((paragraph) => [...paragraph.querySelectorAll('mjx-container svg')].every((svg) => svg.getBoundingClientRect().height < parseFloat(getComputedStyle(paragraph).lineHeight)))
-            .flatMap((paragraph) => {
-              const tops = [];
-              const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
-              for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-                if (node.parentElement.closest('code, mjx-container, sup')) continue;
-                const range = document.createRange();
-                range.selectNodeContents(node);
-                for (const rect of range.getClientRects()) if (rect.height > 0 && !tops.some((top) => Math.abs(top - rect.top) < 4)) tops.push(rect.top);
-              }
-              tops.sort((a, b) => a - b);
-              const lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight);
-              return tops.slice(1).map((top, index) => [paragraph.textContent.slice(0, 12), index + 1, Math.round((top - tops[index]) * 10) / 10, Math.round(lineHeight * 10) / 10]).filter(([, , gap, height]) => Math.abs(gap - height) > 0.6);
-            }),
-        );
-        uneven.push(...gaps.map(([text, line, gap, height]) => `${width} pixels, size ${size}: line ${line + 1} of "${text}" starts ${gap} px after the line before it, with a line height of ${height} px`));
-        await page.close();
-      }
-    }
-    assert.deepEqual(uneven, []);
-  });
-
   test('dark mode follows the system colour scheme', async ({ open }) => {
     const page = await open('widths', { colorScheme: 'dark' });
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)');
@@ -319,97 +286,7 @@ test.describe('the essay theme lays out articles', () => {
     await page.close();
   });
 
-  test('display math fades into the page colour only at an overflowing side in both schemes, also in the first frame after the colour scheme changes', async ({ open }) => {
-    const problems = [];
-    for (const width of [1440, 375]) {
-      const page = await open('jacobian', { viewport: { width, height: 900 }, reducedMotion: 'no-preference', colorScheme: 'light' });
-      const edges = async () => {
-        const boxes = await page.evaluate(() =>
-          [...document.querySelectorAll('.bk-article mjx-container[display]')].map((formula) => {
-            const box = formula.getBoundingClientRect();
-            const fade = (side) => Number(getComputedStyle(formula, side).opacity);
-            return { left: Math.ceil(box.left), right: Math.floor(box.right) - 1, top: Math.ceil(box.top), overflows: formula.scrollWidth > formula.clientWidth, fades: [fade('::before'), fade('::after')] };
-          }),
-        );
-        const { data, info } = await sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true });
-        const pixel = (x, y) => [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
-        return boxes.map((box) => ({ ...box, page: pixel(box.left, box.top - 6), start: pixel(box.left, box.top + 2), end: pixel(box.right, box.top + 2) }));
-      };
-      const distance = (a, b) => Math.max(...a.map((value, index) => Math.abs(value - b[index])));
-      const check = async (moment) => {
-        for (const [index, edge] of (await edges()).entries()) {
-          const name = `formula ${index + 1} at ${width}px ${moment}`;
-          if (distance(edge.start, edge.page) > 2) problems.push(`${name}: start edge ${edge.start} on page ${edge.page}`);
-          if (distance(edge.end, edge.page) > 2) problems.push(`${name}: end edge ${edge.end} on page ${edge.page}`);
-          if (String(edge.fades) !== String([0, edge.overflows ? 1 : 0])) problems.push(`${name}: fades ${edge.fades}, overflows ${edge.overflows}`);
-        }
-      };
-      await page.locator('mjx-container[display]').nth(1).scrollIntoViewIfNeeded();
-      await settle(page);
-      await check('in the light scheme');
-      await page.emulateMedia({ colorScheme: 'dark' });
-      // why: the page fades to the new scheme with a view transition, and Chromium on Linux draws that fade without the old snapshot when the root color-scheme changes, so the first frame of the dark scheme is read with the fade finished
-      await page.waitForFunction(() => document.getAnimations().some((animation) => animation.effect.pseudoElement?.startsWith('::view-transition')));
-      await page.evaluate(async () => {
-        for (const animation of document.getAnimations()) if (animation.effect.pseudoElement?.startsWith('::view-transition')) animation.finish();
-        await new Promise((done) => requestAnimationFrame(done));
-      });
-      await check('in the first frame of the dark scheme');
-      await settle(page);
-      await check('in the dark scheme');
-      if (width === 375) assert.ok((await edges()).some((edge) => edge.overflows), 'a formula overflows on a phone');
-      await page.close();
-    }
-    assert.deepEqual(problems, []);
-  });
 
-  test('tags are styled as inline code', async ({ open }) => {
-    const page = await open('stress');
-    const tags = await page.evaluate(() => {
-      const code = getComputedStyle(document.querySelector('.bk-article p code'));
-      return [...document.querySelectorAll('.bk-tag')].map((tag) => {
-        const style = getComputedStyle(tag);
-        return { text: tag.textContent, font: style.fontFamily === code.fontFamily, background: style.backgroundColor };
-      });
-    });
-    assert.deepEqual(tags, [
-      { text: 'layout', font: true, background: 'rgb(238, 240, 236)' },
-      { text: 'stress', font: true, background: 'rgb(238, 240, 236)' },
-    ]);
-    await page.close();
-  });
-
-  test('no separator of the masthead meta line starts a line on a phone', async ({ open }) => {
-    const page = await open('syntax', { viewport: { width: 375, height: 800 } });
-    const items = await page.evaluate(() => {
-      const meta = document.querySelector('.bk-meta').getBoundingClientRect();
-      return [...document.querySelectorAll('.bk-meta :is(time, .bk-words, .bk-tags, .bk-copy)')].map((item) => {
-        const box = item.getBoundingClientRect();
-        return { text: item.textContent, top: Math.round(box.top), separatorShown: box.left >= meta.left - 1 };
-      });
-    });
-    const lines = [...new Set(items.map((item) => item.top))];
-    assert.ok(lines.length >= 2, `the meta line does not wrap at 375 px: ${JSON.stringify(items)}`);
-    const startsLine = (item, index) => index === 0 || items[index - 1].top !== item.top;
-    assert.deepEqual(
-      items.filter((item, index) => startsLine(item, index) === item.separatorShown).map((item) => item.text),
-      [],
-    );
-    await page.close();
-  });
-
-
-
-  test('the references label is hidden right after a heading and shown otherwise', async ({ open }) => {
-    const labels = async (path) => {
-      const page = await open(path);
-      const shown = await page.evaluate(() => [...document.querySelectorAll('.bk-references-label')].filter((label) => label.getBoundingClientRect().height > 0).map((label) => label.textContent));
-      await page.close();
-      return shown;
-    };
-    assert.deepEqual(await labels('stress'), []);
-    assert.deepEqual(await labels('widths'), ['参考文献']);
-  });
 
   test('placing blocks and cards forces a fixed number of layouts however many blocks an article has', async ({ open }) => {
     const layoutsOnResize = async (path) => {

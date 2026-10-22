@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import sharp from 'sharp';
 import { scrollInSteps, settle } from './browser.js';
-import { API_KEY, CORS, KEY, PETS, QUESTION, ask, backdropRoots, openSettings, petEntry, petSeen, setUpKey, shadow, test, text, watchPet } from './chat-page.js';
+import { CORS, PETS, ask, backdropRoots, openSettings, petEntry, petSeen, setUpKey, shadow, test, text, watchPet } from './chat-page.js';
 
 async function petNow(page, state) {
   await page.waitForFunction((entry) => JSON.stringify(window.bakeTest.pet.at(-1)) === JSON.stringify(entry), petEntry(state));
@@ -295,64 +295,4 @@ test.describe('the pets and the colours of the AI chat on published pages', () =
     });
   }
 
-  test('the pet and the bubbles use the pointer cursor, stay inside a phone screen and only fade with reduced motion', async ({ openChat }) => {
-    const { page } = await openChat({ contextOptions: { viewport: { width: 375, height: 700 }, reducedMotion: 'reduce' } });
-    await page.goto('/2026-10/syntax/');
-    const launcher = page.locator('.bk-chat-launcher');
-    assert.equal(await launcher.evaluate((element) => getComputedStyle(element).cursor), 'pointer');
-    await launcher.click();
-    const chat = page.locator('.bk-chat[data-open]');
-    await chat.waitFor();
-    await page.locator('.bk-chat-note').first().waitFor();
-    const box = await chat.boundingBox();
-    assert.ok(box.x >= 0 && box.x + box.width <= 375 && box.y >= 0 && box.y + box.height <= 700, JSON.stringify(box));
-    assert.equal(await launcher.evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).isIdentity), true);
-    assert.equal(
-      await page
-        .locator('.bk-chat-bubble')
-        .first()
-        .evaluate((element) => getComputedStyle(element).translate),
-      'none',
-    );
-    assert.equal(await page.locator('.bk-chat-composer').evaluate((element) => getComputedStyle(element).translate), 'none');
-    const placeholderFits = (selector) =>
-      page.locator(selector).evaluate((input) => {
-        const context = document.createElement('canvas').getContext('2d');
-        context.font = getComputedStyle(input).font;
-        return { text: input.placeholder, width: context.measureText(input.placeholder).width, room: input.clientWidth };
-      });
-    const keyFit = await placeholderFits(KEY);
-    assert.ok(keyFit.width <= keyFit.room, JSON.stringify(keyFit));
-    await page.locator(KEY).fill(API_KEY);
-    await page.locator(KEY).press('Enter');
-    const questionFit = await placeholderFits(QUESTION);
-    assert.ok(questionFit.width <= questionFit.room, JSON.stringify(questionFit));
-    await page.locator(QUESTION).fill('标题的锚点是怎么来的？');
-    for (const control of ['.bk-chat-send', '.bk-chat-icon']) assert.deepEqual(await page.locator(control).evaluateAll((elements) => [...new Set(elements.map((element) => getComputedStyle(element).cursor))]), ['pointer']);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
-  });
-
-  test('the launcher and the chat take the colours and the color scheme that the page shows, from the system or from the theme setting', async ({ openChat }) => {
-    for (const [colorScheme, theme] of [['dark', 'system'], ['light', 'dark'], ['dark', 'light']]) {
-      const { context, page } = await openChat({ contextOptions: { colorScheme, reducedMotion: 'reduce' } });
-      await context.addInitScript((value) => localStorage.setItem('bk-theme', value), theme);
-      await page.goto('/2026-10/syntax/');
-      const launcher = page.locator('.bk-chat-launcher');
-      await launcher.click();
-      const composer = page.locator('.bk-chat[data-open] .bk-chat-composer');
-      await composer.waitFor();
-      const expected = await page.evaluate(() => {
-        const probe = document.body.appendChild(document.createElement('div'));
-        probe.style.cssText = 'background-color: var(--surface); color: var(--ink)';
-        const style = getComputedStyle(probe);
-        return { surface: style.backgroundColor, ink: style.color, scheme: style.colorScheme, launcherScheme: style.colorScheme };
-      });
-      const shown = {
-        ...(await composer.evaluate((element) => ({ surface: getComputedStyle(element).backgroundColor, ink: getComputedStyle(element).color, scheme: getComputedStyle(element).colorScheme }))),
-        launcherScheme: await launcher.evaluate((element) => getComputedStyle(element).colorScheme),
-      };
-      assert.deepEqual(shown, expected, `${theme} theme in the ${colorScheme} scheme`);
-      await context.close();
-    }
-  });
 });

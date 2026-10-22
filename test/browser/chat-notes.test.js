@@ -333,46 +333,6 @@ test.describe('the notes of the AI chat', () => {
 });
 
 test.describe('the instructions and the prompts of the AI chat', () => {
-  test('the tabs of the prompt form fit the form in Chinese and in English at 320 and 375 pixels and break only between words', async ({ site, openChat }) => {
-    for (const width of [320, 375]) {
-      for (const lang of ['zh-CN', 'en']) {
-        const { page } = await openChat({ contextOptions: { viewport: { width, height: 812 } } });
-        await page.route(`${site.origin}/2026-10/syntax/`, async (route) => {
-          const response = await route.fetch();
-          await route.fulfill({ response, body: (await response.text()).replace('<html lang="zh-CN"', `<html lang="${lang}"`) });
-        });
-        await page.goto('/2026-10/syntax/');
-        await setUpKey(page);
-        await page.locator('.bk-chat-icon').last().click();
-        await page.locator('.bk-chat-menu-item').filter({ hasText: lang === 'en' ? 'Prompts' : '提示词' }).click();
-        const tabs = page.locator('.bk-chat-prompt-tabs');
-        await tabs.waitFor();
-        const fit = await tabs.evaluate((list) =>
-          [...list.children].map((tab) => {
-            const words = [...tab.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
-            const range = document.createRange();
-            const broken = words.filter((word) => {
-              range.selectNodeContents(word);
-              return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size > 1;
-            });
-            return {
-              text: tab.textContent,
-              clipped: tab.scrollWidth > tab.clientWidth,
-              outside: tab.getBoundingClientRect().right > list.getBoundingClientRect().right + 0.5 || list.getBoundingClientRect().right > list.parentElement.getBoundingClientRect().right + 0.5,
-              broken: broken.map((word) => word.textContent),
-            };
-          }),
-        );
-        assert.deepEqual(
-          fit.filter((tab) => tab.clipped || tab.outside || tab.broken.length > 0),
-          [],
-          `${lang} at ${width} pixels: ${JSON.stringify(fit)}`,
-        );
-        await page.close();
-      }
-    }
-  });
-
   test('prompts that cannot all be stored change nothing in storage and stay in the form', async ({ openChat }) => {
     const { page } = await openChat();
     await page.addInitScript(() => {

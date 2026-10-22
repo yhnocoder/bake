@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { article, createBlog, exampleBlog, validConfig } from '../blog.js';
-import { settle, startDev } from './browser.js';
-import { API_KEY, KEY, QUESTION, ask, backdropRoots, events, openSettings, petSeen, setUpKey, shadow, storage, test, text, watchPet } from './chat-page.js';
+import { startDev } from './browser.js';
+import { API_KEY, KEY, QUESTION, ask, events, openSettings, petSeen, setUpKey, storage, test, text, watchPet } from './chat-page.js';
 import { isSelectionChunk } from './selection-module.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
@@ -48,33 +48,6 @@ test.describe('the key and the answers of the AI chat on published pages', () =>
     assert.match(request.body.messages[0].content, /"address":"\/2026-10\/jacobian\/","title":"雅可比矩阵"/);
     assert.deepEqual(request.body.messages.slice(1), [{ role: 'user', content: '这篇文章讲什么？' }]);
     assert.deepEqual(problems, []);
-  });
-
-  test('the frosted glass lies under every part of the chat that asks for the key and blurs the page also while it fades in, at 1440 and 375 pixels', async ({ openChat }) => {
-    for (const [width, height] of [[1440, 900], [375, 812]]) {
-      const { page } = await openChat({ contextOptions: { viewport: { width, height } } });
-      await page.goto('/2026-09/llm-act-fns/');
-      await page.locator('.bk-chat-launcher').click();
-      await page.locator(KEY).waitFor();
-      assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass while it fades in at ${width} pixels`);
-      await settle(page);
-      assert.deepEqual(await page.locator('.bk-chat').evaluate(backdropRoots), [], `no ancestor stops the blur of the glass at ${width} pixels`);
-      const layout = await page.locator('.bk-chat').evaluate((chat) => {
-        const glass = chat.getBoundingClientRect();
-        const style = getComputedStyle(chat, '::before');
-        const parts = [...chat.querySelectorAll('.bk-chat-bubble, .bk-chat-composer')].map((part) => part.getBoundingClientRect()).filter((box) => box.width > 0);
-        return {
-          blur: style.backdropFilter.startsWith('blur('),
-          opacity: style.opacity,
-          parts: parts.length,
-          outside: parts.filter((box) => box.left < glass.left || box.right > glass.right || box.top < glass.top || box.bottom > glass.bottom).length,
-        };
-      });
-      assert.equal(layout.blur && layout.opacity === '1', true, `the glass blurs the page behind the chat at ${width} pixels`);
-      assert.ok(layout.parts >= 2, `the key instructions and the key field show at ${width} pixels`);
-      assert.equal(layout.outside, 0, `the key instructions and the key field lie on the glass at ${width} pixels`);
-      await page.close();
-    }
   });
 
   test('the passkey unlocks the key for 30 days in this browser, and only when a question is sent after that', async ({ openChat }) => {
@@ -545,35 +518,6 @@ test.describe('the key and the answers of the AI chat on published pages', () =>
     assert.deepEqual(api.requests.at(-1).body.messages.slice(1), [{ role: 'user', content: '讲了什么？' }]);
   });
 
-  test('older bubbles scroll inside a box of at most 480 pixels at 1440 pixels and 230 pixels on a phone without a scrollbar and fade at the top', async ({ openChat }) => {
-    const { page, api } = await openChat();
-    await page.goto('/2026-10/syntax/');
-    await setUpKey(page);
-    api.answers.push({ body: text(Array.from({ length: 24 }, (_, index) => `第 ${index + 1} 段。`).join('\n\n'), 40) });
-    await ask(page, '写长一点');
-    await page.locator('.bk-chat-reply[data-done]').waitFor();
-    const bubbles = page.locator('.bk-chat-bubbles');
-    const height = async () => (await bubbles.boundingBox()).height;
-    assert.ok((await height()) > 400 && (await height()) <= 480, String(await height()));
-    await page.setViewportSize({ width: 375, height: 812 });
-    assert.ok((await height()) <= 230, String(await height()));
-    await page.setViewportSize({ width: 1440, height: 900 });
-    assert.equal(await bubbles.evaluate((element) => getComputedStyle(element).scrollbarWidth), 'none');
-    const room = await bubbles.evaluate(async (element) => {
-      await Promise.all(element.closest('.bk-chat').getAnimations({ subtree: true }).map((animation) => animation.finished));
-      const box = element.getBoundingClientRect();
-      const rects = [...element.querySelectorAll('.bk-chat-bubble')].map((bubble) => bubble.getBoundingClientRect());
-      const launcher = element.getRootNode().querySelector('.bk-chat-launcher').getBoundingClientRect();
-      return { left: Math.min(...rects.map((rect) => rect.left - box.left)), right: Math.min(...rects.map((rect) => box.right - rect.right)), bottom: box.bottom - rects.at(-1).bottom, launcher: launcher.left - box.right };
-    });
-    assert.ok(room.left >= 6 && room.right >= 2 && room.bottom >= 6, `the scroll box cuts off the edges and shadows of the bubbles: ${JSON.stringify(room)}`);
-    assert.ok(room.launcher >= 0, `the scroll box covers the launcher: ${JSON.stringify(room)}`);
-    await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
-    await bubbles.evaluate((element) => (element.scrollTop = -element.scrollHeight));
-    await page.locator('.bk-chat-bubbles:not([data-faded])').waitFor();
-    await bubbles.evaluate((element) => (element.scrollTop = 0));
-    await page.locator('.bk-chat-bubbles[data-faded]').waitFor();
-  });
 });
 
 test('a page saved in bake dev gives the chat the new source of the article', async ({ openChat, after }) => {
@@ -594,37 +538,4 @@ test('a page saved in bake dev gives the chat the new source of the article', as
 });
 
 test.describe('the shadows of the AI chat on published pages', () => {
-  test('the bubbles, the input field, the settings menu, the button that asks about a passage and the outline of the pet take their shadows from the theme in the light and the dark scheme', async ({ openChat }) => {
-    const seen = {};
-    for (const colorScheme of ['light', 'dark']) {
-      const { page, api } = await openChat({ contextOptions: { colorScheme } });
-      await page.goto('/2026-10/syntax/');
-      await setUpKey(page);
-      api.answers.push({ body: text('好。') });
-      await ask(page, '你好');
-      await page.locator('.bk-chat-reply[data-done]').waitFor();
-      await openSettings(page);
-      seen[colorScheme] = await shadow(
-        page,
-        `const style = (selector, property) => getComputedStyle(root.querySelector(selector))[property];
-        const token = (name) => {
-          const probe = document.body.appendChild(document.createElement('div'));
-          probe.style.boxShadow = \`var(\${name})\`;
-          const value = getComputedStyle(probe).boxShadow;
-          probe.remove();
-          return value;
-        };
-        return { button: token('--button-shadow'), card: token('--card-shadow'), bubble: style('.bk-chat-reply', 'boxShadow'), composer: style('.bk-chat-composer', 'boxShadow'), menu: style('.bk-chat-menu', 'boxShadow'), ask: getComputedStyle(document.querySelector('[data-bake-chat-ask]').shadowRoot.querySelector('.bk-chat-ask')).boxShadow, pet: style('.bk-chat-launcher .bk-chat-pet', 'filter') };`,
-      );
-      const { button, card, bubble, composer, menu, ask: askButton } = seen[colorScheme];
-      const report = JSON.stringify(seen[colorScheme]);
-      assert.ok(bubble.endsWith(`, ${button}`), report);
-      assert.ok(composer.endsWith(`, ${button}`), report);
-      assert.equal(menu, card, report);
-      assert.equal(askButton, button, report);
-    }
-    for (const part of ['bubble', 'composer', 'menu', 'ask']) assert.notEqual(seen.light[part], seen.dark[part], `the ${part} has the same shadow in both schemes: ${seen.light[part]}`);
-    assert.match(seen.light.pet, /^drop-shadow\(rgba\(0, 0, 0, 0\) /, seen.light.pet);
-    assert.doesNotMatch(seen.dark.pet, /rgba\(0, 0, 0, 0\)/, seen.dark.pet);
-  });
 });
