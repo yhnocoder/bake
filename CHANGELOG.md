@@ -4,6 +4,8 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.0]
+
 ### Added
 
 - The `demo` workflow, which publishes the example blog to the GitHub Pages site of the repository when it is started by hand.
@@ -48,5 +50,6 @@ The first release of Bake as it was rebuilt to follow its new design.
 - The AI chat with DeepSeek, which keeps the reader's API key encrypted with a passkey.
 - `bake dev`, which updates the open page in place on every save, lists the problems of the blog on the page, opens a block in Visual Studio Code on a double click, and shows a parameter bar above every component that writes the chosen parameters back to the Markdown.
 
-[Unreleased]: https://github.com/yhnocoder/bake/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/yhnocoder/bake/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yhnocoder/bake/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yhnocoder/bake/releases/tag/v0.1.0
