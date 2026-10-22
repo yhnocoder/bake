@@ -6,7 +6,7 @@ import { isDeepStrictEqual } from 'node:util';
 const QUERY = /\?.*$/;
 const CHANGED_DURING_COMPUTE = Symbol('changed during compute');
 
-// An entry keeps the value of its compute function with everything the function read: the files, folders and Vite modules of the reader, and the parts of the context it selected. It is reused while all of them are as they were.
+// An entry keeps the value of its compute function with everything the function read: the files, folders and Vite modules of the reader, and the parts of the context it selected. It is reused while all of them are as they were: a selected value equal in content, or for same() the same object.
 export function createMemo(root) {
   const entries = new Map();
   let update = 0;
@@ -83,7 +83,13 @@ export function createMemo(root) {
       },
       value(select) {
         const value = select(context);
-        add({ select, value });
+        add({ select, value, equal: isDeepStrictEqual });
+        return value;
+      },
+      // why: an object such as a parsed article is compared by identity, because comparing its content would take as long as computing it again
+      same(select) {
+        const value = select(context);
+        add({ select, value, equal: Object.is });
         return value;
       },
       // A result that may depend on any file, such as a build that failed before it named its modules, is computed again on every update.
@@ -98,7 +104,7 @@ export function createMemo(root) {
 
   function isCurrent(dependency, context) {
     if (dependency.everything) return false;
-    if (dependency.select !== undefined) return isDeepStrictEqual(dependency.select(context), dependency.value);
+    if (dependency.select !== undefined) return dependency.equal(dependency.select(context), dependency.value);
     if (!mayHaveChanged(dependency.path)) return true;
     const id = `${dependency.probe.name}\0${dependency.path}`;
     if (!states.has(id)) states.set(id, dependency.probe(dependency.path));

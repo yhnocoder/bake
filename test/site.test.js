@@ -64,6 +64,10 @@ function articleOf(result, file) {
   return result.articles.find((candidate) => candidate.file === file);
 }
 
+function pageOf(result, name) {
+  return result.pages.find((page) => page.article.file === `content/posts/${name}/index.md`).outputs.find((output) => output.path.endsWith('/index.html'));
+}
+
 describe('updating a site', () => {
   test('rereads what a changed file affects and keeps the other articles', async (t) => {
     const dir = createBlog(t, await blogFiles());
@@ -90,5 +94,28 @@ describe('updating a site', () => {
       assert.ok(affected(changed), `${path} changed ${changed.join(', ')}`);
       assert.equal(articleOf(result, 'content/posts/gelu/index.md'), gelu, `${path} reread the unrelated article`);
     }
+  });
+
+  test('renders again only the changed article and the articles that show a part of it or link to an address it now has', async (t) => {
+    const names = ['gelu', 'rope', 'swish', 'silu'];
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu', body: '## Intro {#intro}\n\nGELU text.\n' }),
+      'content/posts/rope/index.md': article({ body: 'See [GELU](/2026-10/gelu/#intro) and [SiLU](/2026-10/silu/).\n' }),
+      'content/posts/swish/index.md': article({ title: 'Swish', slug: 'swish', body: 'Unrelated.\n' }),
+    });
+    const site = createSite(dir);
+    let result = await updateSite(site);
+    assert.deepEqual(result.errors.map((error) => error.message), ['link target /2026-10/silu/ does not exist']);
+    const update = async (path, content) => {
+      const before = new Map(names.filter((name) => result.pages.some((page) => page.article.file.includes(`/${name}/`))).map((name) => [name, pageOf(result, name)]));
+      writeFiles(dir, { [path]: content });
+      result = await updateSite(site, [path]);
+      return [...before].filter(([name, output]) => pageOf(result, name) !== output).map(([name]) => name);
+    };
+    assert.deepEqual(await update('content/posts/gelu/index.md', article({ title: 'GELU', slug: 'gelu', body: '## Introduction {#intro}\n\nGELU text.\n' })), ['gelu', 'rope']);
+    assert.deepEqual(await update('content/posts/rope/index.md', article({ body: 'See [GELU](/2026-10/gelu/#intro), and [SiLU](/2026-10/silu/).\n' })), ['rope']);
+    assert.deepEqual(await update('content/posts/silu/index.md', article({ title: 'SiLU', slug: 'silu', body: 'SiLU text.\n' })), ['rope']);
+    assert.deepEqual(result.errors, []);
   });
 });

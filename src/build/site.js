@@ -50,7 +50,7 @@ export async function updateSite(site, changedPaths = null) {
   for (const article of found) articles.push(await articleOf(site, article));
   const errors = [...settings.componentErrors, ...articles.flatMap((article) => article.errors)];
   checkDuplicateUrls(articles, errors);
-  linkArticles(articles, errors);
+  await linkArticles(site, articles, errors);
   // why: bake build publishes no draft, so a draft that is half written does not keep the other articles from being published
   if (!site.drafts) dropDraftErrors(articles, errors);
   const published = articles.filter((article) => article.url !== null && (site.drafts || !article.draft));
@@ -60,7 +60,8 @@ export async function updateSite(site, changedPaths = null) {
   const current = published.map((article) => ({ article, entry: articleEntry(article, config) }));
   const shareImages = site.shareImages && themes.get(config.theme) !== null ? shareImagesOf(root, current, config, assetSources, errors) : new Map();
   const pageSettings = { root, config, themes, bundle, chat, shareImages, mathStyles: await mathStyles() };
-  const pages = current.map(({ article, entry }) => ({ article, entry, outputs: articleOutputs(root, article, entry, pageSettings, errors) }));
+  const pages = [];
+  for (const { article, entry } of current) pages.push({ article, entry, outputs: await pageOutputs(site, article, entry, pageSettings, errors) });
   const listing = [...pages].sort((a, b) => newestFirst(a.entry, b.entry));
   const listed = listing.filter(({ entry }) => !entry.draft);
   const listedEntries = listed.map(({ entry }) => entry);
@@ -224,14 +225,37 @@ async function readMathPreamble(files, errors) {
   return definitions;
 }
 
-function linkArticles(articles, errors) {
-  const index = indexPages(articles.map(linkTarget));
-  for (const article of articles) article.document?.link(index, errors);
-  for (const article of articles) article.content = article.document?.structure() ?? null;
-}
-
-function linkTarget({ url, fields, draft, document }) {
-  return { url, title: fields?.title ?? '', draft, article: document };
+// An article is linked again when it or a page at an address it looked up changed, and its structure is computed again when its links or the links of an article whose parts it shows changed.
+async function linkArticles(site, articles, errors) {
+  const index = indexPages(articles.map((article) => article.page));
+  const links = new Map();
+  for (const article of articles.filter((candidate) => candidate.document !== null)) {
+    const linked = await site.memo.get(`links ${article.file}`, { article, index }, (files) => {
+      const { document } = files.same((context) => context.article);
+      const linkErrors = [];
+      for (const path of document.link(index, linkErrors)) {
+        if (files.same((context) => context.index.page(path)) === undefined) files.value((context) => context.index.moved(path));
+      }
+      return { errors: linkErrors };
+    });
+    links.set(article.document, linked);
+  }
+  for (const article of articles) {
+    if (article.document === null) {
+      article.content = null;
+      continue;
+    }
+    const structure = await site.memo.get(`structure ${article.file}`, { article, links }, (files) => {
+      const { document } = files.same((context) => context.article);
+      files.same((context) => context.links.get(document));
+      const structureErrors = [];
+      const content = document.structure(structureErrors);
+      for (const source of document.borrowed) files.same((context) => context.links.get(source));
+      return { content, errors: structureErrors };
+    });
+    article.content = structure.content;
+    errors.push(...links.get(article.document).errors, ...structure.errors);
+  }
 }
 
 // An article depends on the values of the settings it reads, so a change of bake.config.js or of a component that leaves them as they were keeps it.
@@ -261,7 +285,9 @@ function articleOf(site, found) {
     const positions = frontMatter?.positions ?? {};
     const options = frontMatter?.options ?? {};
     const cover = fields?.cover === undefined ? undefined : await readCover(folder.read(fields.cover), fields.cover, article.file, positions.cover, errors);
-    return { ...article, source, fields, options, positions, url, draft: fields?.draft === true, document, content: null, cover, errors, conversions: new Map() };
+    const draft = fields?.draft === true;
+    const page = { url, title: fields?.title ?? '', draft, article: document };
+    return { ...article, source, fields, options, positions, url, draft, document, page, content: null, cover, errors, conversions: new Map() };
   });
 }
 
@@ -271,6 +297,29 @@ async function readCover(content, cover, file, position, errors) {
   const problem = image.error === undefined ? `must be a ${IMAGE_FORMATS} image` : `cannot be read: ${image.error}`;
   errors.push(errorAt(file, position, `cover ${JSON.stringify(cover)} ${problem}`));
   return undefined;
+}
+
+// The page is rendered again only when a value that it shows changed.
+function pageOutputs(site, article, entry, pageSettings, errors) {
+  const name = articleTheme(article, pageSettings.config);
+  const page = site.memo.get(`page ${article.file}`, { article, entry, pageSettings }, (files) => {
+    const settings = {
+      config: files.value((context) => context.pageSettings.config),
+      theme: files.same((context) => context.pageSettings.themes.get(name)),
+      runtime: files.value((context) => context.pageSettings.bundle?.runtime),
+      chatEntry: files.value((context) => context.pageSettings.chat.entry),
+      shareImage: files.value((context) => shareImageProps(context.pageSettings.config, context.pageSettings.shareImages.get(article.file))),
+      mathStyles: files.value((context) => context.pageSettings.mathStyles),
+    };
+    files.same((context) => context.article.content);
+    const pageErrors = [];
+    const outputs = articleOutputs(site.root, files.same((context) => context.article), files.value((context) => context.entry), settings, pageErrors);
+    return { outputs, errors: pageErrors };
+  });
+  return page.then((result) => {
+    errors.push(...result.errors);
+    return result.outputs;
+  });
 }
 
 function articleOutputs(root, article, entry, pageSettings, errors) {
@@ -302,9 +351,8 @@ function convertedImage(article, file, image) {
   return article.conversions.get(image);
 }
 
-function renderArticle(article, entry, { config, themes, bundle, chat, shareImages, mathStyles }, errors) {
+function renderArticle(article, entry, { config, theme, runtime, chatEntry, shareImage, mathStyles }, errors) {
   const name = articleTheme(article, config);
-  const theme = themes.get(name);
   if (theme === null) return '';
   const { content } = article;
   const root = pageRoot(entry.url);
@@ -320,14 +368,14 @@ function renderArticle(article, entry, { config, themes, bundle, chat, shareImag
       draft: entry.draft,
       url: entry.url,
       link: entry.link,
-      shareImage: shareImageProps(config, shareImages.get(article.file)),
+      shareImage,
       words: content.words,
       content,
     },
     assets: {
       root,
       styles: assetLinks(root, theme.styles),
-      scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || bundle === null ? [] : [bundle.runtime]), chat.entry]),
+      scripts: assetLinks(root, [theme.script, ...(content.components.length === 0 || runtime === undefined ? [] : [runtime]), chatEntry]),
       mathStyles: content.glyphs === undefined ? undefined : mathStyles,
     },
   };

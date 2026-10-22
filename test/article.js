@@ -14,7 +14,7 @@ export const bentoTheme = { name: 'bento', headings: bento.headings, blocks: ben
 export async function parseArticle(file, source, errors, options = {}) {
   const article = await readArticle(file, source, errors, { theme: essayTheme, ...options });
   article.link(indexPages([{ url: article.url, title: '', draft: false, article }]), errors);
-  return withoutCopySource(article.structure());
+  return withoutCopySource(article.structure(errors));
 }
 
 export async function parse(body, options) {
@@ -38,7 +38,7 @@ export async function parseSite(pages, options = {}) {
   }
   const site = indexPages(entries);
   for (const { article } of entries) article.link(site, errors);
-  const articles = Object.fromEntries(entries.map(({ url, article }) => [url, withoutCopySource(article.structure())]));
+  const articles = Object.fromEntries(entries.map(({ url, article }) => [url, withoutCopySource(article.structure(errors))]));
   return { articles, errors: sortErrors(errors).map(formatError) };
 }
 

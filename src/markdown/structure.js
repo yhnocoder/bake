@@ -14,6 +14,8 @@ const WORD = /[\p{L}\p{N}]+/gu;
 
 export function articleStructure(article) {
   const { tree } = article;
+  article.linked.clear();
+  article.borrowed.clear();
   const intro = [];
   const sections = [];
   let recapTarget = null;

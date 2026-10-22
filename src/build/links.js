@@ -7,10 +7,16 @@ export function indexPages(pages) {
     if (page.url !== null && !byUrl.has(page.url)) byUrl.set(page.url, page);
   }
   const bySource = new Map(pages.map((page) => [page.article, page]));
+  const moved = (path) => {
+    const slug = path.split('/')[2];
+    return [...byUrl.values()].filter((page) => !page.draft && page.url.split('/')[2] === slug).map((page) => page.url);
+  };
   return {
+    page: (path) => byUrl.get(path),
+    moved,
     find(address, source) {
       const page = byUrl.get(address.path);
-      if (page === undefined) return { problem: `does not exist${movedHint(address, byUrl)}` };
+      if (page === undefined) return { problem: `does not exist${movedHint(address, moved(address.path))}` };
       if (page.draft && bySource.get(source)?.draft !== true) return { problem: 'is a draft, which is not published' };
       const anchored = address.anchor === undefined || (page.article !== null && page.article.hasTarget(address.anchor));
       if (!address.canonical) return { problem: `does not exist; the address of the article is ${anchored ? address.text : address.path}` };
@@ -25,9 +31,8 @@ function anchorHint(address, page) {
   return meant === undefined ? '' : `; did you mean ${address.path}#${meant}?`;
 }
 
-function movedHint(address, byUrl) {
+function movedHint(address, moved) {
   const slug = address.path.split('/')[2];
-  const moved = [...byUrl.values()].filter((page) => !page.draft && page.url.split('/')[2] === slug).map((page) => page.url);
   if (moved.length === 0) return '';
   if (moved.length === 1) return `; the article with slug "${slug}" is at ${moved[0]}`;
   return `; the articles with slug "${slug}" are at ${moved.slice(0, -1).join(', ')} and ${moved.at(-1)}`;

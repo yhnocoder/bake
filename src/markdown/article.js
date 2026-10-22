@@ -77,10 +77,11 @@ class Article {
   }
 
   link(site, errors) {
-    linkArticle(this, site, errors);
+    return linkArticle(this, site, errors);
   }
 
-  structure() {
+  structure(errors) {
+    this.errors = errors;
     return articleStructure(this);
   }
 }
