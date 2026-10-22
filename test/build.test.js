@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fromHtml } from 'hast-util-from-html';
@@ -128,6 +128,17 @@ describe('bake build', () => {
     assert.deepEqual(await build(dir), ['content/posts/b/index.md:3:7 URL /2026-10/rope/ is already used by content/posts/a/index.md']);
   });
 
+  test('publishes the other articles while a draft has errors', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'content/posts/a/index.md': article({ slug: 'a', extra: 'draft: true\n', body: 'Unfinished $\\frc{1}{2}$ and [a link](/2026-10/nowhere/).\n' }),
+      'content/posts/b/index.md': article({ slug: 'b' }),
+    });
+    assert.deepEqual(await build(dir), []);
+    assert.ok(existsSync(join(dir, 'dist/2026-10/b/index.html')));
+    assert.ok(!existsSync(join(dir, 'dist/2026-10/a')));
+  });
+
   test('reports every error sorted by file and position and leaves dist/ unchanged', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
@@ -214,8 +225,18 @@ describe('bake build', () => {
     });
     assert.deepEqual(await build(dir), [
         'content/posts/b/index.md:5:11 category "math" is not one of the categories in bake.config.js',
-        'content/posts/c/index.md:1:1 front matter is missing "category"',
     ]);
+  });
+
+  test('puts an article without a category into the category "default", which bake.config.js may define', async (t) => {
+    const categories = "{ id: 'ml', name: 'Machine learning', color: '#336699' }";
+    const config = (list) => `export default {\n  title: 'T',\n  url: 'https://example.com',\n  language: 'en',\n  categories: [${list}],\n};\n`;
+    const dir = createBlog(t, { 'bake.config.js': config(categories), 'content/posts/c/index.md': article({ slug: 'c' }), 'content/posts/d/index.md': article({ slug: 'd', extra: 'category: default\n' }) });
+    assert.deepEqual(await build(dir), []);
+    assert.equal(readFileSync(join(dir, 'dist/feed.xml'), 'utf8').match(/<category>Default<\/category>/g).length, 2);
+    writeFileSync(join(dir, 'bake.config.js'), config(`${categories}, { id: 'default', name: 'Notes', color: '#993366' }`));
+    assert.deepEqual(await build(dir), []);
+    assert.equal(readFileSync(join(dir, 'dist/feed.xml'), 'utf8').match(/<category>Notes<\/category>/g).length, 2);
   });
 
   test('builds the example blog', async (t) => {

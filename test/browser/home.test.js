@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article } from '../blog.js';
-import { test as base, expect, luminance, sharedShadowLayers } from './browser.js';
+import { test as base, expect, luminance, scrollInSteps, sharedShadowLayers } from './browser.js';
 
 const config = `export default {
   title: '测试博客',
@@ -158,6 +158,17 @@ test.describe('the essay homepage', () => {
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
     await page.locator(jacobian).evaluate((card) => scrollBy({ top: card.getBoundingClientRect().bottom + 20, behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', jacobian);
+  });
+
+  test('on a phone the pet slides out of view while the reader scrolls down and the settings button stays', async ({ open }) => {
+    const { page } = await open({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+    const shown = () => page.evaluate(() => ['start', 'end'].map((name) => getComputedStyle(document.querySelector(`[data-edge="${name}"]`)).visibility === 'visible'));
+    assert.deepEqual(await shown(), [true, true]);
+    await scrollInSteps(page, 600);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-edge="end"]')).visibility === 'hidden');
+    assert.deepEqual(await shown(), [true, false]);
+    await scrollInSteps(page, -200);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-edge="end"]')).visibility === 'visible');
   });
 
   test('on a phone a preview in the middle of the screen waits until the scrolling stops', async ({ open }) => {

@@ -6,6 +6,7 @@ import { parse } from 'acorn';
 import { DEFAULT_PET, petSourceProblem } from './pet.js';
 import { describeValue, errorAt, fileStart } from '../report.js';
 import { HOME_COLUMNS } from '../choices.js';
+import { labelsFor } from '../theme/labels.js';
 import { characterProblem, choiceProblem, slugProblem } from './rules.js';
 
 export const CONFIG_FILE = 'bake.config.js';
@@ -16,6 +17,7 @@ const HOME_FIELDS = ['columns', 'groupBy'];
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'desc'];
 const GROUP_BY = ['category', 'month'];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const DEFAULT_CATEGORY = { id: 'default', color: '#7d7f84', desc: '' };
 
 export function configNotFoundError() {
   return errorAt(CONFIG_FILE, fileStart, `${CONFIG_FILE} not found, run bake from the blog root or create a blog with bake init`);
@@ -98,7 +100,7 @@ function validateConfig(value, themes, optionProblem, report) {
   required('language', (language) => textProblem('language', language));
   const theme = value.theme ?? 'essay';
   field(['theme'], choiceProblem('theme', [...themes.keys()], theme));
-  const categories = validateCategories(value.categories ?? [], report);
+  const categories = withDefaultCategory(validateCategories(value.categories ?? [], report), typeof value.language === 'string' ? value.language : '');
   const options = validateThemeOptions(value, themes, optionProblem, report);
   const chat = section(value, 'chat', CHAT_FIELDS, report);
   const pet = chat.pet ?? DEFAULT_PET;
@@ -198,6 +200,12 @@ function validateCategories(categories, report) {
     if (descProblem !== null) report([...path, 'desc'], 'value', descProblem);
     return { id, name, color, desc };
   });
+}
+
+// The articles that name no category belong to the category "default", which the config may define itself to choose its name, colour, description and place.
+function withDefaultCategory(categories, language) {
+  if (categories.length === 0 || categories.some((category) => category?.id === DEFAULT_CATEGORY.id)) return categories;
+  return [...categories, { ...DEFAULT_CATEGORY, name: labelsFor(language).defaultCategory }];
 }
 
 function reportUnknownFields(object, fields, path, report, hints = {}) {

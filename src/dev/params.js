@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { convertAttribute, fileProblem, valueProblem } from '../components/declarations.js';
+import { sameValue, writeNumbers } from '../components/numbers.js';
 import { attributeTokens, writeAttribute } from '../markdown/attributes.js';
 import { describeValue } from '../report.js';
 
@@ -48,9 +49,9 @@ function paramEdit(name, param, declaration, value, token, files) {
   const problem = valueProblem(declaration, value) ?? fileProblem(declaration, value, files);
   if (problem !== null) return { error: `parameter "${param}" of ${name} ${problem}` };
   const current = token === undefined ? declaration.default : convertAttribute(declaration, token.value).value;
-  if (current === value) return {};
-  if (value === declaration.default) return { text: null };
-  const text = writeAttribute(param, value);
+  if (sameValue(current, value)) return {};
+  if (sameValue(value, declaration.default)) return { text: null };
+  const text = writeAttribute(param, Array.isArray(value) ? writeNumbers(value) : value);
   return text === null ? { error: `parameter "${param}" of ${name} cannot be written as an attribute, because its text contains both " and '` } : { text };
 }
 

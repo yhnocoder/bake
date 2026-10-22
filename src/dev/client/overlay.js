@@ -90,7 +90,7 @@ export function createOverlay() {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'problem';
-    button.title = `Copy ${problem.position}`;
+    button.title = `Open ${problem.position} in VS Code`;
     const where = document.createElement('span');
     where.className = 'where';
     where.textContent = problem.location;
@@ -98,7 +98,7 @@ export function createOverlay() {
     message.className = 'message';
     message.textContent = problem.message;
     button.append(where, message);
-    button.addEventListener('click', () => copyText(problem.position).then(() => confirmCopy(button)));
+    button.addEventListener('click', () => window.open(problem.editor, '_self'));
     return button;
   };
 

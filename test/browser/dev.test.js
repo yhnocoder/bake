@@ -185,8 +185,7 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.match(await problem.locator('.message').textContent(), /^\S/);
     assert.ok(await page.locator('.bk-block', { hasText: 'says goodbye' }).isVisible());
     await problem.click();
-    await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.problem[data-copied]') !== null);
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `${ARTICLE}:${where}`);
+    assert.deepEqual(await page.evaluate(() => window.openedUrls.at(-1)), [`vscode://file${pathToFileURL(file).pathname}:${where}`, '_self']);
     await panel.locator('.copy-all').click();
     await page.waitForFunction(() => document.querySelector('#bake-dev').shadowRoot.querySelector('.copy-all[data-copied]') !== null);
     assert.match(await page.evaluate(() => navigator.clipboard.readText()), new RegExp(`^${ARTICLE.replaceAll('.', '\\.')}:${where} \\S`));

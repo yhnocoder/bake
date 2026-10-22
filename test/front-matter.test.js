@@ -85,7 +85,7 @@ describe('front matter', () => {
     ]);
   });
 
-  test('accepts every field and requires a category from bake.config.js when it defines categories', async (t) => {
+  test('accepts every field and checks the category against bake.config.js', async (t) => {
     const every = '---\ntitle: Rope\nslug: rope\ndate: 2026-10-19\nsummary: Rotary embeddings.\ntags: [LLM, attention]\ncategory: ml\npreview: ./preview.js\ncover: images/cover.svg\ntheme: bento\ncolumns: 4\ndraft: false\n---\n\nText.\n';
     const lines = await problems(t, {
       'bake.config.js': categoriesConfig,
@@ -95,7 +95,6 @@ describe('front matter', () => {
     });
     assert.deepEqual(lines, [
       'content/posts/bento/index.md:4:1 unknown front matter field "toc"; it is an option of the essay theme, and this article uses the bento theme',
-      'content/posts/missing/index.md:1:1 front matter is missing "category"',
       'content/posts/other/index.md:2:11 category "x" is not one of the categories in bake.config.js',
     ]);
   });

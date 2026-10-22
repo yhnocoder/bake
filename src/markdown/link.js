@@ -1,6 +1,7 @@
 import { toString } from 'mdast-util-to-string';
 import { idOfFragment, referenceId, sidenoteId } from '../fragments.js';
 import { renderChildrenHtml, renderHast, renderInlineHtml } from '../render/html.js';
+import { meantName } from '../suggest.js';
 import { INVALID_PERCENT_ENCODING, addressHref, parseAddress } from '../urls.js';
 import { generatedIds } from './parse.js';
 import { walk, walkWithSidenotes } from './tree.js';
@@ -77,7 +78,10 @@ function checkLink(article, node, site, ids) {
     if (node.url === '#') return;
     const id = idOfFragment(node.url);
     if (id === null) article.report(node.position.start, `link target ${node.url} ${INVALID_PERCENT_ENCODING}`);
-    else if (!ids.has(id)) article.report(node.position.start, `link target #${id} does not exist`);
+    else if (!ids.has(id)) {
+      const meant = meantName(id, ids);
+      article.report(node.position.start, `link target #${id} does not exist${meant === undefined ? '' : `; did you mean #${meant}?`}`);
+    }
     return;
   }
   const address = parseAddress(node.url);
