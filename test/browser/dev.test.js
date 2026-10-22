@@ -350,6 +350,49 @@ test('bake dev updates a page with a save that it made while the event stream wa
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
+test('bake dev in a frame of an editor scrolls to the line the editor names, sends the line that the reader scrolls to and a double-clicked block to the editor, and shows the unsaved text', async ({ browser, after }) => {
+  const source = article({ title: 'Live', slug: 'live', body });
+  const editor = '<!doctype html><title>Editor</title><iframe src="/2026-10/live/" style="width: 1200px; height: 800px"></iframe><script>window.messages = []; addEventListener("message", (event) => window.messages.push(event.data));</script>\n';
+  const dir = createBlog({ after }, { 'bake.config.js': validConfig, [ARTICLE]: source, 'public/editor.html': editor });
+  const dev = await startDev(dir);
+  after(dev.close);
+  const page = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+  await page.goto(`${dev.url}editor.html`);
+  await page.waitForFunction(() => window.messages.some((message) => message.bake === 'ready'));
+  assert.deepEqual(await page.evaluate(() => window.messages.find((message) => message.bake === 'ready')), { bake: 'ready', file: ARTICLE });
+  const frame = page.frameLocator('iframe');
+  const send = (message) => page.evaluate((data) => document.querySelector('iframe').contentWindow.postMessage(data, '*'), message);
+
+  await send({ bake: 'reveal', line: lineOf(source, 'Paragraph 2 about the distance') });
+  const far = frame.locator('.bk-block', { hasText: 'Paragraph 2 about the distance' });
+  const top = () => far.evaluate((element) => element.getBoundingClientRect().top);
+  await expect.poll(async () => (await top()) >= 0 && (await top()) < 50, { message: 'the paragraph at the named line is not at the top of the frame' }).toBe(true);
+
+  await page.waitForTimeout(600);
+  assert.equal(await page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), false, 'the page sent its own scroll to the editor');
+  await page.mouse.move(600, 400);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), { message: 'scrolling the page sent nothing to the editor' }).toBe(true);
+  await page.waitForTimeout(600);
+  const scrolled = await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll'));
+  assert.equal(scrolled.file, ARTICLE);
+  const scrollY = () => frame.locator('html').evaluate(() => window.scrollY);
+  const before = await scrollY();
+  await send({ bake: 'reveal', line: scrolled.line });
+  await expect.poll(async () => (await scrollY()) !== before, { message: 'revealing the line that the page sent does not scroll' }).toBe(true);
+  assert.ok((await scrollY()) <= before, `the line that the page sent starts below the top of the page at ${before} pixels`);
+  await send({ bake: 'reveal', line: scrolled.line + 1 });
+  await expect.poll(async () => (await scrollY()) > before, { message: 'the line after the one that the page sent does not start below the top of the page' }).toBe(true);
+
+  await frame.locator('.bk-block', { hasText: 'The edited paragraph' }).dblclick();
+  await expect.poll(() => page.evaluate(() => window.messages.some((message) => message.bake === 'open')), { message: 'the double-click sent nothing to the editor' }).toBe(true);
+  assert.deepEqual(await page.evaluate(() => window.messages.find((message) => message.bake === 'open')), { bake: 'open', file: ARTICLE, line: lineOf(source, 'The edited paragraph') });
+
+  await send({ bake: 'source', file: ARTICLE, text: source.replace('says hello', 'says goodbye before saving') });
+  await frame.locator('.bk-block', { hasText: 'says goodbye before saving' }).waitFor();
+  assert.equal(readFileSync(join(dir, ARTICLE), 'utf8'), source);
+});
+
 test('bake dev shows a parameter bar on each component of the article that changes, writes, copies and resets its parameters', async ({ browser, after }) => {
   test.slow();
   const dir = copyExample({ after });

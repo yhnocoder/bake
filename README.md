@@ -52,11 +52,17 @@ Bake watches the blog folder and rebuilds what changed each time you save a file
 
 Bake reports every problem that `bake build` would report, as `file:line:col message` lines in the terminal and in a list in the bottom right corner of the page. Clicking an entry opens the file in Visual Studio Code at the position of the problem. The close button hides the list until the problems change. While the blog has errors, every page keeps showing the last version without errors, and the pages update again when the errors are fixed. When `bake dev` starts on a blog whose articles have errors, it shows the pages with those errors.
 
-Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts.
+Double-clicking a block of an article, such as a paragraph, a heading or a sidenote, opens the Markdown file in Visual Studio Code at the line where the block starts. In the preview of the [VS Code extension](#editing-in-visual-studio-code), it moves the editor to that line.
 
 Every component of the article shows a parameter bar above it, with one control per parameter. Moving a control changes the running component at once, and a control whose value differs from the Markdown is marked orange. Write to file changes the attributes of the component's `:::` line in `index.md` and leaves the rest of the file as it is; parameters set back to their default are removed from the line. Copy puts that line on the clipboard without changing the file, and Reset goes back to the values in the Markdown. When `index.md` changed after the page was built, Write to file refuses and asks you to save the file and try again. The Parameter bars switch at the top of the problems list hides and shows the bars.
 
 A draft shows the label Draft, or 草稿 on a Chinese site, next to its date on its page and on its card on the homepage. An address without a page lists every article with a link, drafts included.
+
+### Editing in Visual Studio Code
+
+The folder `editors/vscode/` of the Bake repository holds an extension for Visual Studio Code. It starts `bake dev` for the blog of the article you open and shows the page next to the editor. The preview scrolls with the editor and shows the text as you type, before you save. The problems that Bake finds appear in the Problems panel, and the extension completes and highlights blocks, attributes, citations, footnotes and equation labels. [editors/vscode/README.md](editors/vscode/README.md) describes the features and how to install it.
+
+`bake dev` lets only its own pages and VS Code show its pages in a frame.
 
 ## A blog repository
 
