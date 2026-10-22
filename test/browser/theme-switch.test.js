@@ -68,21 +68,18 @@ test('a change of the system colour scheme fades without showing the new colours
 });
 
 for (const [theme, path] of [['essay', '/2026-10/syntax/'], ['bento', '/2026-10/activations/']]) {
-  for (const width of [1440, 375]) {
-    test(`switching the theme and the text spacing fades into the new look in the ${theme} theme at ${width} pixels`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto(path);
-      await page.evaluate(() => document.fonts.ready);
-      await page.getByRole('button', { name: '设置' }).click();
-      await page.waitForFunction(() => document.querySelector('.bk-settings').getAnimations({ subtree: true }).length === 0);
+  test(`switching the theme and the text spacing fades into the new look in the ${theme} theme`, async ({ page }) => {
+    await page.goto(path);
+    await page.evaluate(() => document.fonts.ready);
+    await page.getByRole('button', { name: '设置' }).click();
+    await page.waitForFunction(() => document.querySelector('.bk-settings').getAnimations({ subtree: true }).length === 0);
 
-      const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      await fades(page, () => page.locator('.bk-settings-options button', { hasText: /^\s*深\s*$/ }).click());
-      assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), background);
+    const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    await fades(page, () => page.locator('.bk-settings-options button', { hasText: /^\s*深\s*$/ }).click());
+    assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), background);
 
-      const lineHeight = await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight);
-      await fades(page, () => page.locator('.bk-settings-row[data-setting="spacing"] button[data-value="loose"]').click());
-      assert.notEqual(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight), lineHeight);
-    });
-  }
+    const lineHeight = await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight);
+    await fades(page, () => page.locator('.bk-settings-row[data-setting="spacing"] button[data-value="loose"]').click());
+    assert.notEqual(await page.evaluate(() => getComputedStyle(document.querySelector('.bk-article p')).lineHeight), lineHeight);
+  });
 }

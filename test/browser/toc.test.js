@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article } from '../blog.js';
-import { test as base, expect, settle } from './browser.js';
+import { test as base, expect, scrollInSteps, settle, sharedShadowLayers } from './browser.js';
 
 const config = "export default { title: '目录测试', url: 'https://example.com', language: 'zh-CN' };\n";
 const STYLES = ['notes', 'dots', 'ticks'];
@@ -107,11 +107,6 @@ function cardReport(selector) {
   };
 }
 
-const sharedShadowLayers = (light, dark) => {
-  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
-  return layers(light).filter((layer) => layers(dark).includes(layer));
-};
-
 function shownCard(selector) {
   return document.querySelector(selector).checkVisibility({ visibilityProperty: true });
 }
@@ -156,15 +151,8 @@ async function restingBox(locator) {
   return locator.boundingBox();
 }
 
-function nextFrame(page) {
-  return page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
-}
-
-async function scrollInSteps(page, delta) {
-  for (let step = 0; step < 5; step += 1) {
-    await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
-    await nextFrame(page);
-  }
+async function scrollAndSettle(page, delta) {
+  await scrollInSteps(page, delta);
   await settle(page);
 }
 
@@ -662,7 +650,7 @@ test.describe('the table of contents', () => {
     assert.ok(handle > 0 && settings > 0);
     for (let step = 0; step < 5; step += 1) {
       await page.evaluate(() => window.scrollBy(0, 120));
-      await nextFrame(page);
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
     }
     await page.waitForFunction(() => [document.querySelector('.bk-toc-handle'), document.querySelector('.bk-settings')].every((element) => element.getBoundingClientRect().right <= 0));
   });
@@ -689,7 +677,7 @@ test.describe('the table of contents', () => {
           return focused;
         }),
       );
-    const scrollBy = (delta) => scrollInSteps(page, delta);
+    const scrollBy = (delta) => scrollAndSettle(page, delta);
     assert.equal(await placed(1), true);
     await page.evaluate(() => {
       const handle = document.querySelector('.bk-toc-handle');
@@ -742,10 +730,10 @@ test.describe('the table of contents', () => {
       });
     assert.deepEqual([await page.locator('.bk-toc').count(), await page.locator('.bk-toc-handle').count()], [0, 0]);
     assert.equal(await state(), 1);
-    await scrollInSteps(page, 600);
+    await scrollAndSettle(page, 600);
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-settings')).visibility === 'hidden', null, { timeout: 2000 });
     assert.equal(await state(), 0);
-    await scrollInSteps(page, -200);
+    await scrollAndSettle(page, -200);
     await expect.poll(state, { message: 'the settings button does not show again' }).toBe(1);
   });
 

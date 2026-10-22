@@ -506,30 +506,20 @@ test.describe('the kit works for any component that imports it', () => {
     assert.ok(layout.edge <= 300.5 && layout.edge > 290, `the label that starts at 290 ends at ${layout.edge}`);
   });
 
-  const assetsOf = async ({ newPage, site }, slug) => {
-    const page = await newPage();
-    const requested = [];
-    page.on('request', (request) => requested.push(new URL(request.url()).pathname));
-    await page.goto(`/2026-10/${slug}/`);
-    await waitForComponents(page);
-    const text = await page.evaluate(() => document.querySelector('figure.component .component-box').textContent);
-    const assets = requested.filter((path) => path.startsWith('/assets/') && /\.(js|css)$/.test(path));
-    const componentAssets = assets.filter((path) => !path.startsWith('/assets/essay-'));
-    return { text, assets, kit: componentAssets.filter((path) => readFileSync(join(site.dir, 'dist', path), 'utf8').includes('bk-kit-')) };
-  };
-
-  test('a component that only uses the plain helpers loads none of the kit parts, their styles or MathJax', async ({ newPage, site }) => {
-    const { text, assets, kit } = await assetsOf({ newPage, site }, 'ticks');
-    assert.equal(text, '0.0 0.2 0.4 0.6 0.8 1.0');
-    assert.deepEqual(kit, []);
-    assert.ok(!assets.some((path) => path.includes('/mathjax-')), assets.join(', '));
-  });
-
-  test('a component that does not import the kit loads no kit code, also when another component of the blog uses it', async ({ newPage, site }) => {
-    const { text, assets, kit } = await assetsOf({ newPage, site }, 'plain');
-    assert.equal(text, 'plain');
-    assert.deepEqual(kit, []);
-    assert.ok(assets.some((path) => path.includes('/plain-view-')), assets.join(', '));
+  test('a component that only uses the plain helpers or does not import the kit loads no kit code and no MathJax, also when another component of the blog uses the kit', async ({ newPage, site }) => {
+    for (const [slug, text] of [
+      ['ticks', '0.0 0.2 0.4 0.6 0.8 1.0'],
+      ['plain', 'plain'],
+    ]) {
+      const page = await newPage();
+      const requested = [];
+      page.on('request', (request) => requested.push(new URL(request.url()).pathname));
+      await page.goto(`/2026-10/${slug}/`);
+      await waitForComponents(page);
+      assert.equal(await page.evaluate(() => document.querySelector('figure.component .component-box').textContent), text);
+      const assets = requested.filter((path) => path.startsWith('/assets/') && /\.(js|css)$/.test(path) && !path.startsWith('/assets/essay-'));
+      assert.deepEqual(assets.filter((path) => readFileSync(join(site.dir, 'dist', path), 'utf8').includes('bk-kit-') || path.includes('/mathjax-')), [], slug);
+    }
   });
 
   test('a TeX label that cannot be typeset is reported with the name of its component and shows its source', async ({ newPage }) => {

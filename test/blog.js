@@ -102,6 +102,10 @@ export function article({ title = 'Rope', slug = 'rope', date = '2026-10-19', ex
   return `---\ntitle: ${title}\nslug: ${slug}\ndate: ${date}\n${extra}---\n\n${body}`;
 }
 
+export function filler(topic, count = 4) {
+  return Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
+}
+
 export function readTree(dir) {
   return Object.fromEntries(
     readdirSync(dir, { recursive: true })

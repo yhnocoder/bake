@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article } from '../blog.js';
-import { test as base, expect, luminance } from './browser.js';
+import { test as base, expect, luminance, sharedShadowLayers } from './browser.js';
 
 const config = `export default {
   title: '测试博客',
@@ -53,11 +53,6 @@ const files = {
   'content/posts/jacobian/preview.js': recordingPreview,
   'content/posts/series/index.md': post('Series', '2026-08-03', 'math', ['级数']),
   'content/posts/attention/index.md': article({ title: longWord, slug: 'attention', date: '2026-07-01', extra: `category: ml\ntags: [注意力]\nsummary: ${longWord} 的摘要。\n` }),
-};
-
-const sharedShadowLayers = (light, dark) => {
-  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
-  return layers(light).filter((layer) => layers(dark).includes(layer));
 };
 
 const test = base.extend({

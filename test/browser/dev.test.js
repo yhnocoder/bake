@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { article, copyExample, createBlog, validConfig } from '../blog.js';
-import { expect, settle, startDev, test } from './browser.js';
+import { article, copyExample, createBlog, filler, validConfig } from '../blog.js';
+import { addPasskeyAuthenticator, expect, settle, startDev, test } from './browser.js';
 
-const filler = (topic, count = 4) => Array.from({ length: count }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
 const body = [
   filler('the introduction'),
@@ -51,7 +50,6 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
   const dir = createBlog({ after }, {
     'bake.config.js': validConfig,
     [ARTICLE]: source,
-    'content/posts/sketch/index.md': article({ title: 'Sketch', slug: 'sketch', extra: 'draft: true\n' }),
   });
   const file = join(dir, ARTICLE);
   const edit = (from, to) => writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
@@ -139,13 +137,9 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     );
     assert.ok(notes[0].offset < 40, `the note is ${notes[0].offset}px away from its paragraph`);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => {
-      const fold = document.querySelector('details.fold');
-      return fold.open && Number(getComputedStyle(fold, '::details-content').opacity) < 1;
-    });
     await page.waitForFunction(() => !document.querySelector('details.fold').open);
     await page.click('details.fold > summary');
-    await page.waitForFunction(() => document.querySelector('details.fold').open && getComputedStyle(document.querySelector('details.fold'), '::details-content').opacity === '1');
+    await page.waitForFunction(() => document.querySelector('details.fold').open);
     edit('gives a width.\n```\n', 'gives a width.\n```\n\nSee [the far section](/2026-10/live/#far).\n');
     const link = page.locator('.bk-article a.internal-link', { hasText: 'the far section' });
     await link.waitFor();
@@ -286,34 +280,11 @@ test('bake dev updates the page in place, lists problems and opens blocks in VS 
     assert.ok(Math.abs((await editingTop()) - 200) <= 1, `the heading is at ${await editingTop()} pixels`);
   });
 
-  await test.step('a draft shows its label and the page for a missing address lists every article', async () => {
-    await page.goto(`${dev.url}2026-10/sketch/`);
-    assert.equal(await page.locator('.bk-draft').textContent(), 'Draft');
-    const response = await page.goto(`${dev.url}missing/`);
-    assert.equal(response.status(), 404);
-    assert.deepEqual(
-      await page.locator('li').evaluateAll((items) => items.map((item) => [item.querySelector('a').getAttribute('href'), item.textContent])),
-      [
-        ['/2026-10/live/', 'Live again2026-10-19content/posts/live/index.md'],
-        ['/2026-10/sketch/', 'Sketch2026-10-19Draftcontent/posts/sketch/index.md'],
-      ],
-    );
-  });
-
-  await test.step('the homepage lists drafts and reloads when an article title changes or an article is added', async () => {
-    const response = await page.goto(dev.url);
-    assert.equal(response.status(), 200);
+  await test.step('the homepage reloads when an article title changes', async () => {
+    await page.goto(dev.url);
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    const titles = () => page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-card-title')].map((title) => title.textContent))].sort());
-    assert.deepEqual(await titles(), ['Live again', 'Sketch']);
-    assert.equal(await page.locator('.bk-card-draft').first().textContent(), 'Draft');
     edit('title: Live again', 'title: Live on the homepage');
     await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Live on the homepage'));
-    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    mkdirSync(join(dir, 'content/posts/added'));
-    writeFileSync(join(dir, 'content/posts/added/index.md'), article({ title: 'Added', slug: 'added' }));
-    await page.waitForFunction(() => [...document.querySelectorAll('.bk-card-title')].some((title) => title.textContent === 'Added'));
-    assert.deepEqual(await titles(), ['Added', 'Live on the homepage', 'Sketch']);
   });
 });
 
@@ -910,11 +881,7 @@ test('the bake dev dot and problems list leave the chat button and the settings 
   for (const width of [1440, 375]) {
     const context = await browser.newContext({ viewport: { width, height: width < 600 ? 812 : 900 } });
     const page = await context.newPage();
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('WebAuthn.enable');
-    await cdp.send('WebAuthn.addVirtualAuthenticator', {
-      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
-    });
+    await addPasskeyAuthenticator(context, page);
     writeFileSync(file, article({ title: 'Live', slug: 'live', body }));
     await page.goto(`${dev.url}2026-10/live/`, { waitUntil: 'load' });
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });

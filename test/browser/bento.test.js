@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { article, createBlog, decodeImage, exampleBlog, writeFiles } from '../blog.js';
-import { test as base, expect, luminance, settle, startDev } from './browser.js';
+import { addPasskeyAuthenticator, test as base, expect, luminance, settle, startDev } from './browser.js';
 import { openWithSelectionModule } from './selection-module.js';
 
 const widths = [1440, 1100, 375];
@@ -483,11 +483,7 @@ test.describe('the settings button and the AI chat button of the bento theme', (
       test.use({ blog });
 
       test('the buttons sit on one line in equal gutters and cover no card and not the text before the first section from 1000 pixels up', async ({ page, context }) => {
-        const cdp = await context.newCDPSession(page);
-        await cdp.send('WebAuthn.enable');
-        await cdp.send('WebAuthn.addVirtualAuthenticator', {
-          options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
-        });
+        await addPasskeyAuthenticator(context, page);
         const problems = [];
         const measure = () =>
           page.evaluate(() => {

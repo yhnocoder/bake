@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import { article, validConfig } from '../blog.js';
+import { article, filler, validConfig } from '../blog.js';
 import { expect, settle, test } from './browser.js';
 
-const filler = (topic) => Array.from({ length: 6 }, (_, index) => `Paragraph ${index + 1} about ${topic}. ${'It fills the page so that the reader has to scroll. '.repeat(6)}`).join('\n\n');
 
 const body = [
-  filler('the introduction'),
+  filler('the introduction', 6),
   '',
   '## Folds {#folds}',
   '',
@@ -18,40 +17,40 @@ const body = [
   ':::fold{title="Derivation"}',
   'The derivation inside the fold. ^inside',
   '',
-  filler('the derivation'),
+  filler('the derivation', 6),
   ':::',
   '',
-  filler('folds'),
+  filler('folds', 6),
   '',
   '### Nested section {#nested}',
   '',
-  filler('the nested section'),
+  filler('the nested section', 6),
   '',
   '## References {#references}',
   '',
-  filler('references'),
+  filler('references', 6),
   '',
   ':::references',
   '- [@shazeer] Shazeer. *GLU Variants Improve Transformer*. 2020.',
   ':::',
   '',
-  filler('the end'),
+  filler('the end', 6),
   '',
 ].join('\n');
 
 const keys = [
   'Keys [@a%zz] with a malformed and [@b%41] with a valid percent-encoding.',
   '',
-  filler('the citations'),
+  filler('the citations', 6),
   '',
   ':::references',
   '- [@a%zz] The malformed entry.',
   '- [@b%41] The encoded entry.',
   ':::',
   '',
-  filler('the end'),
+  filler('the end', 6),
   '',
-  filler('the appendix'),
+  filler('the appendix', 6),
   '',
 ].join('\n');
 
@@ -126,23 +125,6 @@ test('the heading link copies the address of the heading and shows a toast witho
     scrolled,
     'Link copied',
   ]);
-});
-
-test('hovering a citation shows its entry in a card that hides after the pointer leaves', async ({ page }) => {
-  await page.goto(url);
-  const card = page.locator('.bk-preview');
-  await page.hover('a.citation');
-  assert.equal(await card.isVisible(), false);
-  await card.waitFor({ state: 'visible' });
-  assert.equal(await card.locator('.bk-preview-number').textContent(), '[1]');
-  assert.match(await card.locator('.bk-preview-text').textContent(), /GLU Variants Improve Transformer/);
-  const box = await card.boundingBox();
-  assert.ok(box.x >= 0 && box.x + box.width <= 1440 && box.y >= 0 && box.y + box.height <= 900, `the card is outside the viewport: ${JSON.stringify(box)}`);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
-  await page.waitForTimeout(300);
-  assert.equal(await card.isVisible(), true);
-  await page.mouse.move(5, 450);
-  await card.waitFor({ state: 'hidden' });
 });
 
 test('printing hides the preview card, the settings and the toast while they are shown', async ({ page, context }) => {

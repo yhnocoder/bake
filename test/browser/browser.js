@@ -84,6 +84,28 @@ export function luminance(color) {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 
+export function sharedShadowLayers(light, dark) {
+  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
+  return layers(light).filter((layer) => layers(dark).includes(layer));
+}
+
+export async function scrollInSteps(page, delta) {
+  for (let step = 0; step < 5; step += 1) {
+    await page.evaluate((amount) => window.scrollBy(0, amount), delta / 5);
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+  }
+}
+
+// The AI chat asks for a passkey, which this authenticator creates and confirms without a person
+export async function addPasskeyAuthenticator(context, page, { prf = true } = {}) {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: prf, automaticPresenceSimulation: true },
+  });
+  return { cdp, authenticatorId };
+}
+
 export function settle(target) {
   return target.evaluate(async (element) => {
     const frame = () => new Promise((done) => requestAnimationFrame(done));

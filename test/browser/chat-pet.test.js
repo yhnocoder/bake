@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import sharp from 'sharp';
-import { settle } from './browser.js';
-import { API_KEY, CORS, KEY, PETS, QUESTION, ask, backdropRoots, openSettings, petEntry, petSeen, scrollPage, setUpKey, shadow, test, text, watchPet } from './chat-page.js';
+import { scrollInSteps, settle } from './browser.js';
+import { API_KEY, CORS, KEY, PETS, QUESTION, ask, backdropRoots, openSettings, petEntry, petSeen, setUpKey, shadow, test, text, watchPet } from './chat-page.js';
 
 async function petNow(page, state) {
   await page.waitForFunction((entry) => JSON.stringify(window.bakeTest.pet.at(-1)) === JSON.stringify(entry), petEntry(state));
@@ -284,9 +284,9 @@ test.describe('the pets and the colours of the AI chat on published pages', () =
           { hidden: state === 'hidden', inPlace: reducedMotion === 'reduce' },
         );
       await placement('shown');
-      await scrollPage(page, 800);
+      await scrollInSteps(page, 800);
       await placement('hidden');
-      await scrollPage(page, -200);
+      await scrollInSteps(page, -200);
       await placement('shown');
       await page.locator('.bk-toc-handle').click();
       await placement('hidden');

@@ -5,7 +5,8 @@ import { CHAT_RULES } from '../../src/chat/context.js';
 import { chatLabels } from '../../src/chat/labels.js';
 import { noteRules } from '../../src/chat/note.js';
 import { exampleBlog } from '../blog.js';
-import { API_KEY, QUESTION, ask, scrollPage, setUpKey, storage, test, text } from './chat-page.js';
+import { scrollInSteps } from './browser.js';
+import { API_KEY, QUESTION, ask, setUpKey, storage, test, text } from './chat-page.js';
 
 const syntaxSource = readFileSync(join(exampleBlog, 'content/posts/syntax/index.md'), 'utf8');
 const jacobianSource = readFileSync(join(exampleBlog, 'content/posts/jacobian/index.md'), 'utf8');
@@ -287,7 +288,7 @@ test.describe('the notes of the AI chat', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.locator('.bk-chat-note-link', { hasText: '查看笔记' }).click();
     await card.waitFor();
-    await scrollPage(page, 800);
+    await scrollInSteps(page, 800);
     await page.waitForFunction(() => {
       const seenOpacity = (node) => (node === null ? 1 : Number(getComputedStyle(node).opacity) * seenOpacity(node.parentElement ?? node.getRootNode().host ?? null));
       return seenOpacity(document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat')) === 0;
@@ -295,7 +296,7 @@ test.describe('the notes of the AI chat', () => {
     await page.mouse.click(200, 100);
     await page.locator('.bk-chat:not([data-open])').waitFor({ state: 'attached' });
     await card.waitFor({ state: 'detached' });
-    await scrollPage(page, -200);
+    await scrollInSteps(page, -200);
     await page.locator('.bk-chat-launcher').click();
     await page.locator('.bk-chat-bubbles').waitFor();
     assert.equal(await card.count(), 0, 'a chat closed while the theme hides it opens with the bubbles');

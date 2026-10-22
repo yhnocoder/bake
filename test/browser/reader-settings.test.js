@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { article, decodeImage } from '../blog.js';
-import { settle, test } from './browser.js';
+import { settle, sharedShadowLayers, test } from './browser.js';
 
 const config = "export default { title: '测试博客', url: 'https://example.com', language: 'zh-CN' };\n";
 const motionBox = `export const layout = { height: 80 };
@@ -16,11 +16,6 @@ export default class MotionBox extends HTMLElement {
 }
 `;
 const body = ['正文第一段，说明**激活函数**的作用。', '', ':::motion-box', ':::', '', '## 门控单元', '', '门控单元把两路投影逐元素相乘。', '', '### 小节', '', '小节里的正文。', ''].join('\n');
-
-const sharedShadowLayers = (light, dark) => {
-  const layers = (shadow) => shadow.split(/,\s*(?![^(]*\))/);
-  return layers(light).filter((layer) => layers(dark).includes(layer));
-};
 
 function readPage() {
   return {

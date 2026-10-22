@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { settle } from './browser.js';
-import { QUESTION, ask, openSettings, scrollPage, setUpKey, shadow, test, text } from './chat-page.js';
+import { scrollInSteps, settle } from './browser.js';
+import { QUESTION, ask, openSettings, setUpKey, shadow, test, text } from './chat-page.js';
 
 test.describe('the keyboard and the pointer in the AI chat on published pages', () => {
   test('a chat closed right after the key is saved leaves the keyboard focus on the pet', async ({ openChat }) => {
@@ -176,7 +176,7 @@ test.describe('the keyboard and the pointer in the AI chat on published pages', 
           sample();
         }),
     );
-    await scrollPage(page, 800);
+    await scrollInSteps(page, 800);
     assert.deepEqual((await fading).slice(0, 1), ['fade'], 'the chat that the theme hides while the reader scrolls leaves the keyboard order without fading out');
   });
 });
