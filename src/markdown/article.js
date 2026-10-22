@@ -14,28 +14,38 @@ export async function readArticle(file, source, errors, options) {
 class Article {
   constructor(file, source, errors, options) {
     const { folder = null, url = null } = options;
+    // The input of the article.
     this.file = file;
     this.source = source;
     this.errors = errors;
     this.options = options;
     this.folder = folder;
     this.url = url;
+    // parseArticle: the tree, once all its stages have run.
     this.tree = null;
-    this.targets = new Map();
-    this.places = new Map();
-    this.linked = new Map();
-    this.borrowed = new Set();
+    // The parse stage readBlocksAndAnchors.
+    this.anchors = new Map();
+    // The parse stage readFootnotes.
+    this.definitions = new Map();
+    this.sidenotes = new Map();
+    // The parse stage readCitations.
+    this.citations = new Map();
+    this.references = [];
+    // The parse stage renderMath.
     this.equations = new Map();
     this.equationIds = new Map();
     this.glyphs = undefined;
+    // The parse stage readImages.
     this.images = new Map();
     this.image = undefined;
-    this.anchors = new Map();
-    this.definitions = new Map();
-    this.sidenotes = new Map();
+    // indexTargets, after parseArticle.
+    this.targets = new Map();
+    this.places = new Map();
+    // articleStructure, which clears them first because it runs again when a linked article changes.
+    this.linked = new Map();
+    this.borrowed = new Set();
     this.recapLines = new Map();
-    this.citations = new Map();
-    this.references = [];
+    // What rendering reads; the parse stage loadCodeLanguages writes the highlighter.
     this.context = {
       sidenoteNumber: (identifier) => this.sidenotes.get(identifier).number,
       citationNumber: (key) => this.citations.get(key),
