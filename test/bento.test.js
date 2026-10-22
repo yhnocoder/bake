@@ -161,35 +161,50 @@ test('the bento theme draws a sticker and a note as their own cards after the ca
     'content/posts/cards/index.md': article({
       title: 'Cards',
       slug: 'cards',
-      body: ':::sticker\n🧪\n:::\n\n## One\n\nText.[^one]\n\n:::note{cols=3 color=blue}\nA note with $x$.[^note]\n:::\n\n:::sticker{cols=2 rows=4}\n**Short text**\n:::\n\nMore text.\n\n[^one]: The section note.\n\n[^note]: The note of the note.\n',
+      body: ':::sticker{icon=flask}\n:::\n\n## One\n\nText.[^one]\n\n:::note{cols=3 color=blue}\nA note with $x$.[^note]\n:::\n\n:::sticker{icon=chart cols=2 rows=4}\n**Short text**\n:::\n\nMore text.\n\n[^one]: The section note.\n\n[^note]: The note of the note.\n',
     }),
   });
   const result = bake(dir, 'build');
   assert.equal(result.stderr, '');
   const html = withoutCopySource(readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8'));
   const grid = /<div class="bt-grid"[^>]*>(.*)<\/div><\/article>/s.exec(html)[1];
-  const cards = [...grid.matchAll(/<(section|div) class="bt-card[^"]*"([^>]*)>/g)].map(([, tag, attributes]) => [tag, /data-theme-block="(\w+)"/.exec(attributes)?.[1], /style="([^"]*)"/.exec(attributes)[1], /data-color="(\w+)"/.exec(attributes)?.[1], attributes.includes('data-emoji')]);
+  const cards = [...grid.matchAll(/<(section|div) class="bt-card[^"]*"([^>]*)>/g)].map(([, tag, attributes]) => [tag, /data-theme-block="(\w+)"/.exec(attributes)?.[1], /style="([^"]*)"/.exec(attributes)[1], /data-color="(\w+)"/.exec(attributes)?.[1], /data-icon="(\w+)"/.exec(attributes)?.[1]]);
   assert.deepEqual(cards, [
-    ['div', 'sticker', '--bt-span:1;--bt-tilt:-1.5deg', undefined, true],
-    ['section', undefined, '--bt-span:2', undefined, false],
-    ['div', 'note', '--bt-span:3', 'blue', false],
-    ['div', 'sticker', '--bt-span:2;--bt-rows:4;--bt-tilt:1deg', undefined, false],
+    ['div', 'sticker', '--bt-span:1', undefined, 'flask'],
+    ['section', undefined, '--bt-span:2', undefined, undefined],
+    ['div', 'note', '--bt-span:3', 'blue', undefined],
+    ['div', 'sticker', '--bt-span:2;--bt-rows:4', undefined, 'chart'],
   ]);
-  const [, , section, note] = grid.split(/<(?:section|div) class="bt-card/);
+  const [, sticker, section, note, captioned] = grid.split(/<(?:section|div) class="bt-card/);
+  assert.match(sticker, /<svg class="bt-sticker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="[^"]+"\/><\/svg><div class="bt-block-body"><\/div>/);
+  assert.match(captioned, /<svg class="bt-sticker-icon"[^>]*>.*<\/svg><div class="bt-block-body"><p><strong>Short text<\/strong><\/p>\n?<\/div>/s);
   assert.match(section, /<p>Text\.<sup[^>]*>.*<\/sup><\/p>.*<p>More text\.<\/p>.*data-label="one"/s);
   assert.doesNotMatch(section, /data-label="note"/);
   assert.match(note, /role="note".*<p>A note with <mjx-container.*data-label="note"/s);
   assert.doesNotMatch(html, /class="bt-intro"/);
 });
 
-test('the bento theme reports a note colour that is not one of its colours and a block that it does not declare', (t) => {
+test('every built-in sticker of the bento theme has a drawing', (t) => {
+  const icons = ['book', 'bookmark', 'chart', 'check', 'code', 'flask', 'formula', 'heart', 'idea', 'pin', 'question', 'rocket', 'star', 'warning'];
   const dir = createBlog(t, {
     'bake.config.js': config(''),
-    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: '## One\n\n:::note{color=red}\nText.\n:::\n\n:::badge\nText.\n:::\n' }),
+    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: `## One\n\nText.\n\n${icons.map((icon) => `:::sticker{icon=${icon}}\n:::\n`).join('\n')}` }),
+  });
+  assert.equal(bake(dir, 'build').stderr, '');
+  const html = readFileSync(join(dir, 'dist/2026-10/cards/index.html'), 'utf8');
+  const drawn = [...html.matchAll(/data-icon="(\w+)"[^>]*><svg class="bt-sticker-icon"[^>]*>(.*?)<\/svg>/g)].filter(([, , inside]) => /<(path|circle) /.test(inside)).map(([, icon]) => icon);
+  assert.deepEqual(drawn, icons);
+});
+
+test('the bento theme reports a note colour that is not one of its colours, a sticker without an icon and a block that it does not declare', (t) => {
+  const dir = createBlog(t, {
+    'bake.config.js': config(''),
+    'content/posts/cards/index.md': article({ title: 'Cards', slug: 'cards', body: '## One\n\n:::note{color=red}\nText.\n:::\n\n:::sticker\n🧪\n:::\n\n:::badge\nText.\n:::\n' }),
   });
   const lines = bake(dir, 'build').stderr.trimEnd().split('\n');
   const at = (text) => lines.find((line) => line.includes(text));
   assert.match(at('color'), /^content\/posts\/cards\/index\.md:\d+:9 color must be one of yellow, green, blue or pink, got "red"$/);
+  assert.match(at('icon'), /^content\/posts\/cards\/index\.md:\d+:1 :::sticker is missing "icon"; icon is book, bookmark, chart, check, code, flask, formula, heart, idea, pin, question, rocket, star or warning$/);
   assert.match(at('badge'), /^content\/posts\/cards\/index\.md:\d+:1 unknown block ":::badge"; the blocks of the bento theme are sticker and note$/);
-  assert.equal(lines.at(-1), '2 errors, dist/ was not written');
+  assert.equal(lines.at(-1), '3 errors, dist/ was not written');
 });

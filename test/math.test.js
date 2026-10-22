@@ -131,7 +131,7 @@ describe('math', () => {
 
   test('keeps | inside $…$ in the attributes of a block', async () => {
     const article = await parsed(':::fold{title="$|x|$ fold"}\nbody\n:::\n\n:::act-fn-plot{fn="$|x|$"}\n:::\n', { components: components({ 'act-fn-plot': { params: { fn: { label: 'Function', type: 'text', default: '' } } } }) });
-    assert.match(article.intro[0].html, /<summary>\$\|x\|\$ fold<\/summary>/);
+    assert.match(article.intro[0].html, /<summary><mjx-container[^>]*data-tex="\|x\|"[\s\S]*<\/mjx-container> fold<\/summary>/);
     assert.equal(article.intro[1].params.fn, '$|x|$');
   });
 });

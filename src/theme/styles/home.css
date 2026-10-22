@@ -344,33 +344,23 @@ html:has(> body > .bk-home) {
   transition: translate var(--motion) var(--ease);
 }
 
-.bk-home .bk-card::before,
-.bk-home .bk-card::after {
+.bk-home .bk-card::before {
   content: '';
   position: absolute;
   inset: -1px;
+  z-index: -1;
   border-radius: inherit;
+  box-shadow: var(--lift-shadow);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--motion) var(--ease);
-}
-
-.bk-home .bk-card::before {
-  z-index: -1;
-  box-shadow: var(--lift-shadow);
-}
-
-.bk-home .bk-card::after {
-  z-index: 2;
-  border: 1px solid var(--c);
 }
 
 .bk-home .bk-card:is(:hover, :focus-visible, [data-active]) {
   translate: 0 calc(-3px * var(--motion-distance));
 }
 
-.bk-home .bk-card:is(:hover, :focus-visible, [data-active])::before,
-.bk-home .bk-card:is(:hover, :focus-visible, [data-active])::after {
+.bk-home .bk-card:is(:hover, :focus-visible, [data-active])::before {
   opacity: 1;
 }
 
@@ -554,7 +544,7 @@ html:has(> body > .bk-home) {
 
 @media (max-width: 599.98px) {
   html:has(> body > .bk-home) {
-    --home-bar-height: 64px;
+    --home-bar-height: 52px;
   }
 
   .bk-home {
@@ -570,13 +560,15 @@ html:has(> body > .bk-home) {
   }
 
   .bk-home .bk-home-bar {
-    flex-wrap: wrap;
-    gap: 8px 12px;
+    gap: 12px;
     padding: 10px 0;
   }
 
+  .bk-home .bk-switch-label {
+    display: none;
+  }
+
   .bk-home .bk-chips {
-    flex-basis: 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
     margin: -2px 0;

@@ -129,11 +129,8 @@ test('the essay homepage', async (t) => {
     assert.equal(await previewState(page, gate), null);
     await page.hover(gate);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', gate);
-    await page.waitForFunction((selector) => {
-      const ring = getComputedStyle(document.querySelector(selector), '::after');
-      return ring.borderColor === 'rgb(42, 120, 214)' && ring.opacity === '1';
-    }, gate);
-    assert.equal(await page.locator(gate).evaluate((card) => getComputedStyle(card).translate), '0px -3px');
+    await page.waitForFunction((selector) => getComputedStyle(document.querySelector(selector)).translate === '0px -3px', gate);
+    assert.equal(await page.locator(gate).evaluate((card) => getComputedStyle(card).outlineStyle), 'none');
     await page.mouse.move(5, 5);
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'stopped', gate);
     assert.deepEqual(await page.evaluate(() => window.previewLog), ['start Gate', 'stop Gate']);
@@ -158,10 +155,10 @@ test('the essay homepage', async (t) => {
     assert.equal(await page.locator('[data-control="columns"]').isVisible(), false);
     const bar = await page.evaluate(() => {
       const box = (selector) => document.querySelector(selector).getBoundingClientRect();
-      return { bar: box('.bk-home-bar').width, chips: box('.bk-chips[data-for="category"]').width, chipsBottom: box('.bk-chips[data-for="category"]').bottom, controlsTop: box('.bk-home-controls').top };
+      return { height: box('.bk-home-bar').height, chipsRight: box('.bk-chips[data-for="category"]').right, controlsLeft: box('.bk-home-controls').left };
     });
-    assert.equal(bar.chips, bar.bar);
-    assert.ok(bar.controlsTop >= bar.chipsBottom, `the switches start at ${bar.controlsTop}px, above the end of the chip row at ${bar.chipsBottom}px`);
+    assert.ok(bar.height <= 56, `the bar is ${bar.height}px tall, more than one row`);
+    assert.ok(bar.chipsRight <= bar.controlsLeft, `the chips end at ${bar.chipsRight}px, past the start of the switches at ${bar.controlsLeft}px`);
     const jacobian = cardIn('category', '2026-09/jacobian/');
     await page.locator(jacobian).evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);

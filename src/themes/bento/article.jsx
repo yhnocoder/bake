@@ -1,9 +1,7 @@
 import { REGIONS } from 'bake/regions';
 import { Block, SectionHeading, Sidenotes, arrange, subsectionOf } from 'bake/theme';
 import { levelSpan } from './spans.js';
-
-const TILTS = ['-1.5deg', '1deg', '-0.75deg', '1.5deg'];
-const EMOJI_ONLY = /^<p[^>]*>[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}‍️\s]+<\/p>$/u;
+import { STICKERS } from './stickers.js';
 
 export function Article(props) {
   const { content, options, labels } = props;
@@ -11,7 +9,6 @@ export function Article(props) {
   const introText = intro.filter(({ block }) => !isThemeBlock(block));
   const introNotes = introText.flatMap((entry) => entry.notes);
   const cards = [...themeBlocks(intro), ...sections.flatMap((placed) => [{ placed }, ...themeBlocks(placed.entries)])];
-  let stickers = 0;
   return (
     <article class="bk-article bt-article" data-region={REGIONS.article}>
       {introText.length === 0 && introNotes.length === 0 ? null : (
@@ -26,8 +23,7 @@ export function Article(props) {
         <div class="bt-grid" data-columns={options.columns} style={gridStyle(options)}>
           {cards.map(({ placed, entry }) => {
             if (placed !== undefined) return <SectionCard {...placed} columns={options.columns} labels={labels} />;
-            const tilt = entry.block.name === 'sticker' ? TILTS[stickers++ % TILTS.length] : undefined;
-            return <BlockCard entry={entry} columns={options.columns} tilt={tilt} labels={labels} />;
+            return <BlockCard entry={entry} columns={options.columns} labels={labels} />;
           })}
         </div>
       )}
@@ -53,10 +49,10 @@ function SectionCard(props) {
 }
 
 function BlockCard(props) {
-  const { entry, columns, tilt, labels } = props;
+  const { entry, columns, labels } = props;
   const { block } = entry;
   const span = cardStyle(block.attributes, block.name === 'sticker' ? 1 : levelSpan('body', columns), columns);
-  const emoji = block.name === 'sticker' && EMOJI_ONLY.test(block.html);
+  const icon = block.name === 'sticker' ? block.attributes.icon : undefined;
   return (
     <div
       class={`bt-card bt-${block.name}`}
@@ -64,11 +60,12 @@ function BlockCard(props) {
       data-theme-block={block.name}
       data-rows={block.attributes.rows}
       data-color={block.attributes.color}
-      data-emoji={emoji ? '' : undefined}
+      data-icon={icon}
       data-line={block.line}
       data-end-line={block.endLine}
-      style={tilt === undefined ? span : `${span};--bt-tilt:${tilt}`}
+      style={span}
     >
+      {icon === undefined ? null : <svg class="bt-sticker-icon" viewBox="0 0 24 24" aria-hidden="true" innerHTML={STICKERS[icon]} />}
       <div class="bt-block-body" innerHTML={block.html} />
       <Notes notes={entry.notes} labels={labels} />
     </div>

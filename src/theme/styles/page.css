@@ -27,6 +27,12 @@ body {
   animation-duration: var(--motion);
 }
 
+:root[data-switching] *,
+:root[data-switching] ::before,
+:root[data-switching] ::after {
+  transition: none !important;
+}
+
 ::selection {
   background: var(--selection);
 }
