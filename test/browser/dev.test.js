@@ -371,7 +371,7 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), false, 'the page sent its own scroll to the editor');
   await page.mouse.move(600, 400);
-  await page.mouse.wheel(0, 600);
+  await page.mouse.wheel(0, 200);
   await expect.poll(() => page.evaluate(() => window.messages.some((message) => message.bake === 'scroll')), { message: 'scrolling the page sent nothing to the editor' }).toBe(true);
   await page.waitForTimeout(600);
   const scrolled = await page.evaluate(() => window.messages.findLast((message) => message.bake === 'scroll'));
