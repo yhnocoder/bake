@@ -66,11 +66,11 @@
       "basis": "The largest median measured, 559 ms on /2026-09/matrix-calculus/ at 1440 pixels wide, times 2, rounded up to 100 ms, because timings vary between runs and between machines"
     },
     "buildMs": {
-      "limit": 0,
+      "limit": 20000,
       "basis": "placeholder"
     },
     "newMs": {
-      "limit": 0,
+      "limit": 1000,
       "basis": "placeholder"
     }
   }
