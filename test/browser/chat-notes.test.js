@@ -220,14 +220,14 @@ test.describe('the notes of the AI chat', () => {
     assert.equal(await redo.getAttribute('placeholder'), '先写一句要求，比如：写短一点');
     await card.locator('.bk-chat-redo-chip', { hasText: '写短一点' }).click();
     await page.keyboard.press('Escape');
-    await card.locator('.bk-chat-redo:not([data-open])').waitFor();
+    await card.locator('.bk-chat-redo').waitFor({ state: 'hidden' });
     assert.equal(await card.isVisible(), true);
     const focused = () => page.evaluate(() => document.querySelector('[data-bake-chat]').shadowRoot.activeElement?.textContent ?? null);
     assert.equal(await focused(), '重新整理');
     await card.locator('.bk-chat-note-foot').getByRole('button', { name: '重新整理' }).click();
     await card.locator('.bk-chat-redo-chip', { hasText: '加自测题' }).focus();
     await page.keyboard.press('Escape');
-    await card.locator('.bk-chat-redo:not([data-open])').waitFor();
+    await card.locator('.bk-chat-redo').waitFor({ state: 'hidden' });
     assert.equal(await focused(), '重新整理');
     assert.equal(await card.isVisible(), true);
     await card.locator('.bk-chat-note-foot').getByRole('button', { name: '重新整理' }).click();

@@ -69,7 +69,7 @@ test.describe('the key and the answers of the AI chat on published pages', () =>
       assert.equal(api.requests.at(-1).headers.authorization, `Bearer ${API_KEY}`);
       return unlockNotes();
     };
-    await page.goto('/2026-10/syntax/');
+    await page.goto('/2026-10/jacobian/');
     await setUpKey(page);
     assert.equal(await askOnDay(0, '再说一次'), 0, 'the next page asks for no passkey');
     assert.equal(await askOnDay(29, '再说一次'), 0, 'the key is still unlocked after 29 days');
