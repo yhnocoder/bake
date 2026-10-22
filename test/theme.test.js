@@ -22,7 +22,10 @@ export default function Page(props) {
 }
 `;
 
-const scriptPage = plainPage.replace('<For each={props.assets.styles}>', '<For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>\n        <For each={props.assets.styles}>');
+// A page that loads its scripts has the edge areas and the regions that they use.
+const scriptPage = plainPage
+  .replace('<For each={props.assets.styles}>', '<For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>\n        <For each={props.assets.styles}>')
+  .replace('<main innerHTML', '<div data-edge="start" />\n        <div data-edge="end" />\n        <script type="application/json" class="bk-source" data-region="source" />\n        <main data-region="article" innerHTML');
 
 describe('themes', () => {
   test('a theme of the blog reuses the essay theme through bake/themes/essay and replaces its header', async (t) => {
@@ -110,7 +113,7 @@ describe('themes', () => {
         '  return (',
         '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels} bodyClass="plain">',
         '      <Header site={props.site} article={props.article} home={props.assets.root} labels={labels} />',
-        '      <main class="bk-article">{props.article.content.sections[0].blocks.map((block) => <Block block={block} labels={labels} />)}</main>',
+        '      <main class="bk-article" data-region="article">{props.article.content.sections[0].blocks.map((block) => <Block block={block} labels={labels} />)}</main>',
         '    </ArticleDocument>',
         '  );',
         '}',
@@ -143,7 +146,11 @@ describe('themes', () => {
         "import { settings } from './options.js';",
         '',
         'export default function Page(props) {',
-        '  return <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labelsFor(props.site.language)} settings={settings} options={props.options} />;',
+        '  return (',
+        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labelsFor(props.site.language)} settings={settings} options={props.options}>',
+        '      <main data-region="article" />',
+        '    </ArticleDocument>',
+        '  );',
         '}',
         '',
       ].join('\n'),
@@ -214,6 +221,22 @@ describe('themes', () => {
     const scripts = [...html.matchAll(/<script[^>]*>/g)].map(([tag]) => tag);
     assert.deepEqual(scripts.slice(0, 1), [`<script type="module" src="../../assets/${entry}">`]);
     assert.deepEqual([...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(([, href]) => href), [`../../assets/${named(/^plain-[\w-]+\.css$/)[0]}`]);
+  });
+
+  test('reports once, at the theme file that renders it, a page that loads its scripts without an edge area or a region that they use', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig.replace("language: 'en'", "language: 'en', theme: 'plain'"),
+      'content/posts/rope/index.md': article(),
+      'content/posts/gelu/index.md': article({ slug: 'gelu' }),
+      'themes/plain/page.jsx': scriptPage.replace(' data-region="article"', ''),
+      'themes/plain/home.jsx': 'export default function Home(props) {\n  return <html><body><div data-edge="start" />{props.assets.scripts.map((src) => <script type="module" src={src} />)}</body></html>;\n}\n',
+      'themes/plain/client.jsx': 'export default () => () => {};\n',
+      'themes/plain/theme.css': 'body {\n  margin: 0;\n}\n',
+    });
+    assert.deepEqual(await build(dir), [
+      'themes/plain/home.jsx:1:1 the homepage loads its scripts but has no element with data-edge="end"; the AI chat and the problems list of bake dev are placed in it',
+      'themes/plain/page.jsx:1:1 the article page loads its scripts but has no element with data-region="article"; the AI chat reads the selected text in it and bake dev updates the article in it in place',
+    ]);
   });
 
   test('reports a theme folder without page.jsx or client.jsx', async (t) => {

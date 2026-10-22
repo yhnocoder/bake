@@ -21,6 +21,9 @@
   "bin": {
     "bake": "src/cli.js"
   },
+  "exports": {
+    "./package.json": "./package.json"
+  },
   "files": [
     "src",
     "LICENSE",

@@ -233,16 +233,16 @@ describe('homepage', () => {
     assert.deepEqual(await build(dir), ['public/index.html:1:1 dist/index.html is also written by the homepage']);
   });
 
-  test('reports a site theme without home.jsx, not-found.jsx or theme.css, and needs none of them in a theme that only articles use', async (t) => {
-    const { 'themes/probe/home.jsx': home, 'themes/probe/not-found.jsx': notFound, 'themes/probe/theme.css': styles, ...withoutHome } = probeTheme;
-    assert.ok(home && notFound && styles);
-    const missing = createBlog(t, { 'bake.config.js': validConfig.replace("language: 'en'", "language: 'en', theme: 'probe'"), ...withoutHome });
-    assert.deepEqual(await build(missing), [
-        'themes/probe:1:1 theme "probe" has no home.jsx',
-        'themes/probe:1:1 theme "probe" has no not-found.jsx',
-        'themes/probe:1:1 theme "probe" has no theme.css',
-      ]);
-    const articleOnly = createBlog(t, { 'bake.config.js': validConfig, ...withoutHome, 'content/posts/rope/index.md': article({ extra: 'theme: probe\n' }) });
+  test('renders the homepage and the 404 page of a site theme without home.jsx or not-found.jsx with those of bake/theme, reports a site theme without theme.css, and needs none of them in a theme that only articles use', async (t) => {
+    const { 'themes/probe/home.jsx': home, 'themes/probe/not-found.jsx': notFound, 'themes/probe/theme.css': styles, ...articleTheme } = probeTheme;
+    assert.ok(home && notFound);
+    const siteTheme = validConfig.replace("language: 'en'", "language: 'en', theme: 'probe'");
+    const pagesOfBake = createBlog(t, { 'bake.config.js': siteTheme, ...articleTheme, 'themes/probe/theme.css': styles });
+    assert.deepEqual(await build(pagesOfBake), []);
+    assert.match(readFileSync(join(pagesOfBake, 'dist/index.html'), 'utf8'), /<h1 class="bk-home-title">/);
+    assert.match(readFileSync(join(pagesOfBake, 'dist/404.html'), 'utf8'), /<meta name="robots" content="noindex">/);
+    assert.deepEqual(await build(createBlog(t, { 'bake.config.js': siteTheme, ...articleTheme })), ['themes/probe:1:1 theme "probe" has no theme.css']);
+    const articleOnly = createBlog(t, { 'bake.config.js': validConfig, ...articleTheme, 'content/posts/rope/index.md': article({ extra: 'theme: probe\n' }) });
     assert.deepEqual(await build(articleOnly), []);
     assert.match(readFileSync(join(articleOnly, 'dist/index.html'), 'utf8'), /<h1 class="bk-home-title">/);
   });

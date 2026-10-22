@@ -8,6 +8,12 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 - The `demo` workflow, which publishes the example blog to the GitHub Pages site of the repository when it is started by hand.
 - Installation steps in the README.
+- A check of the edge areas and the regions on each page that loads the scripts of Bake, reported at the theme file that renders the page.
+
+### Changed
+
+- `home.jsx` and `not-found.jsx` are optional in a site theme, which then uses `Home` and `NotFound` of `bake/theme`.
+- The npm package exports none of its files; themes and components import the `bake/` modules, which Bake resolves when it builds them.
 
 ## [0.1.0]
 

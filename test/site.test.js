@@ -15,7 +15,10 @@ export default function Page(props) {
         <For each={props.assets.scripts}>{(src) => <script type="module" src={src} />}</For>
       </head>
       <body>
-        <main innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
+        <div data-edge="start" />
+        <div data-edge="end" />
+        <script type="application/json" class="bk-source" data-region="source" />
+        <main data-region="article" innerHTML={props.article.content.intro.map((block) => block.html).join('')} />
       </body>
     </html>
   );
