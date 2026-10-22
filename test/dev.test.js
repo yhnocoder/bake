@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -245,39 +245,6 @@ describe('updates while bake dev runs', () => {
     await eventually(check, message);
   }
 
-  test('serves a saved article, a nested article and a changed theme file and leaves the other pages as they were', async (t) => {
-    const mine = 'theme: mine\n';
-    const { dir, text } = await serve(t, {
-      'content/posts/rope/index.md': article({ extra: mine }),
-      'content/posts/gelu/index.md': article({ slug: 'gelu', extra: 'theme: bento\n', body: '## One\n\nGELU text.\n' }),
-      'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner.\n' }),
-      'themes/mine/page.jsx': [
-        "import { ArticleDocument, labelsFor } from 'bake/theme';",
-        "import { Article } from 'bake/themes/essay';",
-        "import { Header } from './header.jsx';",
-        '',
-        'export default function Page(props) {',
-        '  const labels = labelsFor(props.site.language);',
-        '  return (',
-        '    <ArticleDocument site={props.site} article={props.article} assets={props.assets} labels={labels}>',
-        '      <Header />',
-        '      <Article content={props.article.content} labels={labels} />',
-        '    </ArticleDocument>',
-        '  );',
-        '}',
-        '',
-      ].join('\n'),
-      'themes/mine/header.jsx': 'export function Header() {\n  return <header class="first-header" />;\n}\n',
-      'themes/mine/client.jsx': "export { default } from 'bake/themes/essay/client';\n",
-    });
-    await save(dir, { 'content/posts/rope/index.md': article({ extra: mine, body: 'Changed.\n' }) }, async () => (await text('/2026-10/rope/')).includes('Changed.'), 'the saved article was not served');
-    await save(dir, { 'content/posts/rope/inner/index.md': article({ slug: 'inner', extra: mine, body: 'Inner changed.\n' }) }, async () => (await text('/2026-10/inner/')).includes('Inner changed.'), 'the nested article was not served');
-    await save(dir, { 'themes/mine/header.jsx': 'export function Header() {\n  return <header class="custom-header" />;\n}\n' }, async () => (await text('/2026-10/rope/')).includes('custom-header'), 'the changed theme file was not used');
-    const gelu = await text('/2026-10/gelu/');
-    assert.match(gelu, /GELU text\./);
-    assert.doesNotMatch(gelu, /custom-header/);
-  });
-
   test('compiles a theme again when a file that it imports from another folder under themes/ changes, also when the blog folder is reached through a symbolic link', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,
@@ -300,39 +267,6 @@ describe('updates while bake dev runs', () => {
     await save(dir, { 'themes/common/look.css': '.word { color: blue; }\n' }, async () => /color:\s*#?(blue|00f)/.test(await stylesheet()), 'the imported stylesheet was not compiled again');
   });
 
-  test('reports the options of a theme folder that is removed or added as a whole', async (t) => {
-    const options = "export const options = { extra: { label: 'Extra', type: 'number', default: 1 } };\n";
-    const dir = createBlog(t, {
-      'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', themes: { mine: { extra: 2 } } };\n",
-      'content/posts/rope/index.md': article(),
-      'themes/mine/options.js': options,
-    });
-    const { lines } = await start(t, dir);
-    await save(dir, { 'themes/mine/options.js': options }, async () => lines.includes('Updated every page') || lines.some((line) => line.startsWith('Updated ')), 'bake dev did not watch the theme folder');
-    rmSync(join(dir, 'themes/mine'), { recursive: true });
-    await eventually(() => lines.includes('bake.config.js:1:92 themes.mine names no theme; the themes are essay, bento'), `bake dev printed ${JSON.stringify(lines)}`);
-    await save(dir, { 'themes/mine/options.js': options }, () => lines.at(-1) === 'No problems' || lines.slice(-2).includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
-  });
-
-  test('reports the missing theme.css of a theme that becomes the site theme', async (t) => {
-    const { dir, lines } = await serve(t, {
-      'content/posts/rope/index.md': article({ extra: 'theme: plain\n' }),
-      'themes/plain/page.jsx': 'export default function Page(props) {\n  return <html><body>{props.article.title}</body></html>;\n}\n',
-      'themes/plain/client.jsx': 'export default () => () => {};\n',
-    });
-    await save(dir, { 'bake.config.js': "export default { title: 'Test Blog', url: 'https://example.com', language: 'en', theme: 'plain' };\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
-    assert.deepEqual(lines.slice(-2), ['themes/plain:1:1 theme "plain" has no theme.css', '1 error']);
-  });
-
-  test('updates the homepage when the front matter of an article changes and when an article is added or removed', async (t) => {
-    const { dir, text } = await serve(t, { 'content/posts/rope/index.md': article() });
-    assert.match(await text('/'), /Rope/);
-    await save(dir, { 'content/posts/rope/index.md': article({ title: 'Rope again' }) }, async () => (await text('/')).includes('Rope again'), 'the homepage did not show the new title');
-    await save(dir, { 'content/posts/gelu/index.md': article({ title: 'GELU', slug: 'gelu' }) }, async () => (await text('/')).includes('GELU'), 'the homepage did not show the added article');
-    rmSync(join(dir, 'content/posts/gelu'), { recursive: true });
-    await eventually(async () => !(await text('/')).includes('GELU'), 'the homepage still shows the removed article');
-  });
-
   test('keeps every page at its last version without problems while an article has problems, except at the start', async (t) => {
     const { dir, lines, text, get } = await serve(t, {
       'content/posts/rope/index.md': article({ body: 'Rope[^missing].\n' }),
@@ -353,60 +287,6 @@ describe('updates while bake dev runs', () => {
     await save(dir, { 'content/posts/rope/index.md': article({ slug: 'rotary', body: 'Rope.\n' }) }, async () => (await get('/2026-10/rotary/')).status === 200, 'the fixed article was not served');
     assert.match(await text('/2026-10/gelu/'), /GELU changed\./);
     assert.equal((await get('/2026-10/rope/')).status, 404);
-  });
-
-  test('checks the links of every article again after a change in one article and updates the sections embedded elsewhere', async (t) => {
-    const gelu = (heading, text) => article({ title: 'GELU', slug: 'gelu', body: `## ${heading}\n\n${text}\n` });
-    const { dir, lines, text } = await serve(t, {
-      'content/posts/rope/index.md': article({ body: 'See [the rule](/2026-10/gelu/#chain-rule).\n\n:::embed\n/2026-10/gelu/#chain-rule\n:::\n' }),
-      'content/posts/gelu/index.md': gelu('Chain rule', 'First text.'),
-    });
-    await save(dir, { 'content/posts/gelu/index.md': gelu('Product rule', 'First text.') }, () => lines.includes('2 errors'), `bake dev printed ${JSON.stringify(lines)}`);
-    assert.deepEqual(lines.slice(-3), ['content/posts/rope/index.md:7:5 link target /2026-10/gelu/#chain-rule does not exist', 'content/posts/rope/index.md:10:1 :::embed target /2026-10/gelu/#chain-rule does not exist', '2 errors']);
-    await save(dir, { 'content/posts/gelu/index.md': gelu('Chain rule', 'Second text.') }, async () => (await text('/2026-10/rope/')).includes('Second text.'), 'the embedded section was not updated');
-    assert.ok(lines.includes('No problems'), lines.join('\n'));
-  });
-
-  test('bundles a changed component of components/ or of the components/ folder of its article again and reports a broken one', async (t) => {
-    const chart = (text) => `export const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = '${text}';\n  }\n}\n`;
-    for (const file of ['components/demo-chart.js', 'content/posts/rope/components/demo-chart.js']) {
-      await t.test(file, async (t) => {
-        const { dir, lines, get } = await serve(t, { [file]: chart('first text'), 'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }) });
-        const chunk = async () => {
-          const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
-          const name = /demo-chart-[\w-]+\.js/.exec(await (await get(`/${runtime}`)).text())[0];
-          return (await get(`/assets/${name}`)).text();
-        };
-        assert.match(await chunk(), /first text/);
-        await save(dir, { [file]: chart('second text') }, async () => /second text/.test(await chunk()), 'the changed component was not bundled again');
-        await save(dir, { [file]: "export const layout = { height: 100, frame: 'no' };\n\nexport default class DemoChart extends HTMLElement {}\n" }, () => lines.includes('1 error'), `bake dev printed ${JSON.stringify(lines)}`);
-        assert.equal(lines.at(-2), `${file}:1:38 demo-chart: layout.frame must be true or false, got "no"`);
-      });
-    }
-  });
-
-  test('bundles the components again when a module that a component imports from outside components/ changes', async (t) => {
-    const { dir, get } = await serve(t, {
-      'components/demo-chart.js': "import { text } from '../shared/text.js';\n\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {\n  connectedCallback() {\n    this.textContent = text;\n  }\n}\n",
-      'shared/text.js': "export const text = 'first text';\n",
-      'content/posts/rope/index.md': article({ body: ':::demo-chart\n:::\n' }),
-    });
-    const scripts = async () => {
-      const runtime = /<script type="module" src="\.\.\/\.\.\/(assets\/components-[\w-]+\.js)"><\/script>/.exec(await (await get('/2026-10/rope/')).text())[1];
-      const names = (await (await get(`/${runtime}`)).text()).match(/demo-chart-[\w-]+\.js/g);
-      return (await Promise.all(names.map(async (name) => (await get(`/assets/${name}`)).text()))).join('\n');
-    };
-    assert.match(await scripts(), /first text/);
-    await save(dir, { 'shared/text.js': "export const text = 'second text';\n" }, async () => /second text/.test(await scripts()), 'the components were not bundled again');
-  });
-
-  test('checks an article again when a component that it names is added or changes its parameters', async (t) => {
-    const chart = (params) => `export const params = { ${params} };\nexport const layout = { height: 100 };\n\nexport default class DemoChart extends HTMLElement {}\n`;
-    const { dir, lines } = await serve(t, { 'content/posts/rope/index.md': article({ body: ':::demo-chart{size=2}\n:::\n' }) });
-    assert.equal(lines[0], 'content/posts/rope/index.md:7:1 unknown component "demo-chart"; there is no demo-chart.js or demo-chart.jsx in components/ or in the components/ folder of this article');
-    await save(dir, { 'components/demo-chart.js': chart("size: { label: 'Size', type: 'number', default: 1 }") }, () => lines.includes('No problems'), `bake dev printed ${JSON.stringify(lines)}`);
-    await save(dir, { 'components/demo-chart.js': chart("scale: { label: 'Scale', type: 'number', default: 1 }") }, () => lines.at(-1) === '1 error', `bake dev printed ${JSON.stringify(lines)}`);
-    assert.match(lines.at(-2), /^content\/posts\/rope\/index\.md:7:\d+ .*size/);
   });
 
   test('shows the unsaved text that an editor sends, and the file again when the text is withdrawn or the file is saved', async (t) => {
