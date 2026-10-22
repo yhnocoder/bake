@@ -182,6 +182,11 @@ describe('share images', () => {
     assert.deepEqual(Object.keys(readTree(join(dir, 'dist'))), ['marker.txt']);
   });
 
+  test('reports a preview that does not draw within 10 seconds', async (t) => {
+    const dir = createBlog(t, { ...blogFiles, 'content/posts/rope/preview.js': 'await new Promise(() => {});\n\nexport default function preview() {}\n' });
+    assert.deepEqual(await build(dir), [`${ROPE}:6:10 the preview cannot be drawn on the share image: it did not finish within 10 seconds`]);
+  });
+
   test('reports a missing Chromium with the command that installs it and leaves dist/ unchanged', async (t) => {
     const dir = createBlog(t, { ...blogFiles, 'dist/marker.txt': 'old\n' });
     const result = bakeWithoutChromium(t, dir);

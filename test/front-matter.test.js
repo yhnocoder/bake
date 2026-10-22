@@ -63,6 +63,11 @@ describe('front matter', () => {
     );
   });
 
+  test('accepts an update on the day of the article', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': withField('updated: 2026-10-19', 'rope') });
+    assert.deepEqual(await build(dir), []);
+  });
+
   test('shows the date of the last update next to the date of the article', async (t) => {
     const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': withField('updated: 2026-10-21', 'rope') });
     assert.deepEqual(await build(dir), []);
