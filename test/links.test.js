@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { components as declare, folder, outline, parseSite } from './article.js';
+import { article, build, createBlog, validConfig } from './blog.js';
 
 const fixturesDir = join(import.meta.dirname, 'fixtures/syntax-errors');
 const ID_ATTRIBUTE = new RegExp(' id="([^"]*)"', 'g');
@@ -363,5 +365,29 @@ describe(':::embed', () => {
       'host.md:18:1 :::embed lists no address; write one site address per line, such as /2026-10/slug/#anchor',
       'host.md:22:1 :::embed holds only site addresses, one per line, such as /2026-10/slug/#anchor',
     ]);
+  });
+});
+
+describe('links to other paths of the site', () => {
+  test('are checked against the pages and files that the build writes and written relative to the page', async (t) => {
+    const body = '[home](/) [feed](/feed.xml) [cv](/files/cv.pdf) [about](/about.html) [sibling](../other/) [data](data.txt)\n\n[missing](/about/) [typo](/2026-1/rope/) [gone](../nope/) [mail](mailto:a@b.c) [far](//example.com/x)\n';
+    const files = {
+      'bake.config.js': validConfig.replace("url: 'https://example.com'", "url: 'https://example.com/blog'"),
+      'public/files/cv.pdf': 'pdf\n',
+      'public/about.html': '<p>About</p>\n',
+      'content/posts/rope/index.md': article({ body }),
+      'content/posts/rope/data.txt': 'x\n',
+      'content/posts/other/index.md': article({ title: 'Other', slug: 'other' }),
+    };
+    const dir = createBlog(t, files);
+    assert.deepEqual(await build(dir), [
+      'content/posts/rope/index.md:9:1 link target /about/ is not a page or a file of the site',
+      'content/posts/rope/index.md:9:20 link target /2026-1/rope/ is not a page or a file of the site',
+      'content/posts/rope/index.md:9:42 link target ../nope/ is not a page or a file of the site',
+    ]);
+    const fixed = createBlog(t, { ...files, 'content/posts/rope/index.md': article({ body: body.split('\n\n')[0] }) });
+    assert.deepEqual(await build(fixed), []);
+    const hrefs = [...readFileSync(join(fixed, 'dist/2026-10/rope/index.html'), 'utf8').matchAll(/<a href="([^"]*)" data-src/g)].map(([, href]) => href);
+    assert.deepEqual(hrefs, ['../../', '../../feed.xml', '../../files/cv.pdf', '../../about.html', '../other/', 'data.txt']);
   });
 });

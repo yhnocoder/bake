@@ -4,40 +4,115 @@ Bake generates a static site from a technical blog written in Markdown. Articles
 
 ## Install
 
-Bake needs Node 24 or later. A blog is an npm project that installs Bake as a development dependency. The npm package is named `@yhnocoder/bake`; until it is published to npm, install it from GitHub:
+Bake needs Node 24 or later. A blog is an npm project that installs Bake, the npm package `@yhnocoder/bake`, as a development dependency. One command creates a blog:
 
 ```bash
-mkdir my-blog && cd my-blog
-npm init -y
-npm pkg set type=module
-npm install --save-dev github:yhnocoder/bake
-npx playwright install chromium
-npx bake init
-npx bake dev
+npx @yhnocoder/bake init my-blog
+cd my-blog
+npm run dev
 ```
 
-`bake.config.js` is an ES module, so the `package.json` of the blog sets `"type": "module"`. `npm init -y` writes `"type": "commonjs"`, which `npm pkg set type=module` replaces; Bake reports an error at `bake.config.js` when the nearest `package.json` sets another type or none. `npx playwright install chromium` downloads the browser that `bake build` draws the share images with, see [Share images](#share-images). The command `bake` comes with the package, so `npx bake` runs it from the blog folder, and the scripts in `package.json` can call it as `bake`.
+`bake init` writes the files of the blog into `my-blog/`, adds Bake to its `package.json`, runs `npm install` and downloads Playwright's Chromium, which `bake build` draws the share images with, see [Share images](#share-images). `npm run dev` runs `bake dev`, which opens the blog in the browser.
+
+Bake can also be installed globally, so that the command `bake` is available in every folder:
+
+```bash
+npm install --global @yhnocoder/bake
+bake init my-blog
+```
+
+In a folder whose `package.json` installs Bake, the global `bake` runs the Bake that the blog installs, so every computer builds the blog with the version that its `package.json` names. Inside a blog, `npx bake` and the scripts in `package.json` run that Bake too.
+
+`bake.config.js` is an ES module, so the `package.json` of the blog sets `"type": "module"`. `bake init` sets it, and Bake reports an error at `bake.config.js` when the nearest `package.json` sets another type or none.
 
 ## Example blog
 
-`examples/blog/` is a blog written with Bake. Its articles show every syntax item, components, embeds, plain HTML pages and both themes, see [Writing an article](#writing-an-article). `make example` builds it and serves it at http://localhost:8000/. The `demo` workflow in `.github/workflows/demo.yml` builds it with the address of this repository's GitHub Pages site and publishes it there when it is started by hand from the Actions tab; it is never started by a push.
+`examples/blog/` is a blog written with Bake. Its articles show every syntax item, components, embeds, plain HTML pages and both themes, see [Writing an article](#writing-an-article). `make example` builds it and serves it with `bake preview` at the address it prints. The `demo` workflow in `.github/workflows/demo.yml` builds it with the address of this repository's GitHub Pages site and publishes it there when it is started by hand from the Actions tab; it is never started by a push.
 
 ## Commands
 
 ```bash
-bake init my-blog       # create a blog with bake.config.js and a first post in my-blog/
-bake new 2026-10/rope   # create content/posts/2026-10/rope/index.md as a draft
-bake dev                # serve the blog at http://localhost:4321/, open it and update pages on save
-bake build              # check the blog and generate the static site into dist/
+bake init my-blog                 # create a blog in my-blog/ and install its packages
+bake new "Rope data structures"   # create content/posts/rope-data-structures/index.md as a draft
+bake new 2026-10/rope             # create content/posts/2026-10/rope/index.md as a draft
+bake dev                          # serve the blog at http://localhost:4321/, open it and update pages on save
+bake build                        # check the blog and generate the static site into dist/
+bake preview                      # build the blog for this computer and serve dist/ at http://localhost:4173/
 ```
 
 Run every command except `bake init` from the blog root, the folder that contains `bake.config.js`.
 
-`bake init [folder]` creates a blog in `folder`, or in the current folder when none is given: `bake.config.js` with the folder name as the site title, a first post at `content/posts/hello/index.md` and a `.gitignore` that leaves out `node_modules/`, `dist/`, `.dist-staging/` and `.dist-previous/`. It writes nothing when the folder already holds one of these files.
+`bake init [folder]` creates a blog in `folder`, or in the current folder when none is given:
 
-`bake new <path>` creates `content/posts/<path>/index.md` with front matter for a draft dated today. The last folder name of the path becomes the slug.
+- `bake.config.js` with the folder name as the site title and the language of the system, Chinese (`zh-CN`) on a system set to Chinese and English (`en`) otherwise; `--language <code>` sets another language.
+- A first post at `content/posts/hello/index.md` in the language of the blog, with a section, a sidenote and a formula.
+- `public/favicon.svg`, the initial of the site title on a coloured square.
+- A `.gitignore` that leaves out `node_modules/`, `dist/`, `.dist-staging/` and `.dist-previous/`.
+- `.github/workflows/deploy.yml`, which publishes the blog on GitHub Pages, see [Publishing on GitHub Pages](#publishing-on-github-pages).
+- `package.json` with `"type": "module"`, the scripts `dev` and `build`, and Bake as a development dependency. An existing `package.json`, such as the one `npm init` writes, keeps its fields and scripts.
 
-`bake build` checks `bake.config.js` and the front matter and Markdown of every article that is not a draft, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts and styles of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. It also writes `dist/404.html`, the RSS feed `dist/feed.xml`, the sitemap `dist/sitemap.xml`, the theme stylesheet `dist/_bake/theme.css` and one share image per Markdown article to `dist/og/`, see [Share images](#share-images). Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
+It writes nothing when the folder already holds one of these files other than `package.json`. Then it runs `npm install` and downloads Playwright's Chromium; `--no-install` writes the files only.
+
+`bake new <title>` creates `content/posts/<slug>/index.md` with front matter for a draft dated today. The slug is made of the letters a to z and the digits of the title, joined by `-`, so `bake new "Rope data structures"` creates the slug `rope-data-structures`; `--slug <slug>` sets the slug, which a title without such letters, such as a Chinese one, needs. `bake new <path>`, such as `bake new 2026-10/rope`, creates `content/posts/<path>/index.md` instead and takes the slug from the last folder name of the path; an argument with a `/` or made only of lowercase letters, digits and `-` is a path. The front matter lists `summary` and `tags` as comments to fill in.
+
+`bake build` checks `bake.config.js` and the front matter and Markdown of every article that is not a draft, then writes the homepage to `dist/index.html`, each published article to `dist/YYYY-MM/slug/` together with the other files in its folder, writes the scripts and styles of the themes to `dist/assets/`, and copies `public/` to the root of `dist/`. Files and folders in an article folder whose names start with a dot are not published, and `.DS_Store` files in `public/` are not copied. A symbolic link to a file is copied as that file, and a symbolic link to a folder is skipped. It also writes `dist/404.html`, the RSS feed `dist/feed.xml`, the sitemap `dist/sitemap.xml`, `dist/robots.txt`, the theme stylesheet `dist/_bake/theme.css` and one share image per Markdown article to `dist/og/`, see [Share images](#share-images). Every build replaces `dist/` completely. Bake writes the new site into `.dist-staging/` in the blog root and moves the old one to `.dist-previous/` while it swaps them, so add both folders to the blog's `.gitignore` next to `dist/`. When Bake finds problems, it lists all of them as `file:line:col message`, prints the number of errors and leaves `dist/` unchanged.
+
+The RSS feed holds the full text of every published Markdown article next to its summary, with its sidenotes as a numbered list at the end and every address made absolute. `robots.txt` allows every page and names the sitemap; a `robots.txt` in `public/` replaces it. A `favicon.svg`, `favicon.png` or `favicon.ico` in `public/`, looked for in that order, becomes the icon of every page; `bake init` writes a `favicon.svg`.
+
+`bake build --url <address>` builds the site for the published address given, in place of `url` in `bake.config.js`. The pages need the address for their canonical links, the share images, the RSS feed, the sitemap and `robots.txt`; a build without either reports an error at `bake.config.js`.
+
+`bake preview` builds the blog as `bake build` does, with the local address as the site address when `bake.config.js` sets no `url`, and serves `dist/` at http://localhost:4173/ the way GitHub Pages serves it, with `404.html` for an address without a file. It opens the address in the default browser when it runs in a terminal; `--no-open` leaves the browser closed. When port 4173 is in use, it tries 4174, 4175 and so on; `--port <number>` starts from another port. It stops when you press Ctrl+C.
+
+### Publishing on GitHub Pages
+
+The workflow `.github/workflows/deploy.yml` that `bake init` writes publishes the blog on GitHub Pages with GitHub Actions. Push the blog to a GitHub repository, and choose GitHub Actions as the source under Settings > Pages of the repository. Each push to `main` then installs the packages and Chromium, builds the site with `bake build --url` and the address of the repository's Pages site, and publishes `dist/`; the workflow can also be started by hand from the Actions tab. The address comes from GitHub, so it includes the path of a project site, such as `https://linda.github.io/my-blog/`, and a custom domain set under Settings > Pages; `bake.config.js` needs no `url`.
+
+A blog created before `bake init` wrote the workflow can copy this file:
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps --only-shell chromium
+      - id: pages
+        uses: actions/configure-pages@v5
+      - run: npx bake build --url "${{ steps.pages.outputs.base_url }}"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
 
 ### bake dev
 
@@ -70,7 +145,7 @@ A blog is an ordinary repository. Bake reads it from the blog root:
 
 ```
 my-blog/
-  bake.config.js        site title, URL, language, default theme and theme options
+  bake.config.js        site title, language, default theme and theme options
   preamble.sty          math macros shared by every article
   package.json          Bake and the npm packages that components use
   content/
@@ -81,7 +156,7 @@ my-blog/
           components/   optional: components that only this article uses
   components/           interactive components that any article can use, one file each
   themes/               optional: the blog's own themes
-  public/               copied unchanged to the site root (favicon, CNAME)
+  public/               copied unchanged to the site root (favicon, images, CNAME)
   dist/                 build output, not committed
 ```
 
@@ -93,7 +168,6 @@ my-blog/
 export default {
   title: 'My Blog',
   description: 'Notes on how language models are trained.',
-  url: 'https://example.github.io',
   language: 'en',
   theme: 'essay',
   themes: { essay: { toc: 'notes' } },
@@ -104,7 +178,7 @@ export default {
 |---|---|---|
 | `title` | yes | Site name. |
 | `description` | no | One sentence under the site name on the homepage and in the homepage's page description. |
-| `url` | yes | Absolute `http` or `https` address of the published site. |
+| `url` | no | Absolute `http` or `https` address of the published site. `bake build --url` replaces it, and the workflow that `bake init` writes passes the address of the GitHub Pages site that way, so a blog published there leaves it out. `bake dev` and `bake preview` use the local address when it is not set. |
 | `language` | yes | Language of the site, such as `en` or `zh-CN`. |
 | `theme` | no | Default theme: `essay`, `bento` or the name of a folder in `themes/`. The default is `essay`. |
 | `themes` | no | The options of each theme, keyed by the theme name. The `essay` theme has one option: `toc`, the table of contents style, `notes`, `dots` or `ticks`, `notes` by default. The `bento` theme has two options: `columns`, the number of card columns from 1000 pixels up, an integer from 1 to 6, 6 by default, and `rowHeight`, the height of one card row in pixels, from 8 to 120, 24 by default. Both are written as `themes: { essay: { toc: 'dots' }, bento: { columns: 4, rowHeight: 24 } }`. A theme of the blog declares its options in `options.js` in its folder. |
@@ -133,7 +207,8 @@ tags: [LLM]
 | `title` | yes | Article title. |
 | `slug` | yes | Last part of the URL. It may only contain lowercase letters, digits and `-`. |
 | `date` | yes | Date in the form `YYYY-MM-DD`. Its year and month are part of the URL. |
-| `summary` | no | One sentence for the page header, the homepage card, the page description and RSS. |
+| `updated` | no | Date of the last change in the form `YYYY-MM-DD`, not before `date`. The page header shows it after the date, and the sitemap gives it as the last change of the page. The URL keeps the year and month of `date`. |
+| `summary` | no | One sentence for the page header, the homepage card, the page description and the RSS feed. |
 | `tags` | no | List of tags for filtering on the homepage. |
 | `category` | no | The `id` of one of the categories in `bake.config.js`. Without it, the article belongs to the category `default`. |
 | `preview` | no | Path of a script in the article folder that animates the homepage card, see [The homepage](#the-homepage). |
@@ -151,7 +226,7 @@ The articles of the example blog are the guide to writing. Each one is written i
 - [Bake 写法一览](examples/blog/content/posts/syntax/index.md) lists every Markdown syntax item: headings and anchors, recaps, callouts and folds, sidenotes and references, math and `preamble.sty`, code, tables, images, widths, components, links between articles, `:::embed`, copying as Markdown and the build errors.
 - [写交互组件](examples/blog/content/posts/components/index.md) explains how to write an interactive component: the file, its `params` and `layout`, how a parameter works together with the state inside the component, and every part of `bake/kit` with its properties.
 
-Read them as source in `examples/blog/`, or as pages: `make example` builds the example blog and serves it at http://localhost:8000/.
+Read them as source in `examples/blog/`, or as pages: `make example` builds the example blog and serves it with `bake preview`.
 
 A new article takes these steps:
 
@@ -161,6 +236,8 @@ bake dev                # shows the draft and updates the page on each save
 ```
 
 Write the title, the summary and the text, remove `draft: true` from the front matter when the article is ready, and run `bake build`.
+
+An image is a file in the article folder, written as a path relative to it, or a file in `public/`, written as a path that starts with `/`, such as `/images/logo.png`. Bake converts the images of the article folder to WebP and publishes the images of `public/` unchanged; an `http` or `https` address is used as written. A link to a path of the site, such as `/feed.xml`, `/files/cv.pdf` or a file in the article folder, is checked against the pages and files that `bake build` writes, and a path that starts with `/` is written relative to the page, so the links keep working when the site is published under a path such as `https://linda.github.io/my-blog/`.
 
 ## The homepage
 
@@ -191,7 +268,7 @@ The homepage loads a preview when its card comes near the screen. The animation 
 
 ## Share images
 
-When a link to an article is shared on a social network or in a chat, the preview shows the article's share image. `bake build` draws one for every published Markdown article: a 1200 by 630 pixel PNG with a strip in the category colour, the site title and the category name, the title, the summary and, on the right, the first frame of the article's `preview` script. It uses the fonts and the light colours of the site theme. The article page names the image in its `og:image` and `twitter:image` tags with an absolute address built from `url` in `bake.config.js`, and sets `twitter:card` to `summary_large_image`. A plain HTML page is published unchanged, so no tag could name an image, and Bake draws none for it.
+When a link to an article is shared on a social network or in a chat, the preview shows the article's share image. `bake build` draws one for every published Markdown article: a 1200 by 630 pixel PNG with a strip in the category colour, the site title and the category name, the title, the summary and, on the right, the first frame of the article's `preview` script. It uses the fonts and the light colours of the site theme. The article page names the image in its `og:image` and `twitter:image` tags with an absolute address built from the address of the site, `url` in `bake.config.js` or `bake build --url`, and sets `twitter:card` to `summary_large_image`. A plain HTML page is published unchanged, so no tag could name an image, and Bake draws none for it.
 
 With `cover` in the front matter, that image becomes the share image instead. Bake reads the image to find its format, whatever its file name says: a PNG, JPEG, GIF or WebP image is published unchanged, and an SVG or AVIF image, which social networks do not show, is converted to a PNG of the same size.
 
@@ -203,18 +280,7 @@ npx playwright install chromium
 
 When Chromium is missing, `bake build` reports it with this command and writes nothing. The name of each image contains a hash of everything that goes into the card, including the preview script and every other file in the article folder. When `dist/` already holds an image with that name, `bake build` copies it instead of drawing the card again, so a build in which no card changed does not start Chromium. A preview script that throws or does not draw within 10 seconds is reported at the `preview` field, together with every other problem of the build. `bake dev` draws no share images.
 
-A blog that deploys with GitHub Actions installs Chromium and the system libraries it needs in the deploy job, before `bake build`:
-
-```yaml
-- uses: actions/cache@v4
-  with:
-    path: ~/.cache/ms-playwright
-    key: playwright-${{ hashFiles('package-lock.json') }}
-- run: npx playwright install --with-deps chromium
-- run: npx bake build
-```
-
-The cache step is optional: it keeps the Chromium download between runs, and `npx playwright install` skips the download when the cached browser is already there. A fresh checkout has no `dist/`, so every deploy draws every card again; only local builds reuse the cards in `dist/`.
+The workflow that `bake init` writes, see [Publishing on GitHub Pages](#publishing-on-github-pages), installs Chromium and the system libraries it needs before `bake build` and keeps the Chromium download in the cache of GitHub Actions between runs. A fresh checkout has no `dist/`, so every deploy draws every card again; only local builds reuse the cards in `dist/`.
 
 ## AI chat
 
@@ -303,8 +369,8 @@ A theme is a folder of [SolidJS](https://www.solidjs.com/) components that Bake 
 
 | Prop | Content |
 |---|---|
-| `site` | `title`, `url`, `language` and `description` of `bake.config.js`, and `link`, the absolute address of the homepage. |
-| `article` | `title`, `summary`, `date`, `tags`, `category`, `draft`, `url`, `link`, the absolute address of the page, `shareImage`, `words` and `content`, the structure of the article: `intro`, the blocks before the first `##` heading; `sections`, each with its number, title, `attributes`, `blocks` and recap; `sidenotes`; `references`; `toc`; and `source`, the text of `index.md`. Each block has `type`, `html`, `line` and `endLine`. |
+| `site` | `title`, `language` and `description` of `bake.config.js`, `url`, the address of the site from `bake.config.js`, `bake build --url` or the local address, `link`, the absolute address of the homepage, and `icon`, the path of the favicon in `public/`, such as `favicon.svg`, when there is one. |
+| `article` | `title`, `summary`, `date`, `updated`, `tags`, `category`, `draft`, `url`, `link`, the absolute address of the page, `shareImage`, `words` and `content`, the structure of the article: `intro`, the blocks before the first `##` heading; `sections`, each with its number, title, `attributes`, `blocks` and recap; `sidenotes`; `references`; `toc`; and `source`, the text of `index.md`. Each block has `type`, `html`, `line` and `endLine`. |
 | `assets` | `root`, the address of the site root relative to the page, and the addresses of the `styles` and `scripts` that the page loads. |
 | `options` | The values of the theme's options for this article, from `themes` in `bake.config.js` and the front matter. |
 

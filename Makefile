@@ -11,8 +11,7 @@ browser: node_modules
 	npm run test:browser
 
 example: node_modules
-	cd examples/blog && node ../../src/cli.js build
-	node --input-type=module -e "const { serveStatic } = await import('./scripts/static-server.js'); const { origin } = await serveStatic('examples/blog/dist'); console.log(origin.replace('127.0.0.1', 'localhost') + '/');"
+	cd examples/blog && node ../../src/cli.js preview
 
 dev: node_modules
 	cd examples/blog && node ../../src/cli.js dev

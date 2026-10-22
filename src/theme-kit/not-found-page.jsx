@@ -11,6 +11,7 @@ export default function NotFound(props) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex" />
         <title>{`${labels.notFound} · ${site.title}`}</title>
+        {site.icon === undefined ? null : <link rel="icon" href={`${assets.root}${site.icon}`} />}
         <script innerHTML={prepaintScript(SITE_SETTINGS)} />
         {assets.styles.map((href) => (
           <link rel="stylesheet" href={href} />

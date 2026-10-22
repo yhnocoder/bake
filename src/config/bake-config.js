@@ -97,7 +97,7 @@ function validateConfig(value, themes, optionProblem, report) {
   };
   required('title', (title) => textProblem('title', title));
   if (value.description !== undefined) field(['description'], textProblem('description', value.description));
-  required('url', urlProblem);
+  if (value.url !== undefined) field(['url'], urlProblem(value.url));
   required('language', (language) => textProblem('language', language));
   const theme = value.theme ?? 'essay';
   field(['theme'], choiceProblem('theme', [...themes.keys()], theme));
@@ -223,7 +223,7 @@ function textProblem(label, value) {
   return typeof value === 'string' && value.trim() !== '' ? characterProblem(label, value) : `${label} must be a non-empty string, got ${describeValue(value)}`;
 }
 
-function urlProblem(value) {
+export function urlProblem(value) {
   const problem = `url must be an absolute http or https URL, got ${describeValue(value)}`;
   if (typeof value !== 'string' || !URL.canParse(value)) return problem;
   return ['http:', 'https:'].includes(new URL(value).protocol) ? null : problem;

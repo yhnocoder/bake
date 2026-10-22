@@ -8,6 +8,7 @@ export function articleEntry(article, config) {
     title: fields.title,
     summary: fields.summary,
     date: fields.date,
+    updated: fields.updated,
     tags: fields.tags ?? [],
     category: config.categories.find((category) => category.id === fields.category),
     draft: article.draft,

@@ -4,7 +4,7 @@ import { characterProblem, choiceProblem, folderFile, folderPath, slugProblem } 
 import { CONFIG_FILE } from './bake-config.js';
 
 const REQUIRED = ['title', 'slug', 'date'];
-export const FRONT_MATTER_FIELDS = Object.freeze(['title', 'slug', 'date', 'summary', 'tags', 'category', 'preview', 'theme', 'draft', 'cover', 'page']);
+export const FRONT_MATTER_FIELDS = Object.freeze(['title', 'slug', 'date', 'updated', 'summary', 'tags', 'category', 'preview', 'theme', 'draft', 'cover', 'page']);
 const DATE_FORM = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function readFrontMatter(file, source, rules, errors) {
@@ -63,6 +63,10 @@ export function readFrontMatter(file, source, rules, errors) {
   for (const name of REQUIRED) {
     if (!document.contents?.has(name)) errors.push(errorAt(file, fileStart, `front matter is missing "${name}"`));
   }
+  if (fields.updated !== undefined && fields.date !== undefined && fields.updated < fields.date) {
+    errors.push(errorAt(file, positions.updated, `updated ${fields.updated} is before date ${fields.date}`));
+    delete fields.updated;
+  }
   if (rules.categories.length > 0 && !document.contents?.has('category')) fields.category = 'default';
   if ('page' in fields) {
     const body = lines.findIndex((line, index) => index > close && line.trim() !== '');
@@ -102,7 +106,8 @@ function fieldMessage(name, value, rules) {
     case 'slug':
       return slugProblem('slug', value);
     case 'date':
-      return isCalendarDate(value) ? null : `date must be a date in the form YYYY-MM-DD, got ${describeValue(value)}`;
+    case 'updated':
+      return isCalendarDate(value) ? null : `${name} must be a date in the form YYYY-MM-DD, got ${describeValue(value)}`;
     case 'summary':
       return typeof value === 'string' ? null : `summary must be a string, got ${describeValue(value)}`;
     case 'tags':

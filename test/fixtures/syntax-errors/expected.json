@@ -30,5 +30,8 @@
   "missing-link-target.md": "missing-link-target.md:8:2 link target /2026-10/syntax-linked/#chain does not exist",
   "embed-self.md": "embed-self.md:9:1 :::embed cannot embed the article itself",
   "embed-duplicate.md": "embed-duplicate.md:10:1 :::embed lists /2026-10/syntax-linked/#向量与雅可比矩阵的乘积 twice",
-  "embed-overlap.md": "embed-overlap.md:10:1 :::embed address /2026-10/syntax-linked/#链式法则 contains /2026-10/syntax-linked/#local-grad"
+  "embed-overlap.md": "embed-overlap.md:10:1 :::embed address /2026-10/syntax-linked/#链式法则 contains /2026-10/syntax-linked/#local-grad",
+  "missing-site-file.md": "missing-site-file.md:8:2 link target /about/ is not a page or a file of the site",
+  "block-name-space.md": "block-name-space.md:8:1 the name of a block follows the colons without a space; write :::aside",
+  "unknown-code-language.md": "unknown-code-language.md:8:1 unknown code language \"pyhton\"; did you mean \"python\"?"
 }

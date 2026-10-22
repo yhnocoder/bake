@@ -7,6 +7,7 @@ import { relocateMath } from './math.js';
 
 const ATTRIBUTION_PREFIX = '— ';
 const RELATIVE_URL = /^(?![A-Za-z][A-Za-z0-9+.-]*:|\/|\?)/;
+const ROOT_PATH = /^\/(?!\/)/;
 
 export function resultWidths(example) {
   const widths = new Set();
@@ -81,6 +82,9 @@ function handlers(context) {
           result.properties.dataTarget = address.text;
           context.linked(target);
         }
+      } else if (ROOT_PATH.test(node.url)) {
+        // why: the site may be published under a sub-path, so a path from the site root becomes a path from the page
+        result.properties.href = `${context.root}${result.properties.href.slice(1)}`;
       } else if (excerpt !== undefined && RELATIVE_URL.test(node.url)) {
         result.properties.href = relocate(result.properties.href);
       }

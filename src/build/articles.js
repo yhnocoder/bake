@@ -6,6 +6,7 @@ import { IMAGE_FORMATS, readImage } from '../render/images.js';
 import { errorAt } from '../shared/report.js';
 import { articleUrl } from '../shared/urls.js';
 import { listFiles } from './files.js';
+import { PUBLIC_DIR } from './public.js';
 
 export const POSTS_DIR = 'content/posts';
 
@@ -56,6 +57,7 @@ function articleOf(site, found) {
     const themeName = fields?.theme ?? rules.theme;
     const settings = {
       folder,
+      publicFiles: { read: (path) => files.read(join(files.root, PUBLIC_DIR, path)) },
       url,
       get theme() {
         return files.value((context) => context.settings.markdown.get(themeName));

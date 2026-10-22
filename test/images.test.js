@@ -170,20 +170,29 @@ describe('images', () => {
     ]);
   });
 
-  test('reports images that are not files in the article folder or not images', async (t) => {
+  test('reports images that are not files in the article folder or in public/, or not images', async (t) => {
     const options = { folder: await imageFolder(t, { 'notes.png': 'not an image', 'plot.png': png(10, 10), 'plot.webp': png(10, 10), 'a.gif': png(10, 10), 'a.jpg': png(10, 10), 'huge.png': hugePng() }) };
-    const { errors } = await parse('![](missing.svg)\n\n![](https://example.com/a.png)\n\n![](/images/a.png)\n\n![](../a.png)\n\n![](notes.png)\n\n![](plot.png)\n\n![](a.jpg)\n\n![](a.gif)\n\n![](huge.png)\n', options);
+    const { errors } = await parse('![](missing.svg)\n\n![](/images/a.png)\n\n![](../a.png)\n\n![](notes.png)\n\n![](plot.png)\n\n![](a.jpg)\n\n![](a.gif)\n\n![](huge.png)\n', options);
     assert.deepEqual(errors, [
       'index.md:7:1 image missing.svg is not a file in the article folder',
-      'index.md:9:1 image https://example.com/a.png is not a file in the article folder',
-      'index.md:11:1 image /images/a.png is not a file in the article folder',
-      'index.md:13:1 image ../a.png is not a file in the article folder',
-      'index.md:15:1 image notes.png is not a PNG, JPEG, GIF, WebP, AVIF or SVG file',
-      'index.md:17:1 image plot.png is published as plot.webp, which is also a file in the article folder',
-      'index.md:21:1 images a.jpg and a.gif are both published as a.webp',
-      'index.md:23:1 image huge.png cannot be read: Input image exceeds pixel limit',
+      'index.md:9:1 image /images/a.png is not a file in public/',
+      'index.md:11:1 image ../a.png is not a file in the article folder',
+      'index.md:13:1 image notes.png is not a PNG, JPEG, GIF, WebP, AVIF or SVG file',
+      'index.md:15:1 image plot.png is published as plot.webp, which is also a file in the article folder',
+      'index.md:19:1 images a.jpg and a.gif are both published as a.webp',
+      'index.md:21:1 image huge.png cannot be read: Input image exceeds pixel limit',
     ]);
   });
+  test('shows an image from public/ at its size with an address from the page, and a remote image as written', async (t) => {
+    const body = '![Plot](/img/plot.svg)\n\n![Remote](https://example.com/a.png)\n';
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'public/img/plot.svg': svg, 'content/posts/rope/index.md': article({ body }) });
+    assert.deepEqual(await build(dir), []);
+    const html = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    assert.match(html, /<img src="\.\.\/\.\.\/img\/plot\.svg" alt="Plot" width="320" height="200"/);
+    assert.match(html, /<img src="https:\/\/example\.com\/a\.png" alt="Remote"/);
+    assert.ok(readdirSync(join(dir, 'dist/img')).includes('plot.svg'));
+  });
+
   test('gives a figure its written pixel width as the natural width and none without a size or with a percentage', async (t) => {
     const options = { folder: await imageFolder(t, { 'plot.svg': svg }) };
     const blocks = (await parsed('![](plot.svg)\n\n![](plot.svg){width=560px}\n\n![](plot.svg){width=70%}\n', options)).intro;

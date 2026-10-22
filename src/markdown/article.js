@@ -13,13 +13,14 @@ export async function readArticle(file, source, errors, options) {
 
 class Article {
   constructor(file, source, errors, options) {
-    const { folder = null, url = null } = options;
+    const { folder = null, publicFiles = null, url = null } = options;
     // The input of the article.
     this.file = file;
     this.source = source;
     this.errors = errors;
     this.options = options;
     this.folder = folder;
+    this.publicFiles = publicFiles;
     this.url = url;
     // parseArticle: the tree, once all its stages have run.
     this.tree = null;
@@ -41,6 +42,8 @@ class Article {
     // indexTargets, after parseArticle.
     this.targets = new Map();
     this.places = new Map();
+    // linkArticle: the links to paths of the site that are not articles, which the build checks once it knows every file it writes.
+    this.siteLinks = [];
     // articleStructure, which clears them first because it runs again when a linked article changes.
     this.linked = new Map();
     this.borrowed = new Set();

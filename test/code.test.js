@@ -26,6 +26,6 @@ describe('code', () => {
   });
 
   test('reports an unknown language', async () => {
-    assert.deepEqual((await parse('```pyhton\nx\n```\n')).errors, ['index.md:7:1 unknown code language "pyhton"']);
+    assert.deepEqual((await parse('```pyhton\nx\n```\n')).errors, ['index.md:7:1 unknown code language "pyhton"; did you mean "python"?']);
   });
 });

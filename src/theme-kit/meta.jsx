@@ -4,6 +4,7 @@ export function PageMeta(props) {
     <>
       <link rel="canonical" href={link} />
       <link rel="alternate" type="application/rss+xml" href={`${root}feed.xml`} title={site.title} />
+      {site.icon === undefined ? null : <link rel="icon" href={`${root}${site.icon}`} />}
       <meta property="og:type" content={type} />
       <meta property="og:title" content={title} />
       {description === undefined ? null : <meta property="og:description" content={description} />}

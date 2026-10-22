@@ -1,7 +1,7 @@
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { chromium } from 'playwright';
-import { serveStatic } from './static-server.js';
+import { serveStatic } from '../src/dev/static-server.js';
 
 export const screens = [
   { width: 1440, height: 900, mobile: false },

@@ -114,6 +114,7 @@ function renderArticle(article, entry, { config, theme, runtime, chatEntry, shar
       title: entry.title,
       summary: entry.summary,
       date: entry.date,
+      updated: entry.updated,
       tags: entry.tags,
       category: entry.category,
       draft: entry.draft,
@@ -141,7 +142,7 @@ function shareImageProps(config, image) {
 }
 
 function siteProps(config) {
-  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url) };
+  return { title: config.title, url: config.url, language: config.language, description: config.description, link: siteLink(config.url), icon: config.icon };
 }
 
 function homeArticle({ title, summary, date, tags, category, draft, path, preview, image, sections }) {

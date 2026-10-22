@@ -4,7 +4,7 @@ import { listFiles } from './files.js';
 import { SHARE_IMAGE_DIR } from './share-images.js';
 import { THEME_STYLES_PATH } from './theme.js';
 
-const PUBLIC_DIR = 'public';
+export const PUBLIC_DIR = 'public';
 const RESERVED_DIRS = [posix.dirname(THEME_STYLES_PATH), SHARE_IMAGE_DIR];
 
 export function publicOutputs(root, outputs, errors) {

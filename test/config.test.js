@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { article, build, createBlog } from './blog.js';
+import { article, bake, build, createBlog } from './blog.js';
 
 const base = "title: 'Test', url: 'https://example.com', language: 'en'";
 
@@ -88,6 +88,14 @@ describe('bake.config.js', () => {
 
   test('reads bake.config.js next to a package.json with "type": "module"', async (t) => {
     assert.deepEqual(await build(createBlog(t, { 'package.json': '{ "type": "module" }\n', 'bake.config.js': `export default { ${base} };\n` })), []);
+  });
+
+  test('takes the address of the site from bake build --url when bake.config.js has none, and reports it missing from both', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': "export default { title: 'Notes', language: 'en' };\n" });
+    assert.deepEqual(await problems(t, { 'bake.config.js': "export default { title: 'Notes', language: 'en' };\n" }), ['bake.config.js:1:1 bake.config.js has no url, the address of the published site; set url there, or pass it with bake build --url <address>']);
+    const result = bake(dir, 'build', '--url', 'https://notes.example/blog');
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(join(dir, 'dist/feed.xml'), 'utf8'), /<link>https:\/\/notes\.example\/blog\/<\/link>/);
   });
 
   test('reports missing fields, nested values, unknown fields and reused category ids at their own position', async (t) => {

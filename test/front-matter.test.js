@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { build, createBlog, validConfig } from './blog.js';
 
@@ -27,6 +29,8 @@ describe('front matter', () => {
       ['date: @2026-13-01', 'date must be a date in the form YYYY-MM-DD, got "2026-13-01"'],
       ['date: @2026-02-30', 'date must be a date in the form YYYY-MM-DD, got "2026-02-30"'],
       ['date: @2026-1-5', 'date must be a date in the form YYYY-MM-DD, got "2026-1-5"'],
+      ['updated: @2026-10-32', 'updated must be a date in the form YYYY-MM-DD, got "2026-10-32"'],
+      ['updated: @2026-10-01', 'updated 2026-10-01 is before date 2026-10-19'],
       ['summary: @[a]', 'summary must be a string, got a list'],
       ['summary: @a: b', 'Nested mappings are not allowed in compact mappings'],
       ['title: @"a\\x01b"', 'title contains the character U+0001, which the RSS feed and the sitemap cannot hold'],
@@ -57,6 +61,12 @@ describe('front matter', () => {
       lines,
       cases.map(([marked, message], index) => `content/posts/case-${index}/index.md:2:${marked.indexOf('@') + 1} ${message}`).sort(),
     );
+  });
+
+  test('shows the date of the last update next to the date of the article', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, 'content/posts/rope/index.md': withField('updated: 2026-10-21', 'rope') });
+    assert.deepEqual(await build(dir), []);
+    assert.match(readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8'), /<time datetime="2026-10-19">2026-10-19<\/time><span class="bk-updated">Updated <time datetime="2026-10-21">2026-10-21<\/time><\/span>/);
   });
 
   test('reports a file without front matter or a closing line, a repeated field, a list, missing fields and a body next to "page"', async (t) => {
