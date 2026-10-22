@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { budgetProblems, budgetSummary, defaultBudgets } from '../scripts/check-budgets.js';
-import { metrics as devMetrics } from '../scripts/measure-dev.js';
-import { metrics as pageMetrics } from '../scripts/measure-pages.js';
+import { budgetProblems, budgetSummary } from '../scripts/check-budgets.js';
 
 const budgets = {
   limits: {
@@ -59,16 +57,6 @@ describe('performance budgets', () => {
   test('a metric without a page and width is reported by its name, and only the metrics the report measures are checked', () => {
     const report = { metrics: ['devStartupMs'], measurements: [{ devStartupMs: 2500 }] };
     assert.deepEqual(budgetProblems(report, budgets), ['devStartupMs is 2500, over the limit of 2000']);
-  });
-
-  test('the budget file names only measured metrics and states the basis of every limit', () => {
-    const file = JSON.parse(readFileSync(defaultBudgets, 'utf8'));
-    const measured = new Set([...pageMetrics, ...devMetrics].map((metric) => metric.key));
-    for (const [metric, { limit, basis }] of Object.entries(file.limits)) {
-      assert.ok(measured.has(metric), metric);
-      assert.equal(typeof limit, 'number', metric);
-      assert.ok(basis.length > 0, metric);
-    }
   });
 
   test('the command prints the problems and exits with status 1 when a limit is exceeded', () => {

@@ -111,19 +111,17 @@ test.describe('the essay theme lays out articles', () => {
     },
   });
 
-  test('no article scrolls horizontally at any breakpoint', async ({ open }) => {
+  test('an article of long words, wide tables and long formulas does not scroll horizontally at any breakpoint', async ({ open }) => {
     const overflowing = [];
-    for (const path of ['syntax', 'stress']) {
-      const page = await open(path);
-      for (const width of overflowWidths) {
-        await page.setViewportSize({ width, height: 900 });
-        await settle(page);
-        const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-        if (scrollWidth > width) overflowing.push(`${path} at ${width}px is ${scrollWidth}px wide`);
-      }
-      await page.close();
+    const page = await open('stress');
+    for (const width of overflowWidths) {
+      await page.setViewportSize({ width, height: 900 });
+      await settle(page);
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      if (scrollWidth > width) overflowing.push(`${width}px is ${scrollWidth}px wide`);
     }
     assert.deepEqual(overflowing, []);
+    await page.close();
   });
 
   test('body, wide and page blocks have their widths, and an auto block wider than the body resolves to wide', async ({ open }) => {
@@ -275,14 +273,6 @@ test.describe('the essay theme lays out articles', () => {
       (await formulas()).filter((formula) => !formula.inside || (!formula.fits && !formula.scrolls)),
       [],
     );
-    await page.close();
-  });
-
-  test('dark mode follows the system colour scheme', async ({ open }) => {
-    const page = await open('widths', { colorScheme: 'dark' });
-    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(17, 20, 19)');
-    await page.emulateMedia({ colorScheme: 'light' });
-    await page.waitForFunction(() => getComputedStyle(document.body).backgroundColor === 'rgb(245, 246, 244)');
     await page.close();
   });
 

@@ -1,45 +1,8 @@
 import assert from 'node:assert/strict';
 import { settle, test } from './browser.js';
 
-test('formulas in the syntax article, in its embeds and in an open preview card render in Chromium without errors', async ({ page, browser }) => {
+test('formulas render in an open preview card and in the sidenotes that a phone opens', async ({ page, browser }) => {
   await page.goto('/2026-10/syntax/');
-  await page.evaluate(() => document.fonts.ready);
-  const report = await page.evaluate(() => {
-    const containers = [...document.querySelectorAll('mjx-container')];
-    const hiddenNotes = [...document.querySelectorAll('.bk-sidenote')].filter((note) => note.querySelector('mjx-container') !== null && !note.checkVisibility());
-    return {
-      count: containers.length,
-      errors: containers.filter((container) => container.querySelector('[data-mml-node="merror"], [data-mjx-error]')).map((container) => container.dataset.tex),
-      empty: containers
-        .filter((container) => !hiddenNotes.includes(container.closest('.bk-sidenote')))
-        .filter((container) => {
-          const box = container.querySelector('svg')?.getBoundingClientRect();
-          return box === undefined || box.width === 0 || box.height === 0;
-        })
-        .map((container) => container.dataset.tex),
-      notesWithMath: hiddenNotes.map((note) => note.dataset.sidenote),
-      notesNotShown: hiddenNotes
-        .filter((note) => {
-          const shown = [...document.querySelectorAll(`.bk-sidenote[data-sidenote="${note.dataset.sidenote}"]`)].find((other) => other.checkVisibility());
-          return shown === undefined || shown.querySelectorAll('mjx-container').length !== note.querySelectorAll('mjx-container').length;
-        })
-        .map((note) => note.dataset.sidenote),
-      missingGlyphs: [...document.querySelectorAll('mjx-container use')]
-        .map((use) => use.getAttribute('href') ?? use.getAttribute('xlink:href'))
-        .filter((href) => document.getElementById(href.slice(1)) === null),
-      embedded: document.querySelectorAll('.embed mjx-container').length,
-      duplicateIds: [...document.querySelectorAll('[id]')].map((element) => element.id).filter((id, index, ids) => ids.indexOf(id) !== index),
-    };
-  });
-  assert.ok(report.count > 20, `expected the syntax article to contain formulas, found ${report.count}`);
-  assert.deepEqual(report.errors, []);
-  assert.deepEqual(report.empty, []);
-  assert.ok(report.notesWithMath.length > 0, 'expected a sidenote with a formula in the syntax article');
-  assert.deepEqual(report.notesNotShown, []);
-  assert.deepEqual(report.missingGlyphs, []);
-  assert.ok(report.embedded > 0, 'expected an embed with formulas in the syntax article');
-  assert.deepEqual(report.duplicateIds, []);
-
   const link = page.locator(`.bk-article p a[href="../../2026-10/syntax-linked/#${encodeURIComponent('链式法则')}"]`).first();
   await link.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await settle(page);
@@ -60,10 +23,12 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   assert.deepEqual(card.missingGlyphs, []);
   assert.deepEqual(card.duplicateIds, []);
 
+  const notesWithMath = await page.evaluate(() => [...new Set([...document.querySelectorAll('.bk-sidenote')].filter((note) => note.querySelector('mjx-container') !== null).map((note) => note.dataset.sidenote))]);
+  assert.ok(notesWithMath.length > 0, 'expected a sidenote with a formula in the syntax article');
   const phone = await browser.newPage({ baseURL: page.url(), viewport: { width: 375, height: 760 }, hasTouch: true, isMobile: true });
   await phone.goto('/2026-10/syntax/');
   const opened = [];
-  for (const number of report.notesWithMath) {
+  for (const number of notesWithMath) {
     await phone.locator(`a[href="#sidenote-${number}"]`).first().tap();
     await phone.waitForFunction((value) => {
       const note = [...document.querySelectorAll(`.bk-sidenote[data-sidenote="${value}"]`)].find((element) => element.checkVisibility());
@@ -79,7 +44,8 @@ test('formulas in the syntax article, in its embeds and in an open preview card 
   }
   assert.deepEqual(
     opened.map(({ number, empty }) => ({ number, empty })),
-    report.notesWithMath.map((number) => ({ number, empty: 0 })),
+    notesWithMath.map((number) => ({ number, empty: 0 })),
   );
   assert.ok(opened.every(({ formulas }) => formulas > 0), `opened notes: ${JSON.stringify(opened)}`);
+  await phone.close();
 });

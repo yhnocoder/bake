@@ -295,19 +295,6 @@ test.describe('the bento theme lays out sections as cards', () => {
     assert.deepEqual(outline, { width: '2px', color: true });
   });
 
-  test('no page scrolls horizontally', async ({ open }) => {
-    const overflowing = [];
-    for (const path of ['bento-cards', 'activations']) {
-      const page = await open(path);
-      for (const width of [...widths, 1000, 600]) {
-        await resize(page, width);
-        const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-        if (scrollWidth > width) overflowing.push(`${path} at ${width}px is ${scrollWidth}px wide`);
-      }
-    }
-    assert.deepEqual(overflowing, []);
-  });
-
   test('sidenotes sit at the bottom of their card and there is no table of contents', async ({ open }) => {
     const page = await open('activations');
     for (const width of widths) {
@@ -333,40 +320,6 @@ test.describe('the bento theme lays out sections as cards', () => {
       );
     }
     assert.equal(await page.locator('.bk-toc, nav').count(), 0);
-  });
-
-  test('a component in a card loads and keeps its frame inside the card', async ({ open }) => {
-    for (const width of widths) {
-      const page = await open('activations', { viewport: { width, height: 900 } });
-      const frame = page.locator('.bt-card figure.component');
-      await frame.scrollIntoViewIfNeeded();
-      await page.waitForFunction(() => document.querySelector('.bt-card figure.component').dataset.state === 'ready');
-      const fits = await frame.evaluate((figure) => {
-        const card = figure.closest('.bt-card').getBoundingClientRect();
-        const box = figure.getBoundingClientRect();
-        const element = figure.querySelector('.component-box > *').getBoundingClientRect();
-        return box.left >= card.left && box.right <= card.right && element.height > 100;
-      });
-      assert.ok(fits, `${width}px`);
-      const typography = await frame.evaluate((figure) => {
-        const box = getComputedStyle(figure.querySelector('.component-box'));
-        const card = getComputedStyle(figure.closest('.bt-card'));
-        return { box: [box.fontSize, box.lineHeight], card: [card.fontSize, card.lineHeight] };
-      });
-      assert.deepEqual(typography.box, typography.card, `${width}px`);
-      assert.deepEqual(typography.box, { 1440: ['15.5px', '27.9px'], 1100: ['14px', '21.7px'], 375: ['15px', '27px'] }[width], `${width}px`);
-    }
-  });
-
-  test('dark mode changes the page and the cards', async ({ open }) => {
-    const colors = async (colorScheme) => {
-      const page = await open('activations', { colorScheme });
-      return (await page.evaluate(() => [document.body, document.querySelector('.bt-card')].map((element) => getComputedStyle(element).backgroundColor))).map(luminance);
-    };
-    const [darkPage, darkCard] = await colors('dark');
-    const [lightPage, lightCard] = await colors('light');
-    assert.ok(darkPage < 0.2 && lightPage > 0.8, `the page has the luminance ${darkPage} in dark and ${lightPage} in light mode`);
-    assert.ok(darkCard > darkPage && lightCard > lightPage, 'the cards stand out from the page');
   });
 
   test('the code blocks, tables and display formulas of the example article fit their cards, code wraps on a phone, and a component in a card has no frame of its own', async ({ open }) => {

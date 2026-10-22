@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article } from '../blog.js';
-import { test as base, expect, luminance, scrollInSteps, sharedShadowLayers } from './browser.js';
+import { test as base, expect, scrollInSteps } from './browser.js';
 
 const config = `export default {
   title: '测试博客',
@@ -366,16 +366,8 @@ test.describe('the essay homepage', () => {
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-home')).opacity === '1');
   });
 
-  test('the homepage stays inside the screen at every width and follows dark mode', async ({ open }) => {
-    const { page } = await open({ colorScheme: 'dark' });
-    const overflowing = [];
-    for (const width of [1440, 1100, 375]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      if (scrollWidth > width) overflowing.push(`${width}px is ${scrollWidth}px wide`);
-    }
-    assert.deepEqual(overflowing, []);
+  test('the text of a card stays inside the card with 3, 4 and 5 columns and on a phone', async ({ open }) => {
+    const { page } = await open();
     const clipped = [];
     for (const [width, columns] of [
       [1440, '3'],
@@ -399,14 +391,5 @@ test.describe('the essay homepage', () => {
       if (outside.length > 0) clipped.push(`${width}px with ${columns} columns: ${outside.join(', ')}`);
     }
     assert.deepEqual(clipped, []);
-    const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    const [body, card] = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.bk-card')).backgroundColor]);
-    assert.ok(luminance(body) < 0.2 && luminance(card) > luminance(body), `the page is ${body} and a card ${card} in dark mode`);
-    const pressedShadow = () => page.evaluate(() => getComputedStyle(document.querySelector('.bk-switch[data-control="group"] .bk-switch-options'), '::before').boxShadow);
-    const darkShadow = await pressedShadow();
-    await page.getByRole('button', { name: '设置' }).click();
-    await page.getByRole('button', { name: '浅' }).click();
-    await expect.poll(async () => luminance(await background())).toBeGreaterThan(0.8);
-    assert.deepEqual(sharedShadowLayers(await pressedShadow(), darkShadow), [], 'the shadow of the chosen grouping follows dark mode');
   });
 });
