@@ -19,8 +19,14 @@ const blocks = [
   { name: 'recap', kind: 'built-in', attributes: {} },
 ];
 
+const image = {
+  width: { type: 'text', label: 'image width in pixels such as 560px or as a percentage of the text column such as 70%' },
+  float: { type: 'enum', options: ['left', 'right'] },
+};
+const headings = { toc: { type: 'text' }, cols: { type: 'number', min: 1, max: 6, depth: 2 } };
+
 function complete(lines, cursorLine, character = lines[cursorLine].length) {
-  return completionsAt(lines.join('\n'), cursorLine, character, blocks);
+  return completionsAt(lines.join('\n'), cursorLine, character, { blocks, image, headings });
 }
 
 describe('VS Code completions', () => {
@@ -64,6 +70,16 @@ describe('VS Code completions', () => {
       [{ label: 'title', snippet: 'title="$1"', from: 9 }],
     );
     assert.deepEqual(complete([':::unknown-plot{'], 0), []);
+  });
+
+  test('list the attributes of an image and those of a heading at its depth', () => {
+    assert.deepEqual(complete(['![ReLU](relu.png "The ReLU function"){'], 0).map(({ label, snippet }) => ({ label, snippet })), [
+      { label: 'width', snippet: 'width="$1"' },
+      { label: 'float', snippet: 'float=${1|left,right|}' },
+    ]);
+    assert.deepEqual(complete(['![ReLU](relu.png){float=r'], 0).map(({ label }) => label), ['left', 'right']);
+    assert.deepEqual(complete(['## Activation functions {#act-fns '], 0).map(({ label }) => label), ['toc', 'cols']);
+    assert.deepEqual(complete(['### GELU {'], 0).map(({ label }) => label), ['toc']);
   });
 
   test('list the options of an enum or boolean attribute after =', () => {

@@ -66,7 +66,7 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     if (pathname === `${DEV_PREFIX}params`) return answerParams(request, response);
     if (pathname === `${DEV_PREFIX}source`) return answerSource(request, response);
     if (pathname === `${DEV_PREFIX}articles`) return sendJson(response, 200, { articles: preview.listing() });
-    if (pathname === `${DEV_PREFIX}blocks`) return answerBlocks(request, response);
+    if (pathname === `${DEV_PREFIX}syntax`) return answerSyntax(request, response);
     const clientFile = pathname.startsWith(DEV_PREFIX) ? pathname.slice(DEV_PREFIX.length) : null;
     if (clientFile !== null && CLIENT_FILES.has(clientFile)) {
       response.writeHead(200, { 'content-type': contentType(clientFile), 'cache-control': 'no-store' });
@@ -117,11 +117,11 @@ export async function startDevServer(blogRoot, { port = DEFAULT_PORT, host = DEF
     sendJson(response, 200, {});
   }
 
-  function answerBlocks(request, response) {
+  function answerSyntax(request, response) {
     const file = new URL(request.url, 'http://localhost').searchParams.get('file');
-    const blocks = preview.blocks(file);
-    if (blocks === null) return sendJson(response, 404, { error: `${describeValue(file)} is not an article that bake dev has read` });
-    sendJson(response, 200, { blocks });
+    const syntax = preview.syntax(file);
+    if (syntax === null) return sendJson(response, 404, { error: `${describeValue(file)} is not an article that bake dev has read` });
+    sendJson(response, 200, syntax);
   }
 
   async function pageRequest(request, response, what) {

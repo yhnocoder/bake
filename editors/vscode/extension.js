@@ -10,6 +10,7 @@ const POSTS_DIR = 'content/posts';
 const BAKE_PACKAGE = '@yhnocoder/bake';
 const SERVING = /^Serving the blog at (\S+)$/m;
 const SOURCE_DELAY = 300;
+const NO_SYNTAX = { blocks: [], image: {}, headings: {} };
 // why: revealing a line scrolls the editor in several steps, and each step would scroll the preview back to the start of a block
 const FOLLOW_QUIET_TIME = 300;
 const COMPLETION_KINDS = {
@@ -91,7 +92,7 @@ function startBlog(root) {
     const message = `Bake is not installed for the blog in ${root}; run npm install there and reload the window`;
     output.appendLine(message);
     vscode.window.showErrorMessage(message);
-    const blog = { root, process: null, blocks: new Map(), url: Promise.reject(new Error(message)) };
+    const blog = { root, process: null, syntax: new Map(), url: Promise.reject(new Error(message)) };
     blog.url.catch(() => {});
     blogs.set(root, blog);
     return blog;
@@ -99,7 +100,7 @@ function startBlog(root) {
   output.appendLine(`Starting bake dev in ${root} with ${cli}`);
   // why: node runs Bake itself, so that stopping the process stops the server; a wrapper such as npx would leave it running
   const child = spawn('node', [cli, 'dev', '--no-open'], { cwd: root });
-  const blog = { root, process: child, blocks: new Map(), url: null };
+  const blog = { root, process: child, syntax: new Map(), url: null };
   blogs.set(root, blog);
   blog.url = new Promise((done, fail) => {
     let printed = '';
@@ -161,7 +162,7 @@ async function readProblems(blog, url) {
 }
 
 function showProblems(blog, problems) {
-  blog.blocks.clear();
+  blog.syntax.clear();
   clearDiagnostics(blog.root);
   const byFile = new Map();
   for (const problem of problems) {
@@ -290,8 +291,8 @@ function sendSource(document, text) {
 async function provideCompletionItems(document, position) {
   const article = articleOf(document.uri);
   if (article === null) return [];
-  const blocks = await blocksOf(article).catch(() => []);
-  return completionsAt(document.getText(), position.line, position.character, blocks).map((completion, index) => {
+  const syntax = await syntaxOf(article).catch(() => NO_SYNTAX);
+  return completionsAt(document.getText(), position.line, position.character, syntax).map((completion, index) => {
     const item = new vscode.CompletionItem(completion.label, COMPLETION_KINDS[completion.kind]);
     item.detail = completion.detail;
     item.documentation = completion.documentation;
@@ -304,14 +305,14 @@ async function provideCompletionItems(document, position) {
   });
 }
 
-async function blocksOf({ root, file }) {
+async function syntaxOf({ root, file }) {
   const blog = startBlog(root);
-  if (!blog.blocks.has(file)) {
+  if (!blog.syntax.has(file)) {
     const url = await blog.url;
-    const response = await fetch(new URL(`__bake/blocks?file=${encodeURIComponent(file)}`, url));
-    blog.blocks.set(file, response.ok ? (await response.json()).blocks : []);
+    const response = await fetch(new URL(`__bake/syntax?file=${encodeURIComponent(file)}`, url));
+    blog.syntax.set(file, response.ok ? await response.json() : NO_SYNTAX);
   }
-  return blog.blocks.get(file);
+  return blog.syntax.get(file);
 }
 
 function framePage(src) {

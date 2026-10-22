@@ -47,7 +47,7 @@ export const BUILT_IN_BLOCK_NAMES = Object.freeze(Object.keys(BUILT_IN_BLOCKS));
 const WIDTH_BLOCK_ATTRIBUTES = { width: WIDTH };
 const HEADING_ID = { text: 'an anchor name, for example {#intro}' };
 const IMAGE_FLOATS = ['left', 'right'];
-const IMAGE_ATTRIBUTES = {
+export const IMAGE_ATTRIBUTES = {
   width: { size: 'image width' },
   height: { size: 'image height' },
   float: { choices: IMAGE_FLOATS },

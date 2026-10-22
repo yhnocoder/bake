@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import { POSTS_DIR, findArticles } from '../build/articles.js';
 import { createSite, updateSite } from '../build/site.js';
-import { BUILT_IN_BLOCKS } from '../markdown/parse.js';
+import { BUILT_IN_BLOCKS, IMAGE_ATTRIBUTES } from '../markdown/parse.js';
 import { sourceVersion } from './params.js';
 
 export function createPreview(root) {
@@ -66,25 +66,32 @@ export function createPreview(root) {
     for (const path of paths) site.unsaved.delete(path);
   }
 
-  function blocks(file) {
+  function syntax(file) {
     const { settings } = site;
     const article = site.articles.get(file)?.article;
     if (settings?.markdown === undefined || article === undefined) return null;
     const theme = settings.markdown.get(article.fields?.theme ?? settings.rules.theme);
     const dir = posix.dirname(file);
     const components = [...settings.components.values()].filter((found) => found.valid && (found.article === null || found.article === dir));
-    return [
+    const blocks = [
       ...Object.entries(BUILT_IN_BLOCKS).map(([name, attributes]) => ({ name, kind: 'built-in', attributes: builtInAttributes(attributes) })),
       ...Object.entries(theme?.blocks ?? {}).map(([name, attributes]) => ({ name, kind: 'theme', attributes })),
       ...components.map((found) => ({ name: found.name, kind: 'component', attributes: found.params })),
     ];
+    return { blocks, image: builtInAttributes(IMAGE_ATTRIBUTES), headings: theme?.headings ?? {} };
   }
 
-  return { update, find, listing, problems: () => problems, page: (file) => pages.get(file) ?? null, component, setUnsaved, dropUnsaved, blocks };
+  return { update, find, listing, problems: () => problems, page: (file) => pages.get(file) ?? null, component, setUnsaved, dropUnsaved, syntax };
 }
 
 function builtInAttributes(attributes) {
-  return Object.fromEntries(Object.entries(attributes).map(([name, { text, choices }]) => [name, choices === undefined ? { type: 'text', label: text } : { type: 'enum', options: choices }]));
+  return Object.fromEntries(Object.entries(attributes).map(([name, { text, choices, size }]) => [name, attributeDeclaration(text, choices, size)]));
+}
+
+function attributeDeclaration(text, choices, size) {
+  if (choices !== undefined) return { type: 'enum', options: choices };
+  if (size !== undefined) return { type: 'text', label: `${size} in pixels such as 560px or as a percentage of the text column such as 70%` };
+  return { type: 'text', label: text };
 }
 
 function isArticleSource(path) {

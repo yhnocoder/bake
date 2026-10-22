@@ -7,6 +7,8 @@ const FENCE = /^[ \t]*(`{3,}|~{3,})/;
 const ATTRIBUTE_VALUE = /([A-Za-z_][\w-]*)=("?)([^\s"]*)$/;
 const ATTRIBUTE_START = /(?:^|\s)([A-Za-z_][\w-]*)?$/;
 const WRITTEN_ATTRIBUTE = /(?:^|\s)([A-Za-z_][\w-]*)(?==|\s|$)/g;
+const IMAGE_ATTRIBUTES = /!\[[^\]]*\]\([^)]*\)\{([^}]*)$/;
+const HEADING_ATTRIBUTES = /^ {0,3}(#{1,6})[ \t].*\{([^{}]*)$/;
 const CITATION = /\[@([^\]\s;]*)$/;
 const FOOTNOTE = /\[\^([^\]\s]*)$/;
 const EQREF = /\\eqref\{([^}]*)$/;
@@ -34,9 +36,9 @@ const INLINE_SNIPPETS = [
   { label: 'link', detail: 'a link, [text](address)', snippet: '[$1]($2)' },
 ];
 
-// Returns the completions at a position of an article: block names after :::, attributes inside the braces of a block line, the citations, footnotes and equation labels of the article, and a menu of blocks and Markdown after /.
+// Returns the completions at a position of an article: block names after :::, attributes inside the braces of a block line, an image or a heading, the citations, footnotes and equation labels of the article, and a menu of blocks and Markdown after /.
 // Each completion replaces the characters of the line from `from` to the cursor with `snippet`, a VS Code snippet. VS Code matches what was typed against `filter`, or against `label` when there is no `filter`. `suggest` asks for the completions again after the snippet is inserted.
-function completionsAt(text, line, character, blocks) {
+function completionsAt(text, line, character, { blocks, image, headings }) {
   const lines = text.split('\n');
   const before = lines[line].slice(0, character);
   const after = lines[line].slice(character);
@@ -48,7 +50,7 @@ function completionsAt(text, line, character, blocks) {
     const closing = (lines[line + 1] ?? '').trim() === '' ? `\n${quote}$0\n${quote}${colons}` : '';
     return blocks
       .filter((block) => block.name !== '')
-      .map((block) => ({ ...blockCompletion(block, closing), from: character - typed.length, snippet: `${block.name}${braces(block)}${closing}` }));
+      .map((block) => ({ ...blockCompletion(block), from: character - typed.length, snippet: `${block.name}${braces(block)}${closing}` }));
   }
   const slash = SLASH_AT_LINE_START.exec(before);
   if (slash !== null && after.trim() === '') {
@@ -64,7 +66,15 @@ function completionsAt(text, line, character, blocks) {
   const attributes = BLOCK_ATTRIBUTES.exec(before);
   if (attributes !== null) {
     const block = blocks.find((candidate) => candidate.name === attributes[1]);
-    return block === undefined ? [] : attributeCompletions(block, attributes[2], character);
+    return block === undefined ? [] : attributeCompletions(block.attributes, attributes[2], character);
+  }
+  const imageAttributes = IMAGE_ATTRIBUTES.exec(before);
+  if (imageAttributes !== null) return attributeCompletions(image, imageAttributes[1], character);
+  const heading = HEADING_ATTRIBUTES.exec(before);
+  if (heading !== null) {
+    const depth = heading[1].length;
+    const declared = Object.entries(headings).filter(([, declaration]) => declaration.depth === undefined || declaration.depth === depth);
+    return attributeCompletions(Object.fromEntries(declared), heading[2], character);
   }
   const citation = CITATION.exec(before);
   if (citation !== null) return entries(text, REFERENCE_ENTRY, 'citation', character - citation[1].length);
@@ -115,11 +125,11 @@ function nextFence(fence, text) {
   return marker[0] === fence[0] && marker.length >= fence.length ? null : fence;
 }
 
-function attributeCompletions(block, written, character) {
+function attributeCompletions(declarations, written, character) {
   const value = ATTRIBUTE_VALUE.exec(written);
   if (value !== null) {
     const [, name, quote, typed] = value;
-    const declaration = block.attributes[name];
+    const declaration = declarations[name];
     const choices = declaration?.type === 'enum' ? declaration.options : declaration?.type === 'boolean' ? ['true', 'false'] : [];
     return choices.map((choice) => ({ kind: 'value', label: String(choice), detail: declaration.label, from: character - typed.length - quote.length, snippet: String(choice) }));
   }
@@ -127,7 +137,7 @@ function attributeCompletions(block, written, character) {
   if (start === null) return [];
   const typed = start[1] ?? '';
   const present = new Set([...written.matchAll(WRITTEN_ATTRIBUTE)].map((match) => match[1]));
-  return Object.entries(block.attributes)
+  return Object.entries(declarations)
     .filter(([name]) => !present.has(name) || name === typed)
     .map(([name, declaration]) => ({ kind: 'attribute', label: name, detail: declaration.label, documentation: describeDeclaration(declaration), from: character - typed.length, snippet: attributeSnippet(name, declaration) }));
 }
