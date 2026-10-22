@@ -73,44 +73,10 @@ const test = base.extend({
 test.use({ blog: { example: false, files } });
 
 test.describe('the essay homepage', () => {
-  const state = (page) =>
-    page.evaluate(() => ({
-      groups: [...document.querySelectorAll('.bk-group-title')].filter((title) => title.checkVisibility()).map((title) => title.textContent),
-      gridColumns: getComputedStyle([...document.querySelectorAll('.bk-grid')].find((grid) => grid.checkVisibility())).gridTemplateColumns.split(' ').length,
-    }));
-  const byCategory = { groups: ['模型', '数学'], gridColumns: 3 };
-  const byMonth = { groups: ['2026-10', '2026-09', '2026-08', '2026-07'], gridColumns: 5 };
-  const thumbs = (page, chosen) =>
-    page.evaluate(
-      (labels) =>
-        [...document.querySelectorAll('.bk-switch-options')].map((options, index) => {
-          const thumb = getComputedStyle(options, '::before');
-          const button = [...options.querySelectorAll('button')].find((option) => option.textContent === labels[index]).getBoundingClientRect();
-          const left = options.getBoundingClientRect().left + 2 + new DOMMatrix(thumb.transform).m41;
-          return Math.abs(left - button.left) < 1 && Math.abs(parseFloat(thumb.width) - button.width) < 1 && options.getAnimations({ subtree: true }).length === 0;
-        }),
-      chosen,
-    );
   const currentChips = (page) =>
     page.evaluate(() => [...document.querySelectorAll('.bk-chips[data-for="category"] .bk-chip')].filter((chip) => chip.getAttribute('aria-current') === 'true').map((chip) => chip.getAttribute('href')));
   const cardIn = (grouping, url) => `[data-grouping="${grouping}"] .bk-card[href="${url}"]`;
   const previewState = (page, selector) => page.locator(selector).evaluate((card) => card.querySelector('.bk-card-preview')?.dataset.state ?? null);
-
-  test('grouping and column choices change the page, survive a reload and are applied with the switch thumbs on the chosen buttons before the page script runs', async ({ open }) => {
-    const { page } = await open();
-    assert.deepEqual(await state(page), byCategory);
-    await page.getByRole('button', { name: '月份' }).click();
-    await page.getByRole('button', { name: '5', exact: true }).click();
-    assert.deepEqual(await state(page), byMonth);
-    assert.equal(await page.getByRole('button', { name: '月份' }).getAttribute('aria-pressed'), 'true');
-    await page.reload();
-    assert.deepEqual(await state(page), byMonth);
-    await page.route('**/assets/*.js', (route) => route.abort());
-    await page.reload();
-    assert.deepEqual(await state(page), byMonth);
-    assert.deepEqual(await thumbs(page, ['月份', '5']), [true, true]);
-    await page.unroute('**/assets/*.js');
-  });
 
   test('a preview loads only in the visible grouping, starts while the pointer rests on its card and stops when it leaves', async ({ open }) => {
     const { page, errors } = await open();

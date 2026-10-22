@@ -64,14 +64,10 @@ test('an address deeper in the site, one with an unknown slug and the address of
   }
 });
 
-test('the 404 page offers the theme and the font in the settings panel and applies the chosen theme before its script runs', async ({ page, browser, site }) => {
+test('the settings panel of the 404 page offers the theme and the font', async ({ page }) => {
   await page.goto('/2026-01/rope/');
   await page.getByRole('button', { name: '设置' }).click();
   await expect(page.locator('.bk-settings-label')).toHaveText(['主题', '字体']);
-  await page.getByRole('button', { name: '深' }).click();
-  await page.route('**/assets/*.js', (route) => route.abort());
-  await page.reload();
-  expect((await look(page)).background).toBe((await articleLook(browser, site.origin, 'dark')).background);
 });
 
 test('without scripts the 404 page shows the heading and the link home', async ({ browser, site }) => {

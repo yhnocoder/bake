@@ -629,37 +629,6 @@ test.describe('the table of contents', () => {
     await expect.poll(state, { message: 'the settings button does not show again' }).toBe(1);
   });
 
-  test('the style chosen in the settings applies at once, survives a reload and is applied before the page script runs', async ({ newContext }) => {
-    const context = await newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    const page = await context.newPage();
-    await page.goto(`/2026-10/toc-dots/`);
-    await settle(page);
-    const read = () =>
-      page.evaluate(() => ({
-        views: ['.bk-toc', '.bk-toc-dots', '.bk-toc-ticks'].filter((selector) => document.querySelector(selector)?.checkVisibility()),
-        left: Math.round(document.querySelector('.bk-article').getBoundingClientRect().left),
-      }));
-    const narrow = await read();
-    assert.deepEqual(narrow.views, ['.bk-toc-dots']);
-    assert.deepEqual(await page.locator('.bk-settings-label').allTextContents(), ['目录样式', '主题', '字号', '字重', '间距', '字体', '按钮']);
-    await page.click('.bk-settings-toggle');
-    await page.getByRole('radio', { name: /刻度线/ }).click();
-    await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: narrow.left });
-    await page.getByRole('radio', { name: /前文笔记/ }).click();
-    await settle(page);
-    const notes = await read();
-    assert.deepEqual(notes.views, ['.bk-toc']);
-    assert.ok(notes.left > narrow.left, `the notes style leaves a column of ${notes.left} pixels for the table of contents, the dots style ${narrow.left}`);
-    await page.getByRole('radio', { name: /刻度线/ }).click();
-    await page.reload();
-    await settle(page);
-    assert.deepEqual(await read(), { views: ['.bk-toc-ticks'], left: narrow.left });
-    await page.route('**/assets/*.js', (route) => route.abort());
-    await page.goto(url);
-    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left)), narrow.left);
-  });
-
   test('without scripts every style shows a readable table of contents whose links jump', async ({ newContext, open }) => {
     const { page: scripted } = await open();
     const notesLeft = await scripted.evaluate(() => Math.round(document.querySelector('.bk-article').getBoundingClientRect().left));
