@@ -350,7 +350,7 @@ test('bake dev updates a page with a save that it made while the event stream wa
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
-test('bake dev in a frame of an editor scrolls to the line the editor names, sends the line that the reader scrolls to and a double-clicked block to the editor, and shows the unsaved text', async ({ browser, after }) => {
+test('bake dev in a frame of an editor scrolls to the line the editor names, sends the line that the reader scrolls to and a double-clicked block to the editor, marks the block at the cursor of the editor, and shows the unsaved text without highlighting the changes', async ({ browser, after }) => {
   const source = article({ title: 'Live', slug: 'live', body });
   const editor = '<!doctype html><title>Editor</title><iframe src="/2026-10/live/" style="width: 1200px; height: 800px"></iframe><script>window.messages = []; addEventListener("message", (event) => window.messages.push(event.data));</script>\n';
   const dir = createBlog({ after }, { 'bake.config.js': validConfig, [ARTICLE]: source, 'public/editor.html': editor });
@@ -388,9 +388,28 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
   await expect.poll(() => page.evaluate(() => window.messages.some((message) => message.bake === 'open')), { message: 'the double-click sent nothing to the editor' }).toBe(true);
   assert.deepEqual(await page.evaluate(() => window.messages.find((message) => message.bake === 'open')), { bake: 'open', file: ARTICLE, line: lineOf(source, 'The edited paragraph') });
 
+  const cursorCovers = (text) =>
+    frame.locator('.bk-block', { hasText: text }).evaluate((element) => {
+      const mark = document.querySelector('#bake-dev-marks').shadowRoot.querySelector('.cursor');
+      const box = element.getBoundingClientRect();
+      const cover = mark.getBoundingClientRect();
+      return mark.checkVisibility() && cover.left <= box.left && cover.right >= box.right && cover.top <= box.top && cover.bottom >= box.bottom;
+    });
+  await send({ bake: 'cursor', line: lineOf(source, 'The edited paragraph') });
+  await expect.poll(() => cursorCovers('The edited paragraph'), { message: 'the block at the cursor of the editor is not marked' }).toBe(true);
+  await frame.locator('html').evaluate(() => {
+    window.highlighted = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (keyframes, options) {
+      if (options?.id === 'bake-changed') window.highlighted.push(this.dataset.line);
+      return animate.call(this, keyframes, options);
+    };
+  });
   await send({ bake: 'source', file: ARTICLE, text: source.replace('says hello', 'says goodbye before saving') });
   await frame.locator('.bk-block', { hasText: 'says goodbye before saving' }).waitFor();
   assert.equal(readFileSync(join(dir, ARTICLE), 'utf8'), source);
+  await expect.poll(() => cursorCovers('says goodbye before saving'), { message: 'the block at the cursor is not marked after the update' }).toBe(true);
+  assert.deepEqual(await frame.locator('html').evaluate(() => window.highlighted), [], 'the page highlighted the blocks that the unsaved text changed');
 });
 
 const PLOT = ':::act-fn-plot{fns=swish beta=2 xmin=-6 xmax=6 ymax=6 width=body}';

@@ -86,6 +86,30 @@ export function createOverlay() {
     noticeAction?.();
   });
 
+  const place = (mark, element) => {
+    const box = element.getBoundingClientRect();
+    const origin = marks.getBoundingClientRect();
+    const left = Math.max(box.left - HIGHLIGHT_OUTSET, 0);
+    const right = Math.min(box.right + HIGHLIGHT_OUTSET, document.documentElement.clientWidth);
+    Object.assign(mark.style, {
+      left: `${left - origin.left}px`,
+      top: `${box.top - origin.top - HIGHLIGHT_OUTSET}px`,
+      width: `${right - left}px`,
+      height: `${box.height + 2 * HIGHLIGHT_OUTSET}px`,
+    });
+  };
+  const cursorMark = document.createElement('div');
+  cursorMark.className = 'cursor';
+  cursorMark.hidden = true;
+  marks.append(cursorMark);
+  let cursorBlock = null;
+  const placeCursor = () => {
+    cursorMark.hidden = cursorBlock === null || !cursorBlock.isConnected;
+    if (!cursorMark.hidden) place(cursorMark, cursorBlock);
+  };
+  // why: components that start and images that load move the blocks below them after the cursor block was placed
+  new ResizeObserver(placeCursor).observe(document.body);
+
   const problemButton = (problem) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -147,6 +171,10 @@ export function createOverlay() {
       toggle.addEventListener('change', () => change(toggle.checked));
       label.hidden = false;
     },
+    showCursor(block) {
+      cursorBlock = block;
+      placeCursor();
+    },
     hideNotice() {
       clearTimeout(noticeTimer);
       notice.hidden = true;
@@ -162,19 +190,10 @@ export function createOverlay() {
       }, NOTICE_DURATION);
     },
     mark(element) {
-      const box = element.getBoundingClientRect();
-      const origin = marks.getBoundingClientRect();
-      const left = Math.max(box.left - HIGHLIGHT_OUTSET, 0);
-      const right = Math.min(box.right + HIGHLIGHT_OUTSET, document.documentElement.clientWidth);
       const mark = document.createElement('div');
       mark.className = 'mark';
       mark.dataset.line = element.dataset.line;
-      Object.assign(mark.style, {
-        left: `${left - origin.left}px`,
-        top: `${box.top - origin.top - HIGHLIGHT_OUTSET}px`,
-        width: `${right - left}px`,
-        height: `${box.height + 2 * HIGHLIGHT_OUTSET}px`,
-      });
+      place(mark, element);
       marks.append(mark);
       const keyframes = [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }];
       const animation = mark.animate(keyframes, { id: 'bake-changed', duration: HIGHLIGHT_DURATION, easing: 'ease-in-out', fill: 'forwards' });

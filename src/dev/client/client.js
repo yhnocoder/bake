@@ -13,6 +13,7 @@ const READER_SCROLL_TIME = 500;
 let readerScrolled = -Infinity;
 let pointerDown = false;
 let scrollQueued = false;
+let cursorLine = null;
 
 let pristine = null;
 let outline = JSON.parse(script.dataset.outline ?? '[]');
@@ -149,7 +150,9 @@ async function refresh() {
     anchor.align();
     requestAnimationFrame(() => requestAnimationFrame(anchor.align));
   }
-  showChanges(lines, kept);
+  // why: in the preview of an editor the page changes with each key, so it marks the block at the cursor of the editor instead of each changed block
+  if (editor === null) showChanges(lines, kept);
+  else showCursor();
 }
 
 function applyUpdate(regions) {
@@ -304,9 +307,18 @@ function answerEditor(event) {
   if (event.source !== editor) return;
   const { bake, line, text } = event.data ?? {};
   if (bake === 'reveal' && Number.isInteger(line) && !readerScrolling()) reveal(line);
+  if (bake === 'cursor' && Number.isInteger(line)) {
+    cursorLine = line;
+    showCursor();
+  }
   if (bake === 'source' && token !== undefined && (typeof text === 'string' || text === null)) {
     fetch('/__bake/source', { method: 'POST', headers: { 'content-type': 'application/json', 'x-bake-token': token }, body: JSON.stringify({ file: event.data.file, text }) });
   }
+}
+
+function showCursor() {
+  const blocks = [...document.querySelectorAll(BLOCKS)].filter((block) => Number(block.dataset.line) <= cursorLine && cursorLine <= Number(block.dataset.endLine ?? block.dataset.line) && isShown(block));
+  overlay.showCursor(blocks.at(-1) ?? null);
 }
 
 function readerScrolling() {

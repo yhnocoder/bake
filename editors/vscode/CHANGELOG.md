@@ -7,6 +7,11 @@ This file lists the changes of each version of the Bake extension for Visual Stu
 ### Added
 
 - Completions in the front matter: the fields that are not written yet, the options of the article's theme, such as `toc`, and the values of a field with choices. `date` and `updated` start with the date of today.
+- The preview marks the block at the cursor of the editor.
+
+### Changed
+
+- The preview replaces the blocks that the unsaved text changes without highlighting them.
 
 ## [0.1.0]
 

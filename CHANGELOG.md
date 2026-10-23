@@ -8,6 +8,7 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 - `typeset(element)` in `bake/kit`, which typesets the `$…$` and `$$…$$` formulas in the text of an element, so that a component without SolidJS shows formulas the way `MathText` does.
 - `/__bake/syntax` in `bake dev` also lists the fields of the front matter and the options of the article's theme, so that the VS Code extension completes them.
+- In a frame of an editor, the `bake dev` page marks the block at the line that the editor sends as its cursor, and does not highlight the blocks that an update changes.
 
 ### Changed
 

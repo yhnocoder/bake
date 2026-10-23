@@ -46,6 +46,7 @@ function activate(context) {
       if (preview?.shown !== textEditor.document.uri.fsPath || visibleRanges.length === 0 || Date.now() < preview.quietUntil) return;
       post({ bake: 'reveal', line: visibleRanges[0].start.line + 1 });
     }),
+    vscode.window.onDidChangeTextEditorSelection(({ textEditor }) => postCursor(textEditor)),
     vscode.workspace.onDidChangeTextDocument(({ document }) => sendSourceLater(document)),
     vscode.workspace.onDidCloseTextDocument((document) => sendSource(document, null)),
     vscode.languages.registerCompletionItemProvider({ language: 'markdown', scheme: 'file' }, { provideCompletionItems }, ':', '{', ' ', '=', '@', '^', '/'),
@@ -235,11 +236,16 @@ async function showArticle(uri, column) {
   if (preview?.panel === panel && preview.shown === uri.fsPath) panel.webview.html = html;
 }
 
+function postCursor(editor) {
+  if (preview?.shown === editor.document.uri.fsPath) post({ bake: 'cursor', line: editor.selection.active.line + 1 });
+}
+
 function answerPage(message) {
   if (preview === null) return;
   const editor = vscode.window.visibleTextEditors.find((candidate) => candidate.document.uri.fsPath === preview.shown);
   if (message.bake === 'ready') {
     if (editor !== undefined && editor.visibleRanges.length > 0) post({ bake: 'reveal', line: editor.visibleRanges[0].start.line + 1 });
+    if (editor !== undefined) postCursor(editor);
     for (const document of vscode.workspace.textDocuments) if (document.isDirty) sendSource(document, document.getText());
   }
   if (message.bake === 'scroll' && editor !== undefined && Number.isInteger(message.line)) {
