@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { setTimeout as wait } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 import { budgetProblems, defaultBudgets } from '../../scripts/check-budgets.js';
 import { exampleBlog } from '../blog.js';
@@ -23,17 +24,33 @@ const articles = readdirSync(join(exampleBlog, 'content/posts')).map((name) => {
 
 const pages = ['/', '/a-missing-page/', ...articles.map((article) => article.path)];
 
+// Records the requests of a page, and waits until none has been in flight for half a second
 function recordRequests(cdp) {
   const requests = new Map();
+  const inFlight = new Set();
+  let lastActivity = Date.now();
   cdp.on('Network.requestWillBeSent', (event) => {
     if (event.request.url.startsWith('data:')) return;
     requests.set(event.requestId, { url: event.request.url, initiator: initiatorUrl(event.initiator) });
+    inFlight.add(event.requestId);
+    lastActivity = Date.now();
   });
   cdp.on('Network.responseReceived', (event) => {
     const request = requests.get(event.requestId);
     if (request !== undefined) request.type = event.type;
   });
-  return () => [...requests.values()].filter((request) => request.type !== undefined);
+  const finished = (event) => {
+    if (inFlight.delete(event.requestId)) lastActivity = Date.now();
+  };
+  cdp.on('Network.loadingFinished', finished);
+  cdp.on('Network.loadingFailed', finished);
+  return {
+    // why: the component runtime fetches a component file again when it pauses a prefetch, and the second request reads the HTTP cache, so each address counts once
+    list: () => [...new Map([...requests.values()].filter((request) => request.type !== undefined).map((request) => [request.url, request])).values()],
+    quiet: async () => {
+      while (inFlight.size > 0 || Date.now() - lastActivity < 500) await wait(100);
+    },
+  };
 }
 
 function initiatorUrl(initiator) {
@@ -127,14 +144,19 @@ async function problemsOf(newPage, path, { colorScheme, widths, byteBudgets }) {
   const cdp = await page.context().newCDPSession(page);
   const requests = recordRequests(cdp);
   await cdp.send('Network.enable');
-  await page.goto(path, { waitUntil: 'networkidle' });
-  if (byteBudgets !== undefined) {
-    const values = byteMetrics(requests(), join(byteBudgets.dir, 'dist'), byteBudgets.origin);
-    problems.push(...budgetProblems({ metrics: Object.keys(values), measurements: [{ page: path, width: widths[0], ...values }] }, budgets));
-  }
+  // why: the component runtime listens for beforeprint once the page is parsed, and Playwright can report the network idle before that on a long page
+  await page.goto(path, { waitUntil: 'load' });
   // why: a component starts when it comes near the screen, and the page starts all of them before it is printed
   await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
   await page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((frame) => frame.dataset.state === 'ready' || frame.dataset.state === 'failed'));
+  // why: which components a page has prefetched depends on timing, so the budgets count the files of a page whose components have all started, which are the files that it loads without the reader doing anything
+  if (byteBudgets !== undefined) {
+    // why: a component typesets its formulas after it starts, and MathJax downloads the file of a font variant when a formula first needs it
+    await page.waitForFunction(() => [...document.querySelectorAll('figure.component :is(.bk-kit-tex, .bk-kit-svg-tex, .bk-kit-svg-math-text)')].every((formula) => formula.querySelector('svg') !== null || (formula.matches('.bk-kit-svg-math-text') && formula.childElementCount > 0)));
+    await requests.quiet();
+    const values = byteMetrics(requests.list(), join(byteBudgets.dir, 'dist'), byteBudgets.origin);
+    problems.push(...budgetProblems({ metrics: Object.keys(values), measurements: [{ page: path, width: widths[0], ...values }] }, budgets));
+  }
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
@@ -156,7 +178,8 @@ for (const path of pages) {
       const { page, problems } = await problemsOf(newPage, path, { colorScheme: 'dark', widths: [WIDTHS[0][0]] });
       const background = async () => luminance(await page.evaluate(() => getComputedStyle(document.body).backgroundColor));
       const dark = await background();
-      await page.emulateMedia({ colorScheme: 'light' });
+      // why: with motion the page fades into the other scheme with a view transition, which captures the whole page
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
       await settle(page);
       if (dark >= (await background())) problems.push('the dark scheme is not darker than the light one');
       assert.deepEqual(problems, []);

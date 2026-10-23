@@ -737,8 +737,10 @@ test('bake dev refuses to write the parameters of a bar when the file changed af
   });
 });
 
-test('bake dev drops an unsaved value that the declaration no longer accepts or whose component is removed, and keeps the others', async ({ browser, after }) => {
-  const { page, dir, frameSelector, control, liveParams, edit, file } = await paramBarPage({ browser, after });
+// Opens the article of the parameter bar tests, with functions that find a frame by its directive and read the value of xmax that its bar shows and its component uses
+async function unsavedValuesPage({ browser, after }) {
+  const bake = await paramBarPage({ browser, after });
+  const { page, file } = bake;
   const plotAt = (directive) => `figure.component[data-line="${lineOf(readFileSync(file, 'utf8'), directive)}"]`;
   const shown = async (selector) => {
     await page.locator(selector).scrollIntoViewIfNeeded();
@@ -749,65 +751,68 @@ test('bake dev drops an unsaved value that the declaration no longer accepts or 
       live: await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.xmax, selector),
     };
   };
+  return { ...bake, plotAt, shown };
+}
 
-  await test.step('after a reload, an unsaved value that the declaration no longer accepts and the value of a removed component are dropped', async () => {
-    const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    const reloaded = async (change) => {
-      await page.evaluate(() => {
-        window.beforeReload = true;
-      });
-      change();
-      await page.waitForFunction(() => window.beforeReload === undefined);
-      await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    };
-
-    await control('xmax').locator('.number').fill('20');
-    assert.equal((await liveParams()).xmax, 20);
-    const declaration = join(dir, 'components/act-fn-plot.jsx');
-    await reloaded(() => writeFileSync(declaration, readFileSync(declaration, 'utf8').replace("xmax: { label: '横轴上限', type: 'number', min: -100, max: 100", "xmax: { label: '横轴上限', type: 'number', min: -100, max: 12")));
-    assert.deepEqual(await shown(frameSelector), { xmax: '6', unsaved: false, live: 6 });
-
-    const directive = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
-    const caption = '选中交互组件的任何部分';
-    const block = `${directive}\n${caption}，复制的都是它的整个 \`:::\` 块。\n:::\n`;
-    assert.ok(readFileSync(file, 'utf8').includes(block));
-    const last = plotAt(directive);
-    await shown(last);
-    await page.locator(`${last} bake-param-bar .control[data-param="xmax"] .number`).fill('7');
-    assert.equal((await shown(last)).unsaved, true);
-    edit(block, '');
-    await page.waitForFunction((caption) => !document.querySelector('.bk-article').textContent.includes(caption), caption);
-    await page.reload();
+test('bake dev drops after a reload an unsaved value that the declaration no longer accepts and the value of a removed component', async ({ browser, after }) => {
+  const { page, dir, frameSelector, control, liveParams, edit, file, plotAt, shown } = await unsavedValuesPage({ browser, after });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const reloaded = async (change) => {
+    await page.evaluate(() => {
+      window.beforeReload = true;
+    });
+    change();
+    await page.waitForFunction(() => window.beforeReload === undefined);
     await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    edit('[^copy-notes]: ', `${block}\n[^copy-notes]: `);
-    await page.waitForFunction((caption) => document.querySelector('.bk-article').textContent.includes(caption), caption);
-    assert.deepEqual(await shown(plotAt(directive)), { xmax: '6', unsaved: false, live: 6 });
-    assert.deepEqual(errors, []);
-  });
+  };
 
-  await test.step('removing a component from the middle of the article drops its unsaved value, and the other components of the same name keep theirs', async () => {
-    const middle = ':::act-fn-plot{fns=relu width=70%}';
-    const last = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
-    const block = `::::example\n${middle}\n:::\n::::\n\n`;
-    const after = '像素宽度超过正文栏时';
-    assert.ok(readFileSync(file, 'utf8').includes(`${block}${after}`));
-    await shown(plotAt(middle));
-    await page.locator(`${plotAt(middle)} bake-param-bar .control[data-param="xmax"] .number`).fill('5');
-    await shown(plotAt(last));
-    await page.locator(`${plotAt(last)} bake-param-bar .control[data-param="xmax"] .number`).fill('8');
-    const lastLine = plotAt(last);
-    edit(block, '');
-    await page.locator(lastLine).waitFor({ state: 'detached' });
-    assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
-    await page.reload();
-    await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
-    assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
-    edit(after, `${block}${after}`);
-    await page.locator(plotAt(middle)).waitFor();
-    assert.deepEqual(await shown(plotAt(middle)), { xmax: '4', unsaved: false, live: 4 });
-    assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
-  });
+  await control('xmax').locator('.number').fill('20');
+  assert.equal((await liveParams()).xmax, 20);
+  const declaration = join(dir, 'components/act-fn-plot.jsx');
+  await reloaded(() => writeFileSync(declaration, readFileSync(declaration, 'utf8').replace("xmax: { label: '横轴上限', type: 'number', min: -100, max: 100", "xmax: { label: '横轴上限', type: 'number', min: -100, max: 12")));
+  assert.deepEqual(await shown(frameSelector), { xmax: '6', unsaved: false, live: 6 });
+
+  const directive = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
+  const caption = '选中交互组件的任何部分';
+  const block = `${directive}\n${caption}，复制的都是它的整个 \`:::\` 块。\n:::\n`;
+  assert.ok(readFileSync(file, 'utf8').includes(block));
+  const last = plotAt(directive);
+  await shown(last);
+  await page.locator(`${last} bake-param-bar .control[data-param="xmax"] .number`).fill('7');
+  assert.equal((await shown(last)).unsaved, true);
+  edit(block, '');
+  await page.waitForFunction((caption) => !document.querySelector('.bk-article').textContent.includes(caption), caption);
+  await page.reload();
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  edit('[^copy-notes]: ', `${block}\n[^copy-notes]: `);
+  await page.waitForFunction((caption) => document.querySelector('.bk-article').textContent.includes(caption), caption);
+  assert.deepEqual(await shown(plotAt(directive)), { xmax: '6', unsaved: false, live: 6 });
+  assert.deepEqual(errors, []);
+});
+
+test('bake dev drops the unsaved value of a component removed from the middle of the article, and the other components of the same name keep theirs', async ({ browser, after }) => {
+  const { page, file, edit, plotAt, shown } = await unsavedValuesPage({ browser, after });
+  const middle = ':::act-fn-plot{fns=relu width=70%}';
+  const last = ':::act-fn-plot{fns=silu xmin=-6 xmax=6 ymax=6}';
+  const block = `::::example\n${middle}\n:::\n::::\n\n`;
+  const following = '像素宽度超过正文栏时';
+  assert.ok(readFileSync(file, 'utf8').includes(`${block}${following}`));
+  await shown(plotAt(middle));
+  await page.locator(`${plotAt(middle)} bake-param-bar .control[data-param="xmax"] .number`).fill('5');
+  await shown(plotAt(last));
+  await page.locator(`${plotAt(last)} bake-param-bar .control[data-param="xmax"] .number`).fill('8');
+  const lastLine = plotAt(last);
+  edit(block, '');
+  await page.locator(lastLine).waitFor({ state: 'detached' });
+  assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
+  await page.reload();
+  await page.waitForSelector('#bake-dev[data-ready]', { state: 'attached' });
+  assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
+  edit(following, `${block}${following}`);
+  await page.locator(plotAt(middle)).waitFor();
+  assert.deepEqual(await shown(plotAt(middle)), { xmax: '4', unsaved: false, live: 4 });
+  assert.deepEqual(await shown(plotAt(last)), { xmax: '8', unsaved: true, live: 8 });
 });
 
 const labelView = `export const params = { text: { label: 'Text', type: 'text', default: 'none' } };

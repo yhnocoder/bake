@@ -44,6 +44,15 @@ export const test = base.extend({
     for (const context of contexts) await context.close();
   },
   newPage: async ({ newContext }, use) => use(async (options) => (await newContext(options)).newPage()),
+  // why: a page that a test opens with browser.newPage keeps running in the browser of the worker, and one of bake dev keeps reconnecting after its server stopped, which loads every later test of the worker
+  closeOpenedContexts: [
+    async ({ browser }, use) => {
+      const before = new Set(browser.contexts());
+      await use();
+      for (const context of browser.contexts()) if (!before.has(context)) await context.close();
+    },
+    { auto: true },
+  ],
   // Registers a function that runs when the test ends, as t.after of node:test does, so createBlog({ after }, files) works in a browser test
   after: async ({}, use) => {
     const cleanups = [];

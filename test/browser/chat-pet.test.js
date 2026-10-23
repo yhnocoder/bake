@@ -245,6 +245,8 @@ test.describe('the pets and the colours of the AI chat on published pages', () =
     const field = page.locator('.bk-chat-pet-form input[name="pet"]');
     const status = page.locator('.bk-chat-pet-status');
     const settled = () => page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent !== '正在读取…', null, { timeout: 5000 });
+    // why: the installed clock also runs with real time, which a loaded machine lets pass between the steps
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
     await field.fill(`${PETS}/slow/pet.json`);
     await field.press('Enter');
     await page.waitForFunction(() => document.querySelector('[data-bake-chat]').shadowRoot.querySelector('.bk-chat-pet-status')?.textContent === '正在读取…');
@@ -253,6 +255,7 @@ test.describe('the pets and the colours of the AI chat on published pages', () =
     await page.clock.fastForward(1_000);
     await settled();
     assert.equal(await status.textContent(), '这个链接在 30 秒内没有回应。');
+    await page.clock.resume();
     await field.fill(`http://127.0.0.1:${server.address().port}/old/pet.json`);
     await field.press('Enter');
     await settled();
