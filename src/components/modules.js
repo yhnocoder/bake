@@ -16,7 +16,8 @@ export function browserModules({ preamble, components, prefetch }) {
   });
   return [
     mathModules(`export const definitions = ${JSON.stringify(preamble.map((definition) => definition.tex))};\n`),
-    { ...loaders, generateBundle: (options, bundle) => writeComponentFiles(bundle, prefetch ? components : []) },
+    // why: Vite removes the chunks that hold only CSS, such as a stylesheet that several components import, in its own generateBundle; the list of files runs after it so that it names none of them
+    { ...loaders, generateBundle: { order: 'post', handler: (options, bundle) => writeComponentFiles(bundle, prefetch ? components : []) } },
     { name: 'bake-kit-side-effects', transform: markKitModulesSideEffectFree },
   ];
 }

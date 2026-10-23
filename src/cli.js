@@ -80,7 +80,8 @@ async function runInit(args) {
   const folder = options.positional[0] ?? '.';
   const result = newBlog(folder, { date: localDate(new Date()), language: options['--language'] ?? systemLanguage() });
   if (result.error) return fail(result.error);
-  console.log([`Created a blog in ${result.root}:`, ...result.files.map((file) => `  ${file}`)].join('\n'));
+  const kept = result.kept.length === 0 ? [] : ['Kept the existing files:', ...result.kept.map((file) => `  ${file}`)];
+  console.log([`Created a blog in ${result.root}:`, ...result.written.map((file) => `  ${file}`), ...kept].join('\n'));
   const install = !options['--no-install'];
   if (install) {
     const error = installDependencies(result.root);
@@ -89,7 +90,7 @@ async function runInit(args) {
   const next = [...(folder === '.' ? [] : [`cd ${shellWord(folder)}`]), ...(install ? [] : ['npm install']), 'npm run dev'].join(' && ');
   console.log(
     [
-      `The first post is at ${result.url}. Next: ${next}`,
+      `${result.url === null ? '' : `The first post is at ${result.url}. `}Next: ${next}`,
       'To publish the blog on GitHub Pages, push it to a GitHub repository and choose GitHub Actions as the source under Settings > Pages;',
       '.github/workflows/deploy.yml then publishes every push to main.',
     ].join('\n'),

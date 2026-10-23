@@ -5,7 +5,7 @@ import { delimiter, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { parse } from 'yaml';
 import { openCommand } from '../src/dev/open.js';
-import { bake, build, cli, createBlog, validConfig, writeFiles } from './blog.js';
+import { article, bake, build, cli, createBlog, validConfig, writeFiles } from './blog.js';
 
 function init(dir, ...args) {
   return bake(dir, 'init', ...args, '--no-install');
@@ -53,18 +53,28 @@ describe('bake init', () => {
     assert.match(readFileSync(join(dir, 'notes/bake.config.js'), 'utf8'), /language: "zh-CN"/);
   });
 
-  test('writes a workflow that builds the blog with the address of its GitHub Pages site and publishes dist/', async (t) => {
+  test('writes a workflow that builds the blog in the Playwright container of the version Bake installs, with the address of its GitHub Pages site, and publishes dist/', async (t) => {
     const dir = createBlog(t, {});
     assert.equal(init(dir, 'my-blog').status, 0);
-    const workflow = parse(readFileSync(join(dir, 'my-blog/.github/workflows/deploy.yml'), 'utf8'));
+    const text = readFileSync(join(dir, 'my-blog/.github/workflows/deploy.yml'), 'utf8');
+    assert.ok(readFileSync(join(import.meta.dirname, '../README.md'), 'utf8').includes(`\`\`\`yaml\n${text}\`\`\``), 'the README shows the workflow that bake init writes');
+    const workflow = parse(text);
     assert.deepEqual(workflow.on.push.branches, ['main']);
     assert.deepEqual(workflow.permissions, { contents: 'read', pages: 'write', 'id-token': 'write' });
-    const steps = workflow.jobs.deploy.steps;
-    const runs = steps.map((step) => step.run).filter(Boolean);
-    assert.deepEqual(runs, ['npm ci', 'npx playwright install --with-deps --only-shell chromium', 'npx bake build --url "${{ steps.pages.outputs.base_url }}"']);
-    assert.equal(steps.find((step) => step.id === 'pages').uses, 'actions/configure-pages@v5');
-    assert.deepEqual(steps.find((step) => step.uses?.startsWith('actions/upload-pages-artifact')).with, { path: 'dist' });
-    assert.equal(steps.at(-1).uses, 'actions/deploy-pages@v4');
+    const { playwright, build, deploy } = workflow.jobs;
+    assert.match(playwright.steps.at(-1).run, /^echo "version=\$\(jq -r '\.packages\["node_modules\/@yhnocoder\/bake"\]\.dependencies\.playwright' package-lock\.json\)" >> "\$GITHUB_OUTPUT"$/);
+    assert.equal(build.container, 'mcr.microsoft.com/playwright:v${{ needs.playwright.outputs.version }}-noble');
+    const runs = build.steps.map((step) => step.run).filter(Boolean);
+    assert.deepEqual(runs, ['npm ci', 'npx bake build --url "${{ steps.pages.outputs.base_url }}"']);
+    assert.equal(build.steps.find((step) => step.id === 'pages').uses, 'actions/configure-pages@v5');
+    assert.deepEqual(build.steps.at(-1), { uses: 'actions/upload-pages-artifact@v3', with: { path: 'dist' } });
+    assert.equal(deploy.needs, 'build');
+    assert.equal(deploy.steps.at(-1).uses, 'actions/deploy-pages@v4');
+  });
+
+  test('pins the version of Playwright, which names the container of the workflow', () => {
+    const { dependencies } = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json'), 'utf8'));
+    assert.match(dependencies.playwright, /^\d+\.\d+\.\d+$/);
   });
 
   test('keeps the fields of an existing package.json, sets its type to module and adds the scripts and Bake', async (t) => {
@@ -109,14 +119,31 @@ describe('bake init', () => {
     assert.deepEqual(readdirSync(dir).sort(), ['.github', '.gitignore', 'bake.config.js', 'content', 'notes.txt', 'package.json', 'public']);
   });
 
-  test('refuses a folder that already holds a file it would write and writes nothing', async (t) => {
-    const dir = createBlog(t, { 'bake.config.js': validConfig, '.gitignore': 'dist/\n' });
+  test('keeps the files of an existing folder, writes the missing ones and adds the missing lines to .gitignore', async (t) => {
+    const dir = createBlog(t, { 'bake.config.js': validConfig, '.gitignore': '/node_modules\n.DS_Store\ndist', 'content/posts/hello/index.md': article() });
     const result = init(dir);
-    assert.equal(result.status, 1);
-    assert.equal(result.stderr, 'bake init: bake.config.js, .gitignore already exist; run bake init in a new or empty folder\n');
-    assert.equal(existsSync(join(dir, 'content')), false);
-    assert.equal(existsSync(join(dir, 'package.json')), false);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.stdout,
+      [
+        `Created a blog in ${dir}:`,
+        '  public/favicon.svg',
+        '  .gitignore',
+        '  .github/workflows/deploy.yml',
+        '  package.json',
+        'Kept the existing files:',
+        '  bake.config.js',
+        '  content/posts/hello/index.md',
+        'Next: npm install && npm run dev',
+        'To publish the blog on GitHub Pages, push it to a GitHub repository and choose GitHub Actions as the source under Settings > Pages;',
+        '.github/workflows/deploy.yml then publishes every push to main.',
+        '',
+      ].join('\n'),
+    );
     assert.equal(readFileSync(join(dir, 'bake.config.js'), 'utf8'), validConfig);
+    assert.equal(readFileSync(join(dir, 'content/posts/hello/index.md'), 'utf8'), article());
+    assert.equal(readFileSync(join(dir, '.gitignore'), 'utf8'), '/node_modules\n.DS_Store\ndist\n.dist-staging/\n.dist-previous/\n');
+    assert.equal(init(dir).stdout.split('\n')[1], '  package.json');
   });
 
   test('reports a folder argument that names a file, or a file where it needs a folder, and writes nothing', async (t) => {
@@ -128,7 +155,7 @@ describe('bake init', () => {
     ]) {
       const result = init(dir, folder);
       assert.equal(result.status, 1, folder);
-      assert.equal(result.stderr, `bake init: ${path} already exists; run bake init in a new or empty folder\n`, folder);
+      assert.equal(result.stderr, `bake init: ${path} is a file, and bake init needs a folder there\n`, folder);
     }
     assert.deepEqual(readdirSync(join(dir, 'blocked')), ['content']);
   });

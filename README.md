@@ -51,7 +51,7 @@ Run every command except `bake init` from the blog root, the folder that contain
 - `.github/workflows/deploy.yml`, which publishes the blog on GitHub Pages, see [Publishing on GitHub Pages](#publishing-on-github-pages).
 - `package.json` with `"type": "module"`, the scripts `dev` and `build`, and Bake as a development dependency. An existing `package.json`, such as the one `npm init` writes, keeps its fields and scripts.
 
-It writes nothing when the folder already holds one of these files other than `package.json`. Then it runs `npm install` and downloads Playwright's Chromium; `--no-install` writes the files only.
+In a folder that already holds files, such as a Git repository, it keeps every existing file and writes only the missing ones; it adds to an existing `.gitignore` the lines it lacks and to an existing `package.json` the fields above. Then it runs `npm install` and downloads Playwright's Chromium; `--no-install` writes the files only.
 
 `bake new <title>` creates `content/posts/<slug>/index.md` with front matter for a draft dated today. The slug is made of the letters a to z and the digits of the title, joined by `-`, so `bake new "Rope data structures"` creates the slug `rope-data-structures`; `--slug <slug>` sets the slug, which a title without such letters, such as a Chinese one, needs. `bake new <path>`, such as `bake new 2026-10/rope`, creates `content/posts/<path>/index.md` instead and takes the slug from the last folder name of the path; an argument with a `/` or made only of lowercase letters, digits and `-` is a path. The front matter lists `summary` and `tags` as comments to fill in.
 
@@ -65,7 +65,7 @@ The RSS feed holds the full text of every published Markdown article next to its
 
 ### Publishing on GitHub Pages
 
-The workflow `.github/workflows/deploy.yml` that `bake init` writes publishes the blog on GitHub Pages with GitHub Actions. Push the blog to a GitHub repository, and choose GitHub Actions as the source under Settings > Pages of the repository. Each push to `main` then installs the packages and Chromium, builds the site with `bake build --url` and the address of the repository's Pages site, and publishes `dist/`; the workflow can also be started by hand from the Actions tab. The address comes from GitHub, so it includes the path of a project site, such as `https://linda.github.io/my-blog/`, and a custom domain set under Settings > Pages; `bake.config.js` needs no `url`.
+The workflow `.github/workflows/deploy.yml` that `bake init` writes publishes the blog on GitHub Pages with GitHub Actions. Push the blog to a GitHub repository, and choose GitHub Actions as the source under Settings > Pages of the repository. Each push to `main` then installs the packages in the [Playwright container](https://playwright.dev/docs/docker) of the Playwright version that the installed Bake uses, which already holds Chromium, its system libraries and the fonts of the share images, builds the site with `bake build --url` and the address of the repository's Pages site, and publishes `dist/`; the workflow can also be started by hand from the Actions tab. The address comes from GitHub, so it includes the path of a project site, such as `https://linda.github.io/my-blog/`, and a custom domain set under Settings > Pages; `bake.config.js` needs no `url`.
 
 A blog created before `bake init` wrote the workflow can copy this file:
 
@@ -87,11 +87,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  playwright:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: package-lock.json
+          sparse-checkout-cone-mode: false
+      - id: version
+        run: echo "version=$(jq -r '.packages["node_modules/@yhnocoder/bake"].dependencies.playwright' package-lock.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: playwright
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v${{ needs.playwright.outputs.version }}-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -99,17 +112,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ hashFiles('package-lock.json') }}
-      - run: npx playwright install --with-deps --only-shell chromium
       - id: pages
         uses: actions/configure-pages@v5
       - run: npx bake build --url "${{ steps.pages.outputs.base_url }}"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
 ```

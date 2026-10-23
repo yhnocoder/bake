@@ -211,6 +211,22 @@ describe('building components', () => {
     assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/gelu')).sort(), ['index.html', 'index.md']);
   });
 
+  test('components that share a stylesheet without script name only files that the build writes', async (t) => {
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/lib/figure.css': '.figure-caption { margin: 0; }\n',
+      'components/left-view.js': `import './lib/figure.css';\n\n${height}export default class LeftView extends HTMLElement {}\n`,
+      'components/right-view.js': `import './lib/figure.css';\n\n${height}export default class RightView extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::left-view\n:::\n\n:::right-view\n:::\n' }),
+    });
+    assert.deepEqual(await build(dir), []);
+    const assets = readdirSync(join(dir, 'dist/assets'));
+    const runtime = readFileSync(join(dir, 'dist/assets', assets.find((name) => /^components-[\w-]+\.js$/.test(name))), 'utf8');
+    const named = [...new Set(runtime.match(/[\w-]+-[\w-]{8}\.(js|css)/g))];
+    assert.ok(named.some((name) => name.startsWith('figure-')), named.join(', '));
+    assert.deepEqual(named.filter((name) => !assets.includes(name)), []);
+  });
+
   test('reports a component that another article uses at its use, and a component name defined twice at both files', async (t) => {
     const dir = createBlog(t, {
       'bake.config.js': validConfig,

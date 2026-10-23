@@ -234,7 +234,7 @@ export default function KitPlot(props) {
 | `MathText` | `text` | 一行文字，`$…$` 之间是行内公式，`$$…$$` 之间是独立公式。 |
 | `SvgMathText` | `text`、`x`、`y`、`anchor`、`within` | SVG 里的一行带公式的文字。`within={[left, right]}` 把文字左右移动，保持在两个横坐标之间。 |
 
-`bake/math` 导出 `texToSvg(formula, { display })`，不用 SolidJS 的组件可以用它把公式排成 SVG 元素。
+不用 SolidJS 的组件用 `bake/kit` 的 `typeset(element)` 排公式：它把元素里文字中的 `$…$` 和 `$$…$$` 换成公式，排法和 `MathText` 相同，返回一个在全部公式排好后完成的 Promise。没有配对的 `$` 和 SVG 里的文字保持不变。`bake/math` 还导出 `texToSvg(formula, { display })`，它把一个公式排成 SVG 元素。
 
 ### 数值、尺寸和动画
 
