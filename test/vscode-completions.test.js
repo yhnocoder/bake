@@ -24,9 +24,16 @@ const image = {
   float: { type: 'enum', options: ['left', 'right'] },
 };
 const headings = { toc: { type: 'text' }, cols: { type: 'number', min: 1, max: 6, depth: 2 } };
+const frontMatter = {
+  title: { type: 'text', label: 'article title' },
+  date: { type: 'date' },
+  tags: { type: 'list' },
+  draft: { type: 'boolean' },
+  toc: { label: 'Table of contents style', type: 'enum', options: ['notes', 'dots', 'ticks'], default: 'notes' },
+};
 
 function complete(lines, cursorLine, character = lines[cursorLine].length) {
-  return completionsAt(lines.join('\n'), cursorLine, character, { blocks, image, headings });
+  return completionsAt(lines.join('\n'), cursorLine, character, { blocks, image, headings, frontMatter });
 }
 
 describe('VS Code completions', () => {
@@ -113,6 +120,26 @@ describe('VS Code completions', () => {
     assert.deepEqual(complete(['See https://example.com/a'], 0), []);
     assert.deepEqual(complete(['A ratio a/b'], 0), []);
     assert.deepEqual(complete(['```sh', 'cd /'], 1), []);
+  });
+
+  test('list the front matter fields that are not written yet and the values of an enum or boolean field', () => {
+    const article = ['---', 'title: GELU', 't', '---', '', 'Text.'];
+    assert.deepEqual(
+      complete(article, 2).map(({ label, snippet, from }) => ({ label, snippet, from })),
+      [
+        { label: 'date', snippet: 'date: ${1:$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE}', from: 0 },
+        { label: 'tags', snippet: 'tags: [$1]', from: 0 },
+        { label: 'draft', snippet: 'draft: ${1|true,false|}', from: 0 },
+        { label: 'toc', snippet: 'toc: ${1|notes,dots,ticks|}', from: 0 },
+      ],
+    );
+    assert.deepEqual(complete(['---', 'toc: d'], 1).map(({ label, from }) => ({ label, from })), [
+      { label: 'notes', from: 5 },
+      { label: 'dots', from: 5 },
+      { label: 'ticks', from: 5 },
+    ]);
+    assert.deepEqual(complete(['---', 'title: The /', '---'], 1), []);
+    assert.equal(complete(['---', 'title: GELU', '---', '/'], 3).length > 0, true);
   });
 
   test('list the references, footnotes and equation labels of the article', () => {

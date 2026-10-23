@@ -10,7 +10,7 @@ const POSTS_DIR = 'content/posts';
 const BAKE_PACKAGE = '@yhnocoder/bake';
 const SERVING = /^Serving the blog at (\S+)$/m;
 const SOURCE_DELAY = 300;
-const NO_SYNTAX = { blocks: [], image: {}, headings: {} };
+const NO_SYNTAX = { blocks: [], image: {}, headings: {}, frontMatter: {} };
 // why: revealing a line scrolls the editor in several steps, and each step would scroll the preview back to the start of a block
 const FOLLOW_QUIET_TIME = 300;
 const COMPLETION_KINDS = {

@@ -9,6 +9,9 @@ const ATTRIBUTE_START = /(?:^|\s)([A-Za-z_][\w-]*)?$/;
 const WRITTEN_ATTRIBUTE = /(?:^|\s)([A-Za-z_][\w-]*)(?==|\s|$)/g;
 const IMAGE_ATTRIBUTES = /!\[[^\]]*\]\([^)]*\)\{([^}]*)$/;
 const HEADING_ATTRIBUTES = /^ {0,3}(#{1,6})[ \t].*\{([^{}]*)$/;
+const FIELD_NAME = /^([A-Za-z_][\w-]*)?$/;
+const FIELD_VALUE = /^([A-Za-z_][\w-]*):[ \t]*("?)([^"]*)$/;
+const WRITTEN_FIELD = /^([A-Za-z_][\w-]*):/;
 const CITATION = /\[@([^\]\s;]*)$/;
 const FOOTNOTE = /\[\^([^\]\s]*)$/;
 const EQREF = /\\eqref\{([^}]*)$/;
@@ -36,12 +39,13 @@ const INLINE_SNIPPETS = [
   { label: 'link', detail: 'a link, [text](address)', snippet: '[$1]($2)' },
 ];
 
-// Returns the completions at a position of an article: block names after :::, attributes inside the braces of a block line, an image or a heading, the citations, footnotes and equation labels of the article, and a menu of blocks and Markdown after /.
+// Returns the completions at a position of an article: the fields of the front matter and their values, block names after :::, attributes inside the braces of a block line, an image or a heading, the citations, footnotes and equation labels of the article, and a menu of blocks and Markdown after /.
 // Each completion replaces the characters of the line from `from` to the cursor with `snippet`, a VS Code snippet. VS Code matches what was typed against `filter`, or against `label` when there is no `filter`. `suggest` asks for the completions again after the snippet is inserted.
-function completionsAt(text, line, character, { blocks, image, headings }) {
+function completionsAt(text, line, character, { blocks, image, headings, frontMatter }) {
   const lines = text.split('\n');
   const before = lines[line].slice(0, character);
   const after = lines[line].slice(character);
+  if (inFrontMatter(lines, line)) return fieldCompletions(frontMatter, lines, line, before, after, character);
   if (fenceAt(lines.slice(0, line)) !== null) return [];
   const name = BLOCK_NAME.exec(before);
   if (name !== null && after.trim() === '') {
@@ -125,13 +129,39 @@ function nextFence(fence, text) {
   return marker[0] === fence[0] && marker.length >= fence.length ? null : fence;
 }
 
+// why: while the closing --- line is not written yet, every line after the opening one is front matter
+function inFrontMatter(lines, line) {
+  if (lines[0] !== '---' || line === 0) return false;
+  const close = lines.indexOf('---', 1);
+  return close === -1 || line < close;
+}
+
+function fieldCompletions(declarations, lines, line, before, after, character) {
+  const value = FIELD_VALUE.exec(before);
+  if (value !== null) {
+    const [, name, quote, typed] = value;
+    return valueCompletions(declarations[name], character - typed.length - quote.length);
+  }
+  if (FIELD_NAME.exec(before) === null || after.trim() !== '') return [];
+  const close = lines.indexOf('---', 1);
+  const present = new Set(lines.slice(1, close === -1 ? undefined : close).filter((_, index) => index !== line - 1).map((text) => WRITTEN_FIELD.exec(text)?.[1]));
+  return Object.entries(declarations)
+    .filter(([name]) => !present.has(name))
+    .map(([name, declaration]) => ({ kind: 'attribute', label: name, detail: declaration.label, documentation: describeDeclaration(declaration), from: 0, snippet: fieldSnippet(name, declaration), suggest: declaration.type === 'enum' || declaration.type === 'boolean' }));
+}
+
+function fieldSnippet(name, declaration) {
+  if (declaration.type === 'date') return `${name}: \${1:\$CURRENT_YEAR-\$CURRENT_MONTH-\$CURRENT_DATE}`;
+  if (declaration.type === 'list') return `${name}: [$1]`;
+  if (declaration.type === 'text') return `${name}: $1`;
+  return `${name}: ${valueSnippet(declaration)}`;
+}
+
 function attributeCompletions(declarations, written, character) {
   const value = ATTRIBUTE_VALUE.exec(written);
   if (value !== null) {
     const [, name, quote, typed] = value;
-    const declaration = declarations[name];
-    const choices = declaration?.type === 'enum' ? declaration.options : declaration?.type === 'boolean' ? ['true', 'false'] : [];
-    return choices.map((choice) => ({ kind: 'value', label: String(choice), detail: declaration.label, from: character - typed.length - quote.length, snippet: String(choice) }));
+    return valueCompletions(declarations[name], character - typed.length - quote.length);
   }
   const start = ATTRIBUTE_START.exec(written);
   if (start === null) return [];
@@ -142,11 +172,19 @@ function attributeCompletions(declarations, written, character) {
     .map(([name, declaration]) => ({ kind: 'attribute', label: name, detail: declaration.label, documentation: describeDeclaration(declaration), from: character - typed.length, snippet: attributeSnippet(name, declaration) }));
 }
 
+function valueCompletions(declaration, from) {
+  const choices = declaration?.type === 'enum' ? declaration.options : declaration?.type === 'boolean' ? ['true', 'false'] : [];
+  return choices.map((choice) => ({ kind: 'value', label: String(choice), detail: declaration.label, from, snippet: String(choice) }));
+}
+
 function attributeSnippet(name, declaration) {
-  if (declaration.type === 'enum') return `${name}=\${1|${declaration.options.map(escapeChoice).join(',')}|}`;
-  if (declaration.type === 'boolean') return `${name}=\${1|true,false|}`;
-  if (declaration.type === 'number') return `${name}=\${1:${declaration.default ?? ''}}`;
-  return `${name}="$1"`;
+  return declaration.type === 'text' ? `${name}="$1"` : `${name}=${valueSnippet(declaration)}`;
+}
+
+function valueSnippet(declaration) {
+  if (declaration.type === 'enum') return `\${1|${declaration.options.map(escapeChoice).join(',')}|}`;
+  if (declaration.type === 'boolean') return '${1|true,false|}';
+  return `\${1:${declaration.default ?? ''}}`;
 }
 
 function escapeChoice(choice) {

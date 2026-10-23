@@ -308,7 +308,7 @@ describe('updates while bake dev runs', () => {
     assert.equal((await send({ file: 'content/posts/other/index.md', text: 'x' })).status, 404);
   });
 
-  test('lists the articles with their addresses, and the blocks that an article can use and the attributes of its images and headings', async (t) => {
+  test('lists the articles with their addresses, and the blocks that an article can use and the attributes of its images and headings, and the fields of its front matter with the options of its theme', async (t) => {
     const { get } = await serve(t, {
       'content/posts/rope/index.md': article({ extra: 'theme: bento\n' }),
       'content/posts/gelu/index.md': article({ slug: 'gelu' }),
@@ -332,6 +332,9 @@ describe('updates while bake dev runs', () => {
     assert.equal(byName.has('gelu-plot'), false);
     const gelu = await (await get('/__bake/syntax?file=content/posts/gelu/index.md')).json();
     assert.deepEqual(gelu.headings, { toc: { type: 'text' } });
+    assert.deepEqual(Object.keys(gelu.frontMatter), ['title', 'slug', 'date', 'updated', 'summary', 'tags', 'preview', 'theme', 'draft', 'cover', 'page', 'toc']);
+    assert.deepEqual(gelu.frontMatter.toc, { label: 'Table of contents style', type: 'enum', options: ['notes', 'dots', 'ticks'], default: 'notes' });
+    assert.ok(gelu.frontMatter.theme.options.includes('bento'), JSON.stringify(gelu.frontMatter.theme));
     assert.equal(gelu.blocks.some((block) => block.name === 'gelu-plot'), true);
     assert.equal(gelu.blocks.some((block) => block.name === 'note'), false);
     assert.equal((await get('/__bake/syntax?file=content/posts/none/index.md')).status, 404);
