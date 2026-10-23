@@ -34,3 +34,7 @@ code --install-extension bake.vsix
 ```
 
 To update it, pull the repository, run the last two commands again and run **Developer: Reload Window** in VS Code.
+
+## Run from the repository
+
+`editors/vscode/.vscode/launch.json` starts the extension from its source. Run `npm install` in the Bake repository, open the folder `editors/vscode` in VS Code, choose **Bake extension: example blog** or **Bake extension: another blog** in the Run and Debug view and press F5. A second VS Code window opens the blog with the extension of the repository in place of the installed one. **Developer: Reload Window** in that window loads changes to the extension and starts `bake dev` again. A blog uses the Bake of its `node_modules/`, so `npm install <path of the Bake repository>` in the blog makes it use the repository too.

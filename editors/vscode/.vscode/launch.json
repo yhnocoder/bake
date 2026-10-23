@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bake extension: example blog",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "${workspaceFolder}/../../examples/blog"]
+    },
+    {
+      "name": "Bake extension: another blog",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "${input:blog}"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "blog",
+      "type": "promptString",
+      "description": "Absolute path of a blog whose node_modules holds Bake"
+    }
+  ]
+}
