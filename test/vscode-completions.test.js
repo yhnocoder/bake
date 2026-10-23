@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, test } from 'node:test';
 
-const { completionsAt } = createRequire(import.meta.url)('../editors/vscode/completions.js');
+const { blockNameAt, completionsAt } = createRequire(import.meta.url)('../editors/vscode/completions.js');
 
 const blocks = [
   { name: 'aside', kind: 'built-in', attributes: { title: { type: 'text', label: 'text in quotes, for example title="Notes"' } } },
@@ -140,6 +140,13 @@ describe('VS Code completions', () => {
     ]);
     assert.deepEqual(complete(['---', 'title: The /', '---'], 1), []);
     assert.equal(complete(['---', 'title: GELU', '---', '/'], 3).length > 0, true);
+  });
+
+  test('find the name of the block on a ::: line under the cursor, outside code blocks', () => {
+    assert.deepEqual(blockNameAt(['Text.', '> :::act-fn-plot{fns=gelu}', ':::'].join('\n'), 1, 8), { name: 'act-fn-plot', from: 5, to: 16 });
+    assert.equal(blockNameAt(':::act-fn-plot{fns=gelu}', 0, 20), null);
+    assert.equal(blockNameAt('See act-fn-plot.', 0, 6), null);
+    assert.equal(blockNameAt(['```markdown', ':::act-fn-plot'].join('\n'), 1, 6), null);
   });
 
   test('list the references, footnotes and equation labels of the article', () => {

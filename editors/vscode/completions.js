@@ -1,6 +1,7 @@
 const QUOTE = String.raw`(?:[ \t]*>)*[ \t]*`;
 const BLOCK_NAME = new RegExp(`^(${QUOTE})(:{3,})([A-Za-z][\\w-]*)?$`);
 const BLOCK_ATTRIBUTES = new RegExp(`^${QUOTE}:{3,}([A-Za-z][\\w-]*)\\{([^}]*)$`);
+const BLOCK_LINE = new RegExp(`^(${QUOTE}:{3,})([A-Za-z][\\w-]*)`);
 const OPENING_LINE = new RegExp(`^${QUOTE}:{3,}[A-Za-z{]`);
 const CLOSING_LINE = new RegExp(`^${QUOTE}:{3,}[ \\t]*$`);
 const FENCE = /^[ \t]*(`{3,}|~{3,})/;
@@ -89,6 +90,17 @@ function completionsAt(text, line, character, { blocks, image, headings, frontMa
   const inline = SLASH.exec(before);
   if (inline !== null) return INLINE_SNIPPETS.map((item) => ({ ...item, kind: 'snippet', from: character - inline[1].length - 1, filter: `/${item.label}` }));
   return [];
+}
+
+// Returns the name of the block on a ::: line, with the characters it spans, when the position lies on the name.
+function blockNameAt(text, line, character) {
+  const lines = text.split('\n');
+  if (fenceAt(lines.slice(0, line)) !== null) return null;
+  const match = BLOCK_LINE.exec(lines[line]);
+  if (match === null) return null;
+  const from = match[1].length;
+  const to = from + match[2].length;
+  return character >= from && character <= to ? { name: match[2], from, to } : null;
 }
 
 function blockCompletion(block) {
@@ -214,4 +226,4 @@ function escapeSnippet(text) {
   return text.replace(/[\\$}]/g, (character) => `\\${character}`);
 }
 
-module.exports = { completionsAt };
+module.exports = { blockNameAt, completionsAt };

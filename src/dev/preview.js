@@ -80,7 +80,7 @@ export function createPreview(root, localUrl) {
     const blocks = [
       ...Object.entries(BUILT_IN_BLOCKS).map(([name, attributes]) => ({ name, kind: 'built-in', attributes: builtInAttributes(attributes) })),
       ...Object.entries(theme?.blocks ?? {}).map(([name, attributes]) => ({ name, kind: 'theme', attributes })),
-      ...components.map((found) => ({ name: found.name, kind: 'component', attributes: found.params })),
+      ...components.map((found) => ({ name: found.name, kind: 'component', file: found.file, attributes: found.params })),
     ];
     return {
       blocks,

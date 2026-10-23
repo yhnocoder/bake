@@ -3,7 +3,7 @@ const { randomBytes } = require('node:crypto');
 const { existsSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const vscode = require('vscode');
-const { completionsAt } = require('./completions.js');
+const { blockNameAt, completionsAt } = require('./completions.js');
 
 const CONFIG_FILE = 'bake.config.js';
 const POSTS_DIR = 'content/posts';
@@ -50,6 +50,7 @@ function activate(context) {
     vscode.workspace.onDidChangeTextDocument(({ document }) => sendSourceLater(document)),
     vscode.workspace.onDidCloseTextDocument((document) => sendSource(document, null)),
     vscode.languages.registerCompletionItemProvider({ language: 'markdown', scheme: 'file' }, { provideCompletionItems }, ':', '{', ' ', '=', '@', '^', '/'),
+    vscode.languages.registerDefinitionProvider({ language: 'markdown', scheme: 'file' }, { provideDefinition }),
     { dispose: () => blogs.forEach((blog) => blog.process?.kill()) },
   );
   for (const document of vscode.workspace.textDocuments) {
@@ -309,6 +310,17 @@ async function provideCompletionItems(document, position) {
     if (completion.suggest) item.command = { command: 'editor.action.triggerSuggest', title: 'List the completions' };
     return item;
   });
+}
+
+async function provideDefinition(document, position) {
+  const article = articleOf(document.uri);
+  const block = article === null ? null : blockNameAt(document.getText(), position.line, position.character);
+  if (block === null) return null;
+  const syntax = await syntaxOf(article).catch(() => NO_SYNTAX);
+  const component = syntax.blocks.find((candidate) => candidate.name === block.name && candidate.kind === 'component');
+  if (component === undefined) return null;
+  const start = new vscode.Range(0, 0, 0, 0);
+  return [{ originSelectionRange: new vscode.Range(position.line, block.from, position.line, block.to), targetUri: vscode.Uri.file(path.join(article.root, component.file)), targetRange: start, targetSelectionRange: start }];
 }
 
 async function syntaxOf({ root, file }) {

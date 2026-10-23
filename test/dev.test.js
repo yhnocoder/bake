@@ -328,7 +328,7 @@ describe('updates while bake dev runs', () => {
     assert.deepEqual(byName.get('fold'), { name: 'fold', kind: 'built-in', attributes: { title: { type: 'text', label: 'text in quotes, for example title="Notes"' } } });
     assert.deepEqual(byName.get('note').attributes.color, { type: 'enum', options: ['yellow', 'green', 'blue', 'pink'] });
     assert.equal(byName.get('note').kind, 'theme');
-    assert.deepEqual(byName.get('demo-chart'), { name: 'demo-chart', kind: 'component', attributes: { fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'gelu' } } });
+    assert.deepEqual(byName.get('demo-chart'), { name: 'demo-chart', kind: 'component', file: 'components/demo-chart.js', attributes: { fn: { label: 'Function', type: 'enum', options: ['gelu', 'silu'], default: 'gelu' } } });
     assert.equal(byName.has('gelu-plot'), false);
     const gelu = await (await get('/__bake/syntax?file=content/posts/gelu/index.md')).json();
     assert.deepEqual(gelu.headings, { toc: { type: 'text' } });
