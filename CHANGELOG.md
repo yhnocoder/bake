@@ -18,6 +18,7 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 ### Fixed
 
 - A stylesheet without script that several components import, such as `components/lib/figure.css`, no longer makes the page request a script that the build does not write.
+- On macOS, `bake dev` no longer updates every page right after it starts when a file of the blog was saved in the same millisecond as the start.
 
 ## [0.2.0]
 

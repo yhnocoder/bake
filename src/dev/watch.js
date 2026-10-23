@@ -12,23 +12,23 @@ export function isWatched(path) {
 }
 
 export function watchBlog(root, onChange, onError) {
-  const started = Date.now();
-  const known = new Set(listWatchedFiles(root));
+  // why: macOS also reports writes made a moment before fs.watch started, so a path counts as changed only when the ctimes of its files differ from those read when watching started or at its last change; a write, a rename or a change of metadata sets ctime, which no tool can set back
+  const known = new Map(listWatchedFiles(root));
   let pending = new Set();
   let timer;
+  const within = (file, path) => file === path || file.startsWith(`${path}/`);
   const flush = () => {
-    const changed = [...pending].filter((path) => {
-      const stats = statSync(join(root, path), { throwIfNoEntry: false });
-      // why: macOS also reports writes made a moment before fs.watch started; a write, a rename or a change of metadata sets ctime, which no tool can set back
-      if (stats !== undefined) return stats.ctimeMs >= started;
-      return known.has(path) || [...known].some((file) => file.startsWith(`${path}/`));
-    });
+    const listed = new Map([...pending].map((path) => [path, listWatchedFiles(join(root, path), path)]));
     pending = new Set();
-    for (const path of changed) {
-      for (const file of [...known]) if (file === path || file.startsWith(`${path}/`)) known.delete(file);
-      for (const file of listWatchedFiles(join(root, path), path)) known.add(file);
+    const changed = [...listed].filter(([path, files]) => {
+      const before = [...known.keys()].filter((file) => within(file, path));
+      return before.length !== files.length || files.some(([file, ctime]) => known.get(file) !== ctime);
+    });
+    for (const [path, files] of listed) {
+      for (const file of [...known.keys()]) if (within(file, path)) known.delete(file);
+      for (const [file, ctime] of files) known.set(file, ctime);
     }
-    if (changed.length > 0) onChange(changed.sort());
+    if (changed.length > 0) onChange(changed.map(([path]) => path).sort());
   };
   let stopped = false;
   const stop = () => {
@@ -61,10 +61,11 @@ export function watchBlog(root, onChange, onError) {
   return stop;
 }
 
+// The watched files under a path with their ctimes
 function listWatchedFiles(path, prefix = '') {
   const stats = statSync(path, { throwIfNoEntry: false });
   if (stats === undefined) return [];
-  if (!stats.isDirectory()) return prefix === '' ? [] : [prefix];
+  if (!stats.isDirectory()) return prefix === '' ? [] : [[prefix, stats.ctimeMs]];
   return readdirSync(path)
     .map((name) => (prefix === '' ? name : `${prefix}/${name}`))
     .filter(isWatched)
