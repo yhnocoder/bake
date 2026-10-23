@@ -2,7 +2,7 @@
   "name": "bake",
   "displayName": "Bake",
   "description": "Preview the articles of a Bake blog next to the editor, with problems, completions and highlighting for Bake's Markdown syntax",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "publisher": "yhnocoder",
   "license": "MIT",
   "icon": "icon.png",
