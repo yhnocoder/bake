@@ -327,12 +327,8 @@
 
   :scope .aside-title {
     margin: 0 0 4px;
-    font-family: var(--font-ui);
-    font-size: calc(12.5px * var(--reader-scale));
-    font-weight: 600;
-    line-height: 1.6;
-    letter-spacing: 0.04em;
-    color: var(--ink-2);
+    font-weight: 700;
+    color: var(--ink);
   }
 
   :scope :is(.aside, .quote, blockquote, details.fold, .example-result, [data-block], [data-width], td, th, li) > :last-child {

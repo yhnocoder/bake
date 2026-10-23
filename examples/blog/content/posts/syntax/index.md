@@ -151,7 +151,7 @@ export default function preview(element) {
 
 ## 提示框与折叠块
 
-提示框只有一种样式，`title` 是第一行的小标题，可以不写。小标题里可以写行内公式：
+提示框只有一种样式，`title` 是第一行加粗的标题，和正文一样大，可以不写。标题里可以写行内公式：
 
 ::::example
 :::aside{title="阅读约定：$\sigma$ 与 $\Phi$"}
@@ -161,7 +161,7 @@ export default function preview(element) {
 
 ::::example
 :::aside
-没有小标题的提示框。
+没有标题的提示框。
 :::
 ::::
 

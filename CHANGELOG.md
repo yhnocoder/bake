@@ -12,6 +12,7 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 
 ### Changed
 
+- The title of `:::aside` is set in bold at the size and colour of the text inside the box, instead of a small grey label.
 - `bake new` and `bake init` load only the modules that read the configuration and write files, which shortens them from about 0.9 to 0.1 seconds.
 - The `bake` command turns on Node's compile cache, which shortens each command after the first.
 - `bake init` works in a folder that already holds files, such as a Git repository: it keeps the existing files, writes the missing ones and adds the missing lines to `.gitignore`.
