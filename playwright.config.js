@@ -11,7 +11,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {
     viewport: { width: 1440, height: 900 },
-    trace: 'retain-on-failure',
+    // why: a trace with snapshots copies the whole document before and after every action, which takes about a second on a long article and was most of the time of its tests
+    trace: { mode: 'retain-on-failure', snapshots: false },
   },
   outputDir: 'test-out/playwright',
 });

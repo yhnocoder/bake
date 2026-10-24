@@ -1,21 +1,21 @@
 {
-  "measured": "The byte and request limits: test/browser/pages.test.js on examples/blog at commit 3872dbe, which gives the same values on every machine. The time limits: one run of the nightly workflow at commit 847f315 on GitHub's ubuntu-latest runner in the Playwright container, on 2026-10-22.",
+  "measured": "The byte and request limits: test/browser/pages.test.js on examples/blog on 2026-10-23, after every component of a page started and typeset its formulas, which gives the same values on every machine and in every run. The time limits: one run of the nightly workflow at commit 847f315 on GitHub's ubuntu-latest runner in the Playwright container, on 2026-10-22.",
   "limits": {
     "htmlBytes": {
       "limit": 236700,
       "basis": "The largest value measured, 215154 bytes on /2026-09/matrix-calculus/, plus 10 percent, rounded up to 100 bytes"
     },
     "cssBytes": {
-      "limit": 19300,
-      "basis": "The largest value measured, 17517 bytes on /2026-10/syntax-linked/, plus 10 percent, rounded up to 100 bytes"
+      "limit": 22500,
+      "basis": "The largest value measured, 20434 bytes on /2026-09/matrix-calculus/, plus 10 percent, rounded up to 100 bytes"
     },
     "themeScriptBytes": {
       "limit": 26700,
       "basis": "The largest value measured, 24270 bytes on /, plus 10 percent, rounded up to 100 bytes"
     },
     "componentScriptBytes": {
-      "limit": 574500,
-      "basis": "The largest value measured, 522216 bytes on /2026-09/matrix-calculus/, plus 10 percent, rounded up to 100 bytes; it includes the code of the components of the example blog that the first screen shows"
+      "limit": 643500,
+      "basis": "The largest value measured, 584977 bytes on /2026-09/matrix-calculus/, plus 10 percent, rounded up to 100 bytes; it includes the code of every component of the page and the MathJax font files that their formulas need"
     },
     "chatScriptBytes": {
       "limit": 14000,
@@ -30,8 +30,8 @@
       "basis": "Every script of a page is a theme script, component code, the chat module or a preview, so another script means that the measurement cannot attribute it"
     },
     "requests": {
-      "limit": 64,
-      "basis": "The largest number measured, 58 requests on /2026-09/matrix-calculus/, plus 10 percent, rounded up"
+      "limit": 53,
+      "basis": "The largest number of addresses measured, 48 on /2026-09/matrix-calculus/, plus 10 percent, rounded up"
     },
     "firstContentfulPaintMs": {
       "limit": 700,
