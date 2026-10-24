@@ -151,7 +151,7 @@ A draft shows the label Draft, or 草稿 on a Chinese site, next to its date on 
 
 ### Editing in Visual Studio Code
 
-The folder `editors/vscode/` of the Bake repository holds an extension for Visual Studio Code. It starts `bake dev` for the blog of the article you open and shows the page next to the editor. The preview scrolls with the editor and shows the text as you type, before you save. The problems that Bake finds appear in the Problems panel, and the extension completes and highlights blocks, attributes, citations, footnotes and equation labels. [editors/vscode/README.md](editors/vscode/README.md) describes the features and how to install it.
+The folder `editors/vscode/` of the Bake repository holds an extension for Visual Studio Code. It starts `bake dev` for the blog of the article you open and shows the page next to the editor. The preview scrolls with the editor, marks the block at the cursor and shows the text as you type, before you save, without highlighting the changed blocks. The problems that Bake finds appear in the Problems panel, and the extension completes and highlights blocks, attributes, citations, footnotes and equation labels. [editors/vscode/README.md](editors/vscode/README.md) describes the features and how to install it.
 
 `bake dev` lets only its own pages and VS Code show its pages in a frame.
 

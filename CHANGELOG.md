@@ -7,9 +7,12 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 ### Added
 
 - `typeset(element)` in `bake/kit`, which typesets the `$…$` and `$$…$$` formulas in the text of an element, so that a component without SolidJS shows formulas the way `MathText` does.
+- `/__bake/syntax` in `bake dev` also lists the fields of the front matter and the options of the article's theme, so that the VS Code extension completes them, and the file of each component, so that the extension opens it.
+- In a frame of an editor, the `bake dev` page marks the block at the line that the editor sends as its cursor, and does not highlight the blocks that an update changes.
 
 ### Changed
 
+- The title of `:::aside` is set in bold at the size and colour of the text inside the box, instead of a small grey label.
 - `bake new` and `bake init` load only the modules that read the configuration and write files, which shortens them from about 0.9 to 0.1 seconds.
 - The `bake` command turns on Node's compile cache, which shortens each command after the first.
 - `bake init` works in a folder that already holds files, such as a Git repository: it keeps the existing files, writes the missing ones and adds the missing lines to `.gitignore`.

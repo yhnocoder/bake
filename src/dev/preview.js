@@ -73,18 +73,44 @@ export function createPreview(root, localUrl) {
     const { settings } = site;
     const article = read.get(file);
     if (settings?.markdown === undefined || article === undefined) return null;
-    const theme = settings.markdown.get(article.fields?.theme ?? settings.rules.theme);
+    const themeName = article.fields?.theme ?? settings.rules.theme;
+    const theme = settings.markdown.get(themeName);
     const dir = posix.dirname(file);
     const components = [...settings.components.values()].filter((found) => found.valid && (found.article === null || found.article === dir));
     const blocks = [
       ...Object.entries(BUILT_IN_BLOCKS).map(([name, attributes]) => ({ name, kind: 'built-in', attributes: builtInAttributes(attributes) })),
       ...Object.entries(theme?.blocks ?? {}).map(([name, attributes]) => ({ name, kind: 'theme', attributes })),
-      ...components.map((found) => ({ name: found.name, kind: 'component', attributes: found.params })),
+      ...components.map((found) => ({ name: found.name, kind: 'component', file: found.file, attributes: found.params })),
     ];
-    return { blocks, image: builtInAttributes(IMAGE_ATTRIBUTES), headings: theme?.headings ?? {} };
+    return {
+      blocks,
+      image: builtInAttributes(IMAGE_ATTRIBUTES),
+      headings: theme?.headings ?? {},
+      frontMatter: { ...frontMatterFields(settings.rules), ...(settings.rules.options.get(themeName) ?? {}) },
+    };
   }
 
   return { update, find, listing, problems: () => problems, page: (file) => pages.get(file) ?? null, component, setUnsaved, dropUnsaved, syntax };
+}
+
+function frontMatterFields({ categories, themes }) {
+  const path = (kind) => ({ type: 'text', label: `relative path of ${kind} in the article folder` });
+  const fields = {
+    title: { type: 'text', label: 'article title' },
+    slug: { type: 'text', label: 'last part of the URL, lowercase letters, digits and -' },
+    date: { type: 'date', label: 'date in the form YYYY-MM-DD' },
+    updated: { type: 'date', label: 'date of the last change in the form YYYY-MM-DD' },
+    summary: { type: 'text', label: 'one sentence for the header, the homepage card and the feed' },
+    tags: { type: 'list', label: 'list of tags' },
+    category: { type: 'enum', options: categories },
+    preview: path('a script that animates the homepage card'),
+    theme: { type: 'enum', options: themes },
+    draft: { type: 'boolean', label: 'true keeps the article out of bake build' },
+    cover: path('the image that becomes the share image'),
+    page: path('an HTML file that Bake serves as the article'),
+  };
+  if (categories.length === 0) delete fields.category;
+  return fields;
 }
 
 function builtInAttributes(attributes) {

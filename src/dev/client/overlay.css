@@ -76,13 +76,22 @@ button:focus-visible {
   pointer-events: none;
 }
 
-.mark {
+.mark,
+.cursor {
   position: absolute;
   box-sizing: border-box;
   border-radius: 8px;
   background: var(--dev-mark);
   box-shadow: inset 0 0 0 1px var(--dev-mark-ring);
   opacity: 0;
+}
+
+.cursor {
+  opacity: 1;
+}
+
+.cursor[hidden] {
+  display: none;
 }
 
 :host([data-alone]) {

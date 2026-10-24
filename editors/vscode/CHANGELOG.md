@@ -2,6 +2,18 @@
 
 This file lists the changes of each version of the Bake extension for Visual Studio Code. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Completions in the front matter: the fields that are not written yet, the options of the article's theme, such as `toc`, and the values of a field with choices. `date` and `updated` start with the date of today.
+- The preview marks the block at the cursor of the editor.
+- Ctrl-click or Go to Definition on the name of a component in a `:::` line opens the file of the component.
+
+### Changed
+
+- The preview replaces the blocks that the unsaved text changes without highlighting them.
+
 ## [0.1.0]
 
 The first version. It needs a version of Bake that serves `/__bake/source`, `/__bake/articles` and `/__bake/syntax` in `bake dev`.
