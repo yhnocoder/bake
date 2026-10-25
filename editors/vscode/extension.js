@@ -249,6 +249,7 @@ function answerPage(message) {
     if (editor !== undefined) postCursor(editor);
     for (const document of vscode.workspace.textDocuments) if (document.isDirty) sendSource(document, document.getText());
   }
+  if (message.bake === 'link' && typeof message.url === 'string' && /^(https?|mailto):/.test(message.url)) vscode.env.openExternal(vscode.Uri.parse(message.url, true));
   if (message.bake === 'scroll' && editor !== undefined && Number.isInteger(message.line)) {
     preview.quietUntil = Date.now() + FOLLOW_QUIET_TIME;
     const position = new vscode.Position(message.line - 1, 0);
