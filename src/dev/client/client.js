@@ -44,6 +44,7 @@ if (editor !== null) {
   addEventListener('pointerdown', () => (pointerDown = true));
   for (const type of ['pointerup', 'pointercancel']) addEventListener(type, () => (pointerDown = false));
   addEventListener('scroll', followReader, { passive: true });
+  document.addEventListener('click', openOutside);
   editor.postMessage({ bake: 'ready', file: file ?? null }, '*');
 }
 
@@ -301,6 +302,14 @@ function openInEditor(event) {
   if (block === null) return;
   if (editor === null) window.open(`vscode://file${source}:${block.dataset.line}:1`, '_self');
   else editor.postMessage({ bake: 'open', file, line: Number(block.dataset.line) }, '*');
+}
+
+// why: most other sites refuse to be shown in a frame, so a link to them would leave the preview empty; the editor opens them in the browser
+function openOutside(event) {
+  const link = event.composedPath().find((target) => target instanceof HTMLAnchorElement && target.href !== '');
+  if (link === undefined || new URL(link.href).origin === location.origin) return;
+  event.preventDefault();
+  editor.postMessage({ bake: 'link', url: link.href }, '*');
 }
 
 function answerEditor(event) {

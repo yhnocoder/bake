@@ -350,8 +350,8 @@ test('bake dev updates a page with a save that it made while the event stream wa
   assert.equal(await page.evaluate(() => window.reloaded), false);
 });
 
-test('bake dev in a frame of an editor scrolls to the line the editor names, sends the line that the reader scrolls to and a double-clicked block to the editor, marks the block at the cursor of the editor, and shows the unsaved text without highlighting the changes', async ({ browser, after }) => {
-  const source = article({ title: 'Live', slug: 'live', body });
+test('bake dev in a frame of an editor scrolls to the line the editor names, sends the line that the reader scrolls to and a double-clicked block to the editor, marks the block at the cursor of the editor, sends links to other sites to the editor, and shows the unsaved text without highlighting the changes', async ({ browser, after }) => {
+  const source = article({ title: 'Live', slug: 'live', body: `${body}\n[The outside page](https://example.com/outside)\n` });
   const editor = '<!doctype html><title>Editor</title><iframe src="/2026-10/live/" style="width: 1200px; height: 800px"></iframe><script>window.messages = []; addEventListener("message", (event) => window.messages.push(event.data));</script>\n';
   const dir = createBlog({ after }, { 'bake.config.js': validConfig, [ARTICLE]: source, 'public/editor.html': editor });
   const dev = await startDev(dir);
@@ -387,6 +387,11 @@ test('bake dev in a frame of an editor scrolls to the line the editor names, sen
   await frame.locator('.bk-block', { hasText: 'The edited paragraph' }).dblclick();
   await expect.poll(() => page.evaluate(() => window.messages.some((message) => message.bake === 'open')), { message: 'the double-click sent nothing to the editor' }).toBe(true);
   assert.deepEqual(await page.evaluate(() => window.messages.find((message) => message.bake === 'open')), { bake: 'open', file: ARTICLE, line: lineOf(source, 'The edited paragraph') });
+
+  await page.route('https://example.com/**', (route) => route.abort());
+  await frame.getByRole('link', { name: 'The outside page' }).click();
+  await expect.poll(() => page.evaluate(() => window.messages.find((message) => message.bake === 'link') ?? null), { message: 'the link to another site was not sent to the editor' }).toEqual({ bake: 'link', url: 'https://example.com/outside' });
+  assert.equal(await page.evaluate(() => document.querySelector('iframe').contentWindow.location.pathname), '/2026-10/live/');
 
   const cursorCovers = (text) =>
     frame.locator('.bk-block', { hasText: text }).evaluate((element) => {

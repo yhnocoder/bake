@@ -14,6 +14,10 @@ This file lists the changes of each version of the Bake extension for Visual Stu
 
 - The preview replaces the blocks that the unsaved text changes without highlighting them.
 
+### Fixed
+
+- A link to another site in the preview opens in the browser instead of leaving the preview empty.
+
 ## [0.1.0]
 
 The first version. It needs a version of Bake that serves `/__bake/source`, `/__bake/articles` and `/__bake/syntax` in `bake dev`.
