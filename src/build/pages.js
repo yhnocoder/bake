@@ -4,6 +4,8 @@ import { mathStyles } from '../render/math.js';
 import { REGIONS } from '../shared/regions.js';
 import { errorAt, fileStart, formatError } from '../shared/report.js';
 import { absoluteLink, encodePath, pageRoot, siteLink } from '../shared/urls.js';
+import { componentPageOutputs } from './component-pages.js';
+import { componentImageKey } from './share-images.js';
 import { articleTheme, themeLocation } from './theme.js';
 
 const NOT_FOUND_PATH = '404.html';
@@ -64,6 +66,7 @@ function pageOutputs(site, article, entry, pageSettings) {
       runtime: files.value((context) => context.pageSettings.bundle?.runtime),
       chatEntry: files.value((context) => context.pageSettings.chat.entry),
       shareImage: files.value((context) => shareImageProps(context.pageSettings.config, context.pageSettings.shareImages.get(article.file))),
+      componentImages: files.value((context) => (article.content?.componentPages ?? []).map((component) => shareImageProps(context.pageSettings.config, context.pageSettings.shareImages.get(componentImageKey(article, component))))),
       mathStyles: files.value((context) => context.pageSettings.mathStyles),
     };
     files.same((context) => context.article.content);
@@ -89,7 +92,7 @@ function articleOutputs(root, article, entry, pageSettings, errors) {
     }));
     const converted = new Set(article.content.images.flatMap((image) => (image.keepSource ? [image.path] : [image.path, image.source])));
     const copies = article.files.filter((file) => !converted.has(file)).map((file) => copy(file, file));
-    return [{ path: `${entry.path}index.html`, render: () => html, owner: article.file }, source, ...images, ...copies];
+    return [{ path: `${entry.path}index.html`, render: () => html, owner: article.file }, source, ...images, ...copies, ...componentPageOutputs(article, entry, pageSettings)];
   }
   if (page !== 'index.html' && article.files.includes('index.html')) {
     errors.push(errorAt(article.file, article.positions.page, `page "${page}" is published as index.html, which conflicts with index.html in the article folder`));

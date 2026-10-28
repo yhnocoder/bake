@@ -161,8 +161,10 @@ function createBar(frame, index, declarations, server, { states, bars }) {
   const write = button('Write to file', 'write');
   const copy = button('Copy', 'copy');
   const reset = button('Reset', 'reset');
+  const open = button('Open alone', 'open');
+  open.title = 'Open the page of this component, which other sites can show in a frame';
   const actions = element('div', 'actions');
-  actions.append(reset, copy, write);
+  actions.append(open, reset, copy, write);
   const title = element('code', 'name');
   title.textContent = name;
   const head = element('div', 'head');
@@ -211,6 +213,7 @@ function createBar(frame, index, declarations, server, { states, bars }) {
       report({ text: `Copied line ${frame.dataset.line} with these values`, kind: 'done' });
     }),
   );
+  open.addEventListener('click', () => window.open(new URL(frame.dataset.page, location.href).href, '_blank'));
   reset.addEventListener('click', () => {
     Object.assign(current, markdown);
     for (const control of controls) control.set(current[control.param]);

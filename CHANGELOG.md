@@ -9,9 +9,11 @@ This file lists the changes of each release of Bake. The format follows [Keep a 
 - `typeset(element)` in `bake/kit`, which typesets the `$…$` and `$$…$$` formulas in the text of an element, so that a component without SolidJS shows formulas the way `MathText` does.
 - `/__bake/syntax` in `bake dev` also lists the fields of the front matter and the options of the article's theme, so that the VS Code extension completes them, and the file of each component, so that the extension opens it.
 - In a frame of an editor, the `bake dev` page marks the block at the line that the editor sends as its cursor, and does not highlight the blocks that an update changes.
+- Every component of an article has a page of its own at `components/<name>/` under the address of the article, which shows only the component and which other sites can show in a frame. The name is the id on the `:::` line, such as `{#relu-zoom}`, or the block name with the number of the use. The page takes `?scheme=light` or `?scheme=dark`, has a share image that `bake build` draws from the component, sends its height to the page around its frame as `{ type: 'bake:height', height }`, and opens from Open alone in the parameter bar of `bake dev`.
 
 ### Changed
 
+- A component accepts an id, `{#name}`, which names its page; two components of an article with the same page name are an error. A class on a component is still an error.
 - The title of `:::aside` is set in bold at the size and colour of the text inside the box, instead of a small grey label.
 - `bake new` and `bake init` load only the modules that read the configuration and write files, which shortens them from about 0.9 to 0.1 seconds.
 - The `bake` command turns on Node's compile cache, which shortens each command after the first.

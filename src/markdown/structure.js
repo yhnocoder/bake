@@ -1,7 +1,8 @@
 import { eastAsianWidth } from 'get-east-asian-width';
 import { toString } from 'mdast-util-to-string';
 import { referenceId, sidenoteId } from '../shared/fragments.js';
-import { renderChildrenHtml, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
+import { componentPageFigure, renderChildrenHtml, renderHtml, renderInlineHtml, resultWidths } from '../render/html.js';
+import { folderFile } from '../config/rules.js';
 import { addGlyphs } from '../render/math.js';
 import { embedNodes, preview } from './link.js';
 import { BUILT_IN_BLOCK_NAMES } from './parse.js';
@@ -83,7 +84,18 @@ export function articleStructure(article) {
     images: [...article.images.values()],
     image: article.image,
     components: usedComponents(article),
+    componentPages: componentPages(article),
   };
+}
+
+function componentPages(article) {
+  const pages = [];
+  walkWithSidenotes(article, article.tree, (node) => {
+    if (node.component?.page === undefined) return;
+    const files = node.component.fileParams.map((param) => folderFile(node.component.params[param], article.folder?.files ?? [])).filter((file) => file !== null);
+    pages.push({ name: node.component.page, component: node.name, files, html: componentPageFigure(node) });
+  });
+  return pages;
 }
 
 function usedComponents(article) {

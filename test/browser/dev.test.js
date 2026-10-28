@@ -564,12 +564,26 @@ test('bake dev shows a parameter bar on each component of the article that chang
         ['beta', 'β 初始值', ['range', 'number']],
       ],
     );
-    assert.deepEqual(await bar.locator('button').allTextContents(), ['Reset', 'Copy', 'Write to file']);
+    assert.deepEqual(await bar.locator('button').allTextContents(), ['Open alone', 'Reset', 'Copy', 'Write to file']);
     boxHeight = await frame.locator('.component-box').evaluate((box) => box.getBoundingClientRect().height);
     const [barBox, componentBox] = await Promise.all([bar.boundingBox(), frame.locator('.component-box').boundingBox()]);
     assert.ok(barBox.y + barBox.height <= componentBox.y + 1, 'the bar is above the component');
     assert.equal(await page.locator('figure.component bake-param-bar').count(), await page.locator('figure.component:not(.embed figure.component)').count());
     assert.equal(await page.locator('.embed figure.component bake-param-bar').count(), 0);
+  });
+
+  await test.step('Open alone opens the page of the component, which shows only the component', async () => {
+    await bar.locator('.open').click();
+    const [[opened, target]] = await page.evaluate(() => window.openedUrls);
+    assert.match(opened, /\/2026-10\/syntax\/components\/act-fn-plot(-\d+)?\/$/);
+    assert.equal(target, '_blank');
+    const alone = await page.context().newPage();
+    await alone.goto(opened);
+    await alone.waitForFunction(() => document.querySelector('figure.component').dataset.state === 'ready');
+    assert.equal(await alone.locator('figure.component').count(), 1);
+    assert.deepEqual(await alone.evaluate(() => document.querySelector('act-fn-plot').params.fns), await page.evaluate((selector) => document.querySelector(selector).querySelector('act-fn-plot').params.fns, frameSelector));
+    await alone.close();
+    await page.evaluate(() => delete window.openedUrls);
   });
 
   await test.step('dragging a slider marks the control as changed and updates the running component', async () => {

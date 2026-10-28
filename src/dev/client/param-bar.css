@@ -225,7 +225,8 @@ button {
 
 .actions {
   display: flex;
-  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 2px;
 }
 

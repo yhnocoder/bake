@@ -42,7 +42,7 @@ export async function updateSite(site, changedPaths = null) {
   const [themes, bundle, chat] = await Promise.all([compileThemes(site, published, errors), compileComponents(site, published, errors), compileChat(site)]);
   const assetFiles = assetOutputs(themes, bundle, chat);
   const entries = published.map((article) => ({ article, entry: articleEntry(article, config) }));
-  const shareImages = shareImagesOf(site, entries, { themes, assetFiles }, errors);
+  const shareImages = shareImagesOf(site, entries, { themes, assetFiles, bundle }, errors);
   const pages = await renderPages(site, entries, { themes, bundle, chat, shareImages }, errors);
   const listing = [...pages].sort((a, b) => newestFirst(a.entry, b.entry));
   const model = { root, base: site.base ?? sitePath(config.url), config, settings, themes, chat, assetFiles, shareImages, listing, listed: listing.filter(({ entry }) => !entry.draft), errors };

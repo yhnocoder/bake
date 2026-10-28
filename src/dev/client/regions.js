@@ -1,8 +1,8 @@
 export const BLOCKS = '[data-region] [data-line]';
 export const FRAMES = '[data-region] figure.component[data-line]';
 const FRAME = 'figure.component[data-line]';
-// why: these attributes give the place of a node in the source, which moves with every edit above it
-const POSITIONS = ['data-line', 'data-end-line', 'data-src'];
+// why: these attributes give the place of a node in the source, which moves with every edit above it; the page of a component without an id is named by the number of its use, which moves the same way
+const POSITIONS = ['data-line', 'data-end-line', 'data-src', 'data-page'];
 const POSITIONED = '[data-line], [data-src]';
 
 export function skeleton(doc) {

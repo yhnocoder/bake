@@ -196,14 +196,26 @@ function blockElement(state, node, context) {
 }
 
 function componentElement(state, node, context) {
+  const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
+  const figure = componentFigure(node, context.excerpt?.base ?? '', caption);
+  if (context.excerpt !== undefined) return figure;
+  figure.properties.dataLine = node.position.start.line;
+  if (node.component.page !== undefined) figure.properties.dataPage = `components/${node.component.page}/`;
+  return figure;
+}
+
+// The page of a component shows it without its caption, two folders below the article, so the files of its parameters are found from there.
+export function componentPageFigure(node) {
+  return toHtml(componentFigure(node, '../../', []));
+}
+
+function componentFigure(node, base, caption) {
   const { frame, frameWidth, height, placeholder } = node.component;
-  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, context.excerpt)), ...writtenAttributes(node.attributes) };
-  if (context.excerpt === undefined) properties.dataLine = node.position.start.line;
+  const properties = { className: ['component'], dataComponent: node.name, dataParams: JSON.stringify(componentParams(node.component, base)), ...writtenAttributes(node.attributes) };
   if (!frame) properties.dataFrame = 'none';
   if (frameWidth !== undefined) properties.style = `width:${frameWidth}`;
   const size = height !== null ? `--component-height:${height.height};--component-ratio:${height.ratio}` : placeholder !== null ? `--component-placeholder-narrow:${placeholder.narrow};--component-placeholder-wide:${placeholder.wide}` : null;
   const box = element('div', { className: ['component-box'], ...(size === null ? {} : { style: size }) }, []);
-  const caption = node.children.length === 0 ? [] : [element('figcaption', {}, cellContent(state, node))];
   return element('figure', properties, [box, ...caption]);
 }
 
@@ -211,8 +223,7 @@ function writtenAttributes(attributes) {
   return attributes === undefined || Object.keys(attributes).length === 0 ? {} : { dataAttributes: JSON.stringify(attributes) };
 }
 
-function componentParams({ params, fileParams }, excerpt) {
-  const base = excerpt === undefined ? '' : excerpt.base;
+function componentParams({ params, fileParams }, base) {
   return Object.fromEntries(Object.entries(params).map(([name, value]) => [name, fileParams.includes(name) && value !== '' ? `${base}${encodePath(value)}` : value]));
 }
 

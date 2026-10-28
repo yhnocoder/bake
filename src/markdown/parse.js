@@ -71,6 +71,8 @@ const STAGES = [
   readImageAttributes,
   // reads the footnote definitions and references; writes article.definitions and article.sidenotes, which walkWithSidenotes follows
   readFootnotes,
+  // reads the components in the text and the sidenotes and their ids; writes the name of the page of each component
+  assignComponentPages,
   // reads :::references and the citations; writes article.citations and article.references
   readCitations,
   // reads each :::list-table; writes its rows
@@ -174,7 +176,27 @@ function readComponent(article, node, attributePosition) {
   if (!component.valid) return;
   const resolved = resolveComponent(node.name, component, node.attributes, article.folder?.files ?? []);
   for (const { attribute, message } of resolved.problems) article.report(attributePosition(attribute), message);
-  node.component = resolved;
+  node.component = { ...resolved, pagePosition: attributePosition(resolved.id === undefined ? undefined : 'id') };
+}
+
+// A component without an id is named by its block name, and from its second use in the article on by the block name and the number of the use, such as act-fn-plot-2.
+function assignComponentPages(article, tree) {
+  const uses = new Map();
+  const pages = new Map();
+  walkWithSidenotes(article, tree, (node) => {
+    if (node.component === undefined) return;
+    const use = (uses.get(node.name) ?? 0) + 1;
+    uses.set(node.name, use);
+    const page = node.component.id ?? (use === 1 ? node.name : `${node.name}-${use}`);
+    const first = pages.get(page);
+    if (first === undefined) {
+      pages.set(page, node);
+      node.component.page = page;
+      return;
+    }
+    const { line, column } = first.position.start;
+    article.report(node.component.pagePosition, `the component page "${page}" is also the page of the :::${first.name} at ${line}:${column}; give one of them another id`);
+  });
 }
 
 function readThemeBlock(article, node, parent, attributePosition) {
