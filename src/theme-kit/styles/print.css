@@ -14,7 +14,8 @@
   .bk-toast,
   .bk-preview,
   .bk-copy,
-  .bk-heading-link {
+  .bk-heading-link,
+  .bk-component-link {
     display: none !important;
   }
 

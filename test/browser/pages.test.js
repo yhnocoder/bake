@@ -22,7 +22,16 @@ const articles = readdirSync(join(exampleBlog, 'content/posts')).map((name) => {
   return { name, source, path: `/${month}/${slug}/`, markdown: !/^page: /m.test(source) };
 });
 
-const pages = ['/', '/a-missing-page/', ...articles.map((article) => article.path)];
+// The page of the first component of an article is named by the id of the component or by its block name
+function firstComponentPage(article) {
+  const text = article.source.replace(/^(`{3,}|~{3,}).*\n[\s\S]*?^\1[ \t]*$/gm, '');
+  const block = [...text.matchAll(/^:{3,}([a-z][a-z0-9]*(?:-[a-z0-9]+)+)(\{.*\})?[ \t]*$/gm)].find((match) => match[1] !== 'list-table');
+  if (block === undefined) return [];
+  const id = /(?:^\{|\s)#([a-z0-9-]+)/.exec(block[2] ?? '')?.[1];
+  return [`${article.path}components/${id ?? block[1]}/`];
+}
+
+const pages = ['/', '/a-missing-page/', ...articles.map((article) => article.path), ...articles.flatMap(firstComponentPage)];
 
 // Records the requests of a page, and waits until none has been in flight for half a second
 function recordRequests(cdp) {

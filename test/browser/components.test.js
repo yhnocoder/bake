@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { article, validConfig } from '../blog.js';
-import { test as base, settle } from './browser.js';
+import { test as base, luminance, settle } from './browser.js';
 
 const spacer = Array.from({ length: 120 }, (_, index) => `Paragraph ${index + 1} keeps the last component far below the first screen.`).join('\n\n');
 
@@ -299,6 +299,53 @@ test.describe('components run in the browser', () => {
     const page = await open('embedder');
     await waitForReady(page);
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.embed grid-view')].map((element) => element.textContent)), ['grid far']);
+    assert.deepEqual(page.problems, []);
+  });
+
+  test('the page of a component shows only the component with its parameters, takes the color scheme from ?scheme, and sends its height to the page that shows it in a frame', async ({ open }) => {
+    const page = await open('rope/components/count-view');
+    await waitForReady(page);
+    assert.deepEqual(await page.evaluate(() => [document.querySelectorAll('figure.component').length, document.querySelector('count-view').textContent, document.querySelector('figcaption')]), [1, 'hello 3 false', null]);
+    const background = async (scheme) => {
+      await page.goto(`/2026-10/rope/components/count-view/?scheme=${scheme}`);
+      return luminance(await page.evaluate(() => getComputedStyle(document.body).backgroundColor));
+    };
+    assert.ok((await background('dark')) < (await background('light')), 'the dark scheme is darker than the light one');
+
+    await page.goto('/2026-10/gelu/');
+    const heights = await page.evaluate(async () => {
+      const frame = Object.assign(document.createElement('iframe'), { src: 'components/grid-view/' });
+      frame.style.cssText = 'width: 400px; height: 10px; border: 0';
+      const received = [];
+      const next = () => new Promise((done) => addEventListener('message', (event) => done(event.source === frame.contentWindow ? event.data : null), { once: true }));
+      let message = next();
+      document.body.append(frame);
+      received.push(await message);
+      message = next();
+      frame.style.width = '200px';
+      received.push(await message);
+      return { received, content: Math.ceil(frame.contentDocument.documentElement.getBoundingClientRect().height) };
+    });
+    assert.deepEqual(heights, { received: [{ type: 'bake:height', height: 200 }, { type: 'bake:height', height: 100 }], content: 100 });
+    assert.deepEqual(page.problems, []);
+  });
+
+  test('the link above a component, shown while the pointer is on the component, copies the address of its page and shows a toast, and the page of a component has no such link', async ({ open, baseURL }) => {
+    const page = await open('rope');
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await waitForReady(page, 1);
+    const frame = page.locator('figure.component').first();
+    const link = frame.locator('.bk-component-link');
+    await frame.hover();
+    await link.click();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-toast')).opacity !== '0');
+    assert.deepEqual(await page.evaluate(async () => [await navigator.clipboard.readText(), document.querySelector('.bk-toast').textContent]), [`${baseURL}/2026-10/rope/components/count-view/`, 'Component link copied']);
+    const box = await frame.locator('.component-box').boundingBox();
+    const linkBox = await link.boundingBox();
+    assert.ok(linkBox.y + linkBox.height <= box.y, 'the link covers no part of the component');
+    await page.goto('/2026-10/rope/components/count-view/');
+    await waitForReady(page);
+    assert.equal(await page.locator('.bk-component-link').count(), 0);
     assert.deepEqual(page.problems, []);
   });
 

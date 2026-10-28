@@ -160,6 +160,39 @@ describe('share images', () => {
     assert.notEqual(afterTitle, afterImport);
   });
 
+  test('the page of each component names a share image that shows the component, or the share image of its article when the component does not start', async (t) => {
+    const fill = "export const params = { colour: { label: 'Colour', type: 'text', default: '#ff00ff' } };\nexport const layout = { height: { ratio: 2 }, frame: false };\n\nexport default class FillView extends HTMLElement {\n  connectedCallback() {\n    this.style.background = this.params.colour;\n  }\n}\n";
+    const dir = createBlog(t, {
+      ...blogFiles,
+      'components/fill-view.js': fill,
+      'content/posts/plain/index.md': article({ title: 'Plain', slug: 'plain', date: '2026-09-02', extra: 'category: notes\n', body: ':::fill-view\n:::\n\n:::fill-view{#green colour="#00ff00"}\n:::\n' }),
+    });
+    assert.deepEqual(await build(dir), []);
+    const images = readdirSync(join(dir, 'dist/og/2026-09/plain/components')).sort();
+    assert.equal(images.length, 2);
+    const [fillImage, greenImage] = images;
+    assert.match(fillImage, /^fill-view-[0-9a-f]{12}\.png$/);
+    assert.match(greenImage, /^green-[0-9a-f]{12}\.png$/);
+    const drawn = await decodeImage(readFileSync(join(dir, 'dist/og/2026-09/plain/components', greenImage)));
+    assert.deepEqual([drawn.width, drawn.height], [SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT]);
+    assert.deepEqual(pixel(drawn, 600, 315), [0, 255, 0]);
+    assert.deepEqual(pixel(await decodeImage(readFileSync(join(dir, 'dist/og/2026-09/plain/components', fillImage))), 600, 315), MAGENTA);
+    assert.deepEqual(imageTags(readFileSync(join(dir, 'dist/2026-09/plain/components/green/index.html'), 'utf8')), [
+      '<meta name="twitter:card" content="summary_large_image">',
+      `<meta property="og:image" content="https://x.github.io/bake/og/2026-09/plain/components/${greenImage}">`,
+      '<meta property="og:image:type" content="image/png">',
+      `<meta property="og:image:width" content="${SHARE_IMAGE_WIDTH}">`,
+      `<meta property="og:image:height" content="${SHARE_IMAGE_HEIGHT}">`,
+      `<meta name="twitter:image" content="https://x.github.io/bake/og/2026-09/plain/components/${greenImage}">`,
+    ]);
+
+    writeFiles(dir, { 'components/fill-view.js': fill.replace('this.style.background = this.params.colour;', "throw new Error('no colour');") });
+    assert.deepEqual(await build(dir), []);
+    const card = readdirSync(join(dir, 'dist/og/2026-09')).find((name) => name.startsWith('plain-'));
+    const fallback = readdirSync(join(dir, 'dist/og/2026-09/plain/components')).find((name) => name.startsWith('green-'));
+    assert.deepEqual(pixel(await decodeImage(readFileSync(join(dir, 'dist/og/2026-09/plain/components', fallback))), 10, 315), pixel(await decodeImage(readFileSync(join(dir, 'dist/og/2026-09', card))), 10, 315));
+  });
+
   test('bake dev draws no share images and writes no image tags', async (t) => {
     const dir = createBlog(t, blogFiles);
     const server = await startDevServer(dir, { port: 0, print: () => {} });

@@ -1,4 +1,4 @@
-import { WIDTHS, folderFile, parseSize } from '../config/rules.js';
+import { WIDTHS, folderFile, parseSize, slugProblem } from '../config/rules.js';
 import { describeValue, listAll, listChoices } from '../shared/report.js';
 import { meantName } from '../shared/suggest.js';
 import { readNumbers } from './numbers.js';
@@ -78,10 +78,17 @@ export function resolveComponent(name, component, attributes, files) {
   const report = (attribute, message) => problems.push({ attribute, message });
   const params = {};
   for (const [param, declaration] of Object.entries(component.params)) params[param] = declaration.default;
+  let id;
   for (const [attribute, raw] of Object.entries(attributes)) {
     if (SIZE_ATTRIBUTES.includes(attribute)) continue;
+    if (attribute === 'id') {
+      const problem = slugProblem(`the id of ${name}`, raw);
+      if (problem === null) id = raw;
+      else report(attribute, problem);
+      continue;
+    }
     if (RESERVED_PARAMS.includes(attribute)) {
-      report(attribute, `components take no id or class; remove the ${attribute} from :::${name}`);
+      report(attribute, `components take no ${attribute}; remove the ${attribute} from :::${name}`);
       continue;
     }
     const declaration = component.params[attribute];
@@ -104,7 +111,7 @@ export function resolveComponent(name, component, attributes, files) {
   const height = componentHeight(name, component.layout, attributes.height, report);
   const placeholder = height === null && component.layout.placeholder !== undefined ? readPlaceholder(component.layout.placeholder) : null;
   const fileParams = Object.keys(component.params).filter((param) => component.params[param].type === 'file');
-  return { params, fileParams, ...width, height, placeholder, frame: component.layout.frame !== false, problems };
+  return { params, fileParams, id, ...width, height, placeholder, frame: component.layout.frame !== false, problems };
 }
 
 export function fileProblem(declaration, value, files) {

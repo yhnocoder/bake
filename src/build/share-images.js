@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { errorAt, fileStart } from '../shared/report.js';
 import { contentType } from '../shared/content-types.js';
 import { DIST_DIR } from './dist.js';
+import { componentPageHtml } from './component-pages.js';
 import { cardHtml } from './share-card.js';
 import { THEME_STYLES_PATH } from './theme.js';
 import { encodePath } from '../shared/urls.js';
@@ -19,11 +20,17 @@ export const INSTALL_CHROMIUM = 'npx playwright install chromium';
 const ORIGIN = 'http://share-image.invalid';
 const ARTICLE_DIR = 'article';
 const CARD_FILE = 'card.html';
+// why: a share image is about twice as wide as a column of text, so the component is drawn at the width of a column and at twice the resolution
+const COMPONENT_SCALE = 2;
+const COMPONENT_TIMEOUT = 10000;
+// why: a tall component scaled down to the height of the image would be too small to read, so the image shows its top part and fades out the rest
+const COMPONENT_MAX_HEIGHT = 420;
+const COMPONENT_FADE = 96;
 const PAGE_COUNT = 4;
 const DRAW_TIMEOUT = 10000;
 const HASH_LENGTH = 12;
 const CACHE_DIR = 'bake-share-images';
-const DRAWING_CODE = ['share-card.js', 'share-images.js'].map((file) => readFileSync(join(import.meta.dirname, file)));
+const DRAWING_CODE = ['share-card.js', 'share-images.js', 'component-pages.js'].map((file) => readFileSync(join(import.meta.dirname, file)));
 const PLAYWRIGHT_VERSION = createRequire(import.meta.url)('playwright/package.json').version;
 const PNG = { extension: '.png', type: 'image/png' };
 const PUBLISHED_COVERS = {
@@ -34,13 +41,23 @@ const PUBLISHED_COVERS = {
 };
 
 // The share images are known before the pages, which link to them, and are drawn after them, when the problems of every article are known.
-export function shareImagesOf(site, entries, { themes, assetFiles }, errors) {
+export function shareImagesOf(site, entries, { themes, assetFiles, bundle }, errors) {
   const { config } = site.settings;
   if (!site.shareImages || themes.get(config.theme) === null) return new Map();
   const failed = new Set(errors.map((error) => error.file));
   const listed = entries.filter(({ article, entry }) => !entry.draft && article.fields.page === undefined && !failed.has(article.file));
   const sources = assetSources(assetFiles);
-  return new Map(listed.map((page) => [page.article.file, shareImageOf(site.root, page, config, sources)]));
+  const images = new Map();
+  for (const page of listed) {
+    images.set(page.article.file, shareImageOf(site.root, page, config, sources));
+    if (bundle === null) continue;
+    for (const component of page.article.content.componentPages) images.set(componentImageKey(page.article, component), componentImageOf(site.root, page, component, { config, runtime: bundle.runtime }, sources));
+  }
+  return images;
+}
+
+export function componentImageKey(article, component) {
+  return `${article.file} ${component.name}`;
 }
 
 export function shareImageFiles({ root, shareImages, assetFiles, errors }) {
@@ -89,6 +106,25 @@ function shareImageOf(root, { article, entry }, config, assets) {
   };
 }
 
+// The share image of the page of a component shows the component as its page shows it in the light scheme.
+function componentImageOf(root, { article, entry }, component, { config, runtime }, assets) {
+  const page = `${entry.path}components/${component.name}/`;
+  const html = componentPageHtml(component, entry, { config, runtime, path: page });
+  const inputs = [...DRAWING_CODE, PLAYWRIGHT_VERSION, html, assets.get(THEME_STYLES_PATH), assets.get(runtime)];
+  for (const file of component.files) inputs.push(file, readFileSync(join(root, article.dir, file)));
+  const key = digest(inputs);
+  return {
+    path: `${SHARE_IMAGE_DIR}/${page.slice(0, -1)}-${key}.png`,
+    key,
+    owner: article.file,
+    type: PNG.type,
+    width: SHARE_IMAGE_WIDTH,
+    height: SHARE_IMAGE_HEIGHT,
+    component: { page, html, article: entry.path },
+    folder: { path: join(root, article.dir), files: article.files },
+  };
+}
+
 async function shareImageOutputs(root, images, assets, errors) {
   const outputs = [];
   const pending = [];
@@ -96,7 +132,8 @@ async function shareImageOutputs(root, images, assets, errors) {
     const published = join(root, DIST_DIR, image.path);
     if (image.from !== undefined) outputs.push({ path: image.path, from: image.from, owner: image.owner });
     else if (image.render !== undefined) outputs.push({ path: image.path, render: image.render, owner: image.owner });
-    else if (existsSync(published)) outputs.push({ path: image.path, from: published, owner: image.owner });
+    // why: the image of a component that could not be drawn holds the share image of its article, so only the cache, which holds drawn images, is reused
+    else if (image.component === undefined && existsSync(published)) outputs.push({ path: image.path, from: published, owner: image.owner });
     else {
       const png = cachedCard(image.key);
       if (png === null) pending.push(image);
@@ -104,10 +141,19 @@ async function shareImageOutputs(root, images, assets, errors) {
     }
   }
   if (pending.length === 0) return outputs;
-  return [...outputs, ...(await drawCards(pending, assets, errors))];
+  const undrawn = [];
+  outputs.push(...(await drawCards(pending, assets, undrawn, errors)));
+  for (const image of undrawn) {
+    const article = outputs.find((output) => output.path === images.find((other) => other.owner === image.owner && other.component === undefined).path);
+    if (article === undefined) continue;
+    const source = async () => (article.from === undefined ? article.render() : readFileSync(article.from));
+    outputs.push({ path: image.path, render: async () => sharp(await source()).resize(SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT, { fit: 'contain', background: '#ffffff' }).png().toBuffer(), owner: image.owner });
+  }
+  return outputs;
 }
 
-async function drawCards(images, assets, errors) {
+// A component that fails or does not start in time is listed in undrawn, and its page takes the share image of its article.
+async function drawCards(images, assets, undrawn, errors) {
   let browser;
   try {
     const { chromium } = await import('playwright');
@@ -125,22 +171,31 @@ async function drawCards(images, assets, errors) {
       reducedMotion: 'reduce',
       serviceWorkers: 'block',
     });
-    await context.route('**/*', (route) => answer(route, images, assets));
+    const componentContext = await browser.newContext({
+      viewport: { width: SHARE_IMAGE_WIDTH / COMPONENT_SCALE, height: SHARE_IMAGE_HEIGHT / COMPONENT_SCALE },
+      deviceScaleFactor: COMPONENT_SCALE,
+      colorScheme: 'light',
+      reducedMotion: 'reduce',
+      serviceWorkers: 'block',
+    });
+    for (const opened of [context, componentContext]) await opened.route('**/*', (route) => answer(route, images, assets));
     const queue = images.entries();
     const outputs = [];
     const draw = async () => {
-      let page = await context.newPage();
+      const pages = { card: await context.newPage(), component: await componentContext.newPage() };
       for (const [index, image] of queue) {
-        const result = await drawCard(page, index, image);
+        const kind = image.component === undefined ? 'card' : 'component';
+        const result = kind === 'card' ? await drawCard(pages.card, index, image) : await drawComponent(pages.component, index, image);
         if (result.problem === undefined) {
           storeCard(image.key, result.png);
           outputs.push({ path: image.path, render: () => result.png, owner: image.owner });
           continue;
         }
-        errors.push(errorAt(image.owner, image.previewPosition ?? fileStart, `the preview cannot be drawn on the share image: ${result.problem}`));
+        if (kind === 'card') errors.push(errorAt(image.owner, image.previewPosition ?? fileStart, `the preview cannot be drawn on the share image: ${result.problem}`));
+        else undrawn.push(image);
         if (result.stuck) {
-          await page.close();
-          page = await context.newPage();
+          await pages[kind].close();
+          pages[kind] = await (kind === 'card' ? context : componentContext).newPage();
         }
       }
     };
@@ -166,6 +221,46 @@ async function drawCard(page, index, image) {
   clearTimeout(timer);
   if (result.problem !== undefined) return result;
   return { png: await page.screenshot({ type: 'png' }) };
+}
+
+async function drawComponent(page, index, image) {
+  try {
+    await page.goto(`${ORIGIN}/${index}/${image.component.page}index.html`);
+    await page.waitForFunction(componentStarted, null, { timeout: COMPONENT_TIMEOUT, polling: 100 });
+    if ((await page.evaluate(() => document.querySelector('figure.component').dataset.state)) !== 'ready') return { problem: 'it did not start' };
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    const { clip, background } = await page.evaluate(fadeTallComponent, { maxHeight: COMPONENT_MAX_HEIGHT, fade: COMPONENT_FADE });
+    const shot = await page.screenshot({ type: 'png', clip, fullPage: true });
+    const png = await sharp(shot).resize(SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT, { fit: 'contain', background }).png().toBuffer();
+    return { png };
+  } catch (error) {
+    return { problem: String(error instanceof Error ? error.message : error), stuck: true };
+  }
+}
+
+function fadeTallComponent({ maxHeight, fade }) {
+  const figure = document.querySelector('figure.component');
+  const background = getComputedStyle(document.body).backgroundColor;
+  const box = figure.getBoundingClientRect();
+  const height = Math.min(box.height, maxHeight);
+  if (box.height > maxHeight) {
+    const mask = document.createElement('div');
+    mask.style.cssText = `position: absolute; left: ${box.left + scrollX}px; top: ${box.top + scrollY + height - fade}px; width: ${box.width}px; height: ${fade}px; background: linear-gradient(transparent, ${background}); pointer-events: none`;
+    document.body.append(mask);
+  }
+  return { clip: { x: box.left + scrollX, y: box.top + scrollY, width: box.width, height }, background };
+}
+
+// why: a component typesets its formulas after it starts, and the screenshot waits for them
+function componentStarted() {
+  const figure = document.querySelector('figure.component');
+  if (figure.dataset.state === 'failed') return true;
+  if (figure.dataset.state !== 'ready') return false;
+  const formulas = [...figure.querySelectorAll('.bk-kit-tex, .bk-kit-svg-tex, .bk-kit-svg-math-text')];
+  return formulas.every((formula) => formula.querySelector('svg') !== null || (formula.matches('.bk-kit-svg-math-text') && formula.childElementCount > 0));
 }
 
 async function drawFirstFrame(preview) {
@@ -206,10 +301,20 @@ function requestedFile(path, images, assets) {
   const image = images[Number(index)];
   if (image === undefined || String(Number(index)) !== index) return null;
   const file = rest.join('/');
+  if (image.component !== undefined) return componentFile(file, image, assets);
   if (file === CARD_FILE) return cardHtml(image.card, `/${THEME_STYLES_PATH}`);
   const prefix = `${ARTICLE_DIR}/`;
   if (!file.startsWith(prefix) || !image.folder.files.includes(file.slice(prefix.length))) return null;
   return readFileSync(join(image.folder.path, file.slice(prefix.length)));
+}
+
+// The page of a component is served at its address in the site, so that its relative addresses reach the assets and the files of the article.
+function componentFile(file, image, assets) {
+  const { page, html, article } = image.component;
+  if (file === `${page}index.html`) return html;
+  if (assets.has(file)) return assets.get(file);
+  const name = file.startsWith(article) ? file.slice(article.length) : null;
+  return name !== null && image.folder.files.includes(name) ? readFileSync(join(image.folder.path, name)) : null;
 }
 
 function cachedCard(key) {

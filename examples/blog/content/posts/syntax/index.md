@@ -453,6 +453,15 @@ def swiglu(x, w_gate, w_up, w_down):
 :::
 ::::
 
+每个组件还有一个只显示它自己的页面，地址是文章地址后面加 `components/名字/`，别的网站可以用 iframe 嵌入它。名字默认是组件名，同一篇文章里第二次用到同一个组件时是组件名加 `-2`，依此类推。在花括号里写 `#名字` 可以指定名字，只能用小写字母、数字和 `-`。前面加入同一个组件不会改变指定了名字的页面地址，所以要给别的网站嵌入的组件写上名字。下面这个组件的页面是本文地址后面加 `components/relu-alone/`：
+
+::::example
+:::act-fn-plot{#relu-alone fns=relu}
+:::
+::::
+
+组件页面跟随系统的深浅色，地址后面加 `?scheme=dark` 或 `?scheme=light` 可以指定一种。嵌入它的页面会收到 `{ type: 'bake:height', height }` 消息，告诉它组件页面的高度。`bake build` 还会给每个组件页面截一张图作为分享图，把组件页面的链接发到聊天里时显示的就是这个组件。
+
 ## 站内链接与嵌入
 
 链接到另一篇文章时，地址写目标文章的网址加锚点。锚点可以是标题的 `#id`，也可以是段落的 `^名字`。读者鼠标停在站内链接上时显示预览卡。
@@ -535,7 +544,8 @@ def silu(x):
 | 用宽度块包住组件 | `::::{width=wide}` 里面写 `:::glu-heatmap` | `write the width of a component in its own braces, such as :::glu-heatmap{width=wide}, instead of :::{width=…} around it` |
 | 文件参数指向文章文件夹以外 | `:::points-plot{data=../points.json}` | `parameter "data" of points-plot must be a file in the article folder, got "../points.json"` |
 | 用了另一篇文章的组件 | 在别的文章里写 `:::bar-chart` | `component "bar-chart" belongs to content/posts/syntax and works only in that article; move content/posts/syntax/components/bar-chart.js to components/ to use it in other articles` |
-| 组件写了锚点或类名 | `:::act-fn-plot{#plot}` | `components take no id or class; remove the id from :::act-fn-plot` |
+| 组件写了类名 | `:::act-fn-plot{.wide}` | `components take no class; remove the class from :::act-fn-plot` |
+| 两个组件的 id 相同 | 两个组件都写 `{#relu}` | `the component page "relu" is also the page of the :::act-fn-plot at 8:1; give one of them another id` |
 | 组件声明不是字面量 | `components/range-plot.js` 写 `params = { n: range('N') }` | `range-plot: the build reads params without running the file, so write it with strings, numbers, true, false, null, lists, objects, template strings without ${…} and names of constants of this file with such a value; got a call` |
 | 站内链接的目标不存在 | `[链式法则](/2026-10/syntax-linked/#chain)` | `link target /2026-10/syntax-linked/#chain does not exist` |
 | 链接指向站内不存在的路径 | `[关于](/about/)` | `link target /about/ is not a page or a file of the site` |

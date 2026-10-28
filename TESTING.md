@@ -5,7 +5,7 @@
 A test is one of three kinds:
 
 1. **A promise of README.md.** It writes the smallest blog that the promise needs, runs Bake or opens the page, and checks what the user or the reader observes. Its name says the promise.
-2. **An invariant of every page of the example blog.** `test/browser/pages.test.js` opens each page of `examples/blog/`, the homepage, every article, the plain HTML page and the 404 page, and checks the same properties on each: see [Invariants and tables](#invariants-and-tables).
+2. **An invariant of every page of the example blog.** `test/browser/pages.test.js` opens each page of `examples/blog/`, the homepage, every article, the plain HTML page, the 404 page and the page of the first component of each article, and checks the same properties on each: see [Invariants and tables](#invariants-and-tables).
 3. **A performance budget.** A limit in `test/perf/budgets.json` on a quantity that a reader or an author waits for or downloads.
 
 A check that is none of these is not written. Visual details that README.md does not promise, such as shadows, cursors, colours, radii and the curves of transitions, have no tests.

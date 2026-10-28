@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import { scrollInSteps, settle } from './browser.js';
 import { QUESTION, ask, openSettings, setUpKey, shadow, test, text } from './chat-page.js';
 
+// why: a component changes its height when it starts, which moves a link below it and so closes the preview card that a hover opened
+function componentsOnScreenStarted(page) {
+  return page.waitForFunction(() => [...document.querySelectorAll('figure.component')].every((figure) => {
+    const box = figure.getBoundingClientRect();
+    return box.bottom < 0 || box.top > innerHeight || figure.dataset.state === 'ready' || figure.dataset.state === 'failed';
+  }));
+}
+
 test.describe('the keyboard and the pointer in the AI chat on published pages', () => {
   test('a chat closed right after the key is saved leaves the keyboard focus on the pet', async ({ openChat }) => {
     const { page } = await openChat();
@@ -44,6 +52,7 @@ test.describe('the keyboard and the pointer in the AI chat on published pages', 
 
     const link = page.locator('.bk-article a.internal-link').first();
     await link.scrollIntoViewIfNeeded();
+    await componentsOnScreenStarted(page);
     await focusQuestion();
     await link.hover();
     await page.locator('.bk-preview.is-on').waitFor();
@@ -82,6 +91,7 @@ test.describe('the keyboard and the pointer in the AI chat on published pages', 
     await setUpKey(page);
     const link = page.locator('.bk-article a.internal-link').first();
     await link.scrollIntoViewIfNeeded();
+    await componentsOnScreenStarted(page);
     await settle(page);
     await link.hover();
     await page.locator('.bk-preview.is-on').waitFor();

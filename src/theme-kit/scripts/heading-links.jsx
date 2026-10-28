@@ -66,9 +66,13 @@ export function startHeadingLinks() {
 function copyLink(hash, labels) {
   const url = `${location.href.split('#')[0]}${hash}`;
   history.replaceState(null, '', hash);
+  copyAddress(url, labels.linkCopied);
+}
+
+export function copyAddress(url, message) {
   const copied = navigator.clipboard === undefined ? Promise.reject(new Error('no clipboard')) : navigator.clipboard.writeText(url);
   copied.then(
-    () => showToast(labels.linkCopied),
+    () => showToast(message),
     () => showToast(url),
   );
 }

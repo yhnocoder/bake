@@ -207,8 +207,39 @@ describe('building components', () => {
     const assets = readdirSync(join(dir, 'dist/assets'));
     assert.ok(assets.some((name) => /^rope-plot-[\w-]+\.js$/.test(name)));
     assert.ok(assets.some((name) => /^gelu-plot-[\w-]+\.js$/.test(name)));
-    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/rope')).sort(), ['index.html', 'index.md']);
-    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/gelu')).sort(), ['index.html', 'index.md']);
+    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/rope'), { recursive: true }).sort(), ['components', 'components/rope-plot', 'components/rope-plot/index.html', 'components/shared-view', 'components/shared-view/index.html', 'index.html', 'index.md']);
+    assert.deepEqual(readdirSync(join(dir, 'dist/2026-10/gelu'), { recursive: true }).sort(), ['components', 'components/gelu-plot', 'components/gelu-plot/index.html', 'index.html', 'index.md']);
+  });
+
+  test('gives each component of an article a page that shows only the component with its parameters, named by its id or by its name and number', async (t) => {
+    const params = "export const params = { range: { label: 'Range', type: 'number', default: 4 }, data: { label: 'Data', type: 'file', default: '' } };\n";
+    const dir = createBlog(t, {
+      'bake.config.js': validConfig,
+      'components/fn-plot.js': `${params}${height}export default class FnPlot extends HTMLElement {}\n`,
+      'content/posts/rope/index.md': article({ body: ':::fn-plot{range=3}\nA caption.\n:::\n\n:::fn-plot{#zoom range=5}\n:::\n\n:::fn-plot{data=points.json}\n:::\n\nA note.[^n]\n\n[^n]: :::fn-plot{range=7}\n    :::\n' }),
+      'content/posts/rope/points.json': '[]\n',
+    });
+    assert.deepEqual(await build(dir), []);
+    const pages = join(dir, 'dist/2026-10/rope/components');
+    assert.deepEqual(readdirSync(pages).sort(), ['fn-plot', 'fn-plot-3', 'fn-plot-4', 'zoom']);
+    const page = (name) => readFileSync(join(pages, name, 'index.html'), 'utf8');
+    const figure = (html) => {
+      const figures = [...html.matchAll(/<figure[^>]*data-params="([^"]*)"[^>]*>[\s\S]*?<\/figure>/g)];
+      assert.equal(figures.length, 1);
+      return { params: JSON.parse(figures[0][1].replaceAll('&#x22;', '"')), html: figures[0][0] };
+    };
+    assert.deepEqual(figure(page('fn-plot')).params, { range: 3, data: '' });
+    assert.doesNotMatch(figure(page('fn-plot')).html, /figcaption|A caption/);
+    assert.deepEqual(figure(page('zoom')).params, { range: 5, data: '' });
+    assert.deepEqual(figure(page('fn-plot-3')).params, { range: 4, data: '../../points.json' });
+    assert.deepEqual(figure(page('fn-plot-4')).params, { range: 7, data: '' });
+    const articlePage = readFileSync(join(dir, 'dist/2026-10/rope/index.html'), 'utf8');
+    const html = page('zoom');
+    assert.match(html, /<meta name="robots" content="noindex">/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/example\.com\/2026-10\/rope\/">/);
+    assert.match(html, /<script type="module" src="\.\.\/\.\.\/\.\.\/\.\.\/assets\/components-[\w-]+\.js"><\/script>/);
+    assert.doesNotMatch(readFileSync(join(dir, 'dist/sitemap.xml'), 'utf8'), /components\//);
+    assert.deepEqual([...articlePage.matchAll(/data-page="([^"]+)"/g)].map((match) => match[1]), ['components/fn-plot/', 'components/zoom/', 'components/fn-plot-3/', 'components/fn-plot-4/']);
   });
 
   test('components that share a stylesheet without script name only files that the build writes', async (t) => {

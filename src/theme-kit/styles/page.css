@@ -345,6 +345,38 @@ body {
   color: var(--accent);
 }
 
+/* why: the link sits above the frame, in the margin before it, so that it covers no control of the component */
+.bk-article .bk-component-link {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-fast),
+    color var(--motion-fast);
+}
+
+.bk-article .bk-component-link > svg {
+  width: 13px;
+  height: 13px;
+}
+
+.bk-article .component:is(:hover, :focus-within) > .bk-component-link {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bk-article .bk-component-link:hover {
+  color: var(--accent);
+}
+
 @media (max-width: 999.98px) {
   .bk-header {
     padding-top: 40px;
