@@ -330,6 +330,25 @@ test.describe('components run in the browser', () => {
     assert.deepEqual(page.problems, []);
   });
 
+  test('the link above a component, shown while the pointer is on the component, copies the address of its page and shows a toast, and the page of a component has no such link', async ({ open, baseURL }) => {
+    const page = await open('rope');
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await waitForReady(page, 1);
+    const frame = page.locator('figure.component').first();
+    const link = frame.locator('.bk-component-link');
+    await frame.hover();
+    await link.click();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.bk-toast')).opacity !== '0');
+    assert.deepEqual(await page.evaluate(async () => [await navigator.clipboard.readText(), document.querySelector('.bk-toast').textContent]), [`${baseURL}/2026-10/rope/components/count-view/`, 'Component link copied']);
+    const box = await frame.locator('.component-box').boundingBox();
+    const linkBox = await link.boundingBox();
+    assert.ok(linkBox.y + linkBox.height <= box.y, 'the link covers no part of the component');
+    await page.goto('/2026-10/rope/components/count-view/');
+    await waitForReady(page);
+    assert.equal(await page.locator('.bk-component-link').count(), 0);
+    assert.deepEqual(page.problems, []);
+  });
+
   test('pixel and percent widths measure their width, are centred and never exceed the screen', async ({ open }) => {
     for (const width of [1440, 1100, 375]) {
       const page = await open('rope', { viewport: { width, height: 800 } });
