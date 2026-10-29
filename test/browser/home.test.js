@@ -139,16 +139,24 @@ test.describe('the essay homepage', () => {
     const jacobian = cardIn('category', '2026-09/jacobian/');
     await page.locator(jacobian).evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview')?.dataset.state === 'running', jacobian);
-    const states = await page.locator(jacobian).evaluate(async (card) => {
-      const seen = [];
-      for (let step = 0; step < 16; step += 1) {
-        scrollBy({ top: step % 2 === 0 ? 3 : -3, behavior: 'instant' });
-        await new Promise((done) => setTimeout(done, 50));
-        seen.push(card.querySelector('.bk-card-preview').dataset.state);
-      }
-      return seen;
-    });
-    assert.deepEqual(new Set(states.slice(1)), new Set(['stopped']));
+    // why: the preview starts a moment after the last scroll, and a loaded machine can let that moment pass between two steps of the scrolling, so the clock of the page moves only by the time between the steps
+    await page.clock.install();
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+    const states = [];
+    for (let step = 0; step < 16; step += 1) {
+      await page.evaluate(
+        (top) =>
+          new Promise((done) => {
+            addEventListener('scroll', done, { once: true });
+            scrollBy({ top, behavior: 'instant' });
+          }),
+        step % 2 === 0 ? 3 : -3,
+      );
+      await page.clock.runFor(50);
+      states.push(await previewState(page, jacobian));
+    }
+    assert.deepEqual(new Set(states), new Set(['stopped']));
+    await page.clock.resume();
     await page.waitForFunction((selector) => document.querySelector(selector).querySelector('.bk-card-preview').dataset.state === 'running', jacobian);
   });
 
