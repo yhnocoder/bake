@@ -36,7 +36,8 @@ test.describe('the pet of the AI chat on published pages', () => {
       if (pathname.startsWith('/_bake/pet/')) pets.push(pathname);
     });
     await page.goto('/2026-10/syntax/');
-    await page.waitForLoadState('networkidle');
+    // why: the chat starts once the browser has said whether it supports passkeys, which can come after the network is idle on a loaded machine
+    await page.locator('.bk-chat-pet-frame').evaluate((frame) => frame.decode());
     assert.deepEqual(pets, ['/_bake/pet/frame.webp']);
     const launcher = page.locator('.bk-chat-launcher');
     assert.deepEqual(await launcher.evaluate((element) => [element.offsetWidth, element.offsetHeight, getComputedStyle(element).backgroundColor, getComputedStyle(element).cursor]), [
